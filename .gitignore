@@ -1,0 +1,12 @@
+# Rust
+backend/target/
+
+# React
+frontend/node_modules/
+frontend/build/
+frontend/.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
