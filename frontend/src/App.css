@@ -406,7 +406,40 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
+
+.terminal-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: rgba(255,255,255,0.05);
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+
+.ssh-form {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.ssh-form input {
+  padding: 6px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 13px;
+  flex: 1;
+  min-width: 80px;
+}
+
+.ssh-form input:focus { outline: none; border-color: var(--primary); }
 
 .terminal-container {
   height: calc(100vh - 220px);

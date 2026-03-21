@@ -3,55 +3,69 @@ use actix_web::{get, web, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
 use std::os::unix::io::{FromRawFd, AsRawFd};
 use std::io::{Read, Write};
-use std::process::Command;
 use std::time::Duration;
 use crate::auth::TokenStore;
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
-const PTY_READ_INTERVAL: Duration = Duration::from_millis(50);
+const PTY_READ_INTERVAL: Duration = Duration::from_millis(30);
 
-/// WebSocket actor that bridges browser <-> PTY
 pub struct TerminalSession {
     master_fd: i32,
     master_file: std::fs::File,
     child_pid: nix::unistd::Pid,
 }
 
+struct ShellCommand {
+    program: String,
+    args: Vec<String>,
+}
+
+impl ShellCommand {
+    fn local_shell() -> Self {
+        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".into());
+        Self { program: shell, args: vec!["--login".into()] }
+    }
+
+    fn ssh(user: &str, host: &str, port: &str) -> Self {
+        Self {
+            program: "ssh".into(),
+            args: vec![
+                "-o".into(), "StrictHostKeyChecking=accept-new".into(),
+                "-o".into(), "ServerAliveInterval=30".into(),
+                "-p".into(), port.into(),
+                format!("{}@{}", user, host),
+            ],
+        }
+    }
+}
+
 impl TerminalSession {
-    fn new() -> Result<Self, String> {
-        // Open a PTY pair
+    fn new(cmd: ShellCommand) -> Result<Self, String> {
         let pty = nix::pty::openpty(None, None)
             .map_err(|e| format!("openpty failed: {}", e))?;
 
         let master_fd = pty.master.as_raw_fd();
         let slave_fd = pty.slave.as_raw_fd();
 
-        // Fork a child process
         match unsafe { nix::unistd::fork() } {
             Ok(nix::unistd::ForkResult::Child) => {
-                // Child: set up new session, attach to slave PTY, exec bash
                 drop(pty.master);
                 let _ = nix::unistd::setsid();
-
-                // Set controlling terminal
                 unsafe { libc::ioctl(slave_fd, libc::TIOCSCTTY, 0) };
 
-                // Redirect stdin/stdout/stderr to slave
                 let _ = nix::unistd::dup2(slave_fd, 0);
                 let _ = nix::unistd::dup2(slave_fd, 1);
                 let _ = nix::unistd::dup2(slave_fd, 2);
-
                 if slave_fd > 2 {
                     let _ = nix::unistd::close(slave_fd);
                 }
 
-                // Set TERM env
                 std::env::set_var("TERM", "xterm-256color");
+                std::env::set_var("COLORTERM", "truecolor");
+                std::env::set_var("LANG", "en_US.UTF-8");
 
-                // Exec shell
-                let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".into());
-                let _ = Command::new(&shell)
-                    .arg("--login")
+                let _ = std::process::Command::new(&cmd.program)
+                    .args(&cmd.args)
                     .stdin(unsafe { std::process::Stdio::from_raw_fd(0) })
                     .stdout(unsafe { std::process::Stdio::from_raw_fd(1) })
                     .stderr(unsafe { std::process::Stdio::from_raw_fd(2) })
@@ -60,10 +74,8 @@ impl TerminalSession {
                 std::process::exit(0);
             }
             Ok(nix::unistd::ForkResult::Parent { child }) => {
-                // Parent: close slave, use master
                 drop(pty.slave);
 
-                // Set master to non-blocking
                 let flags = nix::fcntl::fcntl(master_fd, nix::fcntl::FcntlArg::F_GETFL)
                     .map_err(|e| format!("fcntl get: {}", e))?;
                 let mut oflags = nix::fcntl::OFlag::from_bits_truncate(flags);
@@ -72,14 +84,9 @@ impl TerminalSession {
                     .map_err(|e| format!("fcntl set: {}", e))?;
 
                 let master_file = unsafe { std::fs::File::from_raw_fd(master_fd) };
-                // Forget pty.master so it doesn't close master_fd
                 std::mem::forget(pty.master);
 
-                Ok(Self {
-                    master_fd,
-                    master_file,
-                    child_pid: child,
-                })
+                Ok(Self { master_fd, master_file, child_pid: child })
             }
             Err(e) => Err(format!("fork failed: {}", e)),
         }
@@ -90,46 +97,35 @@ impl Actor for TerminalSession {
     type Context = ws::WebsocketContext<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        // Periodically read PTY output and send to WebSocket
+        // Read PTY output → WebSocket
         ctx.run_interval(PTY_READ_INTERVAL, |act, ctx| {
-            let mut buf = [0u8; 4096];
+            let mut buf = [0u8; 8192];
             loop {
                 match act.master_file.read(&mut buf) {
-                    Ok(0) => {
-                        ctx.stop();
-                        break;
-                    }
-                    Ok(n) => {
-                        ctx.binary(buf[..n].to_vec());
-                    }
+                    Ok(0) => { ctx.stop(); break; }
+                    Ok(n) => { ctx.binary(buf[..n].to_vec()); }
                     Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => break,
-                    Err(_) => {
-                        ctx.stop();
-                        break;
-                    }
+                    Err(_) => { ctx.stop(); break; }
                 }
             }
         });
 
-        // Heartbeat
         ctx.run_interval(HEARTBEAT_INTERVAL, |_act, ctx| {
             ctx.ping(b"");
         });
     }
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
-        // Kill the child process
         let _ = nix::sys::signal::kill(self.child_pid, nix::sys::signal::Signal::SIGHUP);
         let _ = nix::sys::wait::waitpid(self.child_pid, None);
     }
 }
 
-/// Handle incoming WebSocket messages
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for TerminalSession {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         match msg {
             Ok(ws::Message::Text(text)) => {
-                // Check for resize command: \x01RESIZE:cols:rows
+                // Resize: \x01RESIZE:cols:rows
                 if text.starts_with("\x01RESIZE:") {
                     let parts: Vec<&str> = text[8..].split(':').collect();
                     if parts.len() == 2 {
@@ -137,15 +133,18 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for TerminalSession {
                             parts[0].parse::<u16>(),
                             parts[1].parse::<u16>(),
                         ) {
-                            let ws = nix::pty::Winsize {
+                            let winsize = nix::pty::Winsize {
                                 ws_row: rows,
                                 ws_col: cols,
                                 ws_xpixel: 0,
                                 ws_ypixel: 0,
                             };
-                            unsafe {
-                                libc::ioctl(self.master_fd, libc::TIOCSWINSZ, &ws);
-                            }
+                            unsafe { libc::ioctl(self.master_fd, libc::TIOCSWINSZ, &winsize) };
+                            // Notify the shell of resize
+                            let _ = nix::sys::signal::kill(
+                                self.child_pid,
+                                nix::sys::signal::Signal::SIGWINCH,
+                            );
                         }
                     }
                     return;
@@ -162,24 +161,60 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for TerminalSession {
     }
 }
 
+fn parse_query_param<'a>(query: &'a str, key: &str) -> Option<String> {
+    query.split('&').find_map(|p| {
+        let mut kv = p.splitn(2, '=');
+        if kv.next() == Some(key) {
+            kv.next().map(|v| urlencoding_decode(v))
+        } else {
+            None
+        }
+    })
+}
+
+fn urlencoding_decode(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.bytes();
+    while let Some(b) = chars.next() {
+        if b == b'%' {
+            let h = chars.next().unwrap_or(b'0');
+            let l = chars.next().unwrap_or(b'0');
+            let val = hex_val(h) * 16 + hex_val(l);
+            result.push(val as char);
+        } else if b == b'+' {
+            result.push(' ');
+        } else {
+            result.push(b as char);
+        }
+    }
+    result
+}
+
+fn hex_val(b: u8) -> u8 {
+    match b {
+        b'0'..=b'9' => b - b'0',
+        b'a'..=b'f' => b - b'a' + 10,
+        b'A'..=b'F' => b - b'A' + 10,
+        _ => 0,
+    }
+}
+
+fn validate_ssh_input(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() < 256
+        && s.chars().all(|c| c.is_alphanumeric() || ".-_@:".contains(c))
+}
+
 #[get("/api/terminal")]
 async fn ws_terminal(
     req: HttpRequest,
     stream: web::Payload,
     store: web::Data<TokenStore>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    // Auth check via query param: ?token=xxx
-    let authenticated = req
-        .query_string()
-        .split('&')
-        .find_map(|p| {
-            let mut kv = p.splitn(2, '=');
-            if kv.next() == Some("token") {
-                kv.next().map(String::from)
-            } else {
-                None
-            }
-        })
+    let query = req.query_string();
+
+    // Auth via token query param
+    let authenticated = parse_query_param(query, "token")
         .map(|token| store.lock().unwrap().contains(&token))
         .unwrap_or(false);
 
@@ -189,7 +224,23 @@ async fn ws_terminal(
         ));
     }
 
-    match TerminalSession::new() {
+    // Determine mode: local shell or SSH
+    let cmd = if let Some(host) = parse_query_param(query, "ssh_host") {
+        let port = parse_query_param(query, "ssh_port").unwrap_or_else(|| "22".into());
+        let user = parse_query_param(query, "ssh_user").unwrap_or_else(|| "root".into());
+
+        if !validate_ssh_input(&host) || !validate_ssh_input(&port) || !validate_ssh_input(&user) {
+            return Ok(HttpResponse::BadRequest().json(
+                crate::models::ApiResponse::<()>::error("Invalid SSH parameters"),
+            ));
+        }
+
+        ShellCommand::ssh(&user, &host, &port)
+    } else {
+        ShellCommand::local_shell()
+    };
+
+    match TerminalSession::new(cmd) {
         Ok(session) => ws::start(session, &req, stream),
         Err(e) => Ok(HttpResponse::InternalServerError().json(
             crate::models::ApiResponse::<()>::error(&e),
