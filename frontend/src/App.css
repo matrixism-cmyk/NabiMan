@@ -398,3 +398,24 @@ body {
 
 .filter-input:focus { outline: none; border-color: var(--primary); }
 .text-secondary { color: var(--text-secondary); font-size: 12px; padding: 8px 0; }
+
+/* Terminal */
+.terminal-panel { padding-bottom: 0; }
+
+.terminal-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.terminal-container {
+  height: calc(100vh - 220px);
+  min-height: 400px;
+  background: var(--bg);
+  border-radius: 0 0 8px 8px;
+  padding: 4px;
+  overflow: hidden;
+}
+
+.terminal-container .xterm { height: 100%; }
+.terminal-container .xterm-viewport { overflow-y: auto !important; }

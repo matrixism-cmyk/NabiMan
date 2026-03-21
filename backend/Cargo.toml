@@ -14,3 +14,7 @@ sysinfo = "0.30"
 chrono = { version = "0.4", features = ["serde"] }
 sha2 = "0.10"
 hex = "0.4"
+actix-web-actors = "4"
+actix = "0.13"
+nix = { version = "0.29", features = ["term", "process", "fs", "signal", "ioctl"] }
+libc = "0.2"

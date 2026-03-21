@@ -7,9 +7,10 @@ import AccountsPanel from './components/AccountsPanel';
 import ConfigPanel from './components/ConfigPanel';
 import TrafficPanel from './components/TrafficPanel';
 import PackagesPanel from './components/PackagesPanel';
+import TerminalPanel from './components/TerminalPanel';
 import { clearToken } from './hooks/useApi';
 
-type Tab = 'server' | 'network' | 'accounts' | 'config' | 'traffic' | 'packages';
+type Tab = 'server' | 'network' | 'accounts' | 'config' | 'traffic' | 'packages' | 'terminal';
 
 const tabs: { key: Tab; label: string }[] = [
   { key: 'server', label: 'Server Status' },
@@ -18,6 +19,7 @@ const tabs: { key: Tab; label: string }[] = [
   { key: 'config', label: 'Config' },
   { key: 'traffic', label: 'Traffic' },
   { key: 'packages', label: 'Packages' },
+  { key: 'terminal', label: 'Terminal' },
 ];
 
 function App() {
@@ -58,6 +60,7 @@ function App() {
         {activeTab === 'config' && <ConfigPanel />}
         {activeTab === 'traffic' && <TrafficPanel />}
         {activeTab === 'packages' && <PackagesPanel />}
+        {activeTab === 'terminal' && <TerminalPanel />}
       </main>
     </div>
   );

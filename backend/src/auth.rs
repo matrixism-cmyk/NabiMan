@@ -68,7 +68,8 @@ pub async fn logout(
 pub fn check_auth(req: &ServiceRequest, store: &TokenStore) -> bool {
     let path = req.path();
 
-    if path == "/api/auth/login" || !path.starts_with("/api/") {
+    // Allow: login, terminal (auth via query param), and non-API paths
+    if path == "/api/auth/login" || path == "/api/terminal" || !path.starts_with("/api/") {
         return true;
     }
 

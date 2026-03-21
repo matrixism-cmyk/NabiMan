@@ -4,6 +4,7 @@ mod accounts;
 mod config_manager;
 mod traffic;
 mod packages;
+mod terminal;
 mod auth;
 mod models;
 
@@ -117,6 +118,7 @@ async fn main() -> std::io::Result<()> {
             .configure(config_manager::config)
             .configure(traffic::config)
             .configure(packages::config)
+            .configure(terminal::config)
             .service(
                 afs::Files::new("/", &static_dir)
                     .index_file("index.html")
