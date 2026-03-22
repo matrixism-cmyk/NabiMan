@@ -1,6 +1,168 @@
 import React, { useState } from 'react';
 import { useApi, apiPost, apiRequest } from '../hooks/useApi';
-import { RemoteServer, RemoteServerStatus } from '../types';
+import { RemoteServer, RemoteServerStatus, SshKeyInfo } from '../types';
+
+function SshKeyPanel() {
+  const { data: keyInfo, loading, refetch } = useApi<SshKeyInfo>('/api/remote-servers/ssh-key');
+  const [generating, setGenerating] = useState(false);
+  const [message, setMessage] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    const res = await apiPost<SshKeyInfo>('/api/remote-servers/ssh-key/generate', {});
+    setMessage(res.success ? 'SSH key generated' : res.message);
+    refetch();
+    setGenerating(false);
+  };
+
+  const handleCopy = () => {
+    if (keyInfo?.public_key) {
+      navigator.clipboard.writeText(keyInfo.public_key);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  if (loading) return <div className="loading">Loading SSH key info...</div>;
+
+  return (
+    <div className="config-section ssh-key-section">
+      <div className="config-header">
+        <h3>NabiMan SSH Key</h3>
+        <div className="config-meta">
+          <span className={`status-badge ${keyInfo?.exists ? 'up' : 'down'}`}>
+            {keyInfo?.exists ? 'Key exists' : 'No key'}
+          </span>
+        </div>
+        <div className="btn-group">
+          {!keyInfo?.exists && (
+            <button className="btn btn-primary btn-sm" onClick={handleGenerate} disabled={generating}>
+              {generating ? 'Generating...' : 'Generate Key'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
+
+      {keyInfo?.exists && keyInfo.public_key && (
+        <div style={{ padding: '8px 0' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Public Key</label>
+            <button className="btn btn-secondary btn-sm" onClick={handleCopy}>
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          <pre className="config-preview" style={{ fontSize: '11px', maxHeight: '60px', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
+            {keyInfo.public_key}
+          </pre>
+          {keyInfo.fingerprint && (
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+              Fingerprint: <code>{keyInfo.fingerprint}</code>
+            </div>
+          )}
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+            Path: <code>{keyInfo.key_path}</code>
+          </div>
+          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
+            Use the "Deploy Key" button on each server to automatically register this key,
+            or manually add it to the remote server's <code>~/.ssh/authorized_keys</code>.
+          </p>
+        </div>
+      )}
+
+      {!keyInfo?.exists && (
+        <p className="text-secondary">
+          No SSH key pair found. Click "Generate Key" to create an ed25519 key pair for NabiMan.
+          This key will be used for passwordless authentication to remote servers.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function DeployKeyDialog({ server, onClose }: { server: RemoteServer; onClose: () => void }) {
+  const [password, setPassword] = useState('');
+  const [deploying, setDeploying] = useState(false);
+  const [result, setResult] = useState('');
+  const [success, setSuccess] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [keyWorks, setKeyWorks] = useState<boolean | null>(null);
+
+  const handleDeploy = async () => {
+    if (!password) return;
+    setDeploying(true);
+    setResult('');
+    const res = await apiPost<string>(`/api/remote-servers/${server.id}/deploy-key`, { password });
+    setResult(res.success ? (res.data || 'Key deployed') : res.message);
+    setSuccess(res.success);
+    setDeploying(false);
+    if (res.success) setPassword('');
+  };
+
+  const handleTest = async () => {
+    setTesting(true);
+    const res = await apiPost<boolean>(`/api/remote-servers/${server.id}/test-key`, {});
+    setKeyWorks(res.success ? res.data : false);
+    setTesting(false);
+  };
+
+  return (
+    <div className="deploy-key-dialog">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <strong>Deploy Key to {server.name} ({server.user}@{server.host})</strong>
+        <button className="btn btn-secondary btn-sm" onClick={onClose}>Close</button>
+      </div>
+
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
+        <button className="btn btn-secondary btn-sm" onClick={handleTest} disabled={testing}>
+          {testing ? 'Testing...' : 'Test Key Auth'}
+        </button>
+        {keyWorks !== null && (
+          <span className={`status-badge ${keyWorks ? 'up' : 'down'}`}>
+            {keyWorks ? 'Key auth works!' : 'Key auth not working'}
+          </span>
+        )}
+      </div>
+
+      {keyWorks !== true && (
+        <>
+          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '8px 0' }}>
+            Enter the SSH password for <code>{server.user}@{server.host}</code> to deploy the public key automatically.
+            The password is used once for deployment and is not stored.
+          </p>
+          <div className="filter-row">
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="SSH password..."
+              className="filter-input"
+              style={{ flex: 1 }}
+              onKeyDown={e => e.key === 'Enter' && handleDeploy()}
+            />
+            <button className="btn btn-primary btn-sm" onClick={handleDeploy} disabled={deploying || !password}>
+              {deploying ? 'Deploying...' : 'Deploy Key'}
+            </button>
+          </div>
+        </>
+      )}
+
+      {result && (
+        <pre className="config-preview" style={{
+          marginTop: '8px',
+          maxHeight: '100px',
+          fontSize: '12px',
+          borderColor: success ? 'var(--success)' : 'var(--danger)',
+          whiteSpace: 'pre-wrap',
+        }}>
+          {result}
+        </pre>
+      )}
+    </div>
+  );
+}
 
 function AddServerForm({ onAdded }: { onAdded: () => void }) {
   const [name, setName] = useState('');
@@ -91,6 +253,7 @@ function ServerCard({
   const [execResult, setExecResult] = useState('');
   const [executing, setExecuting] = useState(false);
   const [showExec, setShowExec] = useState(false);
+  const [showDeploy, setShowDeploy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(server.name);
   const [editMemo, setEditMemo] = useState(server.memo);
@@ -164,6 +327,9 @@ function ServerCard({
                 {checking ? 'Checking...' : 'Check'}
               </button>
               <button className="btn btn-secondary btn-sm" onClick={() => onConnectSSH(server)}>SSH</button>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowDeploy(!showDeploy)}>
+                {showDeploy ? 'Hide Key' : 'Deploy Key'}
+              </button>
               <button className="btn btn-secondary btn-sm" onClick={() => setShowExec(!showExec)}>Exec</button>
               <button className="btn btn-secondary btn-sm" onClick={() => { setEditing(true); setEditName(server.name); setEditMemo(server.memo); setEditTags(server.tags.join(', ')); }}>Edit</button>
               <button className="btn btn-danger btn-sm" onClick={handleDelete}>Delete</button>
@@ -175,6 +341,8 @@ function ServerCard({
       {server.memo && !editing && (
         <div style={{ fontSize: '12px', color: 'var(--text-secondary)', padding: '2px 0' }}>{server.memo}</div>
       )}
+
+      {showDeploy && <DeployKeyDialog server={server} onClose={() => setShowDeploy(false)} />}
 
       {status && (
         <div className="server-status-grid">
@@ -220,6 +388,7 @@ function ServerCard({
 export default function RemoteServersPanel({ onConnectSSH }: { onConnectSSH?: (host: string, port: number, user: string) => void }) {
   const { data, loading, error, refetch } = useApi<RemoteServer[]>('/api/remote-servers');
   const [showAdd, setShowAdd] = useState(false);
+  const [showKeyPanel, setShowKeyPanel] = useState(false);
   const [filter, setFilter] = useState('');
   const [checkingAll, setCheckingAll] = useState(false);
   const [message, setMessage] = useState('');
@@ -273,6 +442,9 @@ export default function RemoteServersPanel({ onConnectSSH }: { onConnectSSH?: (h
           <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(!showAdd)}>
             {showAdd ? 'Close' : '+ Add Server'}
           </button>
+          <button className="btn btn-secondary btn-sm" onClick={() => setShowKeyPanel(!showKeyPanel)}>
+            {showKeyPanel ? 'Hide Key' : 'SSH Key'}
+          </button>
           <button className="btn btn-secondary btn-sm" onClick={handleCheckAll} disabled={checkingAll || servers.length === 0}>
             {checkingAll ? 'Checking...' : 'Check All'}
           </button>
@@ -281,6 +453,7 @@ export default function RemoteServersPanel({ onConnectSSH }: { onConnectSSH?: (h
 
       {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
 
+      {showKeyPanel && <SshKeyPanel />}
       {showAdd && <AddServerForm onAdded={() => { refetch(); setShowAdd(false); }} />}
 
       {servers.length > 3 && (
@@ -298,8 +471,7 @@ export default function RemoteServersPanel({ onConnectSSH }: { onConnectSSH?: (h
           <p>No remote servers registered.</p>
           <p>Click "+ Add Server" to register your first remote server.</p>
           <p style={{ fontSize: '12px', marginTop: '12px' }}>
-            SSH key authentication recommended. Ensure the NabiMan host's public key
-            is in the remote server's <code>~/.ssh/authorized_keys</code>.
+            Click "SSH Key" to generate a key pair, then "Deploy Key" on each server for passwordless auth.
           </p>
         </div>
       )}

@@ -323,6 +323,19 @@ pub struct RemoteExecRequest {
     pub command: String,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct SshKeyInfo {
+    pub exists: bool,
+    pub key_path: String,
+    pub public_key: Option<String>,
+    pub fingerprint: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct DeployKeyRequest {
+    pub password: String,
+}
+
 #[derive(Serialize)]
 pub struct ApiResponse<T: Serialize> {
     pub success: bool,

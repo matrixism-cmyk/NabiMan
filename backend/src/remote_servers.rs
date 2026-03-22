@@ -2,7 +2,7 @@ use actix_web::{web, HttpResponse};
 use std::fs;
 use std::process::Command;
 use crate::models::{
-    ApiResponse, RemoteServer, RemoteServerStatus,
+    ApiResponse, RemoteServer, RemoteServerStatus, SshKeyInfo, DeployKeyRequest,
     AddRemoteServerRequest, UpdateRemoteServerRequest, RemoteExecRequest,
 };
 
@@ -151,7 +151,255 @@ fn ssh_probe(server: &RemoteServer) -> RemoteServerStatus {
     }
 }
 
+// --- SSH Key helpers ---
+
+fn nabiman_key_dir() -> String {
+    let data_dir = data_dir_path();
+    format!("{}/ssh", data_dir)
+}
+
+fn nabiman_key_path() -> String {
+    format!("{}/nabiman_ed25519", nabiman_key_dir())
+}
+
+fn nabiman_pubkey_path() -> String {
+    format!("{}/nabiman_ed25519.pub", nabiman_key_dir())
+}
+
+fn ensure_ssh_key() -> Result<String, String> {
+    let pubkey_path = nabiman_pubkey_path();
+    let key_path = nabiman_key_path();
+
+    // Return existing public key if present
+    if let Ok(pubkey) = fs::read_to_string(&pubkey_path) {
+        if !pubkey.trim().is_empty() {
+            return Ok(pubkey.trim().to_string());
+        }
+    }
+
+    // Generate new key pair
+    let key_dir = nabiman_key_dir();
+    fs::create_dir_all(&key_dir).map_err(|e| format!("Cannot create dir: {}", e))?;
+
+    let output = Command::new("ssh-keygen")
+        .args([
+            "-t", "ed25519",
+            "-f", &key_path,
+            "-N", "",         // no passphrase
+            "-C", "nabiman@server-manager",
+        ])
+        .output()
+        .map_err(|e| format!("ssh-keygen failed: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("ssh-keygen error: {}", stderr));
+    }
+
+    // Set permissions
+    let _ = Command::new("chmod").args(["600", &key_path]).output();
+    let _ = Command::new("chmod").args(["644", &pubkey_path]).output();
+
+    fs::read_to_string(&pubkey_path)
+        .map(|s| s.trim().to_string())
+        .map_err(|e| format!("Cannot read pubkey: {}", e))
+}
+
+fn get_key_info() -> SshKeyInfo {
+    let key_path = nabiman_key_path();
+    let pubkey_path = nabiman_pubkey_path();
+
+    let exists = fs::metadata(&key_path).is_ok();
+    let public_key = fs::read_to_string(&pubkey_path).ok().map(|s| s.trim().to_string());
+
+    let fingerprint = if exists {
+        Command::new("ssh-keygen")
+            .args(["-lf", &pubkey_path])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+    } else {
+        None
+    };
+
+    SshKeyInfo {
+        exists,
+        key_path: key_path.clone(),
+        public_key,
+        fingerprint,
+    }
+}
+
+/// Deploy public key to a remote server using sshpass + ssh-copy-id,
+/// or manual append if sshpass is not available.
+fn deploy_key_to_server(server: &RemoteServer, password: &str) -> Result<String, String> {
+    let pubkey = ensure_ssh_key()?;
+    let port_str = server.port.to_string();
+    let target = format!("{}@{}", server.user, server.host);
+
+    // Try sshpass + ssh-copy-id first (cleanest)
+    let has_sshpass = Command::new("which").arg("sshpass").output()
+        .map(|o| o.status.success()).unwrap_or(false);
+
+    if has_sshpass {
+        let key_path = nabiman_pubkey_path();
+        let output = Command::new("sshpass")
+            .args([
+                "-p", password,
+                "ssh-copy-id",
+                "-i", &key_path,
+                "-o", "StrictHostKeyChecking=accept-new",
+                "-p", &port_str,
+                &target,
+            ])
+            .output()
+            .map_err(|e| format!("sshpass failed: {}", e))?;
+
+        if output.status.success() {
+            return Ok("Public key deployed via ssh-copy-id".into());
+        }
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("Permission denied") {
+            return Err("Password authentication failed".into());
+        }
+        // Fall through to manual method
+    }
+
+    // Manual method: pipe password to ssh and append to authorized_keys
+    // Use printf to pipe password, avoiding shell escaping issues
+    let remote_cmd = format!(
+        "mkdir -p ~/.ssh && chmod 700 ~/.ssh && \
+         echo '{}' >> ~/.ssh/authorized_keys && \
+         chmod 600 ~/.ssh/authorized_keys && \
+         sort -u -o ~/.ssh/authorized_keys ~/.ssh/authorized_keys",
+        pubkey.replace('\'', "'\\''")
+    );
+
+    let output = Command::new("sshpass")
+        .args([
+            "-p", password,
+            "ssh",
+            "-o", "StrictHostKeyChecking=accept-new",
+            "-p", &port_str,
+            &target,
+            &remote_cmd,
+        ])
+        .output();
+
+    match output {
+        Ok(result) if result.status.success() => {
+            Ok("Public key deployed via manual append".into())
+        }
+        Ok(result) => {
+            let stderr = String::from_utf8_lossy(&result.stderr);
+            if !has_sshpass {
+                // No sshpass available, give instructions
+                Err(format!(
+                    "sshpass not installed. Install it first:\n  apt install sshpass  (or)  yum install sshpass\n\n\
+                     Or manually copy the key:\n  ssh-copy-id -i {} -p {} {}",
+                    nabiman_pubkey_path(), port_str, target
+                ))
+            } else if stderr.contains("Permission denied") {
+                Err("Password authentication failed".into())
+            } else {
+                Err(format!("Deploy failed: {}", stderr.trim()))
+            }
+        }
+        Err(e) => {
+            if !has_sshpass {
+                Err(format!(
+                    "sshpass not installed. Install it first:\n  apt install sshpass  (or)  yum install sshpass\n\n\
+                     Or manually copy the key:\n  ssh-copy-id -i {} -p {} {}",
+                    nabiman_pubkey_path(), port_str, target
+                ))
+            } else {
+                Err(format!("Failed: {}", e))
+            }
+        }
+    }
+}
+
+/// Test if key auth already works for a server
+fn test_key_auth(server: &RemoteServer) -> bool {
+    let port_str = server.port.to_string();
+    let key_path = nabiman_key_path();
+
+    if fs::metadata(&key_path).is_err() {
+        return false;
+    }
+
+    Command::new("ssh")
+        .args([
+            "-i", &key_path,
+            "-o", "StrictHostKeyChecking=accept-new",
+            "-o", "ConnectTimeout=5",
+            "-o", "BatchMode=yes",
+            "-o", "PasswordAuthentication=no",
+            "-p", &port_str,
+            &format!("{}@{}", server.user, server.host),
+            "echo ok",
+        ])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
 // --- Handlers ---
+
+async fn get_ssh_key_info() -> HttpResponse {
+    let info = get_key_info();
+    HttpResponse::Ok().json(ApiResponse::ok(info))
+}
+
+async fn generate_ssh_key() -> HttpResponse {
+    match ensure_ssh_key() {
+        Ok(pubkey) => HttpResponse::Ok().json(ApiResponse::ok(SshKeyInfo {
+            exists: true,
+            key_path: nabiman_key_path(),
+            public_key: Some(pubkey),
+            fingerprint: Command::new("ssh-keygen")
+                .args(["-lf", &nabiman_pubkey_path()])
+                .output().ok()
+                .filter(|o| o.status.success())
+                .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()),
+        })),
+        Err(e) => HttpResponse::Ok().json(ApiResponse::<SshKeyInfo>::error(&e)),
+    }
+}
+
+async fn deploy_key(
+    path: web::Path<String>,
+    body: web::Json<DeployKeyRequest>,
+) -> HttpResponse {
+    let server_id = path.into_inner();
+    let servers = load_servers();
+    let srv = match servers.iter().find(|s| s.id == server_id) {
+        Some(s) => s,
+        None => return HttpResponse::Ok().json(ApiResponse::<String>::error("Server not found")),
+    };
+
+    if body.password.is_empty() {
+        return HttpResponse::Ok().json(ApiResponse::<String>::error("Password required"));
+    }
+
+    match deploy_key_to_server(srv, &body.password) {
+        Ok(msg) => HttpResponse::Ok().json(ApiResponse::ok(msg)),
+        Err(e) => HttpResponse::Ok().json(ApiResponse::<String>::error(&e)),
+    }
+}
+
+async fn test_key(path: web::Path<String>) -> HttpResponse {
+    let server_id = path.into_inner();
+    let servers = load_servers();
+    let srv = match servers.iter().find(|s| s.id == server_id) {
+        Some(s) => s,
+        None => return HttpResponse::Ok().json(ApiResponse::<bool>::error("Server not found")),
+    };
+
+    let works = test_key_auth(srv);
+    HttpResponse::Ok().json(ApiResponse::ok(works))
+}
 
 async fn list_servers() -> HttpResponse {
     let servers = load_servers();
@@ -350,10 +598,14 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         web::scope("/api/remote-servers")
             .route("", web::get().to(list_servers))
             .route("", web::post().to(add_server))
+            .route("/check-all", web::post().to(check_all_servers))
+            .route("/ssh-key", web::get().to(get_ssh_key_info))
+            .route("/ssh-key/generate", web::post().to(generate_ssh_key))
             .route("/{id}", web::put().to(update_server))
             .route("/{id}", web::delete().to(delete_server))
             .route("/{id}/check", web::post().to(check_server))
             .route("/{id}/exec", web::post().to(exec_on_server))
-            .route("/check-all", web::post().to(check_all_servers)),
+            .route("/{id}/deploy-key", web::post().to(deploy_key))
+            .route("/{id}/test-key", web::post().to(test_key)),
     );
 }

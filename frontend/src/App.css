@@ -472,6 +472,18 @@ body {
   padding: 8px 0;
 }
 
+.deploy-key-dialog {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  margin: 8px 0;
+}
+
+.ssh-key-section {
+  margin-bottom: 12px;
+}
+
 /* Select input */
 .select-input {
   padding: 8px 12px;

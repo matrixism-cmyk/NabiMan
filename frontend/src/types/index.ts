@@ -202,6 +202,14 @@ export interface RemoteServerStatus {
   checked_at: string;
 }
 
+// --- SSH Key types ---
+export interface SshKeyInfo {
+  exists: boolean;
+  key_path: string;
+  public_key?: string;
+  fingerprint?: string;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data: T | null;
