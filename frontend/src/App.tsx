@@ -12,14 +12,18 @@ import ServicesPanel from './components/ServicesPanel';
 import FirewallPanel from './components/FirewallPanel';
 import LogsPanel from './components/LogsPanel';
 import CronPanel from './components/CronPanel';
+import ProcessesPanel from './components/ProcessesPanel';
+import DisksPanel from './components/DisksPanel';
 import TerminalPanel from './components/TerminalPanel';
 import { clearToken } from './hooks/useApi';
 
 type Tab = 'server' | 'network' | 'accounts' | 'config' | 'traffic' | 'packages'
-  | 'containers' | 'services' | 'firewall' | 'logs' | 'cron' | 'terminal';
+  | 'containers' | 'services' | 'firewall' | 'logs' | 'cron' | 'processes' | 'disks' | 'terminal';
 
 const tabs: { key: Tab; label: string }[] = [
   { key: 'server', label: 'Server Status' },
+  { key: 'processes', label: 'Processes' },
+  { key: 'disks', label: 'Disks' },
   { key: 'network', label: 'Network' },
   { key: 'containers', label: 'Containers' },
   { key: 'services', label: 'Services' },
@@ -76,6 +80,8 @@ function App() {
         {activeTab === 'packages' && <PackagesPanel />}
         {activeTab === 'logs' && <LogsPanel />}
         {activeTab === 'cron' && <CronPanel />}
+        {activeTab === 'processes' && <ProcessesPanel />}
+        {activeTab === 'disks' && <DisksPanel />}
         {activeTab === 'terminal' && <TerminalPanel />}
       </main>
     </div>

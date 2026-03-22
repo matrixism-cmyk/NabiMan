@@ -58,6 +58,22 @@ pub struct DeleteAccountRequest {
     pub username: String,
 }
 
+// --- Config manager models (registry-based) ---
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ServiceDefinition {
+    pub id: String,
+    pub display_name: String,
+    pub config_paths: Vec<String>,
+    #[serde(skip_deserializing)]
+    pub systemd_names: Vec<String>,
+    #[serde(skip_deserializing)]
+    pub process_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_running: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config_found: Option<bool>,
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ServiceConfig {
     pub service_name: String,
@@ -68,8 +84,53 @@ pub struct ServiceConfig {
 
 #[derive(Deserialize)]
 pub struct UpdateConfigRequest {
-    pub service_name: String,
     pub content: String,
+}
+
+// --- Process models ---
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ProcessInfo {
+    pub pid: u32,
+    pub user: String,
+    pub cpu: f32,
+    pub memory: f32,
+    pub vsz: u64,
+    pub rss: u64,
+    pub command: String,
+    pub started: String,
+}
+
+#[derive(Deserialize)]
+pub struct KillProcessRequest {
+    pub pid: u32,
+    pub signal: Option<String>,
+}
+
+// --- Disk models ---
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DiskPartition {
+    pub filesystem: String,
+    pub mount_point: String,
+    pub fs_type: String,
+    pub total: u64,
+    pub used: u64,
+    pub available: u64,
+    pub use_percent: f32,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DiskIo {
+    pub device: String,
+    pub reads_per_sec: f64,
+    pub writes_per_sec: f64,
+    pub read_bytes_per_sec: u64,
+    pub write_bytes_per_sec: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DiskStatus {
+    pub partitions: Vec<DiskPartition>,
+    pub io: Vec<DiskIo>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

@@ -124,6 +124,51 @@ export interface CronJob {
   command: string;
 }
 
+// --- Config service definition ---
+export interface ServiceDefinition {
+  id: string;
+  display_name: string;
+  config_paths: string[];
+  is_running?: boolean;
+  config_found?: boolean;
+}
+
+// --- Process types ---
+export interface ProcessInfo {
+  pid: number;
+  user: string;
+  cpu: number;
+  memory: number;
+  vsz: number;
+  rss: number;
+  command: string;
+  started: string;
+}
+
+// --- Disk types ---
+export interface DiskPartition {
+  filesystem: string;
+  mount_point: string;
+  fs_type: string;
+  total: number;
+  used: number;
+  available: number;
+  use_percent: number;
+}
+
+export interface DiskIo {
+  device: string;
+  reads_per_sec: number;
+  writes_per_sec: number;
+  read_bytes_per_sec: number;
+  write_bytes_per_sec: number;
+}
+
+export interface DiskStatus {
+  partitions: DiskPartition[];
+  io: DiskIo[];
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data: T | null;
