@@ -1,166 +1,8 @@
 import React, { useState } from 'react';
 import { useApi, apiPost, apiRequest } from '../hooks/useApi';
-import { RemoteServer, RemoteServerStatus, SshKeyInfo } from '../types';
+import { RemoteServer, RemoteServerStatus } from '../types';
 import { useT } from '../i18n';
-
-function SshKeyPanel() {
-  const { t } = useT();
-  const { data: keyInfo, loading, refetch } = useApi<SshKeyInfo>('/api/remote-servers/ssh-key');
-  const [generating, setGenerating] = useState(false);
-  const [message, setMessage] = useState('');
-  const [copied, setCopied] = useState(false);
-
-  const handleGenerate = async () => {
-    setGenerating(true);
-    const res = await apiPost<SshKeyInfo>('/api/remote-servers/ssh-key/generate', {});
-    setMessage(res.success ? t('sshKey.generated') : res.message);
-    refetch();
-    setGenerating(false);
-  };
-
-  const handleCopy = () => {
-    if (keyInfo?.public_key) {
-      navigator.clipboard.writeText(keyInfo.public_key);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  if (loading) return <div className="loading">{t('common.loading')}</div>;
-
-  return (
-    <div className="config-section ssh-key-section">
-      <div className="config-header">
-        <h3>{t('sshKey.title')}</h3>
-        <div className="config-meta">
-          <span className={`status-badge ${keyInfo?.exists ? 'up' : 'down'}`}>
-            {keyInfo?.exists ? t('sshKey.exists') : t('sshKey.noKey')}
-          </span>
-        </div>
-        <div className="btn-group">
-          {!keyInfo?.exists && (
-            <button className="btn btn-primary btn-sm" onClick={handleGenerate} disabled={generating}>
-              {generating ? t('sshKey.generating') : t('sshKey.generate')}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
-
-      {keyInfo?.exists && keyInfo.public_key && (
-        <div style={{ padding: '8px 0' }}>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
-            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{t('sshKey.publicKey')}</label>
-            <button className="btn btn-secondary btn-sm" onClick={handleCopy}>
-              {copied ? t('sshKey.copied') : t('sshKey.copy')}
-            </button>
-          </div>
-          <pre className="config-preview" style={{ fontSize: '11px', maxHeight: '60px', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
-            {keyInfo.public_key}
-          </pre>
-          {keyInfo.fingerprint && (
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-              {t('sshKey.fingerprint')}: <code>{keyInfo.fingerprint}</code>
-            </div>
-          )}
-          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            {t('sshKey.path')}: <code>{keyInfo.key_path}</code>
-          </div>
-          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
-            {t('sshKey.deployHint')}
-          </p>
-        </div>
-      )}
-
-      {!keyInfo?.exists && (
-        <p className="text-secondary">{t('sshKey.noKeyHint')}</p>
-      )}
-    </div>
-  );
-}
-
-function DeployKeyDialog({ server, onClose }: { server: RemoteServer; onClose: () => void }) {
-  const { t } = useT();
-  const [password, setPassword] = useState('');
-  const [deploying, setDeploying] = useState(false);
-  const [result, setResult] = useState('');
-  const [success, setSuccess] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [keyWorks, setKeyWorks] = useState<boolean | null>(null);
-
-  const handleDeploy = async () => {
-    if (!password) return;
-    setDeploying(true);
-    setResult('');
-    const res = await apiPost<string>(`/api/remote-servers/${server.id}/deploy-key`, { password });
-    setResult(res.success ? (res.data || 'Key deployed') : res.message);
-    setSuccess(res.success);
-    setDeploying(false);
-    if (res.success) setPassword('');
-  };
-
-  const handleTest = async () => {
-    setTesting(true);
-    const res = await apiPost<boolean>(`/api/remote-servers/${server.id}/test-key`, {});
-    setKeyWorks(res.success ? res.data : false);
-    setTesting(false);
-  };
-
-  return (
-    <div className="deploy-key-dialog">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-        <strong>{t('deployKey.title')} {server.name} ({server.user}@{server.host})</strong>
-        <button className="btn btn-secondary btn-sm" onClick={onClose}>{t('common.close')}</button>
-      </div>
-
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
-        <button className="btn btn-secondary btn-sm" onClick={handleTest} disabled={testing}>
-          {testing ? t('deployKey.testing') : t('deployKey.testAuth')}
-        </button>
-        {keyWorks !== null && (
-          <span className={`status-badge ${keyWorks ? 'up' : 'down'}`}>
-            {keyWorks ? t('deployKey.authWorks') : t('deployKey.authNotWorking')}
-          </span>
-        )}
-      </div>
-
-      {keyWorks !== true && (
-        <>
-          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '8px 0' }}>
-            <code>{server.user}@{server.host}</code>{t('deployKey.passwordHint')}
-          </p>
-          <div className="filter-row">
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder={t('deployKey.passwordPlaceholder')}
-              className="filter-input"
-              style={{ flex: 1 }}
-              onKeyDown={e => e.key === 'Enter' && handleDeploy()}
-            />
-            <button className="btn btn-primary btn-sm" onClick={handleDeploy} disabled={deploying || !password}>
-              {deploying ? t('deployKey.deploying') : t('deployKey.deploy')}
-            </button>
-          </div>
-        </>
-      )}
-
-      {result && (
-        <pre className="config-preview" style={{
-          marginTop: '8px',
-          maxHeight: '100px',
-          fontSize: '12px',
-          borderColor: success ? 'var(--success)' : 'var(--danger)',
-          whiteSpace: 'pre-wrap',
-        }}>
-          {result}
-        </pre>
-      )}
-    </div>
-  );
-}
+import { SshKeyPanel, DeployKeyDialog } from './SshKeyComponents';
 
 function AddServerForm({ onAdded }: { onAdded: () => void }) {
   const { t } = useT();
@@ -179,19 +21,13 @@ function AddServerForm({ onAdded }: { onAdded: () => void }) {
     if (!name.trim() || !host.trim()) return;
     setSaving(true);
     const res = await apiPost<RemoteServer>('/api/remote-servers', {
-      name: name.trim(),
-      host: host.trim(),
-      port: parseInt(port) || 22,
-      user: user.trim() || 'root',
-      auth_method: authMethod,
+      name: name.trim(), host: host.trim(), port: parseInt(port) || 22,
+      user: user.trim() || 'root', auth_method: authMethod,
       tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [],
       memo: memo.trim(),
     });
     setMessage(res.success ? t('remote.serverAdded') : res.message);
-    if (res.success) {
-      setName(''); setHost(''); setPort('22'); setUser('root'); setTags(''); setMemo('');
-      onAdded();
-    }
+    if (res.success) { setName(''); setHost(''); setPort('22'); setUser('root'); setTags(''); setMemo(''); onAdded(); }
     setSaving(false);
   };
 
@@ -200,52 +36,30 @@ function AddServerForm({ onAdded }: { onAdded: () => void }) {
       <h3>{t('remote.addRemoteServer')}</h3>
       {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
       <div className="form-grid">
-        <div className="form-group">
-          <label>{t('common.name')} *</label>
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="Production Web" required className="filter-input" />
-        </div>
-        <div className="form-group">
-          <label>{t('remote.host')} *</label>
-          <input value={host} onChange={e => setHost(e.target.value)} placeholder="192.168.1.100" required className="filter-input" />
-        </div>
-        <div className="form-group">
-          <label>{t('remote.port')}</label>
-          <input value={port} onChange={e => setPort(e.target.value)} type="number" className="filter-input" />
-        </div>
-        <div className="form-group">
-          <label>{t('remote.user')}</label>
-          <input value={user} onChange={e => setUser(e.target.value)} placeholder="root" className="filter-input" />
-        </div>
-        <div className="form-group">
-          <label>{t('remote.auth')}</label>
+        <div className="form-group"><label>{t('common.name')} *</label>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="Production Web" required className="filter-input" /></div>
+        <div className="form-group"><label>{t('remote.host')} *</label>
+          <input value={host} onChange={e => setHost(e.target.value)} placeholder="192.168.1.100" required className="filter-input" /></div>
+        <div className="form-group"><label>{t('remote.port')}</label>
+          <input value={port} onChange={e => setPort(e.target.value)} type="number" className="filter-input" /></div>
+        <div className="form-group"><label>{t('remote.user')}</label>
+          <input value={user} onChange={e => setUser(e.target.value)} placeholder="root" className="filter-input" /></div>
+        <div className="form-group"><label>{t('remote.auth')}</label>
           <select value={authMethod} onChange={e => setAuthMethod(e.target.value)} className="select-input">
-            <option value="key">{t('remote.sshKey')}</option>
-            <option value="password">{t('accounts.password')}</option>
-          </select>
-        </div>
-        <div className="form-group">
-          <label>{t('remote.tags')}</label>
-          <input value={tags} onChange={e => setTags(e.target.value)} placeholder="web, production" className="filter-input" />
-        </div>
-        <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-          <label>{t('remote.memo')}</label>
-          <input value={memo} onChange={e => setMemo(e.target.value)} placeholder="..." className="filter-input" />
-        </div>
+            <option value="key">{t('remote.sshKey')}</option><option value="password">{t('accounts.password')}</option>
+          </select></div>
+        <div className="form-group"><label>{t('remote.tags')}</label>
+          <input value={tags} onChange={e => setTags(e.target.value)} placeholder="web, production" className="filter-input" /></div>
+        <div className="form-group" style={{ gridColumn: '1 / -1' }}><label>{t('remote.memo')}</label>
+          <input value={memo} onChange={e => setMemo(e.target.value)} placeholder="..." className="filter-input" /></div>
       </div>
       <button type="submit" className="btn btn-primary" disabled={saving}>
-        {saving ? t('remote.adding') : t('remote.addServer')}
-      </button>
+        {saving ? t('remote.adding') : t('remote.addServer')}</button>
     </form>
   );
 }
 
-function ServerCard({
-  server, onRefresh, onConnectSSH
-}: {
-  server: RemoteServer;
-  onRefresh: () => void;
-  onConnectSSH: (server: RemoteServer) => void;
-}) {
+function ServerCard({ server, onRefresh, onConnectSSH }: { server: RemoteServer; onRefresh: () => void; onConnectSSH: (server: RemoteServer) => void }) {
   const { t } = useT();
   const [status, setStatus] = useState<RemoteServerStatus | null>(null);
   const [checking, setChecking] = useState(false);
@@ -259,40 +73,10 @@ function ServerCard({
   const [editMemo, setEditMemo] = useState(server.memo);
   const [editTags, setEditTags] = useState(server.tags.join(', '));
 
-  const handleCheck = async () => {
-    setChecking(true);
-    const res = await apiPost<RemoteServerStatus>(`/api/remote-servers/${server.id}/check`, {});
-    if (res.success && res.data) setStatus(res.data);
-    setChecking(false);
-  };
-
-  const handleDelete = async () => {
-    if (!window.confirm(`Delete server "${server.name}" (${server.host})?`)) return;
-    await apiRequest(`/api/remote-servers/${server.id}`, { method: 'DELETE' });
-    onRefresh();
-  };
-
-  const handleExec = async () => {
-    if (!execCmd.trim()) return;
-    setExecuting(true);
-    const res = await apiPost<string>(`/api/remote-servers/${server.id}/exec`, { command: execCmd });
-    setExecResult(res.success ? (res.data || '') : `Error: ${res.message}`);
-    setExecuting(false);
-  };
-
-  const handleSaveEdit = async () => {
-    await apiRequest(`/api/remote-servers/${server.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: editName,
-        memo: editMemo,
-        tags: editTags.split(',').map(t => t.trim()).filter(Boolean),
-      }),
-    });
-    setEditing(false);
-    onRefresh();
-  };
+  const handleCheck = async () => { setChecking(true); const res = await apiPost<RemoteServerStatus>(`/api/remote-servers/${server.id}/check`, {}); if (res.success && res.data) setStatus(res.data); setChecking(false); };
+  const handleDelete = async () => { if (!window.confirm(`Delete "${server.name}"?`)) return; await apiRequest(`/api/remote-servers/${server.id}`, { method: 'DELETE' }); onRefresh(); };
+  const handleExec = async () => { if (!execCmd.trim()) return; setExecuting(true); const res = await apiPost<string>(`/api/remote-servers/${server.id}/exec`, { command: execCmd }); setExecResult(res.success ? (res.data || '') : `Error: ${res.message}`); setExecuting(false); };
+  const handleSaveEdit = async () => { await apiRequest(`/api/remote-servers/${server.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: editName, memo: editMemo, tags: editTags.split(',').map(t => t.trim()).filter(Boolean) }) }); setEditing(false); onRefresh(); };
 
   const statusColor = server.status === 'online' ? 'up' : server.status === 'offline' ? 'down' : '';
 
@@ -311,25 +95,15 @@ function ServerCard({
           <>
             <h3>{server.name}</h3>
             <div className="config-meta">
-              <span className={`status-badge ${statusColor}`}>
-                {server.status || t('common.unknown')}
-              </span>
+              <span className={`status-badge ${statusColor}`}>{server.status || t('common.unknown')}</span>
               <code>{server.user}@{server.host}:{server.port}</code>
-              <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                {server.auth_method === 'key' ? t('remote.sshKey') : t('accounts.password')}
-              </span>
-              {server.tags.length > 0 && server.tags.map(tag => (
-                <span key={tag} className="tag-badge">{tag}</span>
-              ))}
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{server.auth_method === 'key' ? t('remote.sshKey') : t('accounts.password')}</span>
+              {server.tags.map(tag => <span key={tag} className="tag-badge">{tag}</span>)}
             </div>
             <div className="btn-group">
-              <button className="btn btn-primary btn-sm" onClick={handleCheck} disabled={checking}>
-                {checking ? t('remote.checking') : t('remote.check')}
-              </button>
+              <button className="btn btn-primary btn-sm" onClick={handleCheck} disabled={checking}>{checking ? t('remote.checking') : t('remote.check')}</button>
               <button className="btn btn-secondary btn-sm" onClick={() => onConnectSSH(server)}>SSH</button>
-              <button className="btn btn-secondary btn-sm" onClick={() => setShowDeploy(!showDeploy)}>
-                {showDeploy ? t('remote.hideKey') : t('remote.deployKey')}
-              </button>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowDeploy(!showDeploy)}>{showDeploy ? t('remote.hideKey') : t('remote.deployKey')}</button>
               <button className="btn btn-secondary btn-sm" onClick={() => setShowExec(!showExec)}>{t('remote.exec')}</button>
               <button className="btn btn-secondary btn-sm" onClick={() => { setEditing(true); setEditName(server.name); setEditMemo(server.memo); setEditTags(server.tags.join(', ')); }}>{t('common.edit')}</button>
               <button className="btn btn-danger btn-sm" onClick={handleDelete}>{t('common.delete')}</button>
@@ -337,13 +111,8 @@ function ServerCard({
           </>
         )}
       </div>
-
-      {server.memo && !editing && (
-        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', padding: '2px 0' }}>{server.memo}</div>
-      )}
-
+      {server.memo && !editing && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', padding: '2px 0' }}>{server.memo}</div>}
       {showDeploy && <DeployKeyDialog server={server} onClose={() => setShowDeploy(false)} />}
-
       {status && (
         <div className="server-status-grid">
           <div className="status-item"><label>{t('remote.hostname')}</label><span>{status.hostname}</span></div>
@@ -356,31 +125,16 @@ function ServerCard({
           <div className="status-item"><label>{t('remote.checked')}</label><span>{status.checked_at}</span></div>
         </div>
       )}
-
       {showExec && (
         <div className="exec-area">
           <div className="filter-row">
-            <input
-              value={execCmd}
-              onChange={e => setExecCmd(e.target.value)}
-              placeholder={t('remote.execPlaceholder')}
-              className="filter-input"
-              style={{ flex: 1 }}
-              onKeyDown={e => e.key === 'Enter' && handleExec()}
-            />
-            <button className="btn btn-primary btn-sm" onClick={handleExec} disabled={executing}>
-              {executing ? t('common.running') : t('common.run')}
-            </button>
+            <input value={execCmd} onChange={e => setExecCmd(e.target.value)} placeholder={t('remote.execPlaceholder')} className="filter-input" style={{ flex: 1 }} onKeyDown={e => e.key === 'Enter' && handleExec()} />
+            <button className="btn btn-primary btn-sm" onClick={handleExec} disabled={executing}>{executing ? t('common.running') : t('common.run')}</button>
           </div>
           {execResult && <pre className="config-preview" style={{ maxHeight: '200px' }}>{execResult}</pre>}
         </div>
       )}
-
-      {server.last_checked && !status && (
-        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '2px 0' }}>
-          {t('remote.lastChecked')}: {server.last_checked}
-        </div>
-      )}
+      {server.last_checked && !status && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '2px 0' }}>{t('remote.lastChecked')}: {server.last_checked}</div>}
     </div>
   );
 }
@@ -395,24 +149,14 @@ export default function RemoteServersPanel({ onConnectSSH }: { onConnectSSH?: (h
   const [message, setMessage] = useState('');
 
   const handleCheckAll = async () => {
-    setCheckingAll(true);
-    setMessage(t('remote.checkingAll'));
+    setCheckingAll(true); setMessage(t('remote.checkingAll'));
     const res = await apiPost<RemoteServerStatus[]>('/api/remote-servers/check-all', {});
-    if (res.success && res.data) {
-      const online = res.data.filter(s => s.status === 'online').length;
-      setMessage(`${online}/${res.data.length} ${t('common.online')}`);
-    } else {
-      setMessage(res.message);
-    }
-    setCheckingAll(false);
-    refetch();
+    if (res.success && res.data) { setMessage(`${res.data.filter(s => s.status === 'online').length}/${res.data.length} ${t('common.online')}`); }
+    else { setMessage(res.message); }
+    setCheckingAll(false); refetch();
   };
 
-  const handleConnectSSH = (server: RemoteServer) => {
-    if (onConnectSSH) {
-      onConnectSSH(server.host, server.port, server.user);
-    }
-  };
+  const handleConnectSSH = (server: RemoteServer) => { if (onConnectSSH) onConnectSSH(server.host, server.port, server.user); };
 
   if (loading) return <div className="panel loading">{t('common.loading')}</div>;
   if (error) return <div className="panel error">{t('common.error')}: {error}</div>;
@@ -421,12 +165,8 @@ export default function RemoteServersPanel({ onConnectSSH }: { onConnectSSH?: (h
   const filtered = servers.filter(s => {
     if (!filter) return true;
     const q = filter.toLowerCase();
-    return s.name.toLowerCase().includes(q)
-      || s.host.toLowerCase().includes(q)
-      || s.tags.some(t => t.toLowerCase().includes(q))
-      || s.memo.toLowerCase().includes(q);
+    return s.name.toLowerCase().includes(q) || s.host.toLowerCase().includes(q) || s.tags.some(t => t.toLowerCase().includes(q)) || s.memo.toLowerCase().includes(q);
   });
-
   const onlineCount = servers.filter(s => s.status === 'online').length;
   const offlineCount = servers.filter(s => s.status === 'offline').length;
 
@@ -440,51 +180,22 @@ export default function RemoteServersPanel({ onConnectSSH }: { onConnectSSH?: (h
           <span className="text-secondary">{servers.length} {t('remote.total')}</span>
         </div>
         <div className="btn-group">
-          <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(!showAdd)}>
-            {showAdd ? t('common.close') : t('remote.addServer')}
-          </button>
-          <button className="btn btn-secondary btn-sm" onClick={() => setShowKeyPanel(!showKeyPanel)}>
-            {showKeyPanel ? t('remote.hideKey') : t('remote.sshKey')}
-          </button>
-          <button className="btn btn-secondary btn-sm" onClick={handleCheckAll} disabled={checkingAll || servers.length === 0}>
-            {checkingAll ? t('remote.checking') : t('remote.checkAll')}
-          </button>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(!showAdd)}>{showAdd ? t('common.close') : t('remote.addServer')}</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => setShowKeyPanel(!showKeyPanel)}>{showKeyPanel ? t('remote.hideKey') : t('remote.sshKey')}</button>
+          <button className="btn btn-secondary btn-sm" onClick={handleCheckAll} disabled={checkingAll || servers.length === 0}>{checkingAll ? t('remote.checking') : t('remote.checkAll')}</button>
         </div>
       </div>
-
       {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
-
       {showKeyPanel && <SshKeyPanel />}
       {showAdd && <AddServerForm onAdded={() => { refetch(); setShowAdd(false); }} />}
-
-      {servers.length > 3 && (
-        <input
-          value={filter}
-          onChange={e => setFilter(e.target.value)}
-          placeholder={t('remote.filterPlaceholder')}
-          className="filter-input"
-          style={{ marginBottom: '8px' }}
-        />
-      )}
-
+      {servers.length > 3 && <input value={filter} onChange={e => setFilter(e.target.value)} placeholder={t('remote.filterPlaceholder')} className="filter-input" style={{ marginBottom: '8px' }} />}
       {filtered.length === 0 && servers.length === 0 && (
         <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-secondary)' }}>
-          <p>{t('remote.noServers')}</p>
-          <p>{t('remote.noServersHint')}</p>
-          <p style={{ fontSize: '12px', marginTop: '12px' }}>
-            {t('remote.noServersKeyHint')}
-          </p>
+          <p>{t('remote.noServers')}</p><p>{t('remote.noServersHint')}</p>
+          <p style={{ fontSize: '12px', marginTop: '12px' }}>{t('remote.noServersKeyHint')}</p>
         </div>
       )}
-
-      {filtered.map(server => (
-        <ServerCard
-          key={server.id}
-          server={server}
-          onRefresh={refetch}
-          onConnectSSH={handleConnectSSH}
-        />
-      ))}
+      {filtered.map(server => <ServerCard key={server.id} server={server} onRefresh={refetch} onConnectSSH={handleConnectSSH} />)}
     </div>
   );
 }

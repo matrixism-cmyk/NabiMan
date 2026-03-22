@@ -2,6 +2,7 @@ mod server_status;
 mod network;
 mod accounts;
 mod config_manager;
+mod service_registry;
 mod traffic;
 mod packages;
 mod terminal;
@@ -13,6 +14,7 @@ mod cron;
 mod processes;
 mod disks;
 mod remote_servers;
+mod ssh_keys;
 mod auth;
 mod models;
 

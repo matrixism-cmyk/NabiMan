@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './App.css';
+import './components.css';
 import LoginScreen from './components/LoginScreen';
 import ServerStatusPanel from './components/ServerStatusPanel';
 import NetworkPanel from './components/NetworkPanel';
