@@ -63,6 +63,67 @@ export interface TrafficSummary {
   };
 }
 
+// --- Container types ---
+export interface Container {
+  id: string;
+  name: string;
+  image: string;
+  status: string;
+  state: string;
+  ports: string;
+  created: string;
+}
+
+export interface ContainerImage {
+  id: string;
+  repository: string;
+  tag: string;
+  size: string;
+  created: string;
+}
+
+// --- Service types ---
+export interface SystemService {
+  name: string;
+  description: string;
+  load_state: string;
+  active_state: string;
+  sub_state: string;
+  enabled: boolean;
+}
+
+// --- Firewall types ---
+export interface FirewallStatus {
+  backend: string;
+  active: boolean;
+  rules: FirewallRule[];
+}
+
+export interface FirewallRule {
+  number: number;
+  action: string;
+  protocol: string;
+  port: string;
+  source: string;
+  destination: string;
+}
+
+// --- Log types ---
+export interface LogEntry {
+  timestamp: string;
+  unit: string;
+  priority: string;
+  message: string;
+}
+
+// --- Cron types ---
+export interface CronJob {
+  id: number;
+  user: string;
+  schedule: string;
+  command: string;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data: T | null;

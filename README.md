@@ -10,10 +10,15 @@ Linux 서버를 웹 브라우저에서 통합 관리하는 대시보드.
 |------|------|
 | **서버 상태** | CPU, 메모리, 디스크 사용률, Uptime, Load Average 실시간 모니터링 |
 | **네트워크** | 인터페이스 목록, IP/MAC, RX/TX 트래픽, DNS 서버, 연결 수 |
+| **컨테이너 관리** | Docker 컨테이너 목록, 시작/중지/재시작/삭제, 로그 조회, 이미지 관리 |
+| **서비스 관리** | systemd 서비스 목록, 시작/중지/재시작, enable/disable, 상태 필터링 |
+| **방화벽 관리** | ufw/firewalld/iptables 자동 감지, 규칙 조회/추가/삭제, 포트 관리 |
 | **계정 관리** | 시스템 계정 조회, 생성, 삭제, 비밀번호 변경, 접속 상태 확인 |
 | **설정 관리** | Apache/Tomcat 설정 파일 웹 에디터, 자동 백업, 서비스 재시작 |
 | **트래픽 모니터** | 인터페이스별 실시간 RX/TX 속도, TCP 연결 상태(ESTABLISHED/LISTEN/TIME_WAIT) |
 | **패키지 관리** | 설치된 패키지 목록, 검색, 설치, 제거 (apt/yum/dnf 자동 감지) |
+| **로그 뷰어** | journalctl 기반, 유닛/우선순위 필터, 자동 갱신, 키워드 검색 |
+| **스케줄 작업** | cron 작업 목록, 추가/삭제, 사용자별 관리 |
 | **웹 터미널** | xterm.js 기반 풀 터미널, 256색/Truecolor, 복사/붙여넣기, 폰트 크기 조절 |
 | **SSH 접속** | 웹 터미널에서 원격 서버 SSH 접속 (host, port, user 지정) |
 | **인증** | 토큰 기반 로그인, 모든 API 보호 |
@@ -34,6 +39,11 @@ NabiMan/
 │       ├── config_manager.rs # Apache/Tomcat 설정 관리 API
 │       ├── traffic.rs        # 트래픽 모니터링 API
 │       ├── packages.rs       # 패키지 관리 API
+│       ├── containers.rs     # Docker 컨테이너 관리 API
+│       ├── services.rs       # systemd 서비스 관리 API
+│       ├── firewall.rs       # 방화벽 관리 API (ufw/firewalld/iptables)
+│       ├── logs.rs           # 시스템 로그 조회 API (journalctl)
+│       ├── cron.rs           # Cron 스케줄 작업 관리 API
 │       └── terminal.rs       # WebSocket 터미널 (PTY + SSH)
 └── frontend/                 # React (TypeScript)
     ├── package.json
@@ -50,6 +60,11 @@ NabiMan/
             ├── ConfigPanel.tsx       # 설정 에디터
             ├── TrafficPanel.tsx      # 트래픽 모니터
             ├── PackagesPanel.tsx     # 패키지 관리
+            ├── ContainersPanel.tsx   # 컨테이너 관리
+            ├── ServicesPanel.tsx     # 서비스 관리
+            ├── FirewallPanel.tsx     # 방화벽 관리
+            ├── LogsPanel.tsx        # 로그 뷰어
+            ├── CronPanel.tsx        # 스케줄 작업
             └── TerminalPanel.tsx     # 웹 터미널 + SSH
 ```
 
@@ -148,6 +163,44 @@ NABIMAN_PASSWORD=mypassword ./target/release/nabiman-server
 | POST | `/api/packages/search` | 패키지 검색 |
 | POST | `/api/packages/install` | 패키지 설치 |
 | POST | `/api/packages/remove` | 패키지 제거 |
+
+### 컨테이너
+| Method | Path | 설명 |
+|--------|------|------|
+| GET | `/api/containers` | 컨테이너 목록 |
+| GET | `/api/containers/images` | 이미지 목록 |
+| POST | `/api/containers/start` | 컨테이너 시작 |
+| POST | `/api/containers/stop` | 컨테이너 중지 |
+| POST | `/api/containers/restart` | 컨테이너 재시작 |
+| POST | `/api/containers/remove` | 컨테이너 삭제 |
+| POST | `/api/containers/logs` | 컨테이너 로그 조회 |
+| POST | `/api/containers/images/remove` | 이미지 삭제 |
+
+### 서비스
+| Method | Path | 설명 |
+|--------|------|------|
+| GET | `/api/services` | systemd 서비스 목록 |
+| POST | `/api/services/action` | 서비스 제어 (start/stop/restart/enable/disable) |
+
+### 방화벽
+| Method | Path | 설명 |
+|--------|------|------|
+| GET | `/api/firewall/status` | 방화벽 상태 + 규칙 목록 |
+| POST | `/api/firewall/add` | 규칙 추가 |
+| POST | `/api/firewall/delete` | 규칙 삭제 |
+
+### 로그
+| Method | Path | 설명 |
+|--------|------|------|
+| POST | `/api/logs` | 로그 조회 (unit, priority, lines 필터) |
+| GET | `/api/logs/units` | 사용 가능한 유닛 목록 |
+
+### 스케줄 작업
+| Method | Path | 설명 |
+|--------|------|------|
+| GET | `/api/cron` | Cron 작업 목록 |
+| POST | `/api/cron/add` | Cron 작업 추가 |
+| POST | `/api/cron/delete` | Cron 작업 삭제 |
 
 ### 터미널
 | Method | Path | 설명 |

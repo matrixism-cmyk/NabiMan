@@ -81,6 +81,118 @@ pub struct TrafficSnapshot {
     pub interface: String,
 }
 
+// --- Container models ---
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Container {
+    pub id: String,
+    pub name: String,
+    pub image: String,
+    pub status: String,
+    pub state: String,
+    pub ports: String,
+    pub created: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ContainerImage {
+    pub id: String,
+    pub repository: String,
+    pub tag: String,
+    pub size: String,
+    pub created: String,
+}
+
+#[derive(Deserialize)]
+pub struct ContainerActionRequest {
+    pub id: String,
+}
+
+// --- Service models ---
+#[derive(Serialize, Deserialize, Clone)]
+pub struct SystemService {
+    pub name: String,
+    pub description: String,
+    pub load_state: String,
+    pub active_state: String,
+    pub sub_state: String,
+    pub enabled: bool,
+}
+
+#[derive(Deserialize)]
+pub struct ServiceActionRequest {
+    pub name: String,
+    pub action: String,
+}
+
+// --- Firewall models ---
+#[derive(Serialize, Deserialize, Clone)]
+pub struct FirewallStatus {
+    pub backend: String,
+    pub active: bool,
+    pub rules: Vec<FirewallRule>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct FirewallRule {
+    pub number: u32,
+    pub action: String,
+    pub protocol: String,
+    pub port: String,
+    pub source: String,
+    pub destination: String,
+}
+
+#[derive(Deserialize)]
+pub struct FirewallAddRuleRequest {
+    pub port: String,
+    pub protocol: String,
+    pub action: String,
+}
+
+#[derive(Deserialize)]
+pub struct FirewallDeleteRuleRequest {
+    pub number: u32,
+}
+
+// --- Log models ---
+#[derive(Serialize, Deserialize, Clone)]
+pub struct LogEntry {
+    pub timestamp: String,
+    pub unit: String,
+    pub priority: String,
+    pub message: String,
+}
+
+#[derive(Deserialize)]
+pub struct LogQueryRequest {
+    pub unit: Option<String>,
+    pub lines: Option<u32>,
+    pub priority: Option<String>,
+    pub since: Option<String>,
+}
+
+// --- Cron models ---
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CronJob {
+    pub id: u32,
+    pub user: String,
+    pub schedule: String,
+    pub command: String,
+}
+
+#[derive(Deserialize)]
+pub struct CreateCronRequest {
+    pub user: String,
+    pub schedule: String,
+    pub command: String,
+}
+
+#[derive(Deserialize)]
+pub struct DeleteCronRequest {
+    pub user: String,
+    pub id: u32,
+}
+
 #[derive(Serialize)]
 pub struct ApiResponse<T: Serialize> {
     pub success: bool,

@@ -7,18 +7,29 @@ import AccountsPanel from './components/AccountsPanel';
 import ConfigPanel from './components/ConfigPanel';
 import TrafficPanel from './components/TrafficPanel';
 import PackagesPanel from './components/PackagesPanel';
+import ContainersPanel from './components/ContainersPanel';
+import ServicesPanel from './components/ServicesPanel';
+import FirewallPanel from './components/FirewallPanel';
+import LogsPanel from './components/LogsPanel';
+import CronPanel from './components/CronPanel';
 import TerminalPanel from './components/TerminalPanel';
 import { clearToken } from './hooks/useApi';
 
-type Tab = 'server' | 'network' | 'accounts' | 'config' | 'traffic' | 'packages' | 'terminal';
+type Tab = 'server' | 'network' | 'accounts' | 'config' | 'traffic' | 'packages'
+  | 'containers' | 'services' | 'firewall' | 'logs' | 'cron' | 'terminal';
 
 const tabs: { key: Tab; label: string }[] = [
   { key: 'server', label: 'Server Status' },
   { key: 'network', label: 'Network' },
+  { key: 'containers', label: 'Containers' },
+  { key: 'services', label: 'Services' },
+  { key: 'firewall', label: 'Firewall' },
   { key: 'accounts', label: 'Accounts' },
   { key: 'config', label: 'Config' },
   { key: 'traffic', label: 'Traffic' },
   { key: 'packages', label: 'Packages' },
+  { key: 'logs', label: 'Logs' },
+  { key: 'cron', label: 'Cron' },
   { key: 'terminal', label: 'Terminal' },
 ];
 
@@ -56,10 +67,15 @@ function App() {
       <main className="main-content">
         {activeTab === 'server' && <ServerStatusPanel />}
         {activeTab === 'network' && <NetworkPanel />}
+        {activeTab === 'containers' && <ContainersPanel />}
+        {activeTab === 'services' && <ServicesPanel />}
+        {activeTab === 'firewall' && <FirewallPanel />}
         {activeTab === 'accounts' && <AccountsPanel />}
         {activeTab === 'config' && <ConfigPanel />}
         {activeTab === 'traffic' && <TrafficPanel />}
         {activeTab === 'packages' && <PackagesPanel />}
+        {activeTab === 'logs' && <LogsPanel />}
+        {activeTab === 'cron' && <CronPanel />}
         {activeTab === 'terminal' && <TerminalPanel />}
       </main>
     </div>
