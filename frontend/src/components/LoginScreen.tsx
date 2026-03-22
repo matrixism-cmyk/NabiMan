@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { setToken } from '../hooks/useApi';
+import { useT, LANG_LABELS, Lang } from '../i18n';
 
 interface Props {
   onLogin: () => void;
 }
 
 export default function LoginScreen({ onLogin }: Props) {
+  const { t, lang, setLang } = useT();
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,10 +29,10 @@ export default function LoginScreen({ onLogin }: Props) {
         setToken(json.data.token);
         onLogin();
       } else {
-        setError(json.message || 'Login failed');
+        setError(json.message || t('login.failed'));
       }
     } catch {
-      setError('Connection failed');
+      setError(t('login.connectionFailed'));
     } finally {
       setLoading(false);
     }
@@ -39,20 +41,30 @@ export default function LoginScreen({ onLogin }: Props) {
   return (
     <div className="login-screen">
       <form className="login-form" onSubmit={handleSubmit}>
-        <h1>NabiMan</h1>
-        <p className="login-subtitle">Server Management Dashboard</p>
+        <h1>{t('app.title')}</h1>
+        <p className="login-subtitle">{t('app.subtitle')}</p>
         {error && <div className="login-error">{error}</div>}
         <input
           type="password"
-          placeholder="Admin Password"
+          placeholder={t('login.password')}
           value={password}
           onChange={e => setPassword(e.target.value)}
           autoFocus
           required
         />
         <button type="submit" className="btn btn-primary" disabled={loading}>
-          {loading ? 'Logging in...' : 'Login'}
+          {loading ? t('login.loggingIn') : t('login.button')}
         </button>
+        <select
+          value={lang}
+          onChange={e => setLang(e.target.value as Lang)}
+          className="lang-select"
+          style={{ marginTop: '12px', alignSelf: 'center' }}
+        >
+          {(Object.entries(LANG_LABELS) as [Lang, string][]).map(([code, label]) => (
+            <option key={code} value={code}>{label}</option>
+          ))}
+        </select>
       </form>
     </div>
   );

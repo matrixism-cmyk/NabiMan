@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useApi, apiPost, apiDelete } from '../hooks/useApi';
 import { UserAccount } from '../types';
+import { useT } from '../i18n';
 
 export default function AccountsPanel() {
+  const { t } = useT();
   const { data, loading, error, refetch } = useApi<UserAccount[]>('/api/accounts', 10000);
   const [showForm, setShowForm] = useState<'create' | 'password' | null>(null);
   const [username, setUsername] = useState('');
@@ -40,19 +42,19 @@ export default function AccountsPanel() {
     if (res.success) refetch();
   };
 
-  if (loading) return <div className="panel loading">Loading accounts...</div>;
-  if (error) return <div className="panel error">Error: {error}</div>;
+  if (loading) return <div className="panel loading">{t('accounts.loading')}</div>;
+  if (error) return <div className="panel error">{t('common.error')}: {error}</div>;
 
   return (
     <div className="panel">
       <div className="panel-header">
-        <h2>User Accounts</h2>
+        <h2>{t('accounts.title')}</h2>
         <div className="btn-group">
           <button className="btn btn-primary" onClick={() => setShowForm('create')}>
-            Add User
+            {t('accounts.addUser')}
           </button>
           <button className="btn btn-secondary" onClick={() => setShowForm('password')}>
-            Change Password
+            {t('accounts.changePassword')}
           </button>
         </div>
       </div>
@@ -63,32 +65,32 @@ export default function AccountsPanel() {
 
       {showForm === 'create' && (
         <form onSubmit={handleCreate} className="inline-form">
-          <h3>Create Account</h3>
-          <input placeholder="Username" value={username}
+          <h3>{t('accounts.createAccount')}</h3>
+          <input placeholder={t('accounts.username')} value={username}
             onChange={e => setUsername(e.target.value)} required />
-          <input placeholder="Password" type="password" value={password}
+          <input placeholder={t('accounts.password')} type="password" value={password}
             onChange={e => setPassword(e.target.value)} required />
-          <input placeholder="Shell" value={shell}
+          <input placeholder={t('accounts.shell')} value={shell}
             onChange={e => setShell(e.target.value)} />
           <div className="btn-group">
-            <button type="submit" className="btn btn-primary">Create</button>
+            <button type="submit" className="btn btn-primary">{t('accounts.create')}</button>
             <button type="button" className="btn btn-secondary"
-              onClick={() => setShowForm(null)}>Cancel</button>
+              onClick={() => setShowForm(null)}>{t('common.cancel')}</button>
           </div>
         </form>
       )}
 
       {showForm === 'password' && (
         <form onSubmit={handleChangePassword} className="inline-form">
-          <h3>Change Password</h3>
-          <input placeholder="Username" value={username}
+          <h3>{t('accounts.changePassword')}</h3>
+          <input placeholder={t('accounts.username')} value={username}
             onChange={e => setUsername(e.target.value)} required />
-          <input placeholder="New Password" type="password" value={password}
+          <input placeholder={t('accounts.newPassword')} type="password" value={password}
             onChange={e => setPassword(e.target.value)} required />
           <div className="btn-group">
-            <button type="submit" className="btn btn-primary">Change</button>
+            <button type="submit" className="btn btn-primary">{t('common.change')}</button>
             <button type="button" className="btn btn-secondary"
-              onClick={() => setShowForm(null)}>Cancel</button>
+              onClick={() => setShowForm(null)}>{t('common.cancel')}</button>
           </div>
         </form>
       )}
@@ -96,13 +98,13 @@ export default function AccountsPanel() {
       <table className="data-table">
         <thead>
           <tr>
-            <th>Username</th>
-            <th>UID</th>
-            <th>GID</th>
-            <th>Home</th>
-            <th>Shell</th>
-            <th>Status</th>
-            <th>Actions</th>
+            <th>{t('accounts.username')}</th>
+            <th>{t('accounts.uid')}</th>
+            <th>{t('accounts.gid')}</th>
+            <th>{t('accounts.home')}</th>
+            <th>{t('accounts.shell')}</th>
+            <th>{t('common.status')}</th>
+            <th>{t('common.actions')}</th>
           </tr>
         </thead>
         <tbody>
@@ -115,13 +117,13 @@ export default function AccountsPanel() {
               <td><code>{acc.shell}</code></td>
               <td>
                 <span className={`status-badge ${acc.is_logged_in ? 'up' : 'down'}`}>
-                  {acc.is_logged_in ? 'Online' : 'Offline'}
+                  {acc.is_logged_in ? t('common.online') : t('common.offline')}
                 </span>
               </td>
               <td>
                 {acc.username !== 'root' && (
                   <button className="btn btn-danger btn-sm"
-                    onClick={() => handleDelete(acc.username)}>Delete</button>
+                    onClick={() => handleDelete(acc.username)}>{t('common.delete')}</button>
                 )}
               </td>
             </tr>

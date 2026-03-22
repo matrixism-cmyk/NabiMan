@@ -17,30 +17,32 @@ import DisksPanel from './components/DisksPanel';
 import RemoteServersPanel from './components/RemoteServersPanel';
 import TerminalPanel from './components/TerminalPanel';
 import { clearToken, apiPost } from './hooks/useApi';
+import { useT, LANG_LABELS, Lang } from './i18n';
 
 type Tab = 'server' | 'network' | 'accounts' | 'config' | 'traffic' | 'packages'
   | 'containers' | 'services' | 'firewall' | 'logs' | 'cron' | 'processes' | 'disks'
   | 'remote' | 'terminal';
 
-const tabs: { key: Tab; label: string }[] = [
-  { key: 'server', label: 'Server Status' },
-  { key: 'remote', label: 'Remote Servers' },
-  { key: 'processes', label: 'Processes' },
-  { key: 'disks', label: 'Disks' },
-  { key: 'network', label: 'Network' },
-  { key: 'containers', label: 'Containers' },
-  { key: 'services', label: 'Services' },
-  { key: 'firewall', label: 'Firewall' },
-  { key: 'accounts', label: 'Accounts' },
-  { key: 'config', label: 'Config' },
-  { key: 'traffic', label: 'Traffic' },
-  { key: 'packages', label: 'Packages' },
-  { key: 'logs', label: 'Logs' },
-  { key: 'cron', label: 'Cron' },
-  { key: 'terminal', label: 'Terminal' },
+const tabKeys: { key: Tab; labelKey: string }[] = [
+  { key: 'server', labelKey: 'tab.serverStatus' },
+  { key: 'remote', labelKey: 'tab.remoteServers' },
+  { key: 'processes', labelKey: 'tab.processes' },
+  { key: 'disks', labelKey: 'tab.disks' },
+  { key: 'network', labelKey: 'tab.network' },
+  { key: 'containers', labelKey: 'tab.containers' },
+  { key: 'services', labelKey: 'tab.services' },
+  { key: 'firewall', labelKey: 'tab.firewall' },
+  { key: 'accounts', labelKey: 'tab.accounts' },
+  { key: 'config', labelKey: 'tab.config' },
+  { key: 'traffic', labelKey: 'tab.traffic' },
+  { key: 'packages', labelKey: 'tab.packages' },
+  { key: 'logs', labelKey: 'tab.logs' },
+  { key: 'cron', labelKey: 'tab.cron' },
+  { key: 'terminal', labelKey: 'tab.terminal' },
 ];
 
 function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const { t } = useT();
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
@@ -50,25 +52,25 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg('');
-    if (newPw !== confirmPw) { setMsg('New passwords do not match'); return; }
-    if (newPw.length < 4) { setMsg('Password must be at least 4 characters'); return; }
+    if (newPw !== confirmPw) { setMsg(t('app.passwordMismatch')); return; }
+    if (newPw.length < 4) { setMsg(t('app.passwordTooShort')); return; }
     const res = await apiPost<string>('/api/auth/change-password', { current_password: currentPw, new_password: newPw });
-    if (res.success) { setSuccess(true); setMsg('Password changed successfully'); }
-    else { setMsg(res.message || 'Failed'); }
+    if (res.success) { setSuccess(true); setMsg(t('app.passwordChanged')); }
+    else { setMsg(res.message || t('app.failed')); }
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <h3>Change Password</h3>
+        <h3>{t('app.changePassword')}</h3>
         <form onSubmit={handleSubmit}>
-          <input type="password" placeholder="Current Password" value={currentPw} onChange={e => setCurrentPw(e.target.value)} required autoFocus />
-          <input type="password" placeholder="New Password" value={newPw} onChange={e => setNewPw(e.target.value)} required />
-          <input type="password" placeholder="Confirm New Password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} required />
+          <input type="password" placeholder={t('app.currentPassword')} value={currentPw} onChange={e => setCurrentPw(e.target.value)} required autoFocus />
+          <input type="password" placeholder={t('app.newPassword')} value={newPw} onChange={e => setNewPw(e.target.value)} required />
+          <input type="password" placeholder={t('app.confirmPassword')} value={confirmPw} onChange={e => setConfirmPw(e.target.value)} required />
           {msg && <div className={success ? 'login-success' : 'login-error'}>{msg}</div>}
           <div className="modal-actions">
-            {!success && <button type="submit" className="btn btn-primary">Change</button>}
-            <button type="button" className="btn btn-secondary" onClick={onClose}>{success ? 'Close' : 'Cancel'}</button>
+            {!success && <button type="submit" className="btn btn-primary">{t('common.change')}</button>}
+            <button type="button" className="btn btn-secondary" onClick={onClose}>{success ? t('common.close') : t('common.cancel')}</button>
           </div>
         </form>
       </div>
@@ -76,7 +78,28 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+function LanguageSelector() {
+  const { lang, setLang, t } = useT();
+  const langs = Object.entries(LANG_LABELS) as [Lang, string][];
+
+  return (
+    <div className="lang-selector">
+      <select
+        value={lang}
+        onChange={e => setLang(e.target.value as Lang)}
+        className="lang-select"
+        title={t('common.language')}
+      >
+        {langs.map(([code, label]) => (
+          <option key={code} value={code}>{label}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function App() {
+  const { t } = useT();
   const [loggedIn, setLoggedIn] = useState(!!sessionStorage.getItem('nabiman_token'));
   const [activeTab, setActiveTab] = useState<Tab>('server');
   const [sshTarget, setSshTarget] = useState<{ host: string; port: number; user: string } | null>(null);
@@ -99,21 +122,22 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>NabiMan</h1>
-        <span className="subtitle">Server Management Dashboard</span>
+        <h1>{t('app.title')}</h1>
+        <span className="subtitle">{t('app.subtitle')}</span>
         <div className="header-actions">
-          <button className="btn btn-secondary" onClick={() => setShowChangePw(true)}>Change Password</button>
-          <button className="btn btn-secondary logout-btn" onClick={handleLogout}>Logout</button>
+          <LanguageSelector />
+          <button className="btn btn-secondary" onClick={() => setShowChangePw(true)}>{t('app.changePassword')}</button>
+          <button className="btn btn-secondary logout-btn" onClick={handleLogout}>{t('app.logout')}</button>
         </div>
       </header>
       <nav className="tab-nav">
-        {tabs.map((tab) => (
+        {tabKeys.map((tab) => (
           <button
             key={tab.key}
             className={`tab-btn ${activeTab === tab.key ? 'active' : ''}`}
             onClick={() => setActiveTab(tab.key)}
           >
-            {tab.label}
+            {t(tab.labelKey)}
           </button>
         ))}
       </nav>

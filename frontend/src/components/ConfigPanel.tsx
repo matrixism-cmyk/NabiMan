@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useApi, apiPost } from '../hooks/useApi';
 import { ServiceConfig, ServiceDefinition } from '../types';
+import { useT } from '../i18n';
 
 function ConfigEditor({ serviceId, displayName }: { serviceId: string; displayName: string }) {
+  const { t } = useT();
   const { data, loading, error, refetch } = useApi<ServiceConfig>(`/api/config/${serviceId}`);
   const [editing, setEditing] = useState(false);
   const [content, setContent] = useState('');
@@ -39,12 +41,12 @@ function ConfigEditor({ serviceId, displayName }: { serviceId: string; displayNa
   const handleValidate = async () => {
     setActionLoading(true);
     const res = await apiPost<string>(`/api/config/${serviceId}/validate`, {});
-    setMessage(res.success ? `Validation: ${res.data || 'OK'}` : res.message);
+    setMessage(res.success ? `${t('config.validate')}: ${res.data || 'OK'}` : res.message);
     setActionLoading(false);
   };
 
-  if (loading) return <div className="loading">Loading {displayName} config...</div>;
-  if (error) return <div className="error">Error: {error}</div>;
+  if (loading) return <div className="loading">{t('common.loading')}</div>;
+  if (error) return <div className="error">{t('common.error')}: {error}</div>;
   if (!data) return null;
 
   return (
@@ -53,14 +55,14 @@ function ConfigEditor({ serviceId, displayName }: { serviceId: string; displayNa
         <h3>{displayName}</h3>
         <div className="config-meta">
           <span className={`status-badge ${data.is_running ? 'up' : 'down'}`}>
-            {data.is_running ? 'Running' : 'Stopped'}
+            {data.is_running ? t('config.running') : t('config.stopped')}
           </span>
           <code>{data.config_path || 'Not found'}</code>
         </div>
         <div className="btn-group">
-          {!editing && <button className="btn btn-primary" onClick={startEdit} disabled={actionLoading}>Edit</button>}
-          <button className="btn btn-secondary" onClick={handleValidate} disabled={actionLoading}>Validate</button>
-          <button className="btn btn-warning" onClick={handleRestart} disabled={actionLoading}>Restart</button>
+          {!editing && <button className="btn btn-primary" onClick={startEdit} disabled={actionLoading}>{t('common.edit')}</button>}
+          <button className="btn btn-secondary" onClick={handleValidate} disabled={actionLoading}>{t('config.validate')}</button>
+          <button className="btn btn-warning" onClick={handleRestart} disabled={actionLoading}>{t('common.restart')}</button>
         </div>
       </div>
 
@@ -76,9 +78,9 @@ function ConfigEditor({ serviceId, displayName }: { serviceId: string; displayNa
           />
           <div className="btn-group">
             <button className="btn btn-primary" onClick={handleSave} disabled={actionLoading}>
-              {actionLoading ? 'Saving...' : 'Save'}
+              {actionLoading ? t('config.saving') : t('common.save')}
             </button>
-            <button className="btn btn-secondary" onClick={() => setEditing(false)}>Cancel</button>
+            <button className="btn btn-secondary" onClick={() => setEditing(false)}>{t('common.cancel')}</button>
           </div>
         </div>
       ) : (
@@ -89,6 +91,7 @@ function ConfigEditor({ serviceId, displayName }: { serviceId: string; displayNa
 }
 
 function ServiceCard({ svc }: { svc: ServiceDefinition }) {
+  const { t } = useT();
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -98,15 +101,10 @@ function ServiceCard({ svc }: { svc: ServiceDefinition }) {
         <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{expanded ? '▼' : '▶'}</span>
         <strong>{svc.display_name}</strong>
         <span className={`status-badge ${svc.is_running ? 'up' : 'down'}`} style={{ fontSize: '11px' }}>
-          {svc.is_running ? 'Running' : 'Stopped'}
+          {svc.is_running ? t('config.running') : t('config.stopped')}
         </span>
         {svc.version && (
           <code style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{svc.version}</code>
-        )}
-        {svc.detected_by && (
-          <span style={{ fontSize: '11px', color: 'var(--text-secondary)', marginLeft: 'auto' }}>
-            Detected: {svc.detected_by.join(', ')}
-          </span>
         )}
       </div>
       {expanded && <ConfigEditor serviceId={svc.id} displayName={svc.display_name} />}
@@ -117,10 +115,11 @@ function ServiceCard({ svc }: { svc: ServiceDefinition }) {
 type FilterMode = 'installed' | 'running' | 'all';
 
 export default function ConfigPanel() {
+  const { t } = useT();
   const { data: services, loading } = useApi<ServiceDefinition[]>('/api/config/services');
   const [filter, setFilter] = useState<FilterMode>('installed');
 
-  if (loading) return <div className="panel loading">Loading service configurations...</div>;
+  if (loading) return <div className="panel loading">{t('config.loading')}</div>;
 
   const allServices = services || [];
   const installedCount = allServices.filter(s => s.is_installed).length;
@@ -132,38 +131,32 @@ export default function ConfigPanel() {
     return true;
   });
 
-  const filterButtons: { key: FilterMode; label: string; count: number }[] = [
-    { key: 'installed', label: 'Installed', count: installedCount },
-    { key: 'running', label: 'Running', count: runningCount },
-    { key: 'all', label: 'All', count: allServices.length },
+  const filterButtons: { key: FilterMode; labelKey: string; count: number }[] = [
+    { key: 'installed', labelKey: 'config.installed', count: installedCount },
+    { key: 'running', labelKey: 'config.running', count: runningCount },
+    { key: 'all', labelKey: 'common.all', count: allServices.length },
   ];
 
   return (
     <div className="panel">
       <div className="panel-header">
-        <h2>Service Configuration</h2>
+        <h2>{t('config.title')}</h2>
         <div className="btn-group">
           {filterButtons.map(f => (
             <button key={f.key}
               className={`btn btn-sm ${filter === f.key ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setFilter(f.key)}>
-              {f.label} ({f.count})
+              {t(f.labelKey)} ({f.count})
             </button>
           ))}
         </div>
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-secondary">
-          No services detected. Try "All" to see all registered services.
-        </p>
+        <p className="text-secondary">{t('config.noServices')}</p>
       ) : (
         <p className="text-secondary" style={{ marginBottom: '8px' }}>
-          {filter === 'installed'
-            ? `${installedCount} service(s) auto-detected on this system. Click to expand config editor.`
-            : filter === 'running'
-            ? `${runningCount} service(s) currently running.`
-            : `${allServices.length} registered service(s). Grayed out ones are not installed.`}
+          {filtered.length} {t('services.services')}
         </p>
       )}
 

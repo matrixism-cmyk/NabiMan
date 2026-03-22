@@ -3,6 +3,7 @@ import { Terminal } from 'xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import 'xterm/css/xterm.css';
+import { useT } from '../i18n';
 
 interface SshTarget {
   host: string;
@@ -42,6 +43,7 @@ interface TerminalPanelProps {
 }
 
 export default function TerminalPanel({ sshTarget: externalSshTarget, onSshConnected }: TerminalPanelProps) {
+  const { t } = useT();
   const termRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -96,11 +98,9 @@ export default function TerminalPanel({ sshTarget: externalSshTarget, onSshConne
       fitAddon.fit();
     }
 
-    // Clipboard: Ctrl+Shift+C = copy, Ctrl+Shift+V = paste
     term.attachCustomKeyEventHandler((ev: KeyboardEvent) => {
       if (ev.type !== 'keydown') return true;
 
-      // Ctrl+Shift+C → copy selection
       if (ev.ctrlKey && ev.shiftKey && ev.key === 'C') {
         const sel = term.getSelection();
         if (sel) {
@@ -109,7 +109,6 @@ export default function TerminalPanel({ sshTarget: externalSshTarget, onSshConne
         return false;
       }
 
-      // Ctrl+Shift+V → paste from clipboard
       if (ev.ctrlKey && ev.shiftKey && ev.key === 'V') {
         navigator.clipboard.readText().then((text) => {
           if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -119,7 +118,6 @@ export default function TerminalPanel({ sshTarget: externalSshTarget, onSshConne
         return false;
       }
 
-      // Ctrl+Plus/Minus → font size
       if (ev.ctrlKey && ev.key === '=') {
         setFontSize(s => Math.min(s + 1, 28));
         return false;
@@ -132,7 +130,6 @@ export default function TerminalPanel({ sshTarget: externalSshTarget, onSshConne
       return true;
     });
 
-    // Right-click context menu paste
     termRef.current?.addEventListener('contextmenu', (ev) => {
       ev.preventDefault();
       const sel = term.getSelection();
@@ -195,7 +192,6 @@ export default function TerminalPanel({ sshTarget: externalSshTarget, onSshConne
     });
   }, [fontSize]);
 
-  // Update font size on existing terminal
   useEffect(() => {
     if (terminalRef.current) {
       terminalRef.current.options.fontSize = fontSize;
@@ -217,7 +213,6 @@ export default function TerminalPanel({ sshTarget: externalSshTarget, onSshConne
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handle external SSH target from RemoteServersPanel
   useEffect(() => {
     if (externalSshTarget && externalSshTarget.host) {
       const target: SshTarget = {
@@ -251,18 +246,18 @@ export default function TerminalPanel({ sshTarget: externalSshTarget, onSshConne
   return (
     <div className="panel terminal-panel">
       <div className="panel-header">
-        <h2>Terminal {mode === 'ssh' ? `(SSH: ${sshTarget.user}@${sshTarget.host})` : '(Local)'}</h2>
+        <h2>{t('tab.terminal')} {mode === 'ssh' ? `(SSH: ${sshTarget.user}@${sshTarget.host})` : `(${t('terminal.local')})`}</h2>
         <div className="terminal-controls">
           <span className="terminal-hint">Ctrl+Shift+C/V: Copy/Paste</span>
           <span className="terminal-hint">Ctrl+/-: Font Size</span>
           <span className={`status-badge ${connected ? 'up' : 'down'}`}>
-            {connected ? 'Connected' : 'Disconnected'}
+            {connected ? t('terminal.connected') : t('terminal.disconnected')}
           </span>
           <button className="btn btn-primary btn-sm" onClick={() => setShowSshForm(!showSshForm)}>
             SSH
           </button>
           <button className="btn btn-secondary btn-sm" onClick={handleLocalConnect}>
-            Local
+            {t('terminal.local')}
           </button>
         </div>
       </div>
@@ -270,25 +265,25 @@ export default function TerminalPanel({ sshTarget: externalSshTarget, onSshConne
       {showSshForm && (
         <form onSubmit={handleSshConnect} className="ssh-form">
           <input
-            placeholder="Host (IP or hostname)"
+            placeholder={t('terminal.hostPlaceholder')}
             value={sshTarget.host}
             onChange={e => setSshTarget({ ...sshTarget, host: e.target.value })}
             required
           />
           <input
-            placeholder="Port"
+            placeholder={t('terminal.portPlaceholder')}
             value={sshTarget.port}
             onChange={e => setSshTarget({ ...sshTarget, port: e.target.value })}
             style={{ width: 70 }}
           />
           <input
-            placeholder="User"
+            placeholder={t('terminal.userPlaceholder')}
             value={sshTarget.user}
             onChange={e => setSshTarget({ ...sshTarget, user: e.target.value })}
             style={{ width: 100 }}
           />
-          <button type="submit" className="btn btn-primary btn-sm">Connect</button>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowSshForm(false)}>Cancel</button>
+          <button type="submit" className="btn btn-primary btn-sm">{t('common.connect')}</button>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowSshForm(false)}>{t('common.cancel')}</button>
         </form>
       )}
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApi, apiPost } from '../hooks/useApi';
+import { useT } from '../i18n';
 
 interface Package {
   name: string;
@@ -12,6 +13,7 @@ interface SearchResult {
 }
 
 export default function PackagesPanel() {
+  const { t } = useT();
   const { data: installed, loading, error, refetch } = useApi<Package[]>('/api/packages/installed');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -55,19 +57,18 @@ export default function PackagesPanel() {
     p => p.name.toLowerCase().includes(filter.toLowerCase())
   );
 
-  if (loading) return <div className="panel loading">Loading packages...</div>;
-  if (error) return <div className="panel error">Error: {error}</div>;
+  if (loading) return <div className="panel loading">{t('packages.loading')}</div>;
+  if (error) return <div className="panel error">{t('common.error')}: {error}</div>;
 
   return (
     <div className="panel">
-      <h2>Package Management</h2>
+      <h2>{t('packages.title')}</h2>
 
       {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
 
-      {/* Direct install */}
       <div className="inline-form" style={{ flexDirection: 'row', alignItems: 'center' }}>
         <input
-          placeholder="Package name to install"
+          placeholder={t('packages.installPlaceholder')}
           value={installName}
           onChange={e => setInstallName(e.target.value)}
           style={{ flex: 1 }}
@@ -77,29 +78,28 @@ export default function PackagesPanel() {
           disabled={actionLoading || !installName.trim()}
           onClick={() => handleInstall(installName.trim())}
         >
-          {actionLoading ? 'Working...' : 'Install'}
+          {actionLoading ? t('common.working') : t('common.install')}
         </button>
       </div>
 
-      {/* Search */}
       <form onSubmit={handleSearch} className="inline-form" style={{ flexDirection: 'row', alignItems: 'center' }}>
         <input
-          placeholder="Search packages..."
+          placeholder={t('packages.searchPlaceholder')}
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
           style={{ flex: 1 }}
         />
         <button type="submit" className="btn btn-secondary" disabled={searching}>
-          {searching ? 'Searching...' : 'Search'}
+          {searching ? t('packages.searching') : t('common.search')}
         </button>
       </form>
 
       {searchResults.length > 0 && (
         <>
-          <h3>Search Results</h3>
+          <h3>{t('packages.searchResults')}</h3>
           <table className="data-table">
             <thead>
-              <tr><th>Package</th><th>Description</th><th>Action</th></tr>
+              <tr><th>{t('packages.package')}</th><th>{t('common.description')}</th><th>{t('packages.action')}</th></tr>
             </thead>
             <tbody>
               {searchResults.map((r, i) => (
@@ -109,7 +109,7 @@ export default function PackagesPanel() {
                   <td>
                     <button className="btn btn-primary btn-sm"
                       disabled={actionLoading}
-                      onClick={() => handleInstall(r.name)}>Install</button>
+                      onClick={() => handleInstall(r.name)}>{t('common.install')}</button>
                   </td>
                 </tr>
               ))}
@@ -118,10 +118,9 @@ export default function PackagesPanel() {
         </>
       )}
 
-      {/* Installed packages */}
-      <h3>Installed Packages ({filteredPackages.length})</h3>
+      <h3>{t('packages.installed')} ({filteredPackages.length})</h3>
       <input
-        placeholder="Filter installed packages..."
+        placeholder={t('packages.filterPlaceholder')}
         value={filter}
         onChange={e => setFilter(e.target.value)}
         className="filter-input"
@@ -129,7 +128,7 @@ export default function PackagesPanel() {
       <div className="package-list">
         <table className="data-table">
           <thead>
-            <tr><th>Package</th><th>Status</th><th>Action</th></tr>
+            <tr><th>{t('packages.package')}</th><th>{t('common.status')}</th><th>{t('packages.action')}</th></tr>
           </thead>
           <tbody>
             {filteredPackages.slice(0, 100).map((pkg, i) => (
@@ -139,14 +138,14 @@ export default function PackagesPanel() {
                 <td>
                   <button className="btn btn-danger btn-sm"
                     disabled={actionLoading}
-                    onClick={() => handleRemove(pkg.name)}>Remove</button>
+                    onClick={() => handleRemove(pkg.name)}>{t('common.remove')}</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
         {filteredPackages.length > 100 && (
-          <p className="text-secondary">Showing first 100 of {filteredPackages.length} packages. Use filter to narrow.</p>
+          <p className="text-secondary">{t('common.showingFirst', { count: filteredPackages.length })}</p>
         )}
       </div>
     </div>

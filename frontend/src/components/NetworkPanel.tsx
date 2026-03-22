@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApi } from '../hooks/useApi';
 import { NetworkStatus } from '../types';
+import { useT } from '../i18n';
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -11,34 +12,35 @@ function formatBytes(bytes: number): string {
 }
 
 export default function NetworkPanel() {
+  const { t } = useT();
   const { data, loading, error } = useApi<NetworkStatus>('/api/network/status', 5000);
 
-  if (loading) return <div className="panel loading">Loading network info...</div>;
-  if (error) return <div className="panel error">Error: {error}</div>;
+  if (loading) return <div className="panel loading">{t('network.loading')}</div>;
+  if (error) return <div className="panel error">{t('common.error')}: {error}</div>;
   if (!data) return null;
 
   return (
     <div className="panel">
-      <h2>Network Status</h2>
+      <h2>{t('network.title')}</h2>
       <div className="info-item">
-        <span className="info-label">Open Connections</span>
+        <span className="info-label">{t('network.openConns')}</span>
         <span className="info-value">{data.open_connections}</span>
       </div>
       <div className="info-item">
-        <span className="info-label">DNS Servers</span>
+        <span className="info-label">{t('network.dnsServers')}</span>
         <span className="info-value">{data.dns_servers.join(', ') || 'N/A'}</span>
       </div>
 
-      <h3>Interfaces</h3>
+      <h3>{t('network.interfaces')}</h3>
       <table className="data-table">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>IP</th>
-            <th>MAC</th>
-            <th>RX</th>
-            <th>TX</th>
-            <th>Status</th>
+            <th>{t('common.name')}</th>
+            <th>{t('network.ip')}</th>
+            <th>{t('network.mac')}</th>
+            <th>{t('network.rx')}</th>
+            <th>{t('network.tx')}</th>
+            <th>{t('common.status')}</th>
           </tr>
         </thead>
         <tbody>
@@ -51,7 +53,7 @@ export default function NetworkPanel() {
               <td>{formatBytes(iface.tx_bytes)}</td>
               <td>
                 <span className={`status-badge ${iface.is_up ? 'up' : 'down'}`}>
-                  {iface.is_up ? 'UP' : 'DOWN'}
+                  {iface.is_up ? t('network.up') : t('network.down')}
                 </span>
               </td>
             </tr>

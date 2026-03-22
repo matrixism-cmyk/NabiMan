@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApi, apiPost } from '../hooks/useApi';
 import { ProcessInfo } from '../types';
+import { useT } from '../i18n';
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -11,6 +12,7 @@ function formatBytes(bytes: number): string {
 }
 
 export default function ProcessesPanel() {
+  const { t } = useT();
   const { data, loading, error, refetch } = useApi<ProcessInfo[]>('/api/processes', 5000);
   const [filter, setFilter] = useState('');
   const [sortBy, setSortBy] = useState<'cpu' | 'memory' | 'pid'>('cpu');
@@ -24,8 +26,8 @@ export default function ProcessesPanel() {
     setTimeout(refetch, 1000);
   };
 
-  if (loading) return <div className="panel loading">Loading processes...</div>;
-  if (error) return <div className="panel error">Error: {error}</div>;
+  if (loading) return <div className="panel loading">{t('processes.loading')}</div>;
+  if (error) return <div className="panel error">{t('common.error')}: {error}</div>;
 
   const sorted = [...(data || [])].sort((a, b) => {
     if (sortBy === 'cpu') return b.cpu - a.cpu;
@@ -41,13 +43,13 @@ export default function ProcessesPanel() {
 
   return (
     <div className="panel">
-      <h2>Process Monitor</h2>
+      <h2>{t('processes.title')}</h2>
 
       {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
 
       <div className="filter-row">
         <input
-          placeholder="Filter by command, user, or PID..."
+          placeholder={t('processes.filterPlaceholder')}
           value={filter}
           onChange={e => setFilter(e.target.value)}
           className="filter-input"
@@ -62,19 +64,19 @@ export default function ProcessesPanel() {
         </div>
       </div>
 
-      <p className="text-secondary">{filtered.length} processes</p>
+      <p className="text-secondary">{filtered.length} {t('processes.processes')}</p>
 
       <table className="data-table">
         <thead>
           <tr>
-            <th>PID</th>
-            <th>User</th>
-            <th>CPU %</th>
-            <th>MEM %</th>
-            <th>RSS</th>
-            <th>Started</th>
-            <th>Command</th>
-            <th>Actions</th>
+            <th>{t('processes.pid')}</th>
+            <th>{t('processes.user')}</th>
+            <th>{t('processes.cpuPercent')}</th>
+            <th>{t('processes.memPercent')}</th>
+            <th>{t('processes.rss')}</th>
+            <th>{t('processes.started')}</th>
+            <th>{t('processes.command')}</th>
+            <th>{t('common.actions')}</th>
           </tr>
         </thead>
         <tbody>
@@ -98,9 +100,9 @@ export default function ProcessesPanel() {
               <td>
                 <div className="btn-group">
                   <button className="btn btn-warning btn-sm"
-                    onClick={() => handleKill(proc.pid, 'TERM')}>TERM</button>
+                    onClick={() => handleKill(proc.pid, 'TERM')}>{t('processes.term')}</button>
                   <button className="btn btn-danger btn-sm"
-                    onClick={() => handleKill(proc.pid, 'KILL')}>KILL</button>
+                    onClick={() => handleKill(proc.pid, 'KILL')}>{t('processes.kill')}</button>
                 </div>
               </td>
             </tr>
@@ -108,7 +110,7 @@ export default function ProcessesPanel() {
         </tbody>
       </table>
       {filtered.length > 100 && (
-        <p className="text-secondary">Showing first 100 of {filtered.length}. Use filter to narrow.</p>
+        <p className="text-secondary">{t('common.showingFirst', { count: filtered.length })}</p>
       )}
     </div>
   );

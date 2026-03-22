@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApi, apiPost } from '../hooks/useApi';
 import { LogEntry } from '../types';
+import { useT } from '../i18n';
 
 export default function LogsPanel() {
+  const { t } = useT();
   const { data: units } = useApi<string[]>('/api/logs/units');
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [unit, setUnit] = useState('');
@@ -46,46 +48,46 @@ export default function LogsPanel() {
 
   return (
     <div className="panel">
-      <h2>Log Viewer</h2>
+      <h2>{t('logs.title')}</h2>
 
       <div className="filter-row">
         <select value={unit} onChange={e => setUnit(e.target.value)} className="select-input">
-          <option value="">All units</option>
+          <option value="">{t('logs.allUnits')}</option>
           {(units || []).map(u => (
             <option key={u} value={u}>{u}</option>
           ))}
         </select>
         <select value={priority} onChange={e => setPriority(e.target.value)} className="select-input">
-          <option value="">All priorities</option>
-          <option value="emerg">Emergency</option>
-          <option value="alert">Alert</option>
-          <option value="crit">Critical</option>
-          <option value="err">Error</option>
-          <option value="warning">Warning</option>
-          <option value="notice">Notice</option>
-          <option value="info">Info</option>
-          <option value="debug">Debug</option>
+          <option value="">{t('logs.allPriorities')}</option>
+          <option value="emerg">{t('logs.emergency')}</option>
+          <option value="alert">{t('logs.alert')}</option>
+          <option value="crit">{t('logs.critical')}</option>
+          <option value="err">{t('logs.error')}</option>
+          <option value="warning">{t('logs.warning')}</option>
+          <option value="notice">{t('logs.notice')}</option>
+          <option value="info">{t('logs.info')}</option>
+          <option value="debug">{t('logs.debug')}</option>
         </select>
         <select value={lines} onChange={e => setLines(Number(e.target.value))} className="select-input">
-          <option value={50}>50 lines</option>
-          <option value={100}>100 lines</option>
-          <option value={200}>200 lines</option>
-          <option value={500}>500 lines</option>
-          <option value={1000}>1000 lines</option>
+          <option value={50}>50 {t('logs.lines')}</option>
+          <option value={100}>100 {t('logs.lines')}</option>
+          <option value={200}>200 {t('logs.lines')}</option>
+          <option value={500}>500 {t('logs.lines')}</option>
+          <option value={1000}>1000 {t('logs.lines')}</option>
         </select>
         <button className="btn btn-primary" onClick={fetchLogs} disabled={loading}>
-          {loading ? 'Loading...' : 'Fetch'}
+          {loading ? t('common.loading') : t('logs.fetch')}
         </button>
         <button
           className={`btn ${autoRefresh ? 'btn-success' : 'btn-secondary'}`}
           onClick={() => setAutoRefresh(!autoRefresh)}
         >
-          {autoRefresh ? 'Auto: ON' : 'Auto: OFF'}
+          {autoRefresh ? t('logs.autoOn') : t('logs.autoOff')}
         </button>
       </div>
 
       <input
-        placeholder="Filter log messages..."
+        placeholder={t('logs.filterPlaceholder')}
         value={filter}
         onChange={e => setFilter(e.target.value)}
         className="filter-input"
@@ -104,7 +106,7 @@ export default function LogsPanel() {
         ))}
         <div ref={logEndRef} />
       </div>
-      <p className="text-secondary">{filtered.length} entries</p>
+      <p className="text-secondary">{filtered.length} {t('logs.entries')}</p>
     </div>
   );
 }

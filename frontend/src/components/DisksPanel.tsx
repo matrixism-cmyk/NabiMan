@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApi } from '../hooks/useApi';
 import { DiskStatus } from '../types';
+import { useT } from '../i18n';
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -20,27 +21,28 @@ function UsageBar({ percent }: { percent: number }) {
 }
 
 export default function DisksPanel() {
+  const { t } = useT();
   const { data, loading, error } = useApi<DiskStatus>('/api/disks/status', 5000);
 
-  if (loading) return <div className="panel loading">Loading disk status...</div>;
-  if (error) return <div className="panel error">Error: {error}</div>;
+  if (loading) return <div className="panel loading">{t('disks.loading')}</div>;
+  if (error) return <div className="panel error">{t('common.error')}: {error}</div>;
   if (!data) return null;
 
   return (
     <div className="panel">
-      <h2>Disk / Storage</h2>
+      <h2>{t('disks.title')}</h2>
 
-      <h3>Partitions</h3>
+      <h3>{t('disks.partitions')}</h3>
       <table className="data-table">
         <thead>
           <tr>
-            <th>Filesystem</th>
-            <th>Mount</th>
-            <th>Type</th>
-            <th>Total</th>
-            <th>Used</th>
-            <th>Available</th>
-            <th>Usage</th>
+            <th>{t('disks.filesystem')}</th>
+            <th>{t('disks.mount')}</th>
+            <th>{t('disks.type')}</th>
+            <th>{t('disks.total')}</th>
+            <th>{t('disks.used')}</th>
+            <th>{t('disks.available')}</th>
+            <th>{t('disks.usage')}</th>
           </tr>
         </thead>
         <tbody>
@@ -67,15 +69,15 @@ export default function DisksPanel() {
 
       {data.io.length > 0 && (
         <>
-          <h3>Disk I/O</h3>
+          <h3>{t('disks.diskIo')}</h3>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Device</th>
-                <th>Reads/s</th>
-                <th>Writes/s</th>
-                <th>Read</th>
-                <th>Write</th>
+                <th>{t('disks.device')}</th>
+                <th>{t('disks.readsPerSec')}</th>
+                <th>{t('disks.writesPerSec')}</th>
+                <th>{t('disks.read')}</th>
+                <th>{t('disks.write')}</th>
               </tr>
             </thead>
             <tbody>

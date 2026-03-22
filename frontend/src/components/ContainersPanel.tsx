@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useApi, apiPost } from '../hooks/useApi';
 import { Container, ContainerImage } from '../types';
+import { useT } from '../i18n';
 
 export default function ContainersPanel() {
+  const { t } = useT();
   const { data: containers, loading, error, refetch } = useApi<Container[]>('/api/containers', 5000);
   const { data: images, refetch: refetchImages } = useApi<ContainerImage[]>('/api/containers/images');
   const [message, setMessage] = useState('');
@@ -40,16 +42,16 @@ export default function ContainersPanel() {
     refetchImages();
   };
 
-  if (loading) return <div className="panel loading">Loading containers...</div>;
-  if (error) return <div className="panel error">Error: {error}</div>;
+  if (loading) return <div className="panel loading">{t('containers.loading')}</div>;
+  if (error) return <div className="panel error">{t('common.error')}: {error}</div>;
 
   return (
     <div className="panel">
       <div className="panel-header">
-        <h2>Container Management</h2>
+        <h2>{t('containers.title')}</h2>
         <div className="btn-group">
           <button className="btn btn-secondary" onClick={() => setShowImages(!showImages)}>
-            {showImages ? 'Containers' : 'Images'}
+            {showImages ? t('containers.containers') : t('containers.images')}
           </button>
         </div>
       </div>
@@ -59,8 +61,8 @@ export default function ContainersPanel() {
       {logContainer && (
         <div className="log-viewer">
           <div className="log-header">
-            <h3>Logs: {logContainer}</h3>
-            <button className="btn btn-secondary btn-sm" onClick={() => setLogContainer('')}>Close</button>
+            <h3>{t('containers.logs')}: {logContainer}</h3>
+            <button className="btn btn-secondary btn-sm" onClick={() => setLogContainer('')}>{t('common.close')}</button>
           </div>
           <pre className="log-content">{logContent}</pre>
         </div>
@@ -68,15 +70,15 @@ export default function ContainersPanel() {
 
       {!showImages ? (
         <>
-          <h3>Containers ({(containers || []).length})</h3>
+          <h3>{t('containers.containers')} ({(containers || []).length})</h3>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Image</th>
-                <th>Status</th>
-                <th>Ports</th>
-                <th>Actions</th>
+                <th>{t('common.name')}</th>
+                <th>{t('containers.image')}</th>
+                <th>{t('common.status')}</th>
+                <th>{t('containers.ports')}</th>
+                <th>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -94,18 +96,18 @@ export default function ContainersPanel() {
                     <div className="btn-group">
                       {c.state !== 'running' && (
                         <button className="btn btn-primary btn-sm" disabled={actionLoading}
-                          onClick={() => action('start', c.id, 'Start')}>Start</button>
+                          onClick={() => action('start', c.id, 'Start')}>{t('common.start')}</button>
                       )}
                       {c.state === 'running' && (
                         <button className="btn btn-warning btn-sm" disabled={actionLoading}
-                          onClick={() => action('stop', c.id, 'Stop')}>Stop</button>
+                          onClick={() => action('stop', c.id, 'Stop')}>{t('common.stop')}</button>
                       )}
                       <button className="btn btn-secondary btn-sm" disabled={actionLoading}
-                        onClick={() => action('restart', c.id, 'Restart')}>Restart</button>
+                        onClick={() => action('restart', c.id, 'Restart')}>{t('common.restart')}</button>
                       <button className="btn btn-secondary btn-sm"
-                        onClick={() => viewLogs(c.id, c.name)}>Logs</button>
+                        onClick={() => viewLogs(c.id, c.name)}>{t('containers.logs')}</button>
                       <button className="btn btn-danger btn-sm" disabled={actionLoading}
-                        onClick={() => action('remove', c.id, 'Remove')}>Remove</button>
+                        onClick={() => action('remove', c.id, 'Remove')}>{t('common.remove')}</button>
                     </div>
                   </td>
                 </tr>
@@ -113,21 +115,21 @@ export default function ContainersPanel() {
             </tbody>
           </table>
           {(containers || []).length === 0 && (
-            <p className="text-secondary">No containers found. Docker may not be installed or running.</p>
+            <p className="text-secondary">{t('containers.noContainers')}</p>
           )}
         </>
       ) : (
         <>
-          <h3>Images ({(images || []).length})</h3>
+          <h3>{t('containers.images')} ({(images || []).length})</h3>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Repository</th>
-                <th>Tag</th>
-                <th>ID</th>
-                <th>Size</th>
-                <th>Created</th>
-                <th>Actions</th>
+                <th>{t('containers.repository')}</th>
+                <th>{t('containers.tag')}</th>
+                <th>{t('containers.id')}</th>
+                <th>{t('containers.size')}</th>
+                <th>{t('containers.created')}</th>
+                <th>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -140,7 +142,7 @@ export default function ContainersPanel() {
                   <td>{img.created}</td>
                   <td>
                     <button className="btn btn-danger btn-sm" disabled={actionLoading}
-                      onClick={() => removeImage(img.id)}>Remove</button>
+                      onClick={() => removeImage(img.id)}>{t('common.remove')}</button>
                   </td>
                 </tr>
               ))}

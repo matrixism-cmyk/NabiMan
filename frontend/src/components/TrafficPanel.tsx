@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApi } from '../hooks/useApi';
 import { TrafficSnapshot, TrafficSummary } from '../types';
+import { useT } from '../i18n';
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -24,12 +25,13 @@ function TrafficBar({ label, value, max }: { label: string; value: number; max: 
 }
 
 export default function TrafficPanel() {
+  const { t } = useT();
   const { data: snapshots, loading: loadSnap } =
     useApi<TrafficSnapshot[]>('/api/traffic/current', 3000);
   const { data: summary, loading: loadSum } =
     useApi<TrafficSummary>('/api/traffic/summary', 5000);
 
-  if (loadSnap || loadSum) return <div className="panel loading">Loading traffic data...</div>;
+  if (loadSnap || loadSum) return <div className="panel loading">{t('traffic.loading')}</div>;
 
   const maxRate = snapshots
     ? Math.max(...snapshots.map(s => Math.max(s.rx_bytes_per_sec, s.tx_bytes_per_sec)), 1)
@@ -37,24 +39,24 @@ export default function TrafficPanel() {
 
   return (
     <div className="panel">
-      <h2>Traffic Monitor</h2>
+      <h2>{t('traffic.title')}</h2>
 
       {summary && (
         <div className="info-grid">
           <div className="info-item">
-            <span className="info-label">Total RX</span>
+            <span className="info-label">{t('traffic.totalRx')}</span>
             <span className="info-value">{summary.total_rx_mb} MB</span>
           </div>
           <div className="info-item">
-            <span className="info-label">Total TX</span>
+            <span className="info-label">{t('traffic.totalTx')}</span>
             <span className="info-value">{summary.total_tx_mb} MB</span>
           </div>
           <div className="info-item">
-            <span className="info-label">Active Connections</span>
+            <span className="info-label">{t('traffic.activeConns')}</span>
             <span className="info-value">{summary.active_connections}</span>
           </div>
           <div className="info-item">
-            <span className="info-label">TCP States</span>
+            <span className="info-label">{t('traffic.tcpStates')}</span>
             <span className="info-value">
               EST: {summary.tcp_connections.established} /
               LISTEN: {summary.tcp_connections.listen} /
@@ -64,14 +66,14 @@ export default function TrafficPanel() {
         </div>
       )}
 
-      <h3>Real-time Traffic per Interface</h3>
+      <h3>{t('traffic.realtime')}</h3>
       {(snapshots || []).map((snap) => (
         <div key={snap.interface} className="traffic-interface">
           <h4>{snap.interface}</h4>
           <TrafficBar label="RX" value={snap.rx_bytes_per_sec} max={maxRate * 1.2} />
           <TrafficBar label="TX" value={snap.tx_bytes_per_sec} max={maxRate * 1.2} />
           <div className="traffic-meta">
-            <span>Connections: {snap.active_connections}</span>
+            <span>{t('traffic.connections')}: {snap.active_connections}</span>
             <span>{snap.timestamp}</span>
           </div>
         </div>

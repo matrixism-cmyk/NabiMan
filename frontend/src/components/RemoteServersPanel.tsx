@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useApi, apiPost, apiRequest } from '../hooks/useApi';
 import { RemoteServer, RemoteServerStatus, SshKeyInfo } from '../types';
+import { useT } from '../i18n';
 
 function SshKeyPanel() {
+  const { t } = useT();
   const { data: keyInfo, loading, refetch } = useApi<SshKeyInfo>('/api/remote-servers/ssh-key');
   const [generating, setGenerating] = useState(false);
   const [message, setMessage] = useState('');
@@ -11,7 +13,7 @@ function SshKeyPanel() {
   const handleGenerate = async () => {
     setGenerating(true);
     const res = await apiPost<SshKeyInfo>('/api/remote-servers/ssh-key/generate', {});
-    setMessage(res.success ? 'SSH key generated' : res.message);
+    setMessage(res.success ? t('sshKey.generated') : res.message);
     refetch();
     setGenerating(false);
   };
@@ -24,21 +26,21 @@ function SshKeyPanel() {
     }
   };
 
-  if (loading) return <div className="loading">Loading SSH key info...</div>;
+  if (loading) return <div className="loading">{t('common.loading')}</div>;
 
   return (
     <div className="config-section ssh-key-section">
       <div className="config-header">
-        <h3>NabiMan SSH Key</h3>
+        <h3>{t('sshKey.title')}</h3>
         <div className="config-meta">
           <span className={`status-badge ${keyInfo?.exists ? 'up' : 'down'}`}>
-            {keyInfo?.exists ? 'Key exists' : 'No key'}
+            {keyInfo?.exists ? t('sshKey.exists') : t('sshKey.noKey')}
           </span>
         </div>
         <div className="btn-group">
           {!keyInfo?.exists && (
             <button className="btn btn-primary btn-sm" onClick={handleGenerate} disabled={generating}>
-              {generating ? 'Generating...' : 'Generate Key'}
+              {generating ? t('sshKey.generating') : t('sshKey.generate')}
             </button>
           )}
         </div>
@@ -49,9 +51,9 @@ function SshKeyPanel() {
       {keyInfo?.exists && keyInfo.public_key && (
         <div style={{ padding: '8px 0' }}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
-            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Public Key</label>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{t('sshKey.publicKey')}</label>
             <button className="btn btn-secondary btn-sm" onClick={handleCopy}>
-              {copied ? 'Copied!' : 'Copy'}
+              {copied ? t('sshKey.copied') : t('sshKey.copy')}
             </button>
           </div>
           <pre className="config-preview" style={{ fontSize: '11px', maxHeight: '60px', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
@@ -59,30 +61,27 @@ function SshKeyPanel() {
           </pre>
           {keyInfo.fingerprint && (
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-              Fingerprint: <code>{keyInfo.fingerprint}</code>
+              {t('sshKey.fingerprint')}: <code>{keyInfo.fingerprint}</code>
             </div>
           )}
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Path: <code>{keyInfo.key_path}</code>
+            {t('sshKey.path')}: <code>{keyInfo.key_path}</code>
           </div>
           <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
-            Use the "Deploy Key" button on each server to automatically register this key,
-            or manually add it to the remote server's <code>~/.ssh/authorized_keys</code>.
+            {t('sshKey.deployHint')}
           </p>
         </div>
       )}
 
       {!keyInfo?.exists && (
-        <p className="text-secondary">
-          No SSH key pair found. Click "Generate Key" to create an ed25519 key pair for NabiMan.
-          This key will be used for passwordless authentication to remote servers.
-        </p>
+        <p className="text-secondary">{t('sshKey.noKeyHint')}</p>
       )}
     </div>
   );
 }
 
 function DeployKeyDialog({ server, onClose }: { server: RemoteServer; onClose: () => void }) {
+  const { t } = useT();
   const [password, setPassword] = useState('');
   const [deploying, setDeploying] = useState(false);
   const [result, setResult] = useState('');
@@ -111,17 +110,17 @@ function DeployKeyDialog({ server, onClose }: { server: RemoteServer; onClose: (
   return (
     <div className="deploy-key-dialog">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-        <strong>Deploy Key to {server.name} ({server.user}@{server.host})</strong>
-        <button className="btn btn-secondary btn-sm" onClick={onClose}>Close</button>
+        <strong>{t('deployKey.title')} {server.name} ({server.user}@{server.host})</strong>
+        <button className="btn btn-secondary btn-sm" onClick={onClose}>{t('common.close')}</button>
       </div>
 
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
         <button className="btn btn-secondary btn-sm" onClick={handleTest} disabled={testing}>
-          {testing ? 'Testing...' : 'Test Key Auth'}
+          {testing ? t('deployKey.testing') : t('deployKey.testAuth')}
         </button>
         {keyWorks !== null && (
           <span className={`status-badge ${keyWorks ? 'up' : 'down'}`}>
-            {keyWorks ? 'Key auth works!' : 'Key auth not working'}
+            {keyWorks ? t('deployKey.authWorks') : t('deployKey.authNotWorking')}
           </span>
         )}
       </div>
@@ -129,21 +128,20 @@ function DeployKeyDialog({ server, onClose }: { server: RemoteServer; onClose: (
       {keyWorks !== true && (
         <>
           <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '8px 0' }}>
-            Enter the SSH password for <code>{server.user}@{server.host}</code> to deploy the public key automatically.
-            The password is used once for deployment and is not stored.
+            <code>{server.user}@{server.host}</code>{t('deployKey.passwordHint')}
           </p>
           <div className="filter-row">
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder="SSH password..."
+              placeholder={t('deployKey.passwordPlaceholder')}
               className="filter-input"
               style={{ flex: 1 }}
               onKeyDown={e => e.key === 'Enter' && handleDeploy()}
             />
             <button className="btn btn-primary btn-sm" onClick={handleDeploy} disabled={deploying || !password}>
-              {deploying ? 'Deploying...' : 'Deploy Key'}
+              {deploying ? t('deployKey.deploying') : t('deployKey.deploy')}
             </button>
           </div>
         </>
@@ -165,6 +163,7 @@ function DeployKeyDialog({ server, onClose }: { server: RemoteServer; onClose: (
 }
 
 function AddServerForm({ onAdded }: { onAdded: () => void }) {
+  const { t } = useT();
   const [name, setName] = useState('');
   const [host, setHost] = useState('');
   const [port, setPort] = useState('22');
@@ -188,7 +187,7 @@ function AddServerForm({ onAdded }: { onAdded: () => void }) {
       tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [],
       memo: memo.trim(),
     });
-    setMessage(res.success ? 'Server added' : res.message);
+    setMessage(res.success ? t('remote.serverAdded') : res.message);
     if (res.success) {
       setName(''); setHost(''); setPort('22'); setUser('root'); setTags(''); setMemo('');
       onAdded();
@@ -198,43 +197,43 @@ function AddServerForm({ onAdded }: { onAdded: () => void }) {
 
   return (
     <form onSubmit={handleSubmit} className="add-server-form">
-      <h3>Add Remote Server</h3>
+      <h3>{t('remote.addRemoteServer')}</h3>
       {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
       <div className="form-grid">
         <div className="form-group">
-          <label>Name *</label>
+          <label>{t('common.name')} *</label>
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Production Web" required className="filter-input" />
         </div>
         <div className="form-group">
-          <label>Host *</label>
-          <input value={host} onChange={e => setHost(e.target.value)} placeholder="192.168.1.100 or server.example.com" required className="filter-input" />
+          <label>{t('remote.host')} *</label>
+          <input value={host} onChange={e => setHost(e.target.value)} placeholder="192.168.1.100" required className="filter-input" />
         </div>
         <div className="form-group">
-          <label>Port</label>
+          <label>{t('remote.port')}</label>
           <input value={port} onChange={e => setPort(e.target.value)} type="number" className="filter-input" />
         </div>
         <div className="form-group">
-          <label>User</label>
+          <label>{t('remote.user')}</label>
           <input value={user} onChange={e => setUser(e.target.value)} placeholder="root" className="filter-input" />
         </div>
         <div className="form-group">
-          <label>Auth</label>
+          <label>{t('remote.auth')}</label>
           <select value={authMethod} onChange={e => setAuthMethod(e.target.value)} className="select-input">
-            <option value="key">SSH Key</option>
-            <option value="password">Password</option>
+            <option value="key">{t('remote.sshKey')}</option>
+            <option value="password">{t('accounts.password')}</option>
           </select>
         </div>
         <div className="form-group">
-          <label>Tags</label>
+          <label>{t('remote.tags')}</label>
           <input value={tags} onChange={e => setTags(e.target.value)} placeholder="web, production" className="filter-input" />
         </div>
         <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-          <label>Memo</label>
-          <input value={memo} onChange={e => setMemo(e.target.value)} placeholder="Optional notes..." className="filter-input" />
+          <label>{t('remote.memo')}</label>
+          <input value={memo} onChange={e => setMemo(e.target.value)} placeholder="..." className="filter-input" />
         </div>
       </div>
       <button type="submit" className="btn btn-primary" disabled={saving}>
-        {saving ? 'Adding...' : 'Add Server'}
+        {saving ? t('remote.adding') : t('remote.addServer')}
       </button>
     </form>
   );
@@ -247,6 +246,7 @@ function ServerCard({
   onRefresh: () => void;
   onConnectSSH: (server: RemoteServer) => void;
 }) {
+  const { t } = useT();
   const [status, setStatus] = useState<RemoteServerStatus | null>(null);
   const [checking, setChecking] = useState(false);
   const [execCmd, setExecCmd] = useState('');
@@ -302,21 +302,21 @@ function ServerCard({
         {editing ? (
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1 }}>
             <input value={editName} onChange={e => setEditName(e.target.value)} className="filter-input" style={{ width: '200px' }} />
-            <input value={editTags} onChange={e => setEditTags(e.target.value)} className="filter-input" placeholder="tags" style={{ width: '200px' }} />
-            <input value={editMemo} onChange={e => setEditMemo(e.target.value)} className="filter-input" placeholder="memo" style={{ flex: 1 }} />
-            <button className="btn btn-primary btn-sm" onClick={handleSaveEdit}>Save</button>
-            <button className="btn btn-secondary btn-sm" onClick={() => setEditing(false)}>Cancel</button>
+            <input value={editTags} onChange={e => setEditTags(e.target.value)} className="filter-input" placeholder={t('remote.tags')} style={{ width: '200px' }} />
+            <input value={editMemo} onChange={e => setEditMemo(e.target.value)} className="filter-input" placeholder={t('remote.memo')} style={{ flex: 1 }} />
+            <button className="btn btn-primary btn-sm" onClick={handleSaveEdit}>{t('common.save')}</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => setEditing(false)}>{t('common.cancel')}</button>
           </div>
         ) : (
           <>
             <h3>{server.name}</h3>
             <div className="config-meta">
               <span className={`status-badge ${statusColor}`}>
-                {server.status || 'unknown'}
+                {server.status || t('common.unknown')}
               </span>
               <code>{server.user}@{server.host}:{server.port}</code>
               <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                {server.auth_method === 'key' ? 'SSH Key' : 'Password'}
+                {server.auth_method === 'key' ? t('remote.sshKey') : t('accounts.password')}
               </span>
               {server.tags.length > 0 && server.tags.map(tag => (
                 <span key={tag} className="tag-badge">{tag}</span>
@@ -324,15 +324,15 @@ function ServerCard({
             </div>
             <div className="btn-group">
               <button className="btn btn-primary btn-sm" onClick={handleCheck} disabled={checking}>
-                {checking ? 'Checking...' : 'Check'}
+                {checking ? t('remote.checking') : t('remote.check')}
               </button>
               <button className="btn btn-secondary btn-sm" onClick={() => onConnectSSH(server)}>SSH</button>
               <button className="btn btn-secondary btn-sm" onClick={() => setShowDeploy(!showDeploy)}>
-                {showDeploy ? 'Hide Key' : 'Deploy Key'}
+                {showDeploy ? t('remote.hideKey') : t('remote.deployKey')}
               </button>
-              <button className="btn btn-secondary btn-sm" onClick={() => setShowExec(!showExec)}>Exec</button>
-              <button className="btn btn-secondary btn-sm" onClick={() => { setEditing(true); setEditName(server.name); setEditMemo(server.memo); setEditTags(server.tags.join(', ')); }}>Edit</button>
-              <button className="btn btn-danger btn-sm" onClick={handleDelete}>Delete</button>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowExec(!showExec)}>{t('remote.exec')}</button>
+              <button className="btn btn-secondary btn-sm" onClick={() => { setEditing(true); setEditName(server.name); setEditMemo(server.memo); setEditTags(server.tags.join(', ')); }}>{t('common.edit')}</button>
+              <button className="btn btn-danger btn-sm" onClick={handleDelete}>{t('common.delete')}</button>
             </div>
           </>
         )}
@@ -346,14 +346,14 @@ function ServerCard({
 
       {status && (
         <div className="server-status-grid">
-          <div className="status-item"><label>Hostname</label><span>{status.hostname}</span></div>
-          <div className="status-item"><label>OS</label><span>{status.os}</span></div>
-          <div className="status-item"><label>Uptime</label><span>{status.uptime}</span></div>
-          <div className="status-item"><label>CPU</label><span>{status.cpu_usage}</span></div>
-          <div className="status-item"><label>Memory</label><span>{status.memory}</span></div>
-          <div className="status-item"><label>Disk (/)</label><span>{status.disk}</span></div>
-          <div className="status-item"><label>Load</label><span>{status.load}</span></div>
-          <div className="status-item"><label>Checked</label><span>{status.checked_at}</span></div>
+          <div className="status-item"><label>{t('remote.hostname')}</label><span>{status.hostname}</span></div>
+          <div className="status-item"><label>{t('remote.os')}</label><span>{status.os}</span></div>
+          <div className="status-item"><label>{t('remote.uptime')}</label><span>{status.uptime}</span></div>
+          <div className="status-item"><label>{t('remote.cpu')}</label><span>{status.cpu_usage}</span></div>
+          <div className="status-item"><label>{t('remote.memory')}</label><span>{status.memory}</span></div>
+          <div className="status-item"><label>{t('remote.diskRoot')}</label><span>{status.disk}</span></div>
+          <div className="status-item"><label>{t('remote.load')}</label><span>{status.load}</span></div>
+          <div className="status-item"><label>{t('remote.checked')}</label><span>{status.checked_at}</span></div>
         </div>
       )}
 
@@ -363,13 +363,13 @@ function ServerCard({
             <input
               value={execCmd}
               onChange={e => setExecCmd(e.target.value)}
-              placeholder="Enter command to execute on remote..."
+              placeholder={t('remote.execPlaceholder')}
               className="filter-input"
               style={{ flex: 1 }}
               onKeyDown={e => e.key === 'Enter' && handleExec()}
             />
             <button className="btn btn-primary btn-sm" onClick={handleExec} disabled={executing}>
-              {executing ? 'Running...' : 'Run'}
+              {executing ? t('common.running') : t('common.run')}
             </button>
           </div>
           {execResult && <pre className="config-preview" style={{ maxHeight: '200px' }}>{execResult}</pre>}
@@ -378,7 +378,7 @@ function ServerCard({
 
       {server.last_checked && !status && (
         <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '2px 0' }}>
-          Last checked: {server.last_checked}
+          {t('remote.lastChecked')}: {server.last_checked}
         </div>
       )}
     </div>
@@ -386,6 +386,7 @@ function ServerCard({
 }
 
 export default function RemoteServersPanel({ onConnectSSH }: { onConnectSSH?: (host: string, port: number, user: string) => void }) {
+  const { t } = useT();
   const { data, loading, error, refetch } = useApi<RemoteServer[]>('/api/remote-servers');
   const [showAdd, setShowAdd] = useState(false);
   const [showKeyPanel, setShowKeyPanel] = useState(false);
@@ -395,11 +396,11 @@ export default function RemoteServersPanel({ onConnectSSH }: { onConnectSSH?: (h
 
   const handleCheckAll = async () => {
     setCheckingAll(true);
-    setMessage('Checking all servers...');
+    setMessage(t('remote.checkingAll'));
     const res = await apiPost<RemoteServerStatus[]>('/api/remote-servers/check-all', {});
     if (res.success && res.data) {
       const online = res.data.filter(s => s.status === 'online').length;
-      setMessage(`Check complete: ${online}/${res.data.length} online`);
+      setMessage(`${online}/${res.data.length} ${t('common.online')}`);
     } else {
       setMessage(res.message);
     }
@@ -413,8 +414,8 @@ export default function RemoteServersPanel({ onConnectSSH }: { onConnectSSH?: (h
     }
   };
 
-  if (loading) return <div className="panel loading">Loading remote servers...</div>;
-  if (error) return <div className="panel error">Error: {error}</div>;
+  if (loading) return <div className="panel loading">{t('common.loading')}</div>;
+  if (error) return <div className="panel error">{t('common.error')}: {error}</div>;
 
   const servers = data || [];
   const filtered = servers.filter(s => {
@@ -432,21 +433,21 @@ export default function RemoteServersPanel({ onConnectSSH }: { onConnectSSH?: (h
   return (
     <div className="panel">
       <div className="panel-header">
-        <h2>Remote Servers</h2>
+        <h2>{t('remote.title')}</h2>
         <div className="server-summary">
-          <span className="status-badge up">{onlineCount} online</span>
-          {offlineCount > 0 && <span className="status-badge down">{offlineCount} offline</span>}
-          <span className="text-secondary">{servers.length} total</span>
+          <span className="status-badge up">{onlineCount} {t('common.online')}</span>
+          {offlineCount > 0 && <span className="status-badge down">{offlineCount} {t('common.offline')}</span>}
+          <span className="text-secondary">{servers.length} {t('remote.total')}</span>
         </div>
         <div className="btn-group">
           <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(!showAdd)}>
-            {showAdd ? 'Close' : '+ Add Server'}
+            {showAdd ? t('common.close') : t('remote.addServer')}
           </button>
           <button className="btn btn-secondary btn-sm" onClick={() => setShowKeyPanel(!showKeyPanel)}>
-            {showKeyPanel ? 'Hide Key' : 'SSH Key'}
+            {showKeyPanel ? t('remote.hideKey') : t('remote.sshKey')}
           </button>
           <button className="btn btn-secondary btn-sm" onClick={handleCheckAll} disabled={checkingAll || servers.length === 0}>
-            {checkingAll ? 'Checking...' : 'Check All'}
+            {checkingAll ? t('remote.checking') : t('remote.checkAll')}
           </button>
         </div>
       </div>
@@ -460,7 +461,7 @@ export default function RemoteServersPanel({ onConnectSSH }: { onConnectSSH?: (h
         <input
           value={filter}
           onChange={e => setFilter(e.target.value)}
-          placeholder="Filter by name, host, tag..."
+          placeholder={t('remote.filterPlaceholder')}
           className="filter-input"
           style={{ marginBottom: '8px' }}
         />
@@ -468,10 +469,10 @@ export default function RemoteServersPanel({ onConnectSSH }: { onConnectSSH?: (h
 
       {filtered.length === 0 && servers.length === 0 && (
         <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-secondary)' }}>
-          <p>No remote servers registered.</p>
-          <p>Click "+ Add Server" to register your first remote server.</p>
+          <p>{t('remote.noServers')}</p>
+          <p>{t('remote.noServersHint')}</p>
           <p style={{ fontSize: '12px', marginTop: '12px' }}>
-            Click "SSH Key" to generate a key pair, then "Deploy Key" on each server for passwordless auth.
+            {t('remote.noServersKeyHint')}
           </p>
         </div>
       )}

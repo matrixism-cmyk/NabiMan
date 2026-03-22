@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useApi, apiPost } from '../hooks/useApi';
 import { CronJob } from '../types';
+import { useT } from '../i18n';
 
 export default function CronPanel() {
+  const { t } = useT();
   const { data, loading, error, refetch } = useApi<CronJob[]>('/api/cron');
   const [showForm, setShowForm] = useState(false);
   const [user, setUser] = useState('root');
@@ -36,15 +38,15 @@ export default function CronPanel() {
     refetch();
   };
 
-  if (loading) return <div className="panel loading">Loading cron jobs...</div>;
-  if (error) return <div className="panel error">Error: {error}</div>;
+  if (loading) return <div className="panel loading">{t('cron.loading')}</div>;
+  if (error) return <div className="panel error">{t('common.error')}: {error}</div>;
 
   return (
     <div className="panel">
       <div className="panel-header">
-        <h2>Scheduled Tasks (Cron)</h2>
+        <h2>{t('cron.title')}</h2>
         <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-          {showForm ? 'Cancel' : 'Add Job'}
+          {showForm ? t('common.cancel') : t('cron.addJob')}
         </button>
       </div>
 
@@ -52,27 +54,27 @@ export default function CronPanel() {
 
       {showForm && (
         <form onSubmit={handleAdd} className="inline-form">
-          <h3>New Cron Job</h3>
+          <h3>{t('cron.newJob')}</h3>
           <div className="form-row">
-            <label>User</label>
+            <label>{t('cron.user')}</label>
             <input value={user} onChange={e => setUser(e.target.value)} placeholder="root" required />
           </div>
           <div className="form-row">
-            <label>Schedule</label>
+            <label>{t('cron.schedule')}</label>
             <input value={schedule} onChange={e => setSchedule(e.target.value)}
               placeholder="*/5 * * * *" required />
             <span className="text-secondary" style={{ fontSize: '12px' }}>
-              min hour dom month dow
+              {t('cron.scheduleHelp')}
             </span>
           </div>
           <div className="form-row">
-            <label>Command</label>
+            <label>{t('cron.command')}</label>
             <input value={command} onChange={e => setCommand(e.target.value)}
               placeholder="/usr/bin/some-script.sh" required />
           </div>
           <div className="btn-group">
-            <button type="submit" className="btn btn-primary" disabled={actionLoading}>Add</button>
-            <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={actionLoading}>{t('common.add')}</button>
+            <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>{t('common.cancel')}</button>
           </div>
         </form>
       )}
@@ -81,10 +83,10 @@ export default function CronPanel() {
         <thead>
           <tr>
             <th>#</th>
-            <th>User</th>
-            <th>Schedule</th>
-            <th>Command</th>
-            <th>Actions</th>
+            <th>{t('cron.user')}</th>
+            <th>{t('cron.schedule')}</th>
+            <th>{t('cron.command')}</th>
+            <th>{t('common.actions')}</th>
           </tr>
         </thead>
         <tbody>
@@ -96,14 +98,14 @@ export default function CronPanel() {
               <td><code>{job.command}</code></td>
               <td>
                 <button className="btn btn-danger btn-sm" disabled={actionLoading}
-                  onClick={() => handleDelete(job.user, job.id)}>Delete</button>
+                  onClick={() => handleDelete(job.user, job.id)}>{t('common.delete')}</button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
       {(data || []).length === 0 && (
-        <p className="text-secondary">No cron jobs found.</p>
+        <p className="text-secondary">{t('cron.noJobs')}</p>
       )}
     </div>
   );
