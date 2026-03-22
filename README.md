@@ -24,7 +24,7 @@ Linux 서버를 웹 브라우저에서 통합 관리하는 대시보드.
 | **웹 터미널** | xterm.js 기반 풀 터미널, 256색/Truecolor, 복사/붙여넣기, 폰트 크기 조절 |
 | **원격 서버 관리** | 원격 서버 등록/수정/삭제, SSH 프로브 상태 확인, 원격 커맨드 실행, 터미널 연동 |
 | **SSH 접속** | 웹 터미널에서 원격 서버 SSH 접속 (host, port, user 지정) |
-| **인증** | 토큰 기반 로그인, 모든 API 보호 |
+| **인증** | 토큰 기반 로그인, 모든 API 보호, 웹 UI 비밀번호 변경 |
 
 ## 프로젝트 구조
 
@@ -120,7 +120,7 @@ NABIMAN_PASSWORD=mypassword ./target/release/nabiman-server
 | 변수 | 기본값 | 설명 |
 |------|--------|------|
 | `NABIMAN_PORT` | `8080` | 서버 포트 |
-| `NABIMAN_PASSWORD` | `nabiman` | 관리자 비밀번호 |
+| `NABIMAN_PASSWORD` | `nabiman` | 관리자 초기 비밀번호 (웹 UI에서 변경 가능) |
 | `NABIMAN_STATIC` | `./static` | 프론트엔드 정적 파일 경로 |
 | `NABIMAN_DATA_DIR` | `/var/lib/nabiman` | 데이터 저장 경로 (원격 서버 목록 등) |
 
@@ -131,6 +131,7 @@ NABIMAN_PASSWORD=mypassword ./target/release/nabiman-server
 |--------|------|------|
 | POST | `/api/auth/login` | 로그인 (password → token) |
 | POST | `/api/auth/logout` | 로그아웃 |
+| POST | `/api/auth/change-password` | 비밀번호 변경 (current_password, new_password) |
 
 ### 서버
 | Method | Path | 설명 |

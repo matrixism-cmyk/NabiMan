@@ -16,7 +16,7 @@ import ProcessesPanel from './components/ProcessesPanel';
 import DisksPanel from './components/DisksPanel';
 import RemoteServersPanel from './components/RemoteServersPanel';
 import TerminalPanel from './components/TerminalPanel';
-import { clearToken } from './hooks/useApi';
+import { clearToken, apiPost } from './hooks/useApi';
 
 type Tab = 'server' | 'network' | 'accounts' | 'config' | 'traffic' | 'packages'
   | 'containers' | 'services' | 'firewall' | 'logs' | 'cron' | 'processes' | 'disks'
@@ -40,10 +40,47 @@ const tabs: { key: Tab; label: string }[] = [
   { key: 'terminal', label: 'Terminal' },
 ];
 
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const [currentPw, setCurrentPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [msg, setMsg] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMsg('');
+    if (newPw !== confirmPw) { setMsg('New passwords do not match'); return; }
+    if (newPw.length < 4) { setMsg('Password must be at least 4 characters'); return; }
+    const res = await apiPost<string>('/api/auth/change-password', { current_password: currentPw, new_password: newPw });
+    if (res.success) { setSuccess(true); setMsg('Password changed successfully'); }
+    else { setMsg(res.message || 'Failed'); }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <h3>Change Password</h3>
+        <form onSubmit={handleSubmit}>
+          <input type="password" placeholder="Current Password" value={currentPw} onChange={e => setCurrentPw(e.target.value)} required autoFocus />
+          <input type="password" placeholder="New Password" value={newPw} onChange={e => setNewPw(e.target.value)} required />
+          <input type="password" placeholder="Confirm New Password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} required />
+          {msg && <div className={success ? 'login-success' : 'login-error'}>{msg}</div>}
+          <div className="modal-actions">
+            {!success && <button type="submit" className="btn btn-primary">Change</button>}
+            <button type="button" className="btn btn-secondary" onClick={onClose}>{success ? 'Close' : 'Cancel'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [loggedIn, setLoggedIn] = useState(!!sessionStorage.getItem('nabiman_token'));
   const [activeTab, setActiveTab] = useState<Tab>('server');
   const [sshTarget, setSshTarget] = useState<{ host: string; port: number; user: string } | null>(null);
+  const [showChangePw, setShowChangePw] = useState(false);
 
   const handleLogout = () => {
     clearToken();
@@ -64,7 +101,10 @@ function App() {
       <header className="app-header">
         <h1>NabiMan</h1>
         <span className="subtitle">Server Management Dashboard</span>
-        <button className="btn btn-secondary logout-btn" onClick={handleLogout}>Logout</button>
+        <div className="header-actions">
+          <button className="btn btn-secondary" onClick={() => setShowChangePw(true)}>Change Password</button>
+          <button className="btn btn-secondary logout-btn" onClick={handleLogout}>Logout</button>
+        </div>
       </header>
       <nav className="tab-nav">
         {tabs.map((tab) => (
@@ -94,6 +134,7 @@ function App() {
         {activeTab === 'remote' && <RemoteServersPanel onConnectSSH={handleConnectSSH} />}
         {activeTab === 'terminal' && <TerminalPanel sshTarget={sshTarget} onSshConnected={() => setSshTarget(null)} />}
       </main>
+      {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
     </div>
   );
 }

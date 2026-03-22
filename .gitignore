@@ -6,6 +6,9 @@ frontend/node_modules/
 frontend/build/
 frontend/.env.local
 
+# Build artifacts
+backend/static/
+
 # IDE
 .idea/
 .vscode/

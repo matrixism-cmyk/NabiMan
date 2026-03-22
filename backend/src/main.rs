@@ -101,10 +101,10 @@ async fn main() -> std::io::Result<()> {
         .unwrap_or_else(|_| "./static".to_string());
 
     let token_store = auth::new_token_store();
+    let password_store = auth::new_password_store();
 
     println!("NabiMan Server starting on http://0.0.0.0:{}", port);
     println!("Static files: {}", static_dir);
-    println!("Set NABIMAN_PASSWORD env to change admin password (default: nabiman)");
 
     HttpServer::new(move || {
         let cors = Cors::default()
@@ -113,12 +113,14 @@ async fn main() -> std::io::Result<()> {
             .allow_any_header();
 
         let store = token_store.clone();
+        let pw_store = password_store.clone();
         let index_path = format!("{}/index.html", static_dir);
 
         App::new()
             .wrap(cors)
             .wrap(AuthCheck::new(store.clone()))
             .app_data(web::Data::new(store))
+            .app_data(web::Data::new(pw_store))
             .configure(auth::config)
             .configure(server_status::config)
             .configure(network::config)

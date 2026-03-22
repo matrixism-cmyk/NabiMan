@@ -23,7 +23,7 @@ fn check_docker() -> bool {
 
 async fn list_containers() -> HttpResponse {
     if !check_docker() {
-        return HttpResponse::Ok().json(ApiResponse::error("Docker is not available"));
+        return HttpResponse::Ok().json(ApiResponse::<Vec<Container>>::error("Docker is not available"));
     }
 
     match run_docker(&[
@@ -55,7 +55,7 @@ async fn list_containers() -> HttpResponse {
 
 async fn list_images() -> HttpResponse {
     if !check_docker() {
-        return HttpResponse::Ok().json(ApiResponse::error("Docker is not available"));
+        return HttpResponse::Ok().json(ApiResponse::<Vec<ContainerImage>>::error("Docker is not available"));
     }
 
     match run_docker(&[
