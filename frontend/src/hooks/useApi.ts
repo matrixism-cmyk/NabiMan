@@ -85,3 +85,15 @@ export async function apiDelete<T>(endpoint: string, body: object): Promise<ApiR
   }
   return res.json();
 }
+
+export async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+  const res = await fetch(`${API_BASE}${endpoint}`, {
+    ...options,
+    headers: { ...authHeaders(), ...(options.headers as Record<string, string> || {}) },
+  });
+  if (res.status === 401) {
+    clearToken();
+    window.location.reload();
+  }
+  return res.json();
+}

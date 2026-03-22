@@ -12,6 +12,7 @@ mod logs;
 mod cron;
 mod processes;
 mod disks;
+mod remote_servers;
 mod auth;
 mod models;
 
@@ -133,6 +134,7 @@ async fn main() -> std::io::Result<()> {
             .configure(cron::config)
             .configure(processes::config)
             .configure(disks::config)
+            .configure(remote_servers::config)
             .service(
                 afs::Files::new("/", &static_dir)
                     .index_file("index.html")

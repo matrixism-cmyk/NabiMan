@@ -414,6 +414,64 @@ body {
   white-space: nowrap;
 }
 
+/* Remote server styles */
+.add-server-form {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.server-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  padding: 8px 0;
+  font-size: 12px;
+}
+
+.server-status-grid .status-item label {
+  display: block;
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.server-summary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.tag-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 10px;
+  border-radius: 3px;
+  background: var(--primary);
+  color: white;
+  opacity: 0.8;
+}
+
+.exec-area {
+  padding: 8px 0;
+}
+
 /* Select input */
 .select-input {
   padding: 8px 12px;

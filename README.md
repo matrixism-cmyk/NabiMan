@@ -22,6 +22,7 @@ Linux 서버를 웹 브라우저에서 통합 관리하는 대시보드.
 | **로그 뷰어** | journalctl 기반, 유닛/우선순위 필터, 자동 갱신, 키워드 검색 |
 | **스케줄 작업** | cron 작업 목록, 추가/삭제, 사용자별 관리 |
 | **웹 터미널** | xterm.js 기반 풀 터미널, 256색/Truecolor, 복사/붙여넣기, 폰트 크기 조절 |
+| **원격 서버 관리** | 원격 서버 등록/수정/삭제, SSH 프로브 상태 확인, 원격 커맨드 실행, 터미널 연동 |
 | **SSH 접속** | 웹 터미널에서 원격 서버 SSH 접속 (host, port, user 지정) |
 | **인증** | 토큰 기반 로그인, 모든 API 보호 |
 
@@ -41,6 +42,7 @@ NabiMan/
 │       ├── config_manager.rs # 범용 서비스 설정 관리 API (레지스트리 패턴)
 │       ├── processes.rs      # 프로세스 모니터 API
 │       ├── disks.rs          # 디스크/스토리지 API
+│       ├── remote_servers.rs # 원격 서버 인벤토리 관리 API
 │       ├── traffic.rs        # 트래픽 모니터링 API
 │       ├── packages.rs       # 패키지 관리 API
 │       ├── containers.rs     # Docker 컨테이너 관리 API
@@ -71,6 +73,7 @@ NabiMan/
             ├── CronPanel.tsx        # 스케줄 작업
             ├── ProcessesPanel.tsx   # 프로세스 모니터
             ├── DisksPanel.tsx       # 디스크/스토리지
+            ├── RemoteServersPanel.tsx # 원격 서버 관리
             └── TerminalPanel.tsx     # 웹 터미널 + SSH
 ```
 
@@ -119,6 +122,7 @@ NABIMAN_PASSWORD=mypassword ./target/release/nabiman-server
 | `NABIMAN_PORT` | `8080` | 서버 포트 |
 | `NABIMAN_PASSWORD` | `nabiman` | 관리자 비밀번호 |
 | `NABIMAN_STATIC` | `./static` | 프론트엔드 정적 파일 경로 |
+| `NABIMAN_DATA_DIR` | `/var/lib/nabiman` | 데이터 저장 경로 (원격 서버 목록 등) |
 
 ## API 엔드포인트
 
@@ -168,6 +172,17 @@ NABIMAN_PASSWORD=mypassword ./target/release/nabiman-server
 | Method | Path | 설명 |
 |--------|------|------|
 | GET | `/api/disks/status` | 파티션 사용량 + Disk I/O |
+
+### 원격 서버
+| Method | Path | 설명 |
+|--------|------|------|
+| GET | `/api/remote-servers` | 등록된 원격 서버 목록 |
+| POST | `/api/remote-servers` | 원격 서버 등록 |
+| PUT | `/api/remote-servers/{id}` | 원격 서버 정보 수정 |
+| DELETE | `/api/remote-servers/{id}` | 원격 서버 삭제 |
+| POST | `/api/remote-servers/{id}/check` | SSH 프로브 상태 확인 (OS, CPU, Memory, Disk) |
+| POST | `/api/remote-servers/{id}/exec` | 원격 커맨드 실행 |
+| POST | `/api/remote-servers/check-all` | 전체 서버 일괄 상태 확인 |
 
 ### 트래픽
 | Method | Path | 설명 |

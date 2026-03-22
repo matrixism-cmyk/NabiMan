@@ -14,14 +14,17 @@ import LogsPanel from './components/LogsPanel';
 import CronPanel from './components/CronPanel';
 import ProcessesPanel from './components/ProcessesPanel';
 import DisksPanel from './components/DisksPanel';
+import RemoteServersPanel from './components/RemoteServersPanel';
 import TerminalPanel from './components/TerminalPanel';
 import { clearToken } from './hooks/useApi';
 
 type Tab = 'server' | 'network' | 'accounts' | 'config' | 'traffic' | 'packages'
-  | 'containers' | 'services' | 'firewall' | 'logs' | 'cron' | 'processes' | 'disks' | 'terminal';
+  | 'containers' | 'services' | 'firewall' | 'logs' | 'cron' | 'processes' | 'disks'
+  | 'remote' | 'terminal';
 
 const tabs: { key: Tab; label: string }[] = [
   { key: 'server', label: 'Server Status' },
+  { key: 'remote', label: 'Remote Servers' },
   { key: 'processes', label: 'Processes' },
   { key: 'disks', label: 'Disks' },
   { key: 'network', label: 'Network' },
@@ -40,10 +43,16 @@ const tabs: { key: Tab; label: string }[] = [
 function App() {
   const [loggedIn, setLoggedIn] = useState(!!sessionStorage.getItem('nabiman_token'));
   const [activeTab, setActiveTab] = useState<Tab>('server');
+  const [sshTarget, setSshTarget] = useState<{ host: string; port: number; user: string } | null>(null);
 
   const handleLogout = () => {
     clearToken();
     setLoggedIn(false);
+  };
+
+  const handleConnectSSH = (host: string, port: number, user: string) => {
+    setSshTarget({ host, port, user });
+    setActiveTab('terminal');
   };
 
   if (!loggedIn) {
@@ -82,7 +91,8 @@ function App() {
         {activeTab === 'cron' && <CronPanel />}
         {activeTab === 'processes' && <ProcessesPanel />}
         {activeTab === 'disks' && <DisksPanel />}
-        {activeTab === 'terminal' && <TerminalPanel />}
+        {activeTab === 'remote' && <RemoteServersPanel onConnectSSH={handleConnectSSH} />}
+        {activeTab === 'terminal' && <TerminalPanel sshTarget={sshTarget} onSshConnected={() => setSshTarget(null)} />}
       </main>
     </div>
   );

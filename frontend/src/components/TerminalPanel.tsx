@@ -36,7 +36,12 @@ const THEME = {
   brightWhite: '#ffffff',
 };
 
-export default function TerminalPanel() {
+interface TerminalPanelProps {
+  sshTarget?: { host: string; port: number; user: string } | null;
+  onSshConnected?: () => void;
+}
+
+export default function TerminalPanel({ sshTarget: externalSshTarget, onSshConnected }: TerminalPanelProps) {
   const termRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -211,6 +216,23 @@ export default function TerminalPanel() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Handle external SSH target from RemoteServersPanel
+  useEffect(() => {
+    if (externalSshTarget && externalSshTarget.host) {
+      const target: SshTarget = {
+        host: externalSshTarget.host,
+        port: String(externalSshTarget.port),
+        user: externalSshTarget.user,
+      };
+      setSshTarget(target);
+      setMode('ssh');
+      setShowSshForm(false);
+      connect(target);
+      onSshConnected?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalSshTarget]);
 
   const handleSshConnect = (e: React.FormEvent) => {
     e.preventDefault();

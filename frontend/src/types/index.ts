@@ -172,6 +172,36 @@ export interface DiskStatus {
   io: DiskIo[];
 }
 
+// --- Remote server types ---
+export interface RemoteServer {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  user: string;
+  auth_method: string;
+  tags: string[];
+  memo: string;
+  created_at: string;
+  last_checked: string;
+  status: string;
+}
+
+export interface RemoteServerStatus {
+  id: string;
+  name: string;
+  host: string;
+  status: string;
+  hostname: string;
+  os: string;
+  uptime: string;
+  cpu_usage: string;
+  memory: string;
+  disk: string;
+  load: string;
+  checked_at: string;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data: T | null;
