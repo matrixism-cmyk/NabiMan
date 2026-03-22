@@ -88,45 +88,95 @@ function ConfigEditor({ serviceId, displayName }: { serviceId: string; displayNa
   );
 }
 
+function ServiceCard({ svc }: { svc: ServiceDefinition }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div key={svc.id}>
+      <div className="service-detect-header" onClick={() => setExpanded(!expanded)}
+        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
+        <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{expanded ? '▼' : '▶'}</span>
+        <strong>{svc.display_name}</strong>
+        <span className={`status-badge ${svc.is_running ? 'up' : 'down'}`} style={{ fontSize: '11px' }}>
+          {svc.is_running ? 'Running' : 'Stopped'}
+        </span>
+        {svc.version && (
+          <code style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{svc.version}</code>
+        )}
+        {svc.detected_by && (
+          <span style={{ fontSize: '11px', color: 'var(--text-secondary)', marginLeft: 'auto' }}>
+            Detected: {svc.detected_by.join(', ')}
+          </span>
+        )}
+      </div>
+      {expanded && <ConfigEditor serviceId={svc.id} displayName={svc.display_name} />}
+    </div>
+  );
+}
+
+type FilterMode = 'installed' | 'running' | 'all';
+
 export default function ConfigPanel() {
   const { data: services, loading } = useApi<ServiceDefinition[]>('/api/config/services');
-  const [filter, setFilter] = useState<'all' | 'found' | 'running'>('found');
+  const [filter, setFilter] = useState<FilterMode>('installed');
 
   if (loading) return <div className="panel loading">Loading service configurations...</div>;
 
-  const filtered = (services || []).filter(svc => {
-    if (filter === 'found') return svc.config_found;
+  const allServices = services || [];
+  const installedCount = allServices.filter(s => s.is_installed).length;
+  const runningCount = allServices.filter(s => s.is_running).length;
+
+  const filtered = allServices.filter(svc => {
+    if (filter === 'installed') return svc.is_installed;
     if (filter === 'running') return svc.is_running;
     return true;
   });
+
+  const filterButtons: { key: FilterMode; label: string; count: number }[] = [
+    { key: 'installed', label: 'Installed', count: installedCount },
+    { key: 'running', label: 'Running', count: runningCount },
+    { key: 'all', label: 'All', count: allServices.length },
+  ];
 
   return (
     <div className="panel">
       <div className="panel-header">
         <h2>Service Configuration</h2>
         <div className="btn-group">
-          {(['found', 'running', 'all'] as const).map(f => (
-            <button key={f} className={`btn btn-sm ${filter === f ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setFilter(f)}>
-              {f === 'found' ? 'Installed' : f === 'running' ? 'Running' : 'All'}
+          {filterButtons.map(f => (
+            <button key={f.key}
+              className={`btn btn-sm ${filter === f.key ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setFilter(f.key)}>
+              {f.label} ({f.count})
             </button>
           ))}
         </div>
       </div>
 
-      {filtered.length === 0 && (
-        <p className="text-secondary">No services matched the filter. Try "All" to see all registered services.</p>
+      {filtered.length === 0 ? (
+        <p className="text-secondary">
+          No services detected. Try "All" to see all registered services.
+        </p>
+      ) : (
+        <p className="text-secondary" style={{ marginBottom: '8px' }}>
+          {filter === 'installed'
+            ? `${installedCount} service(s) auto-detected on this system. Click to expand config editor.`
+            : filter === 'running'
+            ? `${runningCount} service(s) currently running.`
+            : `${allServices.length} registered service(s). Grayed out ones are not installed.`}
+        </p>
       )}
 
       {filtered.map(svc => (
-        <ConfigEditor key={svc.id} serviceId={svc.id} displayName={svc.display_name} />
+        <div key={svc.id} style={{
+          opacity: filter === 'all' && !svc.is_installed ? 0.5 : 1,
+          borderBottom: '1px solid var(--border)',
+          paddingBottom: '4px',
+          marginBottom: '4px',
+        }}>
+          <ServiceCard svc={svc} />
+        </div>
       ))}
-
-      <div style={{ marginTop: '12px' }}>
-        <p className="text-secondary">
-          Registered: {(services || []).map(s => s.display_name).join(', ')}
-        </p>
-      </div>
     </div>
   );
 }

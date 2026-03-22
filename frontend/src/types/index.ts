@@ -130,7 +130,10 @@ export interface ServiceDefinition {
   display_name: string;
   config_paths: string[];
   is_running?: boolean;
+  is_installed?: boolean;
   config_found?: boolean;
+  detected_by?: string[];
+  version?: string;
 }
 
 // --- Process types ---

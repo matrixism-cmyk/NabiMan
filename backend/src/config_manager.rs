@@ -17,8 +17,8 @@ fn service_registry() -> Vec<ServiceDefinition> {
             ],
             systemd_names: vec!["httpd".into(), "apache2".into()],
             process_name: "apache".into(),
-            is_running: None,
-            config_found: None,
+            binary_names: vec!["httpd".into(), "apache2".into(), "apache2ctl".into()],
+            is_running: None, is_installed: None, config_found: None, detected_by: None, version: None,
         },
         ServiceDefinition {
             id: "tomcat".into(),
@@ -32,8 +32,8 @@ fn service_registry() -> Vec<ServiceDefinition> {
             ],
             systemd_names: vec!["tomcat".into(), "tomcat9".into(), "tomcat10".into()],
             process_name: "tomcat".into(),
-            is_running: None,
-            config_found: None,
+            binary_names: vec!["catalina.sh".into()],
+            is_running: None, is_installed: None, config_found: None, detected_by: None, version: None,
         },
         ServiceDefinition {
             id: "nginx".into(),
@@ -44,8 +44,8 @@ fn service_registry() -> Vec<ServiceDefinition> {
             ],
             systemd_names: vec!["nginx".into()],
             process_name: "nginx".into(),
-            is_running: None,
-            config_found: None,
+            binary_names: vec!["nginx".into()],
+            is_running: None, is_installed: None, config_found: None, detected_by: None, version: None,
         },
         ServiceDefinition {
             id: "mysql".into(),
@@ -58,8 +58,8 @@ fn service_registry() -> Vec<ServiceDefinition> {
             ],
             systemd_names: vec!["mysql".into(), "mysqld".into(), "mariadb".into()],
             process_name: "mysql".into(),
-            is_running: None,
-            config_found: None,
+            binary_names: vec!["mysql".into(), "mysqld".into(), "mariadb".into(), "mariadbd".into()],
+            is_running: None, is_installed: None, config_found: None, detected_by: None, version: None,
         },
         ServiceDefinition {
             id: "postgresql".into(),
@@ -76,8 +76,8 @@ fn service_registry() -> Vec<ServiceDefinition> {
                 "postgresql@15-main".into(),
             ],
             process_name: "postgres".into(),
-            is_running: None,
-            config_found: None,
+            binary_names: vec!["psql".into(), "postgres".into(), "pg_isready".into()],
+            is_running: None, is_installed: None, config_found: None, detected_by: None, version: None,
         },
         ServiceDefinition {
             id: "redis".into(),
@@ -88,8 +88,8 @@ fn service_registry() -> Vec<ServiceDefinition> {
             ],
             systemd_names: vec!["redis".into(), "redis-server".into()],
             process_name: "redis".into(),
-            is_running: None,
-            config_found: None,
+            binary_names: vec!["redis-server".into(), "redis-cli".into()],
+            is_running: None, is_installed: None, config_found: None, detected_by: None, version: None,
         },
         ServiceDefinition {
             id: "php-fpm".into(),
@@ -107,8 +107,8 @@ fn service_registry() -> Vec<ServiceDefinition> {
                 "php8.1-fpm".into(),
             ],
             process_name: "php-fpm".into(),
-            is_running: None,
-            config_found: None,
+            binary_names: vec!["php-fpm".into(), "php-fpm8.3".into(), "php-fpm8.2".into(), "php-fpm8.1".into()],
+            is_running: None, is_installed: None, config_found: None, detected_by: None, version: None,
         },
         ServiceDefinition {
             id: "sshd".into(),
@@ -116,20 +116,38 @@ fn service_registry() -> Vec<ServiceDefinition> {
             config_paths: vec!["/etc/ssh/sshd_config".into()],
             systemd_names: vec!["sshd".into(), "ssh".into()],
             process_name: "sshd".into(),
-            is_running: None,
-            config_found: None,
+            binary_names: vec!["sshd".into()],
+            is_running: None, is_installed: None, config_found: None, detected_by: None, version: None,
         },
     ]
 }
 
-fn find_service(service_id: &str) -> Option<ServiceDefinition> {
-    service_registry().into_iter().find(|s| s.id == service_id)
+// --- Detection helpers ---
+
+fn check_binary_exists(names: &[String]) -> Option<String> {
+    for name in names {
+        if let Ok(output) = Command::new("which").arg(name).output() {
+            if output.status.success() {
+                return Some(name.clone());
+            }
+        }
+    }
+    None
 }
 
-fn validate_service_id(id: &str) -> bool {
-    !id.is_empty()
-        && id.len() < 64
-        && id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+fn check_systemd_registered(names: &[String]) -> Option<String> {
+    for name in names {
+        if let Ok(output) = Command::new("systemctl")
+            .args(["list-unit-files", &format!("{}.service", name)])
+            .output()
+        {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if stdout.contains(&format!("{}.service", name)) {
+                return Some(name.clone());
+            }
+        }
+    }
+    None
 }
 
 fn check_service_running(def: &ServiceDefinition) -> bool {
@@ -144,6 +162,102 @@ fn check_service_running(def: &ServiceDefinition) -> bool {
         return output.status.success();
     }
     false
+}
+
+fn detect_version(def: &ServiceDefinition) -> Option<String> {
+    let version_cmds: Vec<(&str, &[&str])> = match def.id.as_str() {
+        "apache" => vec![("httpd", &["-v"][..]), ("apache2", &["-v"][..])],
+        "nginx" => vec![("nginx", &["-v"][..])],
+        "mysql" => vec![("mysql", &["--version"][..]), ("mariadb", &["--version"][..])],
+        "postgresql" => vec![("psql", &["--version"][..])],
+        "redis" => vec![("redis-server", &["--version"][..])],
+        "php-fpm" => vec![("php", &["--version"][..])],
+        "sshd" => vec![("sshd", &["-V"][..])],
+        "tomcat" => vec![],
+        _ => vec![],
+    };
+
+    for (cmd, args) in version_cmds {
+        if let Ok(output) = Command::new(cmd).args(args).output() {
+            // Some programs output version to stderr (nginx -v, sshd -V)
+            let text = if output.stdout.is_empty() {
+                String::from_utf8_lossy(&output.stderr).to_string()
+            } else {
+                String::from_utf8_lossy(&output.stdout).to_string()
+            };
+            let first_line = text.lines().next().unwrap_or("").trim().to_string();
+            if !first_line.is_empty() {
+                return Some(first_line);
+            }
+        }
+    }
+
+    // Tomcat: read RELEASE-NOTES or version.sh
+    if def.id == "tomcat" {
+        let dirs = ["/opt/tomcat", "/usr/share/tomcat", "/usr/share/tomcat9", "/usr/share/tomcat10"];
+        for dir in &dirs {
+            let release = format!("{}/RELEASE-NOTES", dir);
+            if let Ok(content) = fs::read_to_string(&release) {
+                for line in content.lines().take(10) {
+                    if line.contains("Apache Tomcat Version") || line.contains("Release Notes") {
+                        return Some(line.trim().to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Comprehensive install detection: binary + systemd + config + running process
+fn detect_service(def: &mut ServiceDefinition) {
+    let mut reasons: Vec<String> = Vec::new();
+
+    // 1. Binary check (which)
+    if let Some(bin) = check_binary_exists(&def.binary_names) {
+        reasons.push(format!("binary: {}", bin));
+    }
+
+    // 2. systemd unit registered
+    if let Some(unit) = check_systemd_registered(&def.systemd_names) {
+        reasons.push(format!("systemd: {}.service", unit));
+    }
+
+    // 3. Config file exists
+    let config_exists = def.config_paths.iter().any(|p| fs::metadata(p).is_ok());
+    if config_exists {
+        reasons.push("config file found".into());
+    }
+
+    // 4. Running process
+    let running = check_service_running(def);
+    if running {
+        reasons.push("process running".into());
+    }
+
+    // 5. Version info
+    let version = if !reasons.is_empty() {
+        detect_version(def)
+    } else {
+        None
+    };
+
+    def.is_running = Some(running);
+    def.config_found = Some(config_exists);
+    def.is_installed = Some(!reasons.is_empty());
+    def.detected_by = if reasons.is_empty() { None } else { Some(reasons) };
+    def.version = version;
+}
+
+fn find_service(service_id: &str) -> Option<ServiceDefinition> {
+    service_registry().into_iter().find(|s| s.id == service_id)
+}
+
+fn validate_service_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() < 64
+        && id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_')
 }
 
 fn read_config(def: &ServiceDefinition) -> ServiceConfig {
@@ -172,8 +286,7 @@ async fn list_services() -> HttpResponse {
     let services: Vec<ServiceDefinition> = service_registry()
         .into_iter()
         .map(|mut def| {
-            def.is_running = Some(check_service_running(&def));
-            def.config_found = Some(def.config_paths.iter().any(|p| fs::metadata(p).is_ok()));
+            detect_service(&mut def);
             def
         })
         .collect();
