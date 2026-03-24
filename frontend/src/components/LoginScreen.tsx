@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { setToken } from '../hooks/useApi';
+import { setToken, setRefreshToken } from '../hooks/useApi';
 import { useT, LANG_LABELS, Lang } from '../i18n';
 
 interface Props {
@@ -8,7 +8,10 @@ interface Props {
 
 export default function LoginScreen({ onLogin }: Props) {
   const { t, lang, setLang } = useT();
+  const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
+  const [totpCode, setTotpCode] = useState('');
+  const [needs2fa, setNeeds2fa] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -16,26 +19,34 @@ export default function LoginScreen({ onLogin }: Props) {
     e.preventDefault();
     setLoading(true);
     setError('');
-
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      });
-      const json = await res.json();
-
-      if (json.success && json.data?.token) {
-        setToken(json.data.token);
-        onLogin();
+      if (needs2fa) {
+        const res = await fetch('/api/auth/2fa/verify', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, code: totpCode }),
+        });
+        const json = await res.json();
+        if (json.success && json.data?.token) {
+          setToken(json.data.token);
+          if (json.data.refresh_token) setRefreshToken(json.data.refresh_token);
+          onLogin();
+        } else { setError(json.message || t('login.failed')); }
       } else {
-        setError(json.message || t('login.failed'));
+        const res = await fetch('/api/auth/login', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+        const json = await res.json();
+        if (json.success && json.data?.requires_2fa) {
+          setNeeds2fa(true); setTotpCode('');
+        } else if (json.success && json.data?.token) {
+          setToken(json.data.token);
+          if (json.data.refresh_token) setRefreshToken(json.data.refresh_token);
+          onLogin();
+        } else { setError(json.message || t('login.failed')); }
       }
-    } catch {
-      setError(t('login.connectionFailed'));
-    } finally {
-      setLoading(false);
-    }
+    } catch { setError(t('login.connectionFailed')); }
+    finally { setLoading(false); }
   };
 
   return (
@@ -44,14 +55,16 @@ export default function LoginScreen({ onLogin }: Props) {
         <h1>{t('app.title')}</h1>
         <p className="login-subtitle">{t('app.subtitle')}</p>
         {error && <div className="login-error">{error}</div>}
-        <input
-          type="password"
-          placeholder={t('login.password')}
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          autoFocus
-          required
-        />
+        {!needs2fa ? (<>
+          <input type="text" placeholder={t('login.username')} value={username}
+            onChange={e => setUsername(e.target.value)} autoFocus required />
+          <input type="password" placeholder={t('login.password')} value={password}
+            onChange={e => setPassword(e.target.value)} required />
+        </>) : (
+          <input type="text" placeholder={t('login.totpCode')} value={totpCode}
+            onChange={e => setTotpCode(e.target.value)} autoFocus required
+            maxLength={6} style={{ textAlign: 'center', fontSize: '24px', letterSpacing: '8px' }} />
+        )}
         <button type="submit" className="btn btn-primary" disabled={loading}>
           {loading ? t('login.loggingIn') : t('login.button')}
         </button>

@@ -4,7 +4,7 @@ use actix_web_actors::ws;
 use std::os::unix::io::{FromRawFd, AsRawFd};
 use std::io::{Read, Write};
 use std::time::Duration;
-use crate::auth::TokenStore;
+use crate::auth::JwtSecret;
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 const PTY_READ_INTERVAL: Duration = Duration::from_millis(30);
@@ -209,13 +209,13 @@ fn validate_ssh_input(s: &str) -> bool {
 async fn ws_terminal(
     req: HttpRequest,
     stream: web::Payload,
-    store: web::Data<TokenStore>,
+    secret: web::Data<JwtSecret>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let query = req.query_string();
 
-    // Auth via token query param
+    // Auth via JWT token in query param
     let authenticated = parse_query_param(query, "token")
-        .map(|token| store.lock().unwrap().contains(&token))
+        .map(|token| crate::auth::check_auth_token(&secret, &token))
         .unwrap_or(false);
 
     if !authenticated {

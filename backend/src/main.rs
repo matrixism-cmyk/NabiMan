@@ -15,7 +15,25 @@ mod processes;
 mod disks;
 mod remote_servers;
 mod ssh_keys;
+mod updates;
+mod diagnostics;
+mod ssl;
+mod charts;
+mod file_manager;
+mod backup;
+mod audit;
+mod database;
+mod mail;
+mod swap;
+mod sessions;
+mod dns;
+mod rate_limit;
+mod security_headers;
 mod auth;
+mod users;
+mod rbac;
+mod jwt_sessions;
+mod totp;
 mod models;
 
 use actix_cors::Cors;
@@ -27,15 +45,13 @@ use std::future::{Ready, ready, Future};
 use std::pin::Pin;
 use std::rc::Rc;
 
-// --- Auth Middleware ---
+// --- Auth Middleware (JWT-based) ---
 pub struct AuthCheck {
-    store: auth::TokenStore,
+    secret: auth::JwtSecret,
 }
 
 impl AuthCheck {
-    pub fn new(store: auth::TokenStore) -> Self {
-        Self { store }
-    }
+    pub fn new(secret: auth::JwtSecret) -> Self { Self { secret } }
 }
 
 impl<S, B> Transform<S, ServiceRequest> for AuthCheck
@@ -52,14 +68,14 @@ where
     fn new_transform(&self, service: S) -> Self::Future {
         ready(Ok(AuthCheckMiddleware {
             service: Rc::new(service),
-            store: self.store.clone(),
+            secret: self.secret.clone(),
         }))
     }
 }
 
 pub struct AuthCheckMiddleware<S> {
     service: Rc<S>,
-    store: auth::TokenStore,
+    secret: auth::JwtSecret,
 }
 
 impl<S, B> Service<ServiceRequest> for AuthCheckMiddleware<S>
@@ -76,7 +92,7 @@ where
     }
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        if !auth::check_auth(&req, &self.store) {
+        if !auth::check_auth(&req, &self.secret) {
             return Box::pin(async {
                 Ok(req.into_response(
                     HttpResponse::Unauthorized()
@@ -84,7 +100,6 @@ where
                 ).map_into_right_body())
             });
         }
-
         let svc = self.service.clone();
         Box::pin(async move {
             svc.call(req).await.map(|res| res.map_into_left_body())
@@ -92,38 +107,69 @@ where
     }
 }
 
+fn build_cors() -> Cors {
+    match std::env::var("NABIMAN_CORS_ORIGINS") {
+        Ok(origins) if !origins.is_empty() => {
+            let mut cors = Cors::default()
+                .allow_any_method()
+                .allowed_headers(["Content-Type", "Authorization", "X-Auth-Token"])
+                .max_age(3600);
+            for origin in origins.split(',') {
+                cors = cors.allowed_origin(origin.trim());
+            }
+            cors
+        }
+        _ => Cors::default()
+            .allow_any_origin()
+            .allow_any_method()
+            .allowed_headers(["Content-Type", "Authorization", "X-Auth-Token"])
+            .max_age(3600),
+    }
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let port: u16 = std::env::var("NABIMAN_PORT")
-        .ok()
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(8080);
-
+        .ok().and_then(|p| p.parse().ok()).unwrap_or(8080);
     let static_dir = std::env::var("NABIMAN_STATIC")
         .unwrap_or_else(|_| "./static".to_string());
 
-    let token_store = auth::new_token_store();
     let password_store = auth::new_password_store();
+    let jwt_secret = auth::new_jwt_secret();
+    let pw_hash = password_store.lock().unwrap().clone();
+    let user_store = users::new_user_store(&pw_hash);
+    let session_store = jwt_sessions::new_session_store();
+    let history_store = charts::new_history_store();
+    let audit_log = audit::new_audit_log();
+    charts::start_collector(history_store.clone());
 
     println!("NabiMan Server starting on http://0.0.0.0:{}", port);
     println!("Static files: {}", static_dir);
 
     HttpServer::new(move || {
-        let cors = Cors::default()
-            .allow_any_origin()
-            .allow_any_method()
-            .allow_any_header();
-
-        let store = token_store.clone();
+        let secret = jwt_secret.clone();
         let pw_store = password_store.clone();
+        let usr_store = user_store.clone();
+        let sess_store = session_store.clone();
+        let hist_store = history_store.clone();
+        let aud_log = audit_log.clone();
         let index_path = format!("{}/index.html", static_dir);
 
         App::new()
-            .wrap(cors)
-            .wrap(AuthCheck::new(store.clone()))
-            .app_data(web::Data::new(store))
+            .wrap(security_headers::SecurityHeaders)
+            .wrap(build_cors())
+            .wrap(rate_limit::RateLimiter::new())
+            .wrap(AuthCheck::new(secret.clone()))
+            .app_data(web::Data::new(secret))
             .app_data(web::Data::new(pw_store))
+            .app_data(web::Data::new(usr_store))
+            .app_data(web::Data::new(sess_store))
+            .app_data(web::Data::new(hist_store))
+            .app_data(web::Data::new(aud_log))
             .configure(auth::config)
+            .configure(users::config)
+            .configure(jwt_sessions::config)
+            .configure(totp::config)
             .configure(server_status::config)
             .configure(network::config)
             .configure(accounts::config)
@@ -139,15 +185,25 @@ async fn main() -> std::io::Result<()> {
             .configure(processes::config)
             .configure(disks::config)
             .configure(remote_servers::config)
+            .configure(updates::config)
+            .configure(diagnostics::config)
+            .configure(ssl::config)
+            .configure(charts::config)
+            .configure(file_manager::config)
+            .configure(backup::config)
+            .configure(audit::config)
+            .configure(database::config)
+            .configure(mail::config)
+            .configure(swap::config)
+            .configure(sessions::config)
+            .configure(dns::config)
             .service(
                 afs::Files::new("/", &static_dir)
                     .index_file("index.html")
                     .default_handler(
                         web::to(move || {
                             let path = index_path.clone();
-                            async move {
-                                afs::NamedFile::open_async(path).await
-                            }
+                            async move { afs::NamedFile::open_async(path).await }
                         })
                     )
             )

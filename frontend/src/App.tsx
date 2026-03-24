@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import './App.css';
 import './components.css';
 import LoginScreen from './components/LoginScreen';
@@ -17,29 +17,76 @@ import ProcessesPanel from './components/ProcessesPanel';
 import DisksPanel from './components/DisksPanel';
 import RemoteServersPanel from './components/RemoteServersPanel';
 import TerminalPanel from './components/TerminalPanel';
-import { clearToken, apiPost } from './hooks/useApi';
+import UpdatesPanel from './components/UpdatesPanel';
+import DiagnosticsPanel from './components/DiagnosticsPanel';
+import SslPanel from './components/SslPanel';
+import ChartsPanel from './components/ChartsPanel';
+import FileManagerPanel from './components/FileManagerPanel';
+import BackupPanel from './components/BackupPanel';
+import AuditPanel from './components/AuditPanel';
+import DatabasePanel from './components/DatabasePanel';
+import MailPanel from './components/MailPanel';
+import SwapPanel from './components/SwapPanel';
+import SessionsPanel from './components/SessionsPanel';
+import DnsPanel from './components/DnsPanel';
+import UserManagementPanel from './components/UserManagementPanel';
+import { clearToken, apiPost, useApi } from './hooks/useApi';
 import { useT, LANG_LABELS, Lang } from './i18n';
 
-type Tab = 'server' | 'network' | 'accounts' | 'config' | 'traffic' | 'packages'
+type Tab = 'server' | 'charts' | 'network' | 'accounts' | 'config' | 'traffic' | 'packages'
   | 'containers' | 'services' | 'firewall' | 'logs' | 'cron' | 'processes' | 'disks'
-  | 'remote' | 'terminal';
+  | 'remote' | 'terminal' | 'updates' | 'diagnostics' | 'ssl'
+  | 'files' | 'backup' | 'audit' | 'database' | 'mail' | 'swap' | 'sessions' | 'dns' | 'usermgmt';
 
-const tabKeys: { key: Tab; labelKey: string }[] = [
-  { key: 'server', labelKey: 'tab.serverStatus' },
-  { key: 'remote', labelKey: 'tab.remoteServers' },
-  { key: 'processes', labelKey: 'tab.processes' },
-  { key: 'disks', labelKey: 'tab.disks' },
-  { key: 'network', labelKey: 'tab.network' },
-  { key: 'containers', labelKey: 'tab.containers' },
-  { key: 'services', labelKey: 'tab.services' },
-  { key: 'firewall', labelKey: 'tab.firewall' },
-  { key: 'accounts', labelKey: 'tab.accounts' },
-  { key: 'config', labelKey: 'tab.config' },
-  { key: 'traffic', labelKey: 'tab.traffic' },
-  { key: 'packages', labelKey: 'tab.packages' },
-  { key: 'logs', labelKey: 'tab.logs' },
-  { key: 'cron', labelKey: 'tab.cron' },
-  { key: 'terminal', labelKey: 'tab.terminal' },
+type Category = 'dashboard' | 'monitoring' | 'management' | 'security' | 'system' | 'remote';
+
+interface CatDef {
+  key: Category;
+  labelKey: string;
+  tabs: { key: Tab; labelKey: string }[];
+}
+
+const categories: CatDef[] = [
+  { key: 'dashboard', labelKey: 'cat.dashboard', tabs: [
+    { key: 'server', labelKey: 'tab.serverStatus' },
+    { key: 'charts', labelKey: 'tab.charts' },
+  ]},
+  { key: 'monitoring', labelKey: 'cat.monitoring', tabs: [
+    { key: 'processes', labelKey: 'tab.processes' },
+    { key: 'disks', labelKey: 'tab.disks' },
+    { key: 'swap', labelKey: 'tab.swap' },
+    { key: 'network', labelKey: 'tab.network' },
+    { key: 'traffic', labelKey: 'tab.traffic' },
+    { key: 'dns', labelKey: 'tab.dns' },
+    { key: 'mail', labelKey: 'tab.mail' },
+    { key: 'diagnostics', labelKey: 'tab.diagnostics' },
+  ]},
+  { key: 'management', labelKey: 'cat.management', tabs: [
+    { key: 'containers', labelKey: 'tab.containers' },
+    { key: 'services', labelKey: 'tab.services' },
+    { key: 'packages', labelKey: 'tab.packages' },
+    { key: 'updates', labelKey: 'tab.updates' },
+    { key: 'database', labelKey: 'tab.database' },
+    { key: 'config', labelKey: 'tab.config' },
+    { key: 'backup', labelKey: 'tab.backup' },
+  ]},
+  { key: 'security', labelKey: 'cat.security', tabs: [
+    { key: 'firewall', labelKey: 'tab.firewall' },
+    { key: 'accounts', labelKey: 'tab.accounts' },
+    { key: 'ssl', labelKey: 'tab.ssl' },
+    { key: 'usermgmt', labelKey: 'tab.userMgmt' },
+    { key: 'sessions', labelKey: 'tab.sessions' },
+    { key: 'audit', labelKey: 'tab.audit' },
+  ]},
+  { key: 'system', labelKey: 'cat.system', tabs: [
+    { key: 'logs', labelKey: 'tab.logs' },
+    { key: 'cron', labelKey: 'tab.cron' },
+    { key: 'files', labelKey: 'tab.files' },
+    { key: 'terminal', labelKey: 'tab.terminal' },
+  ]},
+  { key: 'remote', labelKey: 'cat.remote', tabs: [
+    { key: 'remote', labelKey: 'tab.remoteServers' },
+  ]},
 ];
 
 function ChangePasswordModal({ onClose }: { onClose: () => void }) {
@@ -103,8 +150,29 @@ function App() {
   const { t } = useT();
   const [loggedIn, setLoggedIn] = useState(!!sessionStorage.getItem('nabiman_token'));
   const [activeTab, setActiveTab] = useState<Tab>('server');
+  const [activeCat, setActiveCat] = useState<Category>('dashboard');
   const [sshTarget, setSshTarget] = useState<{ host: string; port: number; user: string } | null>(null);
   const [showChangePw, setShowChangePw] = useState(false);
+  const [hiddenTabs, setHiddenTabs] = useState<Set<Tab>>(new Set());
+
+  const { data: dockerAvailable } = useApi<boolean>(loggedIn ? '/api/containers/available' : '');
+  const { data: dbAvailable } = useApi<boolean>(loggedIn ? '/api/database/available' : '');
+  const { data: mailAvailable } = useApi<boolean>(loggedIn ? '/api/mail/available' : '');
+  const { data: dnsAvailable } = useApi<boolean>(loggedIn ? '/api/dns/available' : '');
+  useEffect(() => {
+    const hidden = new Set<Tab>();
+    if (dockerAvailable === false) hidden.add('containers');
+    if (dbAvailable === false) hidden.add('database');
+    if (mailAvailable === false) hidden.add('mail');
+    if (dnsAvailable === false) hidden.add('dns');
+    setHiddenTabs(hidden);
+  }, [dockerAvailable, dbAvailable, mailAvailable, dnsAvailable]);
+
+  const visibleCategories = useMemo(() => {
+    return categories
+      .map(cat => ({ ...cat, tabs: cat.tabs.filter(tab => !hiddenTabs.has(tab.key)) }))
+      .filter(cat => cat.tabs.length > 0);
+  }, [hiddenTabs]);
 
   const handleLogout = () => {
     clearToken();
@@ -113,12 +181,22 @@ function App() {
 
   const handleConnectSSH = (host: string, port: number, user: string) => {
     setSshTarget({ host, port, user });
+    setActiveCat('system');
     setActiveTab('terminal');
+  };
+
+  const handleCatClick = (cat: CatDef) => {
+    setActiveCat(cat.key);
+    if (!cat.tabs.some(t => t.key === activeTab)) {
+      setActiveTab(cat.tabs[0].key);
+    }
   };
 
   if (!loggedIn) {
     return <LoginScreen onLogin={() => setLoggedIn(true)} />;
   }
+
+  const currentCat = visibleCategories.find(c => c.key === activeCat) || visibleCategories[0];
 
   return (
     <div className="app">
@@ -131,34 +209,62 @@ function App() {
           <button className="btn btn-secondary logout-btn" onClick={handleLogout}>{t('app.logout')}</button>
         </div>
       </header>
-      <nav className="tab-nav">
-        {tabKeys.map((tab) => (
+      <nav className="cat-nav">
+        {visibleCategories.map((cat) => (
           <button
-            key={tab.key}
-            className={`tab-btn ${activeTab === tab.key ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.key)}
+            key={cat.key}
+            className={`cat-btn ${activeCat === cat.key ? 'active' : ''}`}
+            onClick={() => handleCatClick(cat)}
           >
-            {t(tab.labelKey)}
+            {t(cat.labelKey)}
           </button>
         ))}
       </nav>
-      <main className="main-content">
-        {activeTab === 'server' && <ServerStatusPanel />}
-        {activeTab === 'network' && <NetworkPanel />}
-        {activeTab === 'containers' && <ContainersPanel />}
-        {activeTab === 'services' && <ServicesPanel />}
-        {activeTab === 'firewall' && <FirewallPanel />}
-        {activeTab === 'accounts' && <AccountsPanel />}
-        {activeTab === 'config' && <ConfigPanel />}
-        {activeTab === 'traffic' && <TrafficPanel />}
-        {activeTab === 'packages' && <PackagesPanel />}
-        {activeTab === 'logs' && <LogsPanel />}
-        {activeTab === 'cron' && <CronPanel />}
-        {activeTab === 'processes' && <ProcessesPanel />}
-        {activeTab === 'disks' && <DisksPanel />}
-        {activeTab === 'remote' && <RemoteServersPanel onConnectSSH={handleConnectSSH} />}
-        {activeTab === 'terminal' && <TerminalPanel sshTarget={sshTarget} onSshConnected={() => setSshTarget(null)} />}
-      </main>
+      <div className="app-body">
+        {currentCat.tabs.length > 1 && (
+          <aside className="sidebar">
+            {currentCat.tabs.map((tab) => (
+              <button
+                key={tab.key}
+                className={`sidebar-btn ${activeTab === tab.key ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab.key)}
+              >
+                {t(tab.labelKey)}
+              </button>
+            ))}
+          </aside>
+        )}
+        <main className={`main-content ${currentCat.tabs.length <= 1 ? 'full-width' : ''}`}>
+          {activeTab === 'server' && <ServerStatusPanel />}
+          {activeTab === 'network' && <NetworkPanel />}
+          {activeTab === 'containers' && <ContainersPanel />}
+          {activeTab === 'services' && <ServicesPanel />}
+          {activeTab === 'firewall' && <FirewallPanel />}
+          {activeTab === 'accounts' && <AccountsPanel />}
+          {activeTab === 'config' && <ConfigPanel />}
+          {activeTab === 'traffic' && <TrafficPanel />}
+          {activeTab === 'packages' && <PackagesPanel />}
+          {activeTab === 'logs' && <LogsPanel />}
+          {activeTab === 'cron' && <CronPanel />}
+          {activeTab === 'processes' && <ProcessesPanel />}
+          {activeTab === 'disks' && <DisksPanel />}
+          {activeTab === 'charts' && <ChartsPanel />}
+          {activeTab === 'updates' && <UpdatesPanel />}
+          {activeTab === 'diagnostics' && <DiagnosticsPanel />}
+          {activeTab === 'ssl' && <SslPanel />}
+          {activeTab === 'files' && <FileManagerPanel />}
+          {activeTab === 'backup' && <BackupPanel />}
+          {activeTab === 'audit' && <AuditPanel />}
+          {activeTab === 'database' && <DatabasePanel />}
+          {activeTab === 'mail' && <MailPanel />}
+          {activeTab === 'swap' && <SwapPanel />}
+          {activeTab === 'sessions' && <SessionsPanel />}
+          {activeTab === 'dns' && <DnsPanel />}
+          {activeTab === 'usermgmt' && <UserManagementPanel />}
+          {activeTab === 'remote' && <RemoteServersPanel onConnectSSH={handleConnectSSH} />}
+          {activeTab === 'terminal' && <TerminalPanel sshTarget={sshTarget} onSshConnected={() => setSshTarget(null)} />}
+        </main>
+      </div>
       {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
     </div>
   );

@@ -210,6 +210,35 @@ export interface SshKeyInfo {
   fingerprint?: string;
 }
 
+// --- Updates types ---
+export interface UpdatablePackage {
+  name: string;
+  current_version: string;
+  new_version: string;
+}
+
+export interface UpdateCheckResult {
+  count: number;
+  packages: UpdatablePackage[];
+}
+
+// --- Diagnostics types ---
+export interface PortCheckResult {
+  host: string;
+  port: number;
+  open: boolean;
+}
+
+// --- SSL types ---
+export interface SslCertificate {
+  domain: string;
+  issuer: string;
+  expiry: string;
+  days_left: number;
+  path: string;
+  status: string;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data: T | null;

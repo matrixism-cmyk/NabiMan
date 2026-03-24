@@ -42,9 +42,27 @@ export default function ServerStatusPanel() {
   if (error) return <div className="panel error">{t('common.error')}: {error}</div>;
   if (!data) return null;
 
+  const alerts: { level: string; msg: string }[] = [];
+  const cpuPct = data.cpu_usage;
+  const memPct = data.memory_total > 0 ? (data.memory_used / data.memory_total) * 100 : 0;
+  const diskPct = data.disk_total > 0 ? (data.disk_used / data.disk_total) * 100 : 0;
+  if (cpuPct > 90) alerts.push({ level: 'danger', msg: t('serverStatus.alertCpu').replace('{v}', cpuPct.toFixed(1)) });
+  else if (cpuPct > 70) alerts.push({ level: 'warning', msg: t('serverStatus.alertCpu').replace('{v}', cpuPct.toFixed(1)) });
+  if (memPct > 90) alerts.push({ level: 'danger', msg: t('serverStatus.alertMem').replace('{v}', memPct.toFixed(1)) });
+  else if (memPct > 80) alerts.push({ level: 'warning', msg: t('serverStatus.alertMem').replace('{v}', memPct.toFixed(1)) });
+  if (diskPct > 90) alerts.push({ level: 'danger', msg: t('serverStatus.alertDisk').replace('{v}', diskPct.toFixed(1)) });
+  else if (diskPct > 80) alerts.push({ level: 'warning', msg: t('serverStatus.alertDisk').replace('{v}', diskPct.toFixed(1)) });
+
   return (
     <div className="panel">
       <h2>{t('serverStatus.title')}</h2>
+      {alerts.length > 0 && (
+        <div className="alerts-banner">
+          {alerts.map((a, i) => (
+            <div key={i} className={`alert-item alert-${a.level}`}>{a.msg}</div>
+          ))}
+        </div>
+      )}
       <div className="info-grid">
         <div className="info-item">
           <span className="info-label">{t('serverStatus.hostname')}</span>

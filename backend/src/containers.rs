@@ -21,6 +21,10 @@ fn check_docker() -> bool {
         .unwrap_or(false)
 }
 
+async fn docker_available() -> HttpResponse {
+    HttpResponse::Ok().json(ApiResponse::ok(check_docker()))
+}
+
 async fn list_containers() -> HttpResponse {
     if !check_docker() {
         return HttpResponse::Ok().json(ApiResponse::<Vec<Container>>::error("Docker is not available"));
@@ -151,6 +155,7 @@ async fn remove_image(body: web::Json<ContainerActionRequest>) -> HttpResponse {
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/containers")
+            .route("/available", web::get().to(docker_available))
             .route("", web::get().to(list_containers))
             .route("/images", web::get().to(list_images))
             .route("/start", web::post().to(start_container))
