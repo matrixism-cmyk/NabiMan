@@ -42,3 +42,43 @@ pub fn role_from_str(s: &str) -> UserRole {
         _ => UserRole::Viewer,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn admin_can_do_everything() {
+        assert!(check_permission(&UserRole::Admin, "GET", "/api/server/status"));
+        assert!(check_permission(&UserRole::Admin, "POST", "/api/users"));
+        assert!(check_permission(&UserRole::Admin, "DELETE", "/api/users/123"));
+    }
+
+    #[test]
+    fn viewer_read_only() {
+        assert!(check_permission(&UserRole::Viewer, "GET", "/api/server/status"));
+        assert!(!check_permission(&UserRole::Viewer, "POST", "/api/packages/install"));
+        assert!(!check_permission(&UserRole::Viewer, "DELETE", "/api/users/123"));
+        // Viewer can change own password and logout
+        assert!(check_permission(&UserRole::Viewer, "POST", "/api/auth/change-password"));
+        assert!(check_permission(&UserRole::Viewer, "POST", "/api/auth/logout"));
+    }
+
+    #[test]
+    fn operator_limited_write() {
+        assert!(check_permission(&UserRole::Operator, "GET", "/api/server/status"));
+        assert!(check_permission(&UserRole::Operator, "POST", "/api/services/action"));
+        assert!(check_permission(&UserRole::Operator, "POST", "/api/containers/restart"));
+        // Operator blocked from user/account management
+        assert!(!check_permission(&UserRole::Operator, "POST", "/api/users"));
+        assert!(!check_permission(&UserRole::Operator, "POST", "/api/accounts"));
+    }
+
+    #[test]
+    fn role_from_str_works() {
+        assert_eq!(role_from_str("admin"), UserRole::Admin);
+        assert_eq!(role_from_str("operator"), UserRole::Operator);
+        assert_eq!(role_from_str("viewer"), UserRole::Viewer);
+        assert_eq!(role_from_str("unknown"), UserRole::Viewer);
+    }
+}

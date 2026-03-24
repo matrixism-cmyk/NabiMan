@@ -1,0 +1,17 @@
+[Unit]
+Description=NabiMan Server Management Dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/nabiman-server
+Environment=NABIMAN_PORT=8080
+Environment=NABIMAN_STATIC=/usr/local/share/nabiman/static
+Environment=NABIMAN_DATA_DIR=/var/lib/nabiman
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

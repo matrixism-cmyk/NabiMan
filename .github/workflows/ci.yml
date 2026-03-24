@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'claude/*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - name: Run tests
+        working-directory: backend
+        run: cargo test --verbose
+      - name: Build release
+        working-directory: backend
+        run: cargo build --release
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci --no-audit
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+      - name: Check line counts
+        run: |
+          echo "Checking all source files are under 400 lines..."
+          OVER=$(find backend/src frontend/src -name "*.rs" -o -name "*.ts" -o -name "*.tsx" | xargs wc -l | awk '$1 > 400 && !/total/')
+          if [ -n "$OVER" ]; then
+            echo "ERROR: Files over 400 lines:"
+            echo "$OVER"
+            exit 1
+          fi
+          echo "All files under 400 lines."

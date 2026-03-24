@@ -24,3 +24,32 @@ impl<T: Serialize> ApiResponse<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_api_response_ok() {
+        let resp = ApiResponse::ok("hello");
+        assert!(resp.success);
+        assert_eq!(resp.data.unwrap(), "hello");
+        assert_eq!(resp.message, "OK");
+    }
+
+    #[test]
+    fn test_api_response_error() {
+        let resp = ApiResponse::<String>::error("something went wrong");
+        assert!(!resp.success);
+        assert!(resp.data.is_none());
+        assert_eq!(resp.message, "something went wrong");
+    }
+
+    #[test]
+    fn test_api_response_serializes() {
+        let resp = ApiResponse::ok(42);
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"success\":true"));
+        assert!(json.contains("\"data\":42"));
+    }
+}

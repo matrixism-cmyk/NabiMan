@@ -1,0 +1,9 @@
+backend/target/
+frontend/node_modules/
+frontend/build/
+backend/static/
+.git
+*.swp
+.idea/
+.vscode/
+docs/

@@ -226,3 +226,54 @@ fn extract_token(req: &ServiceRequest) -> Option<String> {
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(login).service(logout).service(change_password);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_jwt_create_and_verify() {
+        let secret = "test_secret_key_for_jwt_12345678";
+        let token = create_jwt(secret, "admin", "admin").unwrap();
+        assert!(!token.is_empty());
+        let claims = verify_jwt(secret, &token).unwrap();
+        assert_eq!(claims.sub, "admin");
+        assert_eq!(claims.role, "admin");
+    }
+
+    #[test]
+    fn test_jwt_expired_rejected() {
+        let secret = "test_secret";
+        // Create a token that's already expired
+        let now = chrono::Utc::now().timestamp() as usize;
+        let claims = Claims { sub: "u".into(), role: "admin".into(), iat: now - 200, exp: now - 100 };
+        let token = jsonwebtoken::encode(
+            &jsonwebtoken::Header::default(),
+            &claims,
+            &jsonwebtoken::EncodingKey::from_secret(secret.as_bytes()),
+        ).unwrap();
+        assert!(verify_jwt(secret, &token).is_none());
+    }
+
+    #[test]
+    fn test_jwt_wrong_secret_rejected() {
+        let token = create_jwt("secret1", "admin", "admin").unwrap();
+        assert!(verify_jwt("secret2", &token).is_none());
+    }
+
+    #[test]
+    fn test_check_auth_token() {
+        let secret = "test123";
+        let token = create_jwt(secret, "admin", "admin").unwrap();
+        assert!(check_auth_token(secret, &token));
+        assert!(!check_auth_token(secret, "garbage"));
+    }
+
+    #[test]
+    fn test_decode_claims_unverified() {
+        let token = create_jwt("any_secret", "testuser", "viewer").unwrap();
+        let data = decode_claims_unverified(&token).unwrap();
+        assert_eq!(data.claims.sub, "testuser");
+        assert_eq!(data.claims.role, "viewer");
+    }
+}

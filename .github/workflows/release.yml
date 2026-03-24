@@ -1,0 +1,43 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build frontend
+        working-directory: frontend
+        run: npm ci --no-audit && npm run build
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - name: Build backend
+        working-directory: backend
+        run: |
+          mkdir -p static
+          cp -r ../frontend/build/* static/
+          cargo build --release
+
+      - name: Package
+        run: |
+          cp backend/target/release/nabiman-server nabiman-x86_64
+          chmod +x nabiman-x86_64
+          tar czf nabiman-x86_64.tar.gz nabiman-x86_64
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            nabiman-x86_64
+            nabiman-x86_64.tar.gz
+            install.sh

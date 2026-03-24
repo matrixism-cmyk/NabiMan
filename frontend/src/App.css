@@ -84,6 +84,13 @@ body {
 .main-content.full-width { max-width: 1400px; margin: 0 auto; }
 
 @media (max-width: 768px) {
+  .app-header { padding: 10px 12px; gap: 8px; flex-wrap: wrap; }
+  .app-header h1 { font-size: 18px; }
+  .subtitle { display: none; }
+  .header-actions { gap: 4px; }
+  .header-actions .btn { padding: 4px 8px; font-size: 11px; }
+  .cat-nav { padding: 0 8px; }
+  .cat-btn { padding: 10px 14px; font-size: 13px; }
   .app-body { flex-direction: column; }
   .sidebar {
     width: 100%; min-width: 100%;
@@ -96,6 +103,13 @@ body {
     border-left: none; border-bottom: 2px solid transparent;
   }
   .sidebar-btn.active { border-left-color: transparent; border-bottom-color: var(--primary); }
+  .main-content { padding: 12px; }
+  .data-table { font-size: 11px; }
+  .data-table th, .data-table td { padding: 6px 8px; }
+  .info-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+  .panel { padding: 12px; }
+  .filter-row { flex-direction: column; }
+  .filter-row .filter-input { min-width: 100%; }
 }
 
 /* Panel */

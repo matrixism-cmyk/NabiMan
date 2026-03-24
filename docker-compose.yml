@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  nabiman:
+    build: .
+    container_name: nabiman
+    ports:
+      - "8080:8080"
+    volumes:
+      - nabiman-data:/var/lib/nabiman
+    environment:
+      - NABIMAN_PORT=8080
+      - NABIMAN_PASSWORD=changeme
+    restart: unless-stopped
+
+volumes:
+  nabiman-data:
