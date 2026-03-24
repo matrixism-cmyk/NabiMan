@@ -90,6 +90,27 @@ const t: T = {
   'files.perms': { ko: '권한', en: 'Perms', ja: '権限' },
   'files.modified': { ko: '수정일', en: 'Modified', ja: '更新日' },
   'files.saved': { ko: '파일이 저장되었습니다', en: 'File saved', ja: 'ファイルを保存しました' },
+
+  // --- Notifications ---
+  'tab.notifications': { ko: '알림 채널', en: 'Notifications', ja: '通知' },
+  'tab.alertRules': { ko: '알림 규칙', en: 'Alert Rules', ja: 'アラートルール' },
+  'notify.title': { ko: '알림 채널 관리', en: 'Notification Channels', ja: '通知チャネル管理' },
+  'notify.addChannel': { ko: '채널 추가', en: 'Add Channel', ja: 'チャネル追加' },
+  'notify.type': { ko: '유형', en: 'Type', ja: 'タイプ' },
+  'notify.target': { ko: '대상', en: 'Target', ja: '送信先' },
+  'notify.test': { ko: '테스트', en: 'Test', ja: 'テスト' },
+  'notify.confirmDelete': { ko: '이 채널을 삭제하시겠습니까?', en: 'Delete this channel?', ja: 'このチャネルを削除しますか？' },
+  'notify.noChannels': { ko: '알림 채널이 없습니다', en: 'No notification channels', ja: '通知チャネルなし' },
+
+  // --- Alert Rules ---
+  'alerts.title': { ko: '알림 규칙', en: 'Alert Rules', ja: 'アラートルール' },
+  'alerts.addRule': { ko: '규칙 추가', en: 'Add Rule', ja: 'ルール追加' },
+  'alerts.metric': { ko: '메트릭', en: 'Metric', ja: 'メトリック' },
+  'alerts.threshold': { ko: '임계값', en: 'Threshold', ja: '閾値' },
+  'alerts.cooldown': { ko: '재알림 대기', en: 'Cooldown', ja: 'クールダウン' },
+  'alerts.lastTriggered': { ko: '마지막 발동', en: 'Last Triggered', ja: '最終発動' },
+  'alerts.confirmDelete': { ko: '이 규칙을 삭제하시겠습니까?', en: 'Delete this rule?', ja: 'このルールを削除しますか？' },
+  'alerts.noRules': { ko: '알림 규칙이 없습니다', en: 'No alert rules', ja: 'アラートルールなし' },
 };
 
 export default t;

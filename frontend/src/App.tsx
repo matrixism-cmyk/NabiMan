@@ -30,13 +30,16 @@ import SwapPanel from './components/SwapPanel';
 import SessionsPanel from './components/SessionsPanel';
 import DnsPanel from './components/DnsPanel';
 import UserManagementPanel from './components/UserManagementPanel';
+import NotificationsPanel from './components/NotificationsPanel';
+import AlertRulesPanel from './components/AlertRulesPanel';
 import { clearToken, apiPost, useApi } from './hooks/useApi';
 import { useT, LANG_LABELS, Lang } from './i18n';
 
 type Tab = 'server' | 'charts' | 'network' | 'accounts' | 'config' | 'traffic' | 'packages'
   | 'containers' | 'services' | 'firewall' | 'logs' | 'cron' | 'processes' | 'disks'
   | 'remote' | 'terminal' | 'updates' | 'diagnostics' | 'ssl'
-  | 'files' | 'backup' | 'audit' | 'database' | 'mail' | 'swap' | 'sessions' | 'dns' | 'usermgmt';
+  | 'files' | 'backup' | 'audit' | 'database' | 'mail' | 'swap' | 'sessions' | 'dns' | 'usermgmt'
+  | 'notifications' | 'alertrules';
 
 type Category = 'dashboard' | 'monitoring' | 'management' | 'security' | 'system' | 'remote';
 
@@ -69,6 +72,8 @@ const categories: CatDef[] = [
     { key: 'database', labelKey: 'tab.database' },
     { key: 'config', labelKey: 'tab.config' },
     { key: 'backup', labelKey: 'tab.backup' },
+    { key: 'notifications', labelKey: 'tab.notifications' },
+    { key: 'alertrules', labelKey: 'tab.alertRules' },
   ]},
   { key: 'security', labelKey: 'cat.security', tabs: [
     { key: 'firewall', labelKey: 'tab.firewall' },
@@ -261,6 +266,8 @@ function App() {
           {activeTab === 'sessions' && <SessionsPanel />}
           {activeTab === 'dns' && <DnsPanel />}
           {activeTab === 'usermgmt' && <UserManagementPanel />}
+          {activeTab === 'notifications' && <NotificationsPanel />}
+          {activeTab === 'alertrules' && <AlertRulesPanel />}
           {activeTab === 'remote' && <RemoteServersPanel onConnectSSH={handleConnectSSH} />}
           {activeTab === 'terminal' && <TerminalPanel sshTarget={sshTarget} onSshConnected={() => setSshTarget(null)} />}
         </main>

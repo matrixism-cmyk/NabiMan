@@ -163,6 +163,9 @@ const t: T = {
   'audit.path': { ko: '경로', en: 'Path', ja: 'パス' },
   'audit.detail': { ko: '상세', en: 'Detail', ja: '詳細' },
   'audit.noEntries': { ko: '감사 로그가 없습니다', en: 'No audit entries', ja: '監査ログなし' },
+  'audit.filterUser': { ko: '사용자 필터', en: 'Filter by user', ja: 'ユーザーでフィルター' },
+  'audit.filterPath': { ko: '경로 필터', en: 'Filter by path', ja: 'パスでフィルター' },
+  'audit.user': { ko: '사용자', en: 'User', ja: 'ユーザー' },
 
   // --- Sessions ---
   'sessions.title': { ko: '접속 세션', en: 'Login Sessions', ja: 'ログインセッション' },

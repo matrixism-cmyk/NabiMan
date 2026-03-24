@@ -29,6 +29,9 @@ mod sessions;
 mod dns;
 mod rate_limit;
 mod security_headers;
+mod audit_middleware;
+mod notifications;
+mod alert_rules;
 mod auth;
 mod users;
 mod rbac;
@@ -139,6 +142,9 @@ async fn main() -> std::io::Result<()> {
     let pw_hash = password_store.lock().unwrap().clone();
     let user_store = users::new_user_store(&pw_hash);
     let session_store = jwt_sessions::new_session_store();
+    let channel_store = notifications::new_channel_store();
+    let rule_store = alert_rules::new_rule_store();
+    alert_rules::start_alert_checker(rule_store.clone(), channel_store.clone());
     let history_store = charts::new_history_store();
     let audit_log = audit::new_audit_log();
     charts::start_collector(history_store.clone());
@@ -151,11 +157,14 @@ async fn main() -> std::io::Result<()> {
         let pw_store = password_store.clone();
         let usr_store = user_store.clone();
         let sess_store = session_store.clone();
+        let chan_store = channel_store.clone();
+        let rul_store = rule_store.clone();
         let hist_store = history_store.clone();
         let aud_log = audit_log.clone();
         let index_path = format!("{}/index.html", static_dir);
 
         App::new()
+            .wrap(audit_middleware::AuditMiddleware::new(aud_log.clone()))
             .wrap(security_headers::SecurityHeaders)
             .wrap(build_cors())
             .wrap(rate_limit::RateLimiter::new())
@@ -164,6 +173,8 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(pw_store))
             .app_data(web::Data::new(usr_store))
             .app_data(web::Data::new(sess_store))
+            .app_data(web::Data::new(chan_store))
+            .app_data(web::Data::new(rul_store))
             .app_data(web::Data::new(hist_store))
             .app_data(web::Data::new(aud_log))
             .configure(auth::config)
@@ -197,6 +208,8 @@ async fn main() -> std::io::Result<()> {
             .configure(swap::config)
             .configure(sessions::config)
             .configure(dns::config)
+            .configure(notifications::config)
+            .configure(alert_rules::config)
             .service(
                 afs::Files::new("/", &static_dir)
                     .index_file("index.html")
