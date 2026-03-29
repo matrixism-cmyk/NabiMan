@@ -84,6 +84,10 @@ const t: T = {
   'tab.mail': { ko: '메일 서버', en: 'Mail Server', ja: 'メールサーバー' },
   'tab.swap': { ko: 'Swap', en: 'Swap', ja: 'Swap' },
   'tab.sessions': { ko: '접속 세션', en: 'Sessions', ja: 'セッション' },
+  'tab.multiServer': { ko: '멀티서버', en: 'Multi-Server', ja: 'マルチサーバー' },
+  'remote.dashboard': { ko: '멀티서버 대시보드', en: 'Multi-Server Dashboard', ja: 'マルチサーバーダッシュボード' },
+  'remote.totalServers': { ko: '전체 서버', en: 'Total Servers', ja: '全サーバー' },
+  'remote.noServers': { ko: '등록된 원격 서버가 없습니다', en: 'No remote servers registered', ja: 'リモートサーバーが登録されていません' },
 
   // --- Login ---
   'login.password': { ko: '관리자 비밀번호', en: 'Admin Password', ja: '管理者パスワード' },
@@ -93,6 +97,10 @@ const t: T = {
   'login.connectionFailed': { ko: '연결 실패', en: 'Connection failed', ja: '接続失敗' },
   'login.username': { ko: '사용자명', en: 'Username', ja: 'ユーザー名' },
   'login.totpCode': { ko: '인증 코드 (6자리)', en: 'Auth Code (6 digits)', ja: '認証コード (6桁)' },
+  'login.local': { ko: '로컬', en: 'Local', ja: 'ローカル' },
+  'login.ldap': { ko: 'LDAP', en: 'LDAP', ja: 'LDAP' },
+  'login.ldapUsername': { ko: 'LDAP 사용자명', en: 'LDAP Username', ja: 'LDAPユーザー名' },
+  'login.oauthLogin': { ko: '로그인', en: 'Login', ja: 'ログイン' },
 
   // --- Tabs (new) ---
   'tab.userMgmt': { ko: '사용자 관리', en: 'User Management', ja: 'ユーザー管理' },
@@ -107,6 +115,28 @@ const t: T = {
   'userMgmt.created': { ko: '생성일', en: 'Created', ja: '作成日' },
   'userMgmt.lastLogin': { ko: '최근 로그인', en: 'Last Login', ja: '最終ログイン' },
   'userMgmt.confirmDelete': { ko: '{name} 사용자를 삭제하시겠습니까?', en: 'Delete user {name}?', ja: 'ユーザー{name}を削除しますか？' },
+
+  // --- License ---
+  'tab.license': { ko: '라이선스', en: 'License', ja: 'ライセンス' },
+  'license.title': { ko: '라이선스 관리', en: 'License Management', ja: 'ライセンス管理' },
+  'license.tier': { ko: '등급', en: 'Tier', ja: 'ティア' },
+  'license.free': { ko: 'Free', en: 'Free', ja: 'Free' },
+  'license.pro': { ko: 'Pro', en: 'Pro', ja: 'Pro' },
+  'license.enterprise': { ko: 'Enterprise', en: 'Enterprise', ja: 'Enterprise' },
+  'license.holder': { ko: '라이선스 소유자', en: 'License Holder', ja: 'ライセンス所有者' },
+  'license.expiresAt': { ko: '만료일', en: 'Expires', ja: '有効期限' },
+  'license.daysRemaining': { ko: '일 남음', en: 'days remaining', ja: '日残り' },
+  'license.trial': { ko: '체험판', en: 'Trial', ja: 'トライアル' },
+  'license.trialDays': { ko: '체험판 남은 일수', en: 'Trial days remaining', ja: 'トライアル残り日数' },
+  'license.activate': { ko: '라이선스 활성화', en: 'Activate License', ja: 'ライセンス有効化' },
+  'license.activateKey': { ko: '활성화', en: 'Activate', ja: '有効化' },
+  'license.keyPlaceholder': { ko: '라이선스 키를 입력하세요', en: 'Enter license key', ja: 'ライセンスキーを入力' },
+  'license.features': { ko: '사용 가능 기능', en: 'Available Features', ja: '利用可能機能' },
+  'license.maxServers': { ko: '최대 서버 수', en: 'Max Servers', ja: '最大サーバー数' },
+  'license.unlimited': { ko: '무제한', en: 'Unlimited', ja: '無制限' },
+  'license.noLicense': { ko: '라이선스가 없습니다', en: 'No license', ja: 'ライセンスなし' },
+  'license.activated': { ko: '라이선스가 활성화되었습니다', en: 'License activated', ja: 'ライセンスを有効化しました' },
+  'license.invalidKey': { ko: '유효하지 않은 라이선스 키', en: 'Invalid license key', ja: '無効なライセンスキー' },
 };
 
 export default t;

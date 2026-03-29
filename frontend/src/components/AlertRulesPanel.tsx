@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApi, apiPost, apiRequest } from '../hooks/useApi';
 import { useT } from '../i18n';
 
-interface AlertRule { id: string; name: string; metric: string; threshold: number; duration_secs: number; enabled: boolean; last_triggered: string | null; }
+interface AlertRule { id: string; name: string; metric: string; threshold: number; duration_secs: number; enabled: boolean; last_triggered: string | null; service_name?: string; }
 
 export default function AlertRulesPanel() {
   const { t } = useT();
@@ -12,16 +12,21 @@ export default function AlertRulesPanel() {
   const [metric, setMetric] = useState('cpu');
   const [threshold, setThreshold] = useState('80');
   const [cooldown, setCooldown] = useState('300');
+  const [serviceName, setServiceName] = useState('');
   const [msg, setMsg] = useState('');
 
   const addRule = async () => {
     if (!name) return;
-    const res = await apiPost<string>('/api/alerts/rules', {
-      id: '', name, metric, threshold: parseFloat(threshold),
+    if (metric === 'service_down' && !serviceName.trim()) return;
+    const body: Record<string, unknown> = {
+      id: '', name, metric,
+      threshold: metric === 'service_down' ? 0 : parseFloat(threshold),
       duration_secs: parseInt(cooldown), enabled: true, last_triggered: null,
-    });
+    };
+    if (metric === 'service_down') body.service_name = serviceName.trim();
+    const res = await apiPost<string>('/api/alerts/rules', body);
     setMsg(res.data || res.message);
-    if (res.success) { setShowAdd(false); setName(''); refetch(); }
+    if (res.success) { setShowAdd(false); setName(''); setServiceName(''); refetch(); }
   };
 
   const deleteRule = async (id: string) => {
@@ -54,13 +59,21 @@ export default function AlertRulesPanel() {
               <option value="cpu">CPU</option>
               <option value="memory">{t('charts.memory')}</option>
               <option value="disk">{t('serverStatus.disk')}</option>
+              <option value="service_down">{t('alerts.serviceDown')}</option>
             </select>
           </div>
-          <div className="form-row">
-            <label>{t('alerts.threshold')}</label>
-            <input type="number" value={threshold} onChange={e => setThreshold(e.target.value)} style={{ width: 80 }} />
-            <span>%</span>
-          </div>
+          {metric === 'service_down' ? (
+            <div className="form-row">
+              <label>{t('alerts.serviceName')}</label>
+              <input value={serviceName} onChange={e => setServiceName(e.target.value)} placeholder="nginx" />
+            </div>
+          ) : (
+            <div className="form-row">
+              <label>{t('alerts.threshold')}</label>
+              <input type="number" value={threshold} onChange={e => setThreshold(e.target.value)} style={{ width: 80 }} />
+              <span>%</span>
+            </div>
+          )}
           <div className="form-row">
             <label>{t('alerts.cooldown')}</label>
             <input type="number" value={cooldown} onChange={e => setCooldown(e.target.value)} style={{ width: 80 }} />
@@ -77,7 +90,7 @@ export default function AlertRulesPanel() {
               <tr key={r.id}>
                 <td><strong>{r.name}</strong></td>
                 <td><code>{r.metric}</code></td>
-                <td>{r.threshold}%</td>
+                <td>{r.metric === 'service_down' ? (r.service_name || '-') : `${r.threshold}%`}</td>
                 <td>{r.duration_secs}s</td>
                 <td>{r.last_triggered || '-'}</td>
                 <td><button className="btn btn-sm btn-danger" onClick={() => deleteRule(r.id)}>{t('common.delete')}</button></td>

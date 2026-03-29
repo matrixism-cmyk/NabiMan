@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApi, apiPost } from '../hooks/useApi';
 import { FirewallStatus } from '../types';
 import { useT } from '../i18n';
+import { useSortable } from '../hooks/useSortable';
 
 export default function FirewallPanel() {
   const { t } = useT();
@@ -34,6 +35,11 @@ export default function FirewallPanel() {
     setActionLoading(false);
     refetch();
   };
+
+  const { sorted, toggle, indicator } = useSortable(data?.rules || [], 'number', 'asc');
+  const S = (key: string, label: string) => (
+    <th className="sortable" onClick={() => toggle(key)}>{label}{indicator(key)}</th>
+  );
 
   if (loading) return <div className="panel loading">{t('firewall.loading')}</div>;
   if (error) return <div className="panel error">{t('common.error')}: {error}</div>;
@@ -83,17 +89,17 @@ export default function FirewallPanel() {
       <table className="data-table">
         <thead>
           <tr>
-            <th>#</th>
-            <th>{t('firewall.action')}</th>
-            <th>{t('firewall.protocol')}</th>
-            <th>{t('firewall.port')}</th>
+            {S('number', '#')}
+            {S('action', t('firewall.action'))}
+            {S('protocol', t('firewall.protocol'))}
+            {S('port', t('firewall.port'))}
             <th>{t('firewall.source')}</th>
             <th>{t('firewall.destination')}</th>
             <th>{t('common.actions')}</th>
           </tr>
         </thead>
         <tbody>
-          {data.rules.map(rule => (
+          {sorted.map(rule => (
             <tr key={rule.number}>
               <td>{rule.number}</td>
               <td>

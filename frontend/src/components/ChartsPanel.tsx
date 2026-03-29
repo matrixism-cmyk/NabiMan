@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApi } from '../hooks/useApi';
 import { useT } from '../i18n';
 
-interface DataPoint { timestamp: number; cpu: number; memory_pct: number; rx_bytes_sec: number; tx_bytes_sec: number; }
+interface DataPoint { timestamp: number; cpu: number; memory_pct: number; rx_bytes_sec: number; tx_bytes_sec: number; disk_read_bytes_sec: number; disk_write_bytes_sec: number; }
 
 function MiniChart({ data, valueKey, color, label, format }: {
   data: DataPoint[]; valueKey: keyof DataPoint; color: string; label: string; format: (v: number) => string;
@@ -60,6 +60,8 @@ export default function ChartsPanel() {
         <MiniChart data={pts} valueKey="memory_pct" color="#2ecc71" label={t('charts.memory')} format={v => v.toFixed(1) + '%'} />
         <MiniChart data={pts} valueKey="rx_bytes_sec" color="#f39c12" label="RX" format={fmtBytes} />
         <MiniChart data={pts} valueKey="tx_bytes_sec" color="#e74c3c" label="TX" format={fmtBytes} />
+        <MiniChart data={pts} valueKey="disk_read_bytes_sec" color="#a78bfa" label={t('charts.diskRead')} format={fmtBytes} />
+        <MiniChart data={pts} valueKey="disk_write_bytes_sec" color="#f472b6" label={t('charts.diskWrite')} format={fmtBytes} />
       </div>
     </div>
   );

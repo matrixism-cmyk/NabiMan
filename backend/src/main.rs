@@ -27,6 +27,8 @@ mod mail;
 mod swap;
 mod sessions;
 mod dns;
+mod vhost;
+mod license;
 mod rate_limit;
 mod security_headers;
 mod audit_middleware;
@@ -37,6 +39,11 @@ mod users;
 mod rbac;
 mod jwt_sessions;
 mod totp;
+mod api_keys;
+mod ldap_auth;
+mod oauth;
+mod ip_block;
+mod openapi;
 mod models;
 
 use actix_cors::Cors;
@@ -115,7 +122,7 @@ fn build_cors() -> Cors {
         Ok(origins) if !origins.is_empty() => {
             let mut cors = Cors::default()
                 .allow_any_method()
-                .allowed_headers(["Content-Type", "Authorization", "X-Auth-Token"])
+                .allowed_headers(["Content-Type", "Authorization", "X-Auth-Token", "X-API-Key", "X-File-Path"])
                 .max_age(3600);
             for origin in origins.split(',') {
                 cors = cors.allowed_origin(origin.trim());
@@ -125,7 +132,7 @@ fn build_cors() -> Cors {
         _ => Cors::default()
             .allow_any_origin()
             .allow_any_method()
-            .allowed_headers(["Content-Type", "Authorization", "X-Auth-Token"])
+            .allowed_headers(["Content-Type", "Authorization", "X-Auth-Token", "X-API-Key", "X-File-Path"])
             .max_age(3600),
     }
 }
@@ -148,6 +155,11 @@ async fn main() -> std::io::Result<()> {
     let history_store = charts::new_history_store();
     let audit_log = audit::new_audit_log();
     charts::start_collector(history_store.clone());
+    let api_key_store = api_keys::new_api_key_store();
+    let schedule_store = backup::new_schedule_store();
+    backup::start_backup_scheduler(schedule_store.clone());
+    let pty_store = terminal::new_pty_store();
+    terminal::start_pty_cleanup(pty_store.clone());
 
     println!("NabiMan Server starting on http://0.0.0.0:{}", port);
     println!("Static files: {}", static_dir);
@@ -177,6 +189,9 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(rul_store))
             .app_data(web::Data::new(hist_store))
             .app_data(web::Data::new(aud_log))
+            .app_data(web::Data::new(api_key_store.clone()))
+            .app_data(web::Data::new(schedule_store.clone()))
+            .app_data(web::Data::new(pty_store.clone()))
             .configure(auth::config)
             .configure(users::config)
             .configure(jwt_sessions::config)
@@ -208,8 +223,15 @@ async fn main() -> std::io::Result<()> {
             .configure(swap::config)
             .configure(sessions::config)
             .configure(dns::config)
+            .configure(vhost::config)
+            .configure(license::config)
             .configure(notifications::config)
             .configure(alert_rules::config)
+            .configure(ip_block::config)
+            .configure(api_keys::config)
+            .configure(ldap_auth::config)
+            .configure(oauth::config)
+            .configure(openapi::config)
             .service(
                 afs::Files::new("/", &static_dir)
                     .index_file("index.html")

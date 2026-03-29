@@ -61,6 +61,7 @@ const t: T = {
   'updates.package': { ko: '패키지', en: 'Package', ja: 'パッケージ' },
   'updates.current': { ko: '현재 버전', en: 'Current', ja: '現在' },
   'updates.available': { ko: '업데이트 버전', en: 'Available', ja: '利用可能' },
+  'updates.upgrade': { ko: '업그레이드', en: 'Upgrade', ja: '更新' },
   'updates.confirmUpgrade': { ko: '모든 패키지를 업그레이드 하시겠습니까?', en: 'Upgrade all packages?', ja: 'すべてのパッケージを更新しますか？' },
 
   // --- Database ---
@@ -91,6 +92,27 @@ const t: T = {
   'files.modified': { ko: '수정일', en: 'Modified', ja: '更新日' },
   'files.saved': { ko: '파일이 저장되었습니다', en: 'File saved', ja: 'ファイルを保存しました' },
 
+  // --- Virtual Host ---
+  'tab.vhost': { ko: '가상호스트', en: 'Virtual Hosts', ja: '仮想ホスト' },
+  'vhost.title': { ko: '가상호스트 관리', en: 'Virtual Host Management', ja: '仮想ホスト管理' },
+  'vhost.add': { ko: '가상호스트 추가', en: 'Add Virtual Host', ja: '仮想ホスト追加' },
+  'vhost.create': { ko: '생성', en: 'Create', ja: '作成' },
+  'vhost.domain': { ko: '도메인', en: 'Domain', ja: 'ドメイン' },
+  'vhost.type': { ko: '유형', en: 'Type', ja: 'タイプ' },
+  'vhost.target': { ko: '대상', en: 'Target', ja: '対象' },
+  'vhost.static': { ko: '정적 사이트', en: 'Static Site', ja: '静的サイト' },
+  'vhost.proxy': { ko: '리버스 프록시', en: 'Reverse Proxy', ja: 'リバースプロキシ' },
+  'vhost.redirect': { ko: '리다이렉트', en: 'Redirect', ja: 'リダイレクト' },
+  'vhost.docroot': { ko: '문서 루트', en: 'Document Root', ja: 'ドキュメントルート' },
+  'vhost.proxyUrl': { ko: '프록시 대상 URL', en: 'Proxy Target URL', ja: 'プロキシ先URL' },
+  'vhost.redirectUrl': { ko: '리다이렉트 URL', en: 'Redirect URL', ja: 'リダイレクトURL' },
+  'vhost.wsPlaceholder': { ko: 'WebSocket 경로 (예: /ws)', en: 'WebSocket path (e.g. /ws)', ja: 'WebSocketパス (例: /ws)' },
+  'vhost.autoSsl': { ko: 'Let\'s Encrypt SSL 자동 발급', en: 'Auto-issue Let\'s Encrypt SSL', ja: 'Let\'s Encrypt SSL自動発行' },
+  'vhost.confirmDelete': { ko: '{domain} 가상호스트를 삭제하시겠습니까?', en: 'Delete virtual host {domain}?', ja: '仮想ホスト{domain}を削除しますか？' },
+  'vhost.noVhosts': { ko: '가상호스트가 없습니다', en: 'No virtual hosts', ja: '仮想ホストなし' },
+  'vhost.editTitle': { ko: '가상호스트 설정 편집', en: 'Edit Virtual Host Config', ja: '仮想ホスト設定編集' },
+  'vhost.config': { ko: '설정', en: 'Config', ja: '設定' },
+
   // --- Notifications ---
   'tab.notifications': { ko: '알림 채널', en: 'Notifications', ja: '通知' },
   'tab.alertRules': { ko: '알림 규칙', en: 'Alert Rules', ja: 'アラートルール' },
@@ -111,6 +133,46 @@ const t: T = {
   'alerts.lastTriggered': { ko: '마지막 발동', en: 'Last Triggered', ja: '最終発動' },
   'alerts.confirmDelete': { ko: '이 규칙을 삭제하시겠습니까?', en: 'Delete this rule?', ja: 'このルールを削除しますか？' },
   'alerts.noRules': { ko: '알림 규칙이 없습니다', en: 'No alert rules', ja: 'アラートルールなし' },
+  'alerts.serviceDown': { ko: '서비스 다운', en: 'Service Down', ja: 'サービスダウン' },
+  'alerts.serviceName': { ko: '서비스명', en: 'Service Name', ja: 'サービス名' },
+
+  // --- Database (additions) ---
+  'db.backup': { ko: 'DB 백업', en: 'DB Backup', ja: 'DBバックアップ' },
+  'db.restore': { ko: 'DB 복원', en: 'DB Restore', ja: 'DB復元' },
+  'db.backups': { ko: 'DB 백업 목록', en: 'DB Backups', ja: 'DBバックアップ一覧' },
+  'db.noBackups': { ko: 'DB 백업이 없습니다', en: 'No DB backups', ja: 'DBバックアップなし' },
+  'db.query': { ko: '쿼리 실행', en: 'Query Runner', ja: 'クエリ実行' },
+  'db.execute': { ko: '실행', en: 'Execute', ja: '実行' },
+  'db.results': { ko: '결과', en: 'Results', ja: '結果' },
+  'db.noResults': { ko: '결과 없음', en: 'No results', ja: '結果なし' },
+  'db.readOnlyHint': { ko: '읽기 전용 쿼리만 가능 (SELECT, SHOW, DESCRIBE, EXPLAIN)', en: 'Read-only queries only (SELECT, SHOW, DESCRIBE, EXPLAIN)', ja: '読み取り専用クエリのみ (SELECT, SHOW, DESCRIBE, EXPLAIN)' },
+  'db.selectDb': { ko: 'DB 선택', en: 'Select DB', ja: 'DB選択' },
+  'db.confirmRestore': { ko: '이 백업을 복원하시겠습니까?', en: 'Restore this backup?', ja: 'このバックアップを復元しますか？' },
+
+  // --- Backup (additions) ---
+  'backup.schedules': { ko: '스케줄', en: 'Schedules', ja: 'スケジュール' },
+  'backup.backups': { ko: '백업', en: 'Backups', ja: 'バックアップ' },
+  'backup.addSchedule': { ko: '스케줄 추가', en: 'Add Schedule', ja: 'スケジュール追加' },
+  'backup.scheduleName': { ko: '스케줄 이름', en: 'Schedule Name', ja: 'スケジュール名' },
+  'backup.paths': { ko: '경로 (콤마 구분)', en: 'Paths (comma separated)', ja: 'パス (カンマ区切り)' },
+  'backup.cronExpr': { ko: 'Cron 식', en: 'Cron Expression', ja: 'Cron式' },
+  'backup.compression': { ko: '압축', en: 'Compression', ja: '圧縮' },
+  'backup.compressed': { ko: '압축 백업', en: 'Compressed Backup', ja: '圧縮バックアップ' },
+  'backup.noSchedules': { ko: '스케줄이 없습니다', en: 'No schedules', ja: 'スケジュールなし' },
+  'backup.createCompressed': { ko: '압축 백업 생성', en: 'Create Compressed Backup', ja: '圧縮バックアップ作成' },
+
+  // --- File Manager (additions) ---
+  'files.upload': { ko: '업로드', en: 'Upload', ja: 'アップロード' },
+  'files.download': { ko: '다운로드', en: 'Download', ja: 'ダウンロード' },
+  'files.chmod': { ko: '권한 변경', en: 'Chmod', ja: '権限変更' },
+  'files.mkdir': { ko: '폴더 생성', en: 'New Folder', ja: 'フォルダ作成' },
+  'files.delete': { ko: '삭제', en: 'Delete', ja: '削除' },
+  'files.newFolder': { ko: '새 폴더', en: 'New Folder', ja: '新規フォルダ' },
+  'files.folderName': { ko: '폴더 이름', en: 'Folder name', ja: 'フォルダ名' },
+  'files.confirmDelete': { ko: '이 파일을 삭제하시겠습니까?', en: 'Delete this file?', ja: 'このファイルを削除しますか？' },
+  'files.chmodMode': { ko: '권한 (예: 755)', en: 'Mode (e.g. 755)', ja: '権限 (例: 755)' },
+  'files.uploading': { ko: '업로드 중...', en: 'Uploading...', ja: 'アップロード中...' },
+  'files.uploaded': { ko: '업로드 완료', en: 'Upload complete', ja: 'アップロード完了' },
 };
 
 export default t;

@@ -183,6 +183,7 @@ fn extract_username(req: &actix_web::HttpRequest) -> String {
 pub fn check_auth(req: &ServiceRequest, secret: &JwtSecret) -> bool {
     let path = req.path();
     if path == "/api/auth/login" || path == "/api/auth/refresh" || path == "/api/auth/2fa/verify"
+        || path == "/api/auth/oauth/callback" || path == "/api/auth/ldap/login"
         || !path.starts_with("/api/") {
         return true;
     }

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApi, apiPost } from '../hooks/useApi';
 import { useT } from '../i18n';
+import { useSortable } from '../hooks/useSortable';
 
 interface AuditEntry { timestamp: string; user: string; method: string; path: string; status: number; ip: string; }
 
@@ -17,6 +18,11 @@ export default function AuditPanel() {
   const qs = params.toString();
 
   const { data, loading, error, refetch } = useApi<AuditEntry[]>(`/api/audit${qs ? '?' + qs : ''}`, 10000);
+
+  const { sorted, toggle, indicator } = useSortable(data || []);
+  const S = (key: string, label: string) => (
+    <th className="sortable" onClick={() => toggle(key)}>{label}{indicator(key)}</th>
+  );
 
   const handleClear = async () => {
     if (!window.confirm(t('audit.confirmClear'))) return;
@@ -50,11 +56,11 @@ export default function AuditPanel() {
       {data && data.length > 0 ? (
         <table className="data-table">
           <thead><tr>
-            <th>{t('audit.time')}</th><th>{t('audit.user')}</th><th>Method</th>
-            <th>{t('audit.path')}</th><th>Status</th><th>IP</th>
+            {S('timestamp', t('audit.time'))}{S('user', t('audit.user'))}{S('method', 'Method')}
+            {S('path', t('audit.path'))}{S('status', 'Status')}{S('ip', 'IP')}
           </tr></thead>
           <tbody>
-            {data.map((e, i) => (
+            {sorted.map((e, i) => (
               <tr key={i}>
                 <td style={{ whiteSpace: 'nowrap' }}>{e.timestamp}</td>
                 <td><strong>{e.user}</strong></td>

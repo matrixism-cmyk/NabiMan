@@ -118,10 +118,49 @@ async fn run_upgrade() -> HttpResponse {
     }
 }
 
+#[derive(serde::Deserialize)]
+struct UpgradePackageRequest {
+    pub name: String,
+}
+
+async fn upgrade_package(body: web::Json<UpgradePackageRequest>) -> HttpResponse {
+    let name = &body.name;
+    if name.is_empty() || name.len() > 128
+        || !name.chars().all(|c| c.is_alphanumeric() || "-_.+:".contains(c)) {
+        return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid package name"));
+    }
+    let mgr = match detect_pkg_manager() {
+        Some(m) => m,
+        None => return HttpResponse::Ok().json(ApiResponse::<String>::error("No package manager")),
+    };
+    let result = match mgr {
+        "apt" => std::process::Command::new("apt")
+            .args(["install", "--only-upgrade", "-y", name])
+            .env("DEBIAN_FRONTEND", "noninteractive").output(),
+        "dnf" => std::process::Command::new("dnf").args(["upgrade", "-y", name]).output(),
+        "yum" => std::process::Command::new("yum").args(["update", "-y", name]).output(),
+        _ => return HttpResponse::Ok().json(ApiResponse::<String>::error("Unsupported")),
+    };
+    match result {
+        Ok(o) => {
+            let combined = format!("{}\n{}",
+                String::from_utf8_lossy(&o.stdout),
+                String::from_utf8_lossy(&o.stderr)).trim().to_string();
+            if o.status.success() {
+                HttpResponse::Ok().json(ApiResponse::ok(combined))
+            } else {
+                HttpResponse::Ok().json(ApiResponse::<String>::error(&combined))
+            }
+        }
+        Err(e) => HttpResponse::Ok().json(ApiResponse::<String>::error(&e.to_string())),
+    }
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/updates")
             .route("/check", web::get().to(check_updates))
             .route("/upgrade", web::post().to(run_upgrade))
+            .route("/upgrade-package", web::post().to(upgrade_package))
     );
 }

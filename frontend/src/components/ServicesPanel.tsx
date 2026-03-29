@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApi, apiPost } from '../hooks/useApi';
 import { SystemService } from '../types';
 import { useT } from '../i18n';
+import { useSortable } from '../hooks/useSortable';
 
 export default function ServicesPanel() {
   const { t } = useT();
@@ -21,9 +22,6 @@ export default function ServicesPanel() {
     refetch();
   };
 
-  if (loading) return <div className="panel loading">{t('services.loading')}</div>;
-  if (error) return <div className="panel error">{t('common.error')}: {error}</div>;
-
   const filtered = (data || []).filter(s => {
     const matchName = s.name.toLowerCase().includes(filter.toLowerCase())
       || s.description.toLowerCase().includes(filter.toLowerCase());
@@ -33,6 +31,14 @@ export default function ServicesPanel() {
       || (stateFilter === 'failed' && s.active_state === 'failed');
     return matchName && matchState;
   });
+
+  const { sorted, toggle, indicator } = useSortable(filtered, 'name', 'asc');
+  const S = (key: string, label: string) => (
+    <th className="sortable" onClick={() => toggle(key)}>{label}{indicator(key)}</th>
+  );
+
+  if (loading) return <div className="panel loading">{t('services.loading')}</div>;
+  if (error) return <div className="panel error">{t('common.error')}: {error}</div>;
 
   const stateButtons: { key: typeof stateFilter; labelKey: string }[] = [
     { key: 'all', labelKey: 'common.all' },
@@ -69,15 +75,15 @@ export default function ServicesPanel() {
       <table className="data-table">
         <thead>
           <tr>
-            <th>{t('services.service')}</th>
+            {S('name', t('services.service'))}
             <th>{t('common.description')}</th>
-            <th>{t('services.state')}</th>
-            <th>{t('services.enabled')}</th>
+            {S('active_state', t('services.state'))}
+            {S('enabled', t('services.enabled'))}
             <th>{t('common.actions')}</th>
           </tr>
         </thead>
         <tbody>
-          {filtered.slice(0, 100).map(svc => (
+          {sorted.slice(0, 100).map(svc => (
             <tr key={svc.name}>
               <td><strong>{svc.name}</strong></td>
               <td className="text-secondary">{svc.description}</td>

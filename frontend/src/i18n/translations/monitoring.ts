@@ -81,6 +81,9 @@ const t: T = {
   // --- Charts ---
   'charts.title': { ko: '리소스 모니터링', en: 'Resource Monitoring', ja: 'リソースモニタリング' },
   'charts.memory': { ko: '메모리', en: 'Memory', ja: 'メモリ' },
+  'charts.diskRead': { ko: '디스크 읽기', en: 'Disk Read', ja: 'ディスク読込' },
+  'charts.diskWrite': { ko: '디스크 쓰기', en: 'Disk Write', ja: 'ディスク書込' },
+  'disks.ioTrend': { ko: '디스크 I/O 추이', en: 'Disk I/O Trend', ja: 'ディスク I/O 推移' },
 
   // --- Swap ---
   'swap.title': { ko: 'Swap 관리', en: 'Swap Management', ja: 'Swap管理' },

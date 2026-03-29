@@ -53,6 +53,8 @@ export default function ServerStatusPanel() {
   if (diskPct > 90) alerts.push({ level: 'danger', msg: t('serverStatus.alertDisk').replace('{v}', diskPct.toFixed(1)) });
   else if (diskPct > 80) alerts.push({ level: 'warning', msg: t('serverStatus.alertDisk').replace('{v}', diskPct.toFixed(1)) });
 
+  const kpiColor = (pct: number) => pct > 90 ? 'var(--danger)' : pct > 70 ? 'var(--warning)' : 'var(--success)';
+
   return (
     <div className="panel">
       <h2>{t('serverStatus.title')}</h2>
@@ -63,18 +65,34 @@ export default function ServerStatusPanel() {
           ))}
         </div>
       )}
-      <div className="info-grid">
-        <div className="info-item">
-          <span className="info-label">{t('serverStatus.hostname')}</span>
-          <span className="info-value">{data.hostname}</span>
+
+      <div className="kpi-grid">
+        <div className="kpi-card">
+          <div className="kpi-value" style={{ color: kpiColor(cpuPct) }}>{cpuPct.toFixed(1)}%</div>
+          <div className="kpi-label">{t('serverStatus.cpu')}</div>
+          <div className="kpi-sub">Load: {data.load_average[0].toFixed(2)}</div>
         </div>
+        <div className="kpi-card">
+          <div className="kpi-value" style={{ color: kpiColor(memPct) }}>{memPct.toFixed(1)}%</div>
+          <div className="kpi-label">{t('serverStatus.memory')}</div>
+          <div className="kpi-sub">{formatBytes(data.memory_used)} / {formatBytes(data.memory_total)}</div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-value" style={{ color: kpiColor(diskPct) }}>{diskPct.toFixed(1)}%</div>
+          <div className="kpi-label">{t('serverStatus.disk')}</div>
+          <div className="kpi-sub">{formatBytes(data.disk_used)} / {formatBytes(data.disk_total)}</div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-value" style={{ color: 'var(--primary)' }}>{formatUptime(data.uptime)}</div>
+          <div className="kpi-label">{t('serverStatus.uptime')}</div>
+          <div className="kpi-sub">{data.hostname}</div>
+        </div>
+      </div>
+
+      <div className="info-grid">
         <div className="info-item">
           <span className="info-label">{t('serverStatus.os')}</span>
           <span className="info-value">{data.os}</span>
-        </div>
-        <div className="info-item">
-          <span className="info-label">{t('serverStatus.uptime')}</span>
-          <span className="info-value">{formatUptime(data.uptime)}</span>
         </div>
         <div className="info-item">
           <span className="info-label">{t('serverStatus.loadAvg')}</span>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApi, apiPost } from '../hooks/useApi';
 import { Container, ContainerImage } from '../types';
 import { useT } from '../i18n';
+import { useSortable } from '../hooks/useSortable';
 
 export default function ContainersPanel() {
   const { t } = useT();
@@ -42,6 +43,12 @@ export default function ContainersPanel() {
     refetchImages();
   };
 
+  const containerList = containers || [];
+  const { sorted, toggle, indicator } = useSortable(containerList, 'name', 'asc');
+  const S = (key: string, label: string) => (
+    <th className="sortable" onClick={() => toggle(key)}>{label}{indicator(key)}</th>
+  );
+
   if (loading) return <div className="panel loading">{t('containers.loading')}</div>;
   if (error) return <div className="panel error">{t('common.error')}: {error}</div>;
 
@@ -70,19 +77,19 @@ export default function ContainersPanel() {
 
       {!showImages ? (
         <>
-          <h3>{t('containers.containers')} ({(containers || []).length})</h3>
+          <h3>{t('containers.containers')} ({containerList.length})</h3>
           <table className="data-table">
             <thead>
               <tr>
-                <th>{t('common.name')}</th>
-                <th>{t('containers.image')}</th>
-                <th>{t('common.status')}</th>
+                {S('name', t('common.name'))}
+                {S('image', t('containers.image'))}
+                {S('state', t('common.status'))}
                 <th>{t('containers.ports')}</th>
                 <th>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
-              {(containers || []).map((c) => (
+              {sorted.map((c) => (
                 <tr key={c.id}>
                   <td><strong>{c.name}</strong></td>
                   <td>{c.image}</td>
@@ -114,7 +121,7 @@ export default function ContainersPanel() {
               ))}
             </tbody>
           </table>
-          {(containers || []).length === 0 && (
+          {sorted.length === 0 && (
             <p className="text-secondary">{t('containers.noContainers')}</p>
           )}
         </>

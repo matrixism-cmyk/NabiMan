@@ -7,16 +7,22 @@ export default function UpdatesPanel() {
   const { t } = useT();
   const { data, loading, error, refetch } = useApi<UpdateCheckResult>('/api/updates/check');
   const [upgrading, setUpgrading] = useState(false);
+  const [upgradingPkg, setUpgradingPkg] = useState('');
   const [result, setResult] = useState('');
 
-  const handleUpgrade = async () => {
+  const handleUpgradeAll = async () => {
     if (!window.confirm(t('updates.confirmUpgrade'))) return;
-    setUpgrading(true);
-    setResult('');
+    setUpgrading(true); setResult('');
     const res = await apiPost<string>('/api/updates/upgrade', {});
     setResult(res.data || res.message);
-    setUpgrading(false);
-    refetch();
+    setUpgrading(false); refetch();
+  };
+
+  const handleUpgradeOne = async (name: string) => {
+    setUpgradingPkg(name); setResult('');
+    const res = await apiPost<string>('/api/updates/upgrade-package', { name });
+    setResult(res.data || res.message);
+    setUpgradingPkg(''); refetch();
   };
 
   if (loading) return <div className="panel loading">{t('common.loading')}</div>;
@@ -30,7 +36,7 @@ export default function UpdatesPanel() {
         <div className="btn-group">
           <button className="btn btn-secondary btn-sm" onClick={refetch}>{t('updates.checkAgain')}</button>
           {data.count > 0 && (
-            <button className="btn btn-primary btn-sm" onClick={handleUpgrade} disabled={upgrading}>
+            <button className="btn btn-primary btn-sm" onClick={handleUpgradeAll} disabled={upgrading}>
               {upgrading ? t('common.working') : t('updates.upgradeAll')} ({data.count})
             </button>
           )}
@@ -44,13 +50,21 @@ export default function UpdatesPanel() {
             <th>{t('updates.package')}</th>
             <th>{t('updates.current')}</th>
             <th>{t('updates.available')}</th>
+            <th>{t('common.actions')}</th>
           </tr></thead>
           <tbody>
             {data.packages.map((pkg, i) => (
               <tr key={i}>
-                <td>{pkg.name}</td>
+                <td><strong>{pkg.name}</strong></td>
                 <td><code>{pkg.current_version}</code></td>
                 <td><code>{pkg.new_version}</code></td>
+                <td>
+                  <button className="btn btn-sm btn-primary"
+                    onClick={() => handleUpgradeOne(pkg.name)}
+                    disabled={upgradingPkg === pkg.name || upgrading}>
+                    {upgradingPkg === pkg.name ? t('common.working') : t('updates.upgrade')}
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

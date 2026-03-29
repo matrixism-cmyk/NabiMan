@@ -32,6 +32,11 @@ import DnsPanel from './components/DnsPanel';
 import UserManagementPanel from './components/UserManagementPanel';
 import NotificationsPanel from './components/NotificationsPanel';
 import AlertRulesPanel from './components/AlertRulesPanel';
+import VhostPanel from './components/VhostPanel';
+import IpBlockPanel from './components/IpBlockPanel';
+import LicensePanel from './components/LicensePanel';
+import EnterpriseAuthPanel from './components/EnterpriseAuthPanel';
+import MultiServerDashboard from './components/MultiServerDashboard';
 import { clearToken, apiPost, useApi } from './hooks/useApi';
 import { useT, LANG_LABELS, Lang } from './i18n';
 
@@ -39,7 +44,7 @@ type Tab = 'server' | 'charts' | 'network' | 'accounts' | 'config' | 'traffic' |
   | 'containers' | 'services' | 'firewall' | 'logs' | 'cron' | 'processes' | 'disks'
   | 'remote' | 'terminal' | 'updates' | 'diagnostics' | 'ssl'
   | 'files' | 'backup' | 'audit' | 'database' | 'mail' | 'swap' | 'sessions' | 'dns' | 'usermgmt'
-  | 'notifications' | 'alertrules';
+  | 'notifications' | 'alertrules' | 'vhost' | 'ipblock' | 'license' | 'enterpriseauth' | 'multiserver';
 
 type Category = 'dashboard' | 'monitoring' | 'management' | 'security' | 'system' | 'remote';
 
@@ -53,6 +58,7 @@ const categories: CatDef[] = [
   { key: 'dashboard', labelKey: 'cat.dashboard', tabs: [
     { key: 'server', labelKey: 'tab.serverStatus' },
     { key: 'charts', labelKey: 'tab.charts' },
+    { key: 'multiserver', labelKey: 'tab.multiServer' },
   ]},
   { key: 'monitoring', labelKey: 'cat.monitoring', tabs: [
     { key: 'processes', labelKey: 'tab.processes' },
@@ -70,6 +76,7 @@ const categories: CatDef[] = [
     { key: 'packages', labelKey: 'tab.packages' },
     { key: 'updates', labelKey: 'tab.updates' },
     { key: 'database', labelKey: 'tab.database' },
+    { key: 'vhost', labelKey: 'tab.vhost' },
     { key: 'config', labelKey: 'tab.config' },
     { key: 'backup', labelKey: 'tab.backup' },
     { key: 'notifications', labelKey: 'tab.notifications' },
@@ -77,17 +84,20 @@ const categories: CatDef[] = [
   ]},
   { key: 'security', labelKey: 'cat.security', tabs: [
     { key: 'firewall', labelKey: 'tab.firewall' },
+    { key: 'ipblock', labelKey: 'tab.ipBlock' },
     { key: 'accounts', labelKey: 'tab.accounts' },
     { key: 'ssl', labelKey: 'tab.ssl' },
     { key: 'usermgmt', labelKey: 'tab.userMgmt' },
     { key: 'sessions', labelKey: 'tab.sessions' },
     { key: 'audit', labelKey: 'tab.audit' },
+    { key: 'enterpriseauth', labelKey: 'tab.enterpriseAuth' },
   ]},
   { key: 'system', labelKey: 'cat.system', tabs: [
     { key: 'logs', labelKey: 'tab.logs' },
     { key: 'cron', labelKey: 'tab.cron' },
     { key: 'files', labelKey: 'tab.files' },
     { key: 'terminal', labelKey: 'tab.terminal' },
+    { key: 'license', labelKey: 'tab.license' },
   ]},
   { key: 'remote', labelKey: 'cat.remote', tabs: [
     { key: 'remote', labelKey: 'tab.remoteServers' },
@@ -206,7 +216,7 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>{t('app.title')}</h1>
+        <h1 className="logo-link" onClick={() => { setActiveCat('dashboard'); setActiveTab('server'); }}>{t('app.title')}</h1>
         <span className="subtitle">{t('app.subtitle')}</span>
         <div className="header-actions">
           <LanguageSelector />
@@ -268,9 +278,18 @@ function App() {
           {activeTab === 'usermgmt' && <UserManagementPanel />}
           {activeTab === 'notifications' && <NotificationsPanel />}
           {activeTab === 'alertrules' && <AlertRulesPanel />}
+          {activeTab === 'vhost' && <VhostPanel />}
+          {activeTab === 'ipblock' && <IpBlockPanel />}
+          {activeTab === 'license' && <LicensePanel />}
+          {activeTab === 'enterpriseauth' && <EnterpriseAuthPanel />}
+          {activeTab === 'multiserver' && <MultiServerDashboard />}
           {activeTab === 'remote' && <RemoteServersPanel onConnectSSH={handleConnectSSH} />}
-          {activeTab === 'terminal' && <TerminalPanel sshTarget={sshTarget} onSshConnected={() => setSshTarget(null)} />}
         </main>
+        {/* Terminal: always mounted, positioned over main when active.
+            Uses visibility+offscreen instead of display:none to keep xterm.js buffer intact. */}
+        <div className={`terminal-persist ${activeTab === 'terminal' ? 'terminal-persist-visible' : 'terminal-persist-hidden'}`}>
+          <TerminalPanel sshTarget={sshTarget} onSshConnected={() => setSshTarget(null)} isVisible={activeTab === 'terminal'} />
+        </div>
       </div>
       {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
     </div>

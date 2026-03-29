@@ -56,6 +56,32 @@ pub fn find_user_by_name(store: &UserStore, username: &str) -> Option<NabimanUse
     store.lock().unwrap().iter().find(|u| u.username == username).cloned()
 }
 
+/// Auto-provision or update an external (OAuth/LDAP) user
+pub fn ensure_oauth_user(store: &UserStore, username: &str, role: &str) {
+    let mut users = store.lock().unwrap();
+    if let Some(u) = users.iter_mut().find(|u| u.username == username) {
+        // Update role if changed
+        let new_role: UserRole = serde_json::from_str(&format!("\"{}\"", role))
+            .unwrap_or(UserRole::Viewer);
+        u.role = new_role;
+        u.last_login = Some(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string());
+    } else {
+        let new_role: UserRole = serde_json::from_str(&format!("\"{}\"", role))
+            .unwrap_or(UserRole::Viewer);
+        users.push(NabimanUser {
+            id: generate_id(),
+            username: username.to_string(),
+            password_hash: String::new(), // External auth, no local password
+            role: new_role,
+            created_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+            last_login: Some(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()),
+            totp_enabled: false,
+            totp_secret: None,
+        });
+    }
+    let _ = save_users(&users);
+}
+
 pub fn update_last_login(store: &UserStore, username: &str) {
     let mut users = store.lock().unwrap();
     if let Some(u) = users.iter_mut().find(|u| u.username == username) {

@@ -82,7 +82,7 @@ where
 
             append_entry(&log, AuditEntry {
                 timestamp: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string(),
-                user, method, path, status, ip,
+                user, method, path, status, ip, hash: None,
             });
 
             Ok(res)

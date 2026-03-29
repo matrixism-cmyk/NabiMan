@@ -10,6 +10,8 @@ pub struct DataPoint {
     pub memory_pct: f32,
     pub rx_bytes_sec: u64,
     pub tx_bytes_sec: u64,
+    pub disk_read_bytes_sec: u64,
+    pub disk_write_bytes_sec: u64,
 }
 
 pub type HistoryStore = Arc<Mutex<Vec<DataPoint>>>;
@@ -22,6 +24,8 @@ pub fn start_collector(store: HistoryStore) {
     std::thread::spawn(move || {
         let mut prev_rx: u64 = 0;
         let mut prev_tx: u64 = 0;
+        let mut prev_disk_read: u64 = 0;
+        let mut prev_disk_write: u64 = 0;
         loop {
             let cpu = read_cpu_usage();
             let mem = read_memory_pct();
@@ -31,9 +35,16 @@ pub fn start_collector(store: HistoryStore) {
             prev_rx = rx;
             prev_tx = tx;
 
+            let (dr, dw) = read_disk_bytes();
+            let dr_sec = if prev_disk_read > 0 { dr.saturating_sub(prev_disk_read) / 10 } else { 0 };
+            let dw_sec = if prev_disk_write > 0 { dw.saturating_sub(prev_disk_write) / 10 } else { 0 };
+            prev_disk_read = dr;
+            prev_disk_write = dw;
+
             let point = DataPoint {
                 timestamp: chrono::Utc::now().timestamp(),
                 cpu, memory_pct: mem, rx_bytes_sec: rx_sec, tx_bytes_sec: tx_sec,
+                disk_read_bytes_sec: dr_sec, disk_write_bytes_sec: dw_sec,
             };
 
             let mut data = store.lock().unwrap();
@@ -87,6 +98,28 @@ fn read_net_bytes() -> (u64, u64) {
         }
     }
     (rx, tx)
+}
+
+fn read_disk_bytes() -> (u64, u64) {
+    let s = std::fs::read_to_string("/proc/diskstats").unwrap_or_default();
+    let mut read_bytes = 0u64;
+    let mut write_bytes = 0u64;
+    for line in s.lines() {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() >= 14 {
+            let name = parts[2];
+            // Only real disks (sd*, nvme*, vd*), skip partitions (sda1, nvme0n1p1)
+            let is_whole_disk = (name.starts_with("sd") && name.len() == 3)
+                || (name.starts_with("nvme") && !name.contains('p'))
+                || (name.starts_with("vd") && name.len() == 3);
+            if is_whole_disk {
+                // field 5 = sectors read, field 9 = sectors written (512 bytes each)
+                read_bytes += parts[5].parse::<u64>().unwrap_or(0) * 512;
+                write_bytes += parts[9].parse::<u64>().unwrap_or(0) * 512;
+            }
+        }
+    }
+    (read_bytes, write_bytes)
 }
 
 fn num_cpus() -> usize {

@@ -1,26 +1,70 @@
-Business Source License 1.1
+NabiMan Proprietary License
+Copyright (c) 2026 XOS. All rights reserved.
 
-Licensor: NabiMan Project
+1. DEFINITIONS
 
-Licensed Work: NabiMan Server Management Dashboard
+"Software" means the NabiMan server management dashboard, including all source code,
+binary executables, documentation, configuration files, and associated materials.
 
-Change Date: 2028-03-24
+"Licensee" means the individual or entity that has purchased a valid license.
 
-Change License: Apache License, Version 2.0
+2. GRANT OF LICENSE
 
-Usage Grant:
-You may use the Licensed Work for any purpose, including production use,
-provided that you do not offer it as a hosted service to third parties.
+Subject to the terms of this License, XOS grants the Licensee a non-exclusive,
+non-transferable, limited license to:
+  (a) Install and use the Software on the agreed number of servers.
+  (b) Use the Software for the Licensee's internal business purposes.
 
-You may make copies, modifications, and derivative works for your own
-internal use or for use by your organization.
+3. RESTRICTIONS
 
-For production use as a managed/hosted service, contact the Licensor for
-a commercial license.
+The Licensee shall NOT:
+  (a) Copy, redistribute, sublicense, or transfer the Software to any third party.
+  (b) Modify, adapt, translate, reverse engineer, decompile, or disassemble the Software.
+  (c) Remove or alter any copyright notices, trademarks, or proprietary markings.
+  (d) Use the Software to provide hosted or managed services to third parties
+      without a separate SaaS license agreement.
 
-On the Change Date, the Licensed Work will automatically be released under
-the Change License (Apache 2.0), at which point all restrictions are removed.
+4. SOURCE CODE ACCESS
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  (a) Upon request and under a Non-Disclosure Agreement (NDA), the Licensee may
+      inspect the source code for security audit purposes.
+  (b) Authorized certification bodies (e.g., CC/GS evaluation agencies) may access
+      the source code under NDA for product evaluation and certification.
+  (c) Source code access does not grant any rights to modify, copy, or redistribute.
+
+5. INTELLECTUAL PROPERTY
+
+The Software and all copies thereof are proprietary to XOS and title thereto
+remains in XOS. All rights in the Software not specifically granted in this
+License are reserved to XOS.
+
+6. WARRANTY DISCLAIMER
+
+THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+7. LIMITATION OF LIABILITY
+
+IN NO EVENT SHALL XOS BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES ARISING OUT OF OR IN CONNECTION WITH
+THE USE OF THE SOFTWARE.
+
+8. SUPPORT AND MAINTENANCE
+
+Technical support and software updates are provided under a separate support
+agreement. This License does not include any support obligations.
+
+9. TERMINATION
+
+This License is effective until terminated. XOS may terminate this License
+if the Licensee fails to comply with any term. Upon termination, the Licensee
+must destroy all copies of the Software.
+
+10. GOVERNING LAW
+
+This License shall be governed by the laws of the Republic of Korea.
+Any disputes shall be resolved in the Mokpo Branch of Gwangju District Court,
+Republic of Korea.
+
+For licensing inquiries: support@xos.kr

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApi, apiPost, apiDelete } from '../hooks/useApi';
 import { UserAccount } from '../types';
 import { useT } from '../i18n';
+import { useSortable } from '../hooks/useSortable';
 
 export default function AccountsPanel() {
   const { t } = useT();
@@ -41,6 +42,11 @@ export default function AccountsPanel() {
     setMessage(res.message);
     if (res.success) refetch();
   };
+
+  const { sorted, toggle, indicator } = useSortable(data || [], 'uid', 'asc');
+  const S = (key: string, label: string) => (
+    <th className="sortable" onClick={() => toggle(key)}>{label}{indicator(key)}</th>
+  );
 
   if (loading) return <div className="panel loading">{t('accounts.loading')}</div>;
   if (error) return <div className="panel error">{t('common.error')}: {error}</div>;
@@ -98,17 +104,17 @@ export default function AccountsPanel() {
       <table className="data-table">
         <thead>
           <tr>
-            <th>{t('accounts.username')}</th>
-            <th>{t('accounts.uid')}</th>
-            <th>{t('accounts.gid')}</th>
+            {S('username', t('accounts.username'))}
+            {S('uid', t('accounts.uid'))}
+            {S('gid', t('accounts.gid'))}
             <th>{t('accounts.home')}</th>
-            <th>{t('accounts.shell')}</th>
+            {S('shell', t('accounts.shell'))}
             <th>{t('common.status')}</th>
             <th>{t('common.actions')}</th>
           </tr>
         </thead>
         <tbody>
-          {(data || []).map((acc) => (
+          {sorted.map((acc) => (
             <tr key={acc.username}>
               <td><strong>{acc.username}</strong></td>
               <td>{acc.uid}</td>

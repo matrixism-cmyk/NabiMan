@@ -1,6 +1,7 @@
 use actix_web::{web, HttpResponse};
 use crate::models::ApiResponse;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 #[derive(Serialize, Clone)]
 pub struct DbStatus {
@@ -11,6 +12,13 @@ pub struct DbStatus {
     pub connections: String,
     pub databases: Vec<String>,
     pub slow_queries: String,
+}
+
+#[derive(Serialize, Clone)]
+pub struct DbQueryResult {
+    pub columns: Vec<String>,
+    pub rows: Vec<Vec<String>>,
+    pub row_count: usize,
 }
 
 fn detect_db() -> Option<&'static str> {
@@ -26,6 +34,11 @@ fn detect_db() -> Option<&'static str> {
         }
     }
     None
+}
+
+pub fn db_backup_dir() -> PathBuf {
+    let dir = std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into());
+    PathBuf::from(dir).join("db_backups")
 }
 
 fn mysql_status() -> DbStatus {
@@ -96,10 +109,193 @@ async fn available() -> HttpResponse {
     HttpResponse::Ok().json(ApiResponse::ok(detect_db().is_some()))
 }
 
+// --- New backup/restore/query endpoints ---
+
+#[derive(Deserialize)]
+struct DbBackupRequest {
+    database: String,
+}
+
+async fn db_backup(body: web::Json<DbBackupRequest>) -> HttpResponse {
+    let db = &body.database;
+    if db.contains("..") || db.contains('/') || db.contains(';') {
+        return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid database name"));
+    }
+    let engine = match detect_db() {
+        Some(e) => e,
+        None => return HttpResponse::Ok().json(ApiResponse::<String>::error("No database running")),
+    };
+    let dir = db_backup_dir();
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        return HttpResponse::Ok().json(ApiResponse::<String>::error(&e.to_string()));
+    }
+    let ts = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+    let filename = format!("db_{}_{}.sql.gz", db, ts);
+    let dest = dir.join(&filename);
+
+    let cmd = match engine {
+        "mysql" => format!("mysqldump '{}' | gzip > '{}'", db, dest.display()),
+        "postgresql" => format!(
+            "sudo -u postgres pg_dump '{}' | gzip > '{}'", db, dest.display()
+        ),
+        _ => return HttpResponse::Ok().json(ApiResponse::<String>::error("Unknown engine")),
+    };
+    let result = std::process::Command::new("sh").args(["-c", &cmd]).output();
+    match result {
+        Ok(o) if o.status.success() => {
+            HttpResponse::Ok().json(ApiResponse::ok(filename))
+        }
+        Ok(o) => {
+            let err = String::from_utf8_lossy(&o.stderr).to_string();
+            HttpResponse::Ok().json(ApiResponse::<String>::error(&err))
+        }
+        Err(e) => HttpResponse::Ok().json(ApiResponse::<String>::error(&e.to_string())),
+    }
+}
+
+async fn list_db_backups() -> HttpResponse {
+    let dir = db_backup_dir();
+    if !dir.exists() {
+        return HttpResponse::Ok().json(ApiResponse::ok(Vec::<String>::new()));
+    }
+    let mut files: Vec<String> = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(&dir) {
+        for entry in rd.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.ends_with(".sql.gz") {
+                files.push(name);
+            }
+        }
+    }
+    files.sort_by(|a, b| b.cmp(a));
+    HttpResponse::Ok().json(ApiResponse::ok(files))
+}
+
+#[derive(Deserialize)]
+struct DbRestoreRequest {
+    database: String,
+    filename: String,
+}
+
+async fn db_restore(body: web::Json<DbRestoreRequest>) -> HttpResponse {
+    let db = &body.database;
+    let fname = &body.filename;
+    if fname.contains("..") || fname.contains('/') {
+        return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid filename"));
+    }
+    if db.contains("..") || db.contains('/') || db.contains(';') {
+        return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid database name"));
+    }
+    let src = db_backup_dir().join(fname);
+    if !src.exists() {
+        return HttpResponse::Ok().json(ApiResponse::<String>::error("Backup file not found"));
+    }
+    let engine = match detect_db() {
+        Some(e) => e,
+        None => return HttpResponse::Ok().json(ApiResponse::<String>::error("No database running")),
+    };
+    let cmd = match engine {
+        "mysql" => format!("gunzip -c '{}' | mysql '{}'", src.display(), db),
+        "postgresql" => format!(
+            "gunzip -c '{}' | sudo -u postgres psql '{}'", src.display(), db
+        ),
+        _ => return HttpResponse::Ok().json(ApiResponse::<String>::error("Unknown engine")),
+    };
+    let result = std::process::Command::new("sh").args(["-c", &cmd]).output();
+    match result {
+        Ok(o) if o.status.success() => {
+            HttpResponse::Ok().json(ApiResponse::ok("Restore completed".to_string()))
+        }
+        Ok(o) => {
+            let err = String::from_utf8_lossy(&o.stderr).to_string();
+            HttpResponse::Ok().json(ApiResponse::<String>::error(&err))
+        }
+        Err(e) => HttpResponse::Ok().json(ApiResponse::<String>::error(&e.to_string())),
+    }
+}
+
+#[derive(Deserialize)]
+struct DbQueryRequest {
+    database: String,
+    query: String,
+}
+
+fn is_safe_query(q: &str) -> bool {
+    let trimmed = q.trim().to_uppercase();
+    ["SELECT", "SHOW", "DESCRIBE", "EXPLAIN"]
+        .iter()
+        .any(|prefix| trimmed.starts_with(prefix))
+}
+
+async fn db_query(body: web::Json<DbQueryRequest>) -> HttpResponse {
+    let db = &body.database;
+    let query = &body.query;
+    if !is_safe_query(query) {
+        return HttpResponse::Ok().json(
+            ApiResponse::<DbQueryResult>::error("Only SELECT/SHOW/DESCRIBE/EXPLAIN allowed")
+        );
+    }
+    if db.contains("..") || db.contains('/') || db.contains(';') {
+        return HttpResponse::Ok().json(
+            ApiResponse::<DbQueryResult>::error("Invalid database name")
+        );
+    }
+    let engine = match detect_db() {
+        Some(e) => e,
+        None => return HttpResponse::Ok().json(
+            ApiResponse::<DbQueryResult>::error("No database running")
+        ),
+    };
+    let output = match engine {
+        "mysql" => {
+            std::process::Command::new("mysql")
+                .args(["-BN", db, "-e", query])
+                .output()
+        }
+        "postgresql" => {
+            std::process::Command::new("sudo")
+                .args(["-u", "postgres", "psql", "-d", db, "-tA", "-F", "\t", "-c", query])
+                .output()
+        }
+        _ => return HttpResponse::Ok().json(
+            ApiResponse::<DbQueryResult>::error("Unknown engine")
+        ),
+    };
+    match output {
+        Ok(o) if o.status.success() => {
+            let stdout = String::from_utf8_lossy(&o.stdout).to_string();
+            let mut rows: Vec<Vec<String>> = Vec::new();
+            for line in stdout.lines() {
+                if line.trim().is_empty() { continue; }
+                rows.push(line.split('\t').map(|s| s.to_string()).collect());
+            }
+            let col_count = rows.first().map(|r| r.len()).unwrap_or(0);
+            let columns: Vec<String> = (0..col_count)
+                .map(|i| format!("col{}", i + 1))
+                .collect();
+            let row_count = rows.len();
+            HttpResponse::Ok().json(ApiResponse::ok(DbQueryResult {
+                columns, rows, row_count,
+            }))
+        }
+        Ok(o) => {
+            let err = String::from_utf8_lossy(&o.stderr).to_string();
+            HttpResponse::Ok().json(ApiResponse::<DbQueryResult>::error(&err))
+        }
+        Err(e) => HttpResponse::Ok().json(
+            ApiResponse::<DbQueryResult>::error(&e.to_string())
+        ),
+    }
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/database")
             .route("/available", web::get().to(available))
             .route("/status", web::get().to(status))
+            .route("/backup", web::post().to(db_backup))
+            .route("/backups", web::get().to(list_db_backups))
+            .route("/restore", web::post().to(db_restore))
+            .route("/query", web::post().to(db_query))
     );
 }

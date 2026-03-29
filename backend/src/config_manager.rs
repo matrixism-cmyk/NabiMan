@@ -65,6 +65,14 @@ async fn update_config(path: web::Path<String>, body: web::Json<UpdateConfigRequ
         None => return HttpResponse::Ok().json(ApiResponse::<String>::error("Config file not found on disk")),
     };
 
+    // Save timestamped version history
+    let ts = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+    let history_dir = format!("{}.history", config_path);
+    let _ = fs::create_dir_all(&history_dir);
+    let version_path = format!("{}/{}.conf", history_dir, ts);
+    let _ = fs::copy(&config_path, &version_path);
+
+    // Also keep .bak for compatibility
     let backup_path = format!("{}.bak", config_path);
     if let Err(e) = fs::copy(&config_path, &backup_path) {
         return HttpResponse::Ok().json(ApiResponse::<String>::error(&format!("Backup failed: {}", e)));
@@ -147,6 +155,96 @@ fn try_commands(cmds: &[(&str, &[&str])]) -> Result<String, String> {
     Err(last_err)
 }
 
+// --- Version history, diff, rollback ---
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize)]
+struct ConfigVersion { filename: String, timestamp: String, size: u64 }
+
+async fn list_versions(path: web::Path<String>) -> HttpResponse {
+    let service_id = path.into_inner();
+    let def = match find_service(&service_id) {
+        Some(d) => d,
+        None => return HttpResponse::Ok().json(ApiResponse::<Vec<ConfigVersion>>::error("Service not found")),
+    };
+    let config_path = match def.config_paths.iter().find(|p| fs::metadata(p).is_ok()) {
+        Some(p) => p.clone(),
+        None => return HttpResponse::Ok().json(ApiResponse::ok(Vec::<ConfigVersion>::new())),
+    };
+    let history_dir = format!("{}.history", config_path);
+    let mut versions = Vec::new();
+    if let Ok(rd) = fs::read_dir(&history_dir) {
+        for entry in rd.flatten() {
+            let meta = match entry.metadata() { Ok(m) => m, Err(_) => continue };
+            if !meta.is_file() { continue; }
+            let name = entry.file_name().to_string_lossy().to_string();
+            // Parse timestamp from filename (YYYYMMDD_HHMMSS.conf)
+            let ts_part = name.trim_end_matches(".conf");
+            let timestamp = if ts_part.len() >= 15 {
+                format!("{}-{}-{} {}:{}:{}", &ts_part[0..4], &ts_part[4..6], &ts_part[6..8],
+                    &ts_part[9..11], &ts_part[11..13], &ts_part[13..15])
+            } else { ts_part.to_string() };
+            versions.push(ConfigVersion { filename: name, timestamp, size: meta.len() });
+        }
+    }
+    versions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    HttpResponse::Ok().json(ApiResponse::ok(versions))
+}
+
+#[derive(Deserialize)]
+struct DiffQuery { version: String }
+
+#[derive(Serialize)]
+struct DiffResult { version_content: String, current_content: String }
+
+async fn get_diff(path: web::Path<String>, query: web::Query<DiffQuery>) -> HttpResponse {
+    let service_id = path.into_inner();
+    let def = match find_service(&service_id) {
+        Some(d) => d,
+        None => return HttpResponse::Ok().json(ApiResponse::<DiffResult>::error("Service not found")),
+    };
+    let config_path = match def.config_paths.iter().find(|p| fs::metadata(p).is_ok()) {
+        Some(p) => p.clone(),
+        None => return HttpResponse::Ok().json(ApiResponse::<DiffResult>::error("Config not found")),
+    };
+    let version_file = query.version.replace("..", "").replace('/', "");
+    let version_path = format!("{}.history/{}", config_path, version_file);
+    let current = fs::read_to_string(&config_path).unwrap_or_default();
+    let version = fs::read_to_string(&version_path).unwrap_or_else(|_| "Version not found".into());
+    HttpResponse::Ok().json(ApiResponse::ok(DiffResult { version_content: version, current_content: current }))
+}
+
+#[derive(Deserialize)]
+struct RollbackRequest { version: String }
+
+async fn rollback(path: web::Path<String>, body: web::Json<RollbackRequest>) -> HttpResponse {
+    let service_id = path.into_inner();
+    let def = match find_service(&service_id) {
+        Some(d) => d,
+        None => return HttpResponse::Ok().json(ApiResponse::<String>::error("Service not found")),
+    };
+    let config_path = match def.config_paths.iter().find(|p| fs::metadata(p).is_ok()) {
+        Some(p) => p.clone(),
+        None => return HttpResponse::Ok().json(ApiResponse::<String>::error("Config not found")),
+    };
+    let version_file = body.version.replace("..", "").replace('/', "");
+    let version_path = format!("{}.history/{}", config_path, version_file);
+    if !std::path::Path::new(&version_path).exists() {
+        return HttpResponse::Ok().json(ApiResponse::<String>::error("Version not found"));
+    }
+
+    // Save current as new history entry before rollback
+    let ts = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+    let pre_rollback = format!("{}.history/{}_pre_rollback.conf", config_path, ts);
+    let _ = fs::copy(&config_path, &pre_rollback);
+
+    match fs::copy(&version_path, &config_path) {
+        Ok(_) => HttpResponse::Ok().json(ApiResponse::ok(format!("Rolled back to {}", version_file))),
+        Err(e) => HttpResponse::Ok().json(ApiResponse::<String>::error(&e.to_string())),
+    }
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/config")
@@ -154,6 +252,9 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("/{service_id}", web::get().to(get_config))
             .route("/{service_id}", web::post().to(update_config))
             .route("/{service_id}/restart", web::post().to(restart_service_handler))
-            .route("/{service_id}/validate", web::post().to(validate_config)),
+            .route("/{service_id}/validate", web::post().to(validate_config))
+            .route("/{service_id}/versions", web::get().to(list_versions))
+            .route("/{service_id}/diff", web::get().to(get_diff))
+            .route("/{service_id}/rollback", web::post().to(rollback)),
     );
 }

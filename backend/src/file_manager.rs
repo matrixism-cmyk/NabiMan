@@ -1,7 +1,9 @@
-use actix_web::{web, HttpResponse};
+use actix_web::{web, HttpRequest, HttpResponse};
 use crate::models::ApiResponse;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+const MAX_UPLOAD_SIZE: u64 = 50 * 1024 * 1024; // 50MB
 
 #[derive(Serialize, Clone)]
 pub struct FileEntry {
@@ -45,6 +47,20 @@ fn sanitize_path(p: &str) -> Option<PathBuf> {
         return None;
     }
     Some(canonical)
+}
+
+fn sanitize_parent_path(p: &str) -> Option<PathBuf> {
+    let path = PathBuf::from(p);
+    if let Some(parent) = path.parent() {
+        let canonical = std::fs::canonicalize(parent).ok()?;
+        let s = canonical.to_string_lossy();
+        if s.starts_with("/proc") || s.starts_with("/sys") || s.starts_with("/dev") {
+            return None;
+        }
+        Some(canonical.join(path.file_name()?))
+    } else {
+        None
+    }
 }
 
 async fn browse(query: web::Query<BrowseRequest>) -> HttpResponse {
@@ -132,11 +148,144 @@ async fn write_file(body: web::Json<WriteFileRequest>) -> HttpResponse {
     }
 }
 
+// --- New endpoints ---
+
+#[derive(Deserialize)]
+struct ChmodRequest {
+    path: String,
+    mode: String,
+}
+
+async fn chmod_file(body: web::Json<ChmodRequest>) -> HttpResponse {
+    let path = match sanitize_path(&body.path) {
+        Some(p) => p,
+        None => return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid path")),
+    };
+    // Validate mode is octal (3-4 digits)
+    if !body.mode.chars().all(|c| c.is_ascii_digit() && c < '8')
+        || body.mode.len() < 3 || body.mode.len() > 4
+    {
+        return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid octal mode"));
+    }
+    match std::process::Command::new("chmod").arg(&body.mode).arg(&path).output() {
+        Ok(o) if o.status.success() => {
+            HttpResponse::Ok().json(ApiResponse::ok("Permissions changed".to_string()))
+        }
+        Ok(o) => {
+            let err = String::from_utf8_lossy(&o.stderr).to_string();
+            HttpResponse::Ok().json(ApiResponse::<String>::error(&err))
+        }
+        Err(e) => HttpResponse::Ok().json(ApiResponse::<String>::error(&e.to_string())),
+    }
+}
+
+#[derive(Deserialize)]
+struct MkdirRequest {
+    path: String,
+}
+
+async fn mkdir(body: web::Json<MkdirRequest>) -> HttpResponse {
+    let target = match sanitize_parent_path(&body.path) {
+        Some(p) => p,
+        None => return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid path")),
+    };
+    match std::fs::create_dir_all(&target) {
+        Ok(_) => HttpResponse::Ok().json(ApiResponse::ok("Directory created".to_string())),
+        Err(e) => HttpResponse::Ok().json(ApiResponse::<String>::error(&e.to_string())),
+    }
+}
+
+#[derive(Deserialize)]
+struct DeleteRequest {
+    path: String,
+}
+
+async fn delete_file(body: web::Json<DeleteRequest>) -> HttpResponse {
+    let path = match sanitize_path(&body.path) {
+        Some(p) => p,
+        None => return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid path")),
+    };
+    let result = if path.is_dir() {
+        std::fs::remove_dir(&path) // only removes empty dirs
+    } else {
+        std::fs::remove_file(&path)
+    };
+    match result {
+        Ok(_) => HttpResponse::Ok().json(ApiResponse::ok("Deleted".to_string())),
+        Err(e) => HttpResponse::Ok().json(ApiResponse::<String>::error(&e.to_string())),
+    }
+}
+
+#[derive(Deserialize)]
+struct DownloadQuery {
+    path: String,
+}
+
+async fn download_file(query: web::Query<DownloadQuery>) -> HttpResponse {
+    let path = match sanitize_path(&query.path) {
+        Some(p) if p.is_file() => p,
+        _ => return HttpResponse::BadRequest().json(ApiResponse::<String>::error("Invalid file")),
+    };
+    let meta = match std::fs::metadata(&path) {
+        Ok(m) => m,
+        Err(e) => return HttpResponse::BadRequest().json(
+            ApiResponse::<String>::error(&e.to_string())
+        ),
+    };
+    if meta.len() > MAX_UPLOAD_SIZE {
+        return HttpResponse::BadRequest().json(
+            ApiResponse::<String>::error("File too large (>50MB)")
+        );
+    }
+    let bytes = match std::fs::read(&path) {
+        Ok(b) => b,
+        Err(e) => return HttpResponse::InternalServerError().json(
+            ApiResponse::<String>::error(&e.to_string())
+        ),
+    };
+    let fname = path.file_name().map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "download".into());
+    HttpResponse::Ok()
+        .insert_header(("Content-Disposition", format!("attachment; filename=\"{}\"", fname)))
+        .insert_header(("Content-Type", "application/octet-stream"))
+        .body(bytes)
+}
+
+async fn upload_file(req: HttpRequest, body: web::Bytes) -> HttpResponse {
+    let target_path = match req.headers().get("X-File-Path") {
+        Some(v) => v.to_str().unwrap_or("").to_string(),
+        None => return HttpResponse::BadRequest().json(
+            ApiResponse::<String>::error("Missing X-File-Path header")
+        ),
+    };
+    if body.len() as u64 > MAX_UPLOAD_SIZE {
+        return HttpResponse::BadRequest().json(
+            ApiResponse::<String>::error("File too large (>50MB)")
+        );
+    }
+    let path = match sanitize_parent_path(&target_path) {
+        Some(p) => p,
+        None => return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid path")),
+    };
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    match std::fs::write(&path, &body) {
+        Ok(_) => HttpResponse::Ok().json(ApiResponse::ok("File uploaded".to_string())),
+        Err(e) => HttpResponse::Ok().json(ApiResponse::<String>::error(&e.to_string())),
+    }
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/files")
             .route("/browse", web::get().to(browse))
             .route("/read", web::post().to(read_file))
             .route("/write", web::post().to(write_file))
+            .route("/chmod", web::post().to(chmod_file))
+            .route("/mkdir", web::post().to(mkdir))
+            .route("/delete", web::post().to(delete_file))
+            .route("/download", web::get().to(download_file))
+            .route("/upload", web::post().to(upload_file))
     );
 }
