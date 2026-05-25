@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import './App.css';
 import './components.css';
 import LoginScreen from './components/LoginScreen';
@@ -202,14 +202,35 @@ function App() {
   const [showChangePw, setShowChangePw] = useState(false);
   const [hiddenTabs, setHiddenTabs] = useState<Set<Tab>>(new Set());
   // Focus mode: hide the top bars + left sidebar so only the content frame shows.
+  // Also drives the browser Fullscreen API for a true edge-to-edge view.
   const [focusMode, setFocusMode] = useState(false);
 
+  const enterFocus = useCallback(() => {
+    setFocusMode(true);
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen().catch(() => { /* denied/unsupported */ });
+  }, []);
+  const exitFocus = useCallback(() => {
+    setFocusMode(false);
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    }
+  }, []);
+
+  // Keep focus mode in sync when the browser leaves fullscreen (Esc / F11 / UI).
+  useEffect(() => {
+    const onFsChange = () => { if (!document.fullscreenElement) setFocusMode(false); };
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  // Esc also exits when focus mode is on without browser fullscreen (denied).
   useEffect(() => {
     if (!focusMode) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFocusMode(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') exitFocus(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [focusMode]);
+  }, [focusMode, exitFocus]);
 
   const { data: dockerAvailable } = useApi<boolean>(loggedIn ? '/api/containers/available' : '');
   const { data: dbAvailable } = useApi<boolean>(loggedIn ? '/api/database/available' : '');
@@ -262,7 +283,7 @@ function App() {
         <div className="header-actions">
           <ThemeSelector compact />
           <LanguageSelector />
-          <button className="btn btn-secondary" title={t('app.focusMode')} onClick={() => setFocusMode(true)}>⛶</button>
+          <button className="btn btn-secondary" title={t('app.focusMode')} onClick={enterFocus}>⛶</button>
           <button className="btn btn-secondary" onClick={() => setShowChangePw(true)}>{t('app.changePassword')}</button>
           <button className="btn btn-secondary logout-btn" onClick={handleLogout}>{t('app.logout')}</button>
         </div>
@@ -356,7 +377,7 @@ function App() {
         <button
           className="focus-exit-btn"
           title={t('app.exitFocus')}
-          onClick={() => setFocusMode(false)}
+          onClick={exitFocus}
         >
           ⛶ {t('app.exitFocus')}
         </button>
