@@ -8,8 +8,18 @@ frontend/.env.local
 
 # Build artifacts
 backend/static/
+backend/static.bak-*/
+dist/
+
+# Runtime data
+backend/data/
+
+# Local tooling & captures
+.playwright-mcp/
+screenshots/
 
 # IDE
 .idea/
 .vscode/
 *.swp
+docs/mec-management/08-handoff-to-server.md
