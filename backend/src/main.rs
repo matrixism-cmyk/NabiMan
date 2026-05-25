@@ -174,6 +174,8 @@ async fn main() -> std::io::Result<()> {
     let mec_state = web::Data::new(
         mec::MecState::new(mec_db, mec_services).with_channels(channel_store.clone()),
     );
+    // Shared (cross-worker) throttle for recording MEC read access as audit views.
+    let mec_view_throttle = mec::safety::new_view_throttle();
 
     println!("NabiMan Server starting on http://0.0.0.0:{}", port);
     println!("Static files: {}", static_dir);
@@ -193,6 +195,10 @@ async fn main() -> std::io::Result<()> {
             .wrap(audit_middleware::AuditMiddleware::new(aud_log.clone()))
             .wrap(mec::safety::MecReadOnly)
             .wrap(mec::safety::MecRateLimit::new())
+            .wrap(mec::safety::MecAccessAudit::new(
+                mec_state.audit.clone(),
+                mec_view_throttle.clone(),
+            ))
             .wrap(security_headers::SecurityHeaders)
             .wrap(build_cors())
             .wrap(rate_limit::RateLimiter::new())
