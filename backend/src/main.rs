@@ -45,6 +45,7 @@ mod oauth;
 mod ip_block;
 mod openapi;
 mod models;
+mod mec;
 
 use actix_cors::Cors;
 use actix_files as afs;
@@ -161,6 +162,19 @@ async fn main() -> std::io::Result<()> {
     let pty_store = terminal::new_pty_store();
     terminal::start_pty_cleanup(pty_store.clone());
 
+    // MEC Management module state. Services pick real/mock based on
+    // NABIMAN_MEC_MODE=real|mock (default: auto — real when env creds exist).
+    let mec_db = mec::db::open(mec::db::default_path())
+        .unwrap_or_else(|e| {
+            eprintln!("Failed to open MEC DB, falling back to in-memory: {}", e);
+            mec::db::open_in_memory().expect("in-memory MEC DB")
+        });
+    let mec_mode = mec::services::bootstrap::ServiceMode::from_env();
+    let mec_services = mec::services::bootstrap::bootstrap(mec_mode).await;
+    let mec_state = web::Data::new(
+        mec::MecState::new(mec_db, mec_services).with_channels(channel_store.clone()),
+    );
+
     println!("NabiMan Server starting on http://0.0.0.0:{}", port);
     println!("Static files: {}", static_dir);
 
@@ -177,6 +191,8 @@ async fn main() -> std::io::Result<()> {
 
         App::new()
             .wrap(audit_middleware::AuditMiddleware::new(aud_log.clone()))
+            .wrap(mec::safety::MecReadOnly)
+            .wrap(mec::safety::MecRateLimit::new())
             .wrap(security_headers::SecurityHeaders)
             .wrap(build_cors())
             .wrap(rate_limit::RateLimiter::new())
@@ -192,6 +208,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(api_key_store.clone()))
             .app_data(web::Data::new(schedule_store.clone()))
             .app_data(web::Data::new(pty_store.clone()))
+            .app_data(mec_state.clone())
             .configure(auth::config)
             .configure(users::config)
             .configure(jwt_sessions::config)
@@ -232,6 +249,7 @@ async fn main() -> std::io::Result<()> {
             .configure(ldap_auth::config)
             .configure(oauth::config)
             .configure(openapi::config)
+            .configure(mec::config)
             .service(
                 afs::Files::new("/", &static_dir)
                     .index_file("index.html")

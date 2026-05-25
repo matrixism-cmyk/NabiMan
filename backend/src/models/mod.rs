@@ -4,6 +4,7 @@ pub mod config;
 pub mod infra;
 pub mod remote;
 pub mod auth;
+pub mod mec;
 
 pub use common::*;
 pub use server::*;
