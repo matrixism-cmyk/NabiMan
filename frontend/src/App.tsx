@@ -201,6 +201,15 @@ function App() {
   const [sshTarget, setSshTarget] = useState<{ host: string; port: number; user: string } | null>(null);
   const [showChangePw, setShowChangePw] = useState(false);
   const [hiddenTabs, setHiddenTabs] = useState<Set<Tab>>(new Set());
+  // Focus mode: hide the top bars + left sidebar so only the content frame shows.
+  const [focusMode, setFocusMode] = useState(false);
+
+  useEffect(() => {
+    if (!focusMode) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFocusMode(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [focusMode]);
 
   const { data: dockerAvailable } = useApi<boolean>(loggedIn ? '/api/containers/available' : '');
   const { data: dbAvailable } = useApi<boolean>(loggedIn ? '/api/database/available' : '');
@@ -246,13 +255,14 @@ function App() {
   const currentCat = visibleCategories.find(c => c.key === activeCat) || visibleCategories[0];
 
   return (
-    <div className="app">
+    <div className={`app ${focusMode ? 'focus-mode' : ''}`}>
       <header className="app-header">
         <h1 className="logo-link" onClick={() => { setActiveCat('dashboard'); setActiveTab('server'); }}>{t('app.title')}</h1>
         <span className="subtitle">{t('app.subtitle')}</span>
         <div className="header-actions">
           <ThemeSelector compact />
           <LanguageSelector />
+          <button className="btn btn-secondary" title={t('app.focusMode')} onClick={() => setFocusMode(true)}>⛶</button>
           <button className="btn btn-secondary" onClick={() => setShowChangePw(true)}>{t('app.changePassword')}</button>
           <button className="btn btn-secondary logout-btn" onClick={handleLogout}>{t('app.logout')}</button>
         </div>
@@ -342,6 +352,15 @@ function App() {
         </div>
       </div>
       {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
+      {focusMode && (
+        <button
+          className="focus-exit-btn"
+          title={t('app.exitFocus')}
+          onClick={() => setFocusMode(false)}
+        >
+          ⛶ {t('app.exitFocus')}
+        </button>
+      )}
     </div>
   );
 }

@@ -41,6 +41,8 @@ const t: T = {
   'app.subtitle': { ko: '서버 관리 대시보드', en: 'Server Management Dashboard', ja: 'サーバー管理ダッシュボード' },
   'app.changePassword': { ko: '비밀번호 변경', en: 'Change Password', ja: 'パスワード変更' },
   'app.logout': { ko: '로그아웃', en: 'Logout', ja: 'ログアウト' },
+  'app.focusMode': { ko: '전체화면 (콘텐츠만)', en: 'Fullscreen (content only)', ja: '全画面（コンテンツのみ）' },
+  'app.exitFocus': { ko: '전체화면 종료 (Esc)', en: 'Exit fullscreen (Esc)', ja: '全画面を終了 (Esc)' },
   'app.currentPassword': { ko: '현재 비밀번호', en: 'Current Password', ja: '現在のパスワード' },
   'app.newPassword': { ko: '새 비밀번호', en: 'New Password', ja: '新しいパスワード' },
   'app.confirmPassword': { ko: '새 비밀번호 확인', en: 'Confirm New Password', ja: '新しいパスワード確認' },
