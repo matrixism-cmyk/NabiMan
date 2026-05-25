@@ -2,6 +2,7 @@ import common from './common';
 import monitoring from './monitoring';
 import management from './management';
 import security from './security';
+import mec from './mec';
 
 export type Lang = 'ko' | 'en' | 'ja';
 
@@ -16,6 +17,7 @@ const translations: Record<string, Record<Lang, string>> = {
   ...monitoring,
   ...management,
   ...security,
+  ...mec,
 };
 
 export default translations;

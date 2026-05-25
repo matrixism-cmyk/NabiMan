@@ -47,7 +47,7 @@ async function tryRefresh(): Promise<boolean> {
   return result;
 }
 
-async function fetchWithRefresh(url: string, options: RequestInit = {}): Promise<Response> {
+export async function fetchWithRefresh(url: string, options: RequestInit = {}): Promise<Response> {
   const res = await fetch(url, { ...options, headers: { ...authHeaders(), ...(options.headers as Record<string, string> || {}) } });
   if (res.status === 401 && getRefreshToken()) {
     const refreshed = await tryRefresh();

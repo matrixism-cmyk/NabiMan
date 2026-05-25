@@ -37,16 +37,33 @@ import IpBlockPanel from './components/IpBlockPanel';
 import LicensePanel from './components/LicensePanel';
 import EnterpriseAuthPanel from './components/EnterpriseAuthPanel';
 import MultiServerDashboard from './components/MultiServerDashboard';
+import MecDashboardPanel from './components/mec/MecDashboardPanel';
+import TenantsPanel from './components/mec/TenantsPanel';
+import MecNodesPanel from './components/mec/MecNodesPanel';
+import MecGpuPanel from './components/mec/MecGpuPanel';
+import MecFirewallPanel from './components/mec/MecFirewallPanel';
+import MecAuditPanel from './components/mec/MecAuditPanel';
+import MecJobsPanel from './components/mec/MecJobsPanel';
+import MecStoragePanel from './components/mec/MecStoragePanel';
+import MecHealthPanel from './components/mec/MecHealthPanel';
+import MecSettingsPanel from './components/mec/MecSettingsPanel';
+import MecIngressPanel from './components/mec/MecIngressPanel';
+import MecDiscoveryPanel from './components/mec/MecDiscoveryPanel';
+import MecUsersPanel from './components/mec/MecUsersPanel';
 import { clearToken, apiPost, useApi } from './hooks/useApi';
 import { useT, LANG_LABELS, Lang } from './i18n';
+import { ThemeProvider, ThemeSelector } from './theme';
 
 type Tab = 'server' | 'charts' | 'network' | 'accounts' | 'config' | 'traffic' | 'packages'
   | 'containers' | 'services' | 'firewall' | 'logs' | 'cron' | 'processes' | 'disks'
   | 'remote' | 'terminal' | 'updates' | 'diagnostics' | 'ssl'
   | 'files' | 'backup' | 'audit' | 'database' | 'mail' | 'swap' | 'sessions' | 'dns' | 'usermgmt'
-  | 'notifications' | 'alertrules' | 'vhost' | 'ipblock' | 'license' | 'enterpriseauth' | 'multiserver';
+  | 'notifications' | 'alertrules' | 'vhost' | 'ipblock' | 'license' | 'enterpriseauth' | 'multiserver'
+  | 'mecDashboard' | 'mecTenants' | 'mecNodes' | 'mecGpu' | 'mecFirewall'
+  | 'mecStorage' | 'mecIngress' | 'mecJobs' | 'mecAudit' | 'mecHealth'
+  | 'mecSettings' | 'mecDiscovery' | 'mecUsers';
 
-type Category = 'dashboard' | 'monitoring' | 'management' | 'security' | 'system' | 'remote';
+type Category = 'dashboard' | 'monitoring' | 'management' | 'security' | 'system' | 'remote' | 'mec';
 
 interface CatDef {
   key: Category;
@@ -101,6 +118,21 @@ const categories: CatDef[] = [
   ]},
   { key: 'remote', labelKey: 'cat.remote', tabs: [
     { key: 'remote', labelKey: 'tab.remoteServers' },
+  ]},
+  { key: 'mec', labelKey: 'cat.mec', tabs: [
+    { key: 'mecDashboard', labelKey: 'tab.mecDashboard' },
+    { key: 'mecHealth', labelKey: 'tab.mecHealth' },
+    { key: 'mecDiscovery', labelKey: 'tab.mecDiscovery' },
+    { key: 'mecTenants', labelKey: 'tab.mecTenants' },
+    { key: 'mecUsers', labelKey: 'tab.mecUsers' },
+    { key: 'mecNodes', labelKey: 'tab.mecNodes' },
+    { key: 'mecGpu', labelKey: 'tab.mecGpu' },
+    { key: 'mecFirewall', labelKey: 'tab.mecFirewall' },
+    { key: 'mecIngress', labelKey: 'tab.mecIngress' },
+    { key: 'mecStorage', labelKey: 'tab.mecStorage' },
+    { key: 'mecJobs', labelKey: 'tab.mecJobs' },
+    { key: 'mecAudit', labelKey: 'tab.mecAudit' },
+    { key: 'mecSettings', labelKey: 'tab.mecSettings' },
   ]},
 ];
 
@@ -219,6 +251,7 @@ function App() {
         <h1 className="logo-link" onClick={() => { setActiveCat('dashboard'); setActiveTab('server'); }}>{t('app.title')}</h1>
         <span className="subtitle">{t('app.subtitle')}</span>
         <div className="header-actions">
+          <ThemeSelector compact />
           <LanguageSelector />
           <button className="btn btn-secondary" onClick={() => setShowChangePw(true)}>{t('app.changePassword')}</button>
           <button className="btn btn-secondary logout-btn" onClick={handleLogout}>{t('app.logout')}</button>
@@ -284,6 +317,19 @@ function App() {
           {activeTab === 'enterpriseauth' && <EnterpriseAuthPanel />}
           {activeTab === 'multiserver' && <MultiServerDashboard />}
           {activeTab === 'remote' && <RemoteServersPanel onConnectSSH={handleConnectSSH} />}
+          {activeTab === 'mecDashboard' && <MecDashboardPanel />}
+          {activeTab === 'mecTenants' && <TenantsPanel />}
+          {activeTab === 'mecNodes' && <MecNodesPanel />}
+          {activeTab === 'mecGpu' && <MecGpuPanel />}
+          {activeTab === 'mecFirewall' && <MecFirewallPanel />}
+          {activeTab === 'mecAudit' && <MecAuditPanel />}
+          {activeTab === 'mecJobs' && <MecJobsPanel />}
+          {activeTab === 'mecStorage' && <MecStoragePanel />}
+          {activeTab === 'mecHealth' && <MecHealthPanel />}
+          {activeTab === 'mecSettings' && <MecSettingsPanel />}
+          {activeTab === 'mecIngress' && <MecIngressPanel />}
+          {activeTab === 'mecDiscovery' && <MecDiscoveryPanel />}
+          {activeTab === 'mecUsers' && <MecUsersPanel />}
         </main>
         {/* Terminal: always mounted, positioned over main when active.
             Uses visibility+offscreen instead of display:none to keep xterm.js buffer intact. */}
@@ -296,4 +342,12 @@ function App() {
   );
 }
 
-export default App;
+function AppWithProviders() {
+  return (
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
+  );
+}
+
+export default AppWithProviders;
