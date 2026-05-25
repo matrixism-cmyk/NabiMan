@@ -130,7 +130,9 @@ pub struct PodInfo {
 pub struct NodeMetrics {
     pub name: String,
     pub cpu_usage_millicores: u64,
+    pub cpu_capacity_millicores: u64,
     pub memory_usage_bytes: u64,
+    pub memory_capacity_bytes: u64,
     pub cpu_usage_percent: f32,
     pub memory_usage_percent: f32,
     pub gpu_usage_percent: Option<f32>,

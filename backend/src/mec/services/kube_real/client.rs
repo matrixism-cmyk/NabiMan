@@ -201,6 +201,22 @@ impl KubeService for KubeReal {
         super::pvcs::list(&self.client, namespace).await
     }
 
+    async fn node_metrics(&self) -> ServiceResult<Vec<crate::models::mec::NodeMetrics>> {
+        super::live::node_metrics(&self.client).await
+    }
+
+    async fn tenant_usage(&self) -> ServiceResult<Vec<crate::models::mec::TenantUsage>> {
+        super::live::tenant_usage(&self.client).await
+    }
+
+    async fn pod_phase_summary(&self) -> ServiceResult<crate::models::mec::PodPhaseSummary> {
+        super::live::pod_phase_summary(&self.client).await
+    }
+
+    async fn list_events(&self, limit: u32) -> ServiceResult<Vec<crate::models::mec::ClusterEvent>> {
+        super::live::list_events(&self.client, limit).await
+    }
+
     async fn health_check(&self) -> ServiceResult<KubeHealth> {
         let start = Instant::now();
         let api: kube::Api<k8s_openapi::api::core::v1::Namespace> =

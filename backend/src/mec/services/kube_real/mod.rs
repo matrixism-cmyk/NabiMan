@@ -7,5 +7,6 @@ mod rbac;
 mod workloads;
 mod ingress_ops;
 mod pvcs;
+mod live;
 
 pub use client::{KubeReal, KubeRealConfig};

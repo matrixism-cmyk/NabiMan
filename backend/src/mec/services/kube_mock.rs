@@ -1,8 +1,12 @@
-use super::kube_mock_fixtures::{sample_namespaces, sample_nodes, sample_services};
+use super::kube_mock_fixtures::{
+    sample_events, sample_namespaces, sample_node_metrics, sample_nodes, sample_pod_phases,
+    sample_services, sample_tenant_usage,
+};
 use super::kube_service::{IngressRow, KubeHealth, KubeService, NamespaceInfo, PvcRow};
 use super::{ServiceError, ServiceResult};
 use crate::models::mec::{
-    GpuMode, LoadBalancerService, Node, PodInfo, QuotaUsage, ResourceQuota, Taint, TaintEffect,
+    ClusterEvent, GpuMode, LoadBalancerService, Node, NodeMetrics, PodInfo, PodPhaseSummary,
+    QuotaUsage, ResourceQuota, Taint, TaintEffect, TenantUsage,
 };
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -322,6 +326,22 @@ impl KubeService for KubeMock {
 
     async fn list_pvcs(&self, _namespace: Option<&str>) -> ServiceResult<Vec<PvcRow>> {
         Ok(vec![])
+    }
+
+    async fn node_metrics(&self) -> ServiceResult<Vec<NodeMetrics>> {
+        Ok(sample_node_metrics())
+    }
+
+    async fn tenant_usage(&self) -> ServiceResult<Vec<TenantUsage>> {
+        Ok(sample_tenant_usage())
+    }
+
+    async fn pod_phase_summary(&self) -> ServiceResult<PodPhaseSummary> {
+        Ok(sample_pod_phases())
+    }
+
+    async fn list_events(&self, limit: u32) -> ServiceResult<Vec<ClusterEvent>> {
+        Ok(sample_events(limit))
     }
 
     async fn health_check(&self) -> ServiceResult<KubeHealth> {

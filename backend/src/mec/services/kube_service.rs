@@ -1,6 +1,7 @@
 use super::{ServiceError, ServiceResult};
 use crate::models::mec::{
-    GpuMode, LoadBalancerService, Node, PodInfo, QuotaUsage, ResourceQuota, Taint, TaintEffect,
+    ClusterEvent, GpuMode, LoadBalancerService, Node, NodeMetrics, PodInfo, PodPhaseSummary,
+    QuotaUsage, ResourceQuota, Taint, TaintEffect, TenantUsage,
 };
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -65,6 +66,15 @@ pub trait KubeService: Send + Sync {
     async fn delete_ingress(&self, namespace: &str, name: &str) -> ServiceResult<()>;
 
     async fn list_pvcs(&self, namespace: Option<&str>) -> ServiceResult<Vec<PvcRow>>;
+
+    /// Real CPU/memory utilization per node (metrics-server + node capacity).
+    async fn node_metrics(&self) -> ServiceResult<Vec<NodeMetrics>>;
+    /// Real CPU/memory consumption rolled up per namespace (pod metrics).
+    async fn tenant_usage(&self) -> ServiceResult<Vec<TenantUsage>>;
+    /// Count of pods by phase across all namespaces.
+    async fn pod_phase_summary(&self) -> ServiceResult<PodPhaseSummary>;
+    /// Recent cluster events (live activity), newest first.
+    async fn list_events(&self, limit: u32) -> ServiceResult<Vec<ClusterEvent>>;
 
     async fn health_check(&self) -> ServiceResult<KubeHealth>;
 }

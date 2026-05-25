@@ -6,9 +6,11 @@ pub mod gpu;
 pub mod job;
 pub mod audit;
 pub mod response;
+pub mod live;
 
 pub use tenant::*;
 pub use node::*;
+pub use live::*;
 pub use network::*;
 pub use firewall::*;
 pub use gpu::*;

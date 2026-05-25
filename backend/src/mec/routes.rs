@@ -10,7 +10,8 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .service(
                 web::scope("/dashboard")
                     .route("/summary", web::get().to(dashboard::summary))
-                    .route("/activity", web::get().to(dashboard::activity)),
+                    .route("/activity", web::get().to(dashboard::activity))
+                    .route("/live", web::get().to(dashboard::live)),
             )
             .service(tenant_scope())
             .service(node_scope())

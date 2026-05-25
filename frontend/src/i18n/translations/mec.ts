@@ -11,6 +11,11 @@ const mec: Record<string, Record<Lang, string>> = {
     en: 'MEC Dashboard',
     ja: 'MECダッシュボード',
   },
+  'tab.mecLive': {
+    ko: '실시간 모니터링',
+    en: 'Live Monitoring',
+    ja: 'リアルタイム監視',
+  },
   'tab.mecTenants': {
     ko: '테넌트',
     en: 'Tenants',

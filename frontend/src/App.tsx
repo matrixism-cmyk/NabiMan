@@ -38,6 +38,7 @@ import LicensePanel from './components/LicensePanel';
 import EnterpriseAuthPanel from './components/EnterpriseAuthPanel';
 import MultiServerDashboard from './components/MultiServerDashboard';
 import MecDashboardPanel from './components/mec/MecDashboardPanel';
+import MecLivePanel from './components/mec/MecLivePanel';
 import TenantsPanel from './components/mec/TenantsPanel';
 import MecNodesPanel from './components/mec/MecNodesPanel';
 import MecGpuPanel from './components/mec/MecGpuPanel';
@@ -59,7 +60,7 @@ type Tab = 'server' | 'charts' | 'network' | 'accounts' | 'config' | 'traffic' |
   | 'remote' | 'terminal' | 'updates' | 'diagnostics' | 'ssl'
   | 'files' | 'backup' | 'audit' | 'database' | 'mail' | 'swap' | 'sessions' | 'dns' | 'usermgmt'
   | 'notifications' | 'alertrules' | 'vhost' | 'ipblock' | 'license' | 'enterpriseauth' | 'multiserver'
-  | 'mecDashboard' | 'mecTenants' | 'mecNodes' | 'mecGpu' | 'mecFirewall'
+  | 'mecDashboard' | 'mecLive' | 'mecTenants' | 'mecNodes' | 'mecGpu' | 'mecFirewall'
   | 'mecStorage' | 'mecIngress' | 'mecJobs' | 'mecAudit' | 'mecHealth'
   | 'mecSettings' | 'mecDiscovery' | 'mecUsers';
 
@@ -121,6 +122,7 @@ const categories: CatDef[] = [
   ]},
   { key: 'mec', labelKey: 'cat.mec', tabs: [
     { key: 'mecDashboard', labelKey: 'tab.mecDashboard' },
+    { key: 'mecLive', labelKey: 'tab.mecLive' },
     { key: 'mecHealth', labelKey: 'tab.mecHealth' },
     { key: 'mecDiscovery', labelKey: 'tab.mecDiscovery' },
     { key: 'mecTenants', labelKey: 'tab.mecTenants' },
@@ -353,6 +355,7 @@ function App() {
               onNavigate={(tab) => { setActiveCat('mec'); setActiveTab(tab as Tab); }}
             />
           )}
+          {activeTab === 'mecLive' && <MecLivePanel />}
           {activeTab === 'mecTenants' && <TenantsPanel />}
           {activeTab === 'mecNodes' && <MecNodesPanel />}
           {activeTab === 'mecGpu' && <MecGpuPanel />}

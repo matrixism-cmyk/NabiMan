@@ -1,5 +1,6 @@
 use super::util::{from_service_error, ok_response};
 use crate::mec::MecState;
+use crate::models::mec::{ClusterUsage, LiveSnapshot};
 use actix_web::{web, HttpResponse};
 use serde::Serialize;
 
@@ -15,6 +16,37 @@ pub async fn activity(state: web::Data<MecState>) -> HttpResponse {
         Ok(logs) => super::util::list_response(logs),
         Err(e) => from_service_error(e.into()),
     }
+}
+
+pub async fn live(state: web::Data<MecState>) -> HttpResponse {
+    match build_live(&state).await {
+        Ok(s) => ok_response(s),
+        Err(e) => from_service_error(e),
+    }
+}
+
+async fn build_live(state: &MecState) -> crate::mec::services::ServiceResult<LiveSnapshot> {
+    let nodes = state.services.kube.node_metrics().await?;
+    let pods = state.services.kube.pod_phase_summary().await?;
+    let mut tenants = state.services.kube.tenant_usage().await?;
+    tenants.truncate(12);
+    let events = state.services.kube.list_events(25).await?;
+
+    let mut cluster = ClusterUsage {
+        node_count: nodes.len() as u32,
+        ..Default::default()
+    };
+    for n in &nodes {
+        cluster.cpu_used_millicores += n.cpu_usage_millicores;
+        cluster.cpu_capacity_millicores += n.cpu_capacity_millicores;
+        cluster.memory_used_bytes += n.memory_usage_bytes;
+        cluster.memory_capacity_bytes += n.memory_capacity_bytes;
+    }
+    let pct = |u: u64, c: u64| if c == 0 { 0.0 } else { (u as f64 / c as f64 * 100.0) as f32 };
+    cluster.cpu_percent = pct(cluster.cpu_used_millicores, cluster.cpu_capacity_millicores);
+    cluster.memory_percent = pct(cluster.memory_used_bytes, cluster.memory_capacity_bytes);
+
+    Ok(LiveSnapshot { cluster, nodes, pods, tenants, events })
 }
 
 #[derive(Serialize)]

@@ -155,3 +155,59 @@ export interface AuditLog {
     duration_ms: number;
   }>;
 }
+
+export interface NodeMetrics {
+  name: string;
+  cpu_usage_millicores: number;
+  cpu_capacity_millicores: number;
+  memory_usage_bytes: number;
+  memory_capacity_bytes: number;
+  cpu_usage_percent: number;
+  memory_usage_percent: number;
+  gpu_usage_percent: number | null;
+}
+
+export interface ClusterUsage {
+  cpu_used_millicores: number;
+  cpu_capacity_millicores: number;
+  memory_used_bytes: number;
+  memory_capacity_bytes: number;
+  cpu_percent: number;
+  memory_percent: number;
+  node_count: number;
+}
+
+export interface PodPhaseSummary {
+  running: number;
+  pending: number;
+  failed: number;
+  succeeded: number;
+  unknown: number;
+  total: number;
+}
+
+export interface TenantUsage {
+  namespace: string;
+  cpu_millicores: number;
+  memory_bytes: number;
+  pods: number;
+}
+
+export interface ClusterEvent {
+  last_time: string | null;
+  event_type: string;
+  reason: string;
+  kind: string;
+  name: string;
+  namespace: string | null;
+  message: string;
+  count: number;
+}
+
+export interface LiveSnapshot {
+  cluster: ClusterUsage;
+  nodes: NodeMetrics[];
+  pods: PodPhaseSummary;
+  tenants: TenantUsage[];
+  events: ClusterEvent[];
+}
