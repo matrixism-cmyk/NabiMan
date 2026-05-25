@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useMecApi, useMecList } from '../../hooks/mec/useMecApi';
+import { useMetricHistory, trendOf } from '../../hooks/mec/useMetricHistory';
 import { AuditLog, DashboardSummary } from '../../types/mec';
 import {
   BarChart,
   DonutChart,
   ErrorBanner,
+  LiveIndicator,
   MetricCard,
   MetricGrid,
   PanelLayout,
@@ -13,13 +15,18 @@ import {
   StatusBadge,
 } from './common';
 
-const REFRESH_INTERVAL = 30_000;
+const REFRESH_INTERVAL = 15_000;
+
+interface Props {
+  /** Navigate to another MEC tab (drill-down from a metric card). */
+  onNavigate?: (tab: string) => void;
+}
 
 function pct(x: number, total: number): number {
   return total > 0 ? Math.round((x / total) * 100) : 0;
 }
 
-export default function MecDashboardPanel() {
+export default function MecDashboardPanel({ onNavigate }: Props) {
   const summaryQuery = useMecApi<DashboardSummary>(
     '/api/mec/v1/dashboard/summary',
     REFRESH_INTERVAL,
@@ -34,15 +41,61 @@ export default function MecDashboardPanel() {
     summaryQuery.refetch();
     activityQuery.refetch();
   };
+  const go = (tab: string) => onNavigate?.(tab);
+
+  // Timestamp of the latest successful summary load (drives the LIVE label).
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  useEffect(() => {
+    if (s) setLastUpdated(Date.now());
+  }, [s]);
+
+  // Rolling history for the per-card sparklines + trend arrows.
+  const metrics = useMemo(
+    () =>
+      s
+        ? {
+            tenants: s.tenants.active,
+            nodes: s.nodes.ready,
+            gpu: s.gpu.allocated_slots,
+            lb: s.network.lb_services,
+            nat: s.firewall.nat_rules,
+          }
+        : null,
+    [s],
+  );
+  const history = useMetricHistory('mec-dashboard-history', metrics);
+
+  // Animate genuinely new activity rows (skip the very first load).
+  const activity = useMemo(() => activityQuery.data || [], [activityQuery.data]);
+  const seen = useRef<Set<string>>(new Set());
+  const [newKeys, setNewKeys] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    const incoming = new Set<string>();
+    for (const a of activity) if (!seen.current.has(a.id)) incoming.add(a.id);
+    if (incoming.size && seen.current.size) {
+      setNewKeys(incoming);
+      const t = setTimeout(() => setNewKeys(new Set()), 1000);
+      activity.forEach((a) => seen.current.add(a.id));
+      return () => clearTimeout(t);
+    }
+    activity.forEach((a) => seen.current.add(a.id));
+  }, [activity]);
 
   return (
     <PanelLayout
       title="MEC 통합 대시보드"
       subtitle="실시간 클러스터 자원 현황과 최근 운영 활동 요약"
       actions={
-        <button className="btn btn-secondary" onClick={refresh}>
-          새로고침
-        </button>
+        <>
+          <LiveIndicator
+            lastUpdated={lastUpdated}
+            intervalMs={REFRESH_INTERVAL}
+            refreshing={summaryQuery.loading}
+          />
+          <button className="btn btn-secondary" onClick={refresh}>
+            새로고침
+          </button>
+        </>
       }
     >
       <ErrorBanner error={summaryQuery.error || undefined} />
@@ -52,7 +105,7 @@ export default function MecDashboardPanel() {
       )}
 
       {s && (
-        <>
+        <div className="mec-fade-in-up">
           <MetricGrid>
             <MetricCard
               label="테넌트"
@@ -60,6 +113,9 @@ export default function MecDashboardPanel() {
               unit={`/ ${s.tenants.total}`}
               helper={`활성 ${s.tenants.active}곳 · 전체 ${s.tenants.total}곳`}
               tone={s.tenants.active === s.tenants.total ? 'success' : 'info'}
+              trend={trendOf(history.tenants)}
+              sparkline={history.tenants}
+              onClick={() => go('mecTenants')}
             />
             <MetricCard
               label="노드 Ready"
@@ -67,6 +123,9 @@ export default function MecDashboardPanel() {
               unit={`/ ${s.nodes.total}`}
               helper={`${pct(s.nodes.ready, s.nodes.total)}% 정상`}
               tone={s.nodes.ready === s.nodes.total ? 'success' : 'warning'}
+              trend={trendOf(history.nodes)}
+              sparkline={history.nodes}
+              onClick={() => go('mecNodes')}
             />
             <MetricCard
               label="GPU Slot"
@@ -74,18 +133,27 @@ export default function MecDashboardPanel() {
               unit={`/ ${s.gpu.total_slots}`}
               helper={`여유 ${s.gpu.available_slots} slots`}
               tone={s.gpu.available_slots === 0 ? 'error' : 'info'}
+              trend={trendOf(history.gpu)}
+              sparkline={history.gpu}
+              onClick={() => go('mecGpu')}
             />
             <MetricCard
               label="LB Services"
               value={s.network.lb_services}
               helper={`공인 IP 할당 ${s.network.public_ips_assigned}개`}
               tone="info"
+              trend={trendOf(history.lb)}
+              sparkline={history.lb}
+              onClick={() => go('mecIngress')}
             />
             <MetricCard
               label="NAT 규칙"
               value={s.firewall.nat_rules}
               helper={`보안 정책 ${s.firewall.security_policies}개`}
               tone="info"
+              trend={trendOf(history.nat)}
+              sparkline={history.nat}
+              onClick={() => go('mecFirewall')}
             />
           </MetricGrid>
 
@@ -155,10 +223,11 @@ export default function MecDashboardPanel() {
               </div>
             )}
             <SortableTable<AuditLog>
-              data={activityQuery.data || []}
+              data={activity}
               defaultSortKey="timestamp"
               defaultSortDir="desc"
               rowKey={(r) => r.id}
+              highlightRowKeys={newKeys}
               emptyMessage="기록된 활동이 없습니다."
               columns={[
                 {
@@ -216,7 +285,7 @@ export default function MecDashboardPanel() {
               ]}
             />
           </Section>
-        </>
+        </div>
       )}
     </PanelLayout>
   );

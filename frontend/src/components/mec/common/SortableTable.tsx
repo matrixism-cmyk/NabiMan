@@ -28,6 +28,8 @@ interface Props<T> {
   maxHeight?: string | number;
   /** Optional client-side filter input value applied across all string columns. */
   filter?: string;
+  /** Row keys to animate in (e.g. newly streamed rows in a live feed). */
+  highlightRowKeys?: Set<string | number>;
 }
 
 function compare(a: unknown, b: unknown): number {
@@ -59,6 +61,7 @@ export default function SortableTable<T>({
   stickyHeader = false,
   maxHeight,
   filter,
+  highlightRowKeys,
 }: Props<T>) {
   const [sortKey, setSortKey] = useState<string | null>(defaultSortKey ?? null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>(defaultSortDir);
@@ -173,9 +176,12 @@ export default function SortableTable<T>({
               </td>
             </tr>
           )}
-          {sorted.map((row, idx) => (
+          {sorted.map((row, idx) => {
+            const rk = rowKey(row, idx);
+            return (
             <tr
-              key={rowKey(row, idx)}
+              key={rk}
+              className={highlightRowKeys?.has(rk) ? 'mec-row-in' : undefined}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
               style={{
                 cursor: onRowClick ? 'pointer' : undefined,
@@ -210,7 +216,8 @@ export default function SortableTable<T>({
                 </td>
               ))}
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>

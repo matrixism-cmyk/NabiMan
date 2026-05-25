@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StatusTone, tone as toneFor } from './StatusBadge';
+import { useCountUp } from '../../../hooks/mec/useCountUp';
+import Sparkline from './Sparkline';
 
 interface Props {
   label: string;
@@ -10,6 +12,8 @@ interface Props {
   tone?: StatusTone | string;
   icon?: React.ReactNode;
   onClick?: () => void;
+  /** Recent samples for a trend sparkline under the value. */
+  sparkline?: number[];
 }
 
 const TONE_BG: Record<StatusTone, string> = {
@@ -30,12 +34,28 @@ export default function MetricCard({
   tone: toneProp,
   icon,
   onClick,
+  sparkline,
 }: Props) {
   const t: StatusTone =
     typeof toneProp === 'string' && toneProp in TONE_BG
       ? (toneProp as StatusTone)
       : toneFor(toneProp as any);
   const accent = TONE_BG[t];
+
+  // Animate numeric values; render anything else verbatim.
+  const numeric = typeof value === 'number' ? value : null;
+  const animated = useCountUp(numeric ?? 0);
+  const display = numeric !== null ? Math.round(animated).toLocaleString() : value;
+
+  // Brief "pop" on the value whenever the number changes.
+  const [pop, setPop] = useState(false);
+  const prev = useRef<number | null>(numeric);
+  useEffect(() => {
+    if (numeric !== null && prev.current !== null && prev.current !== numeric) {
+      setPop(true);
+    }
+    prev.current = numeric;
+  }, [numeric]);
 
   return (
     <div
@@ -102,7 +122,15 @@ export default function MetricCard({
           fontVariantNumeric: 'tabular-nums',
         }}
       >
-        {value}
+        <span
+          style={{
+            display: 'inline-block',
+            animation: pop ? 'mec-pop 0.5s ease-out' : undefined,
+          }}
+          onAnimationEnd={() => setPop(false)}
+        >
+          {display}
+        </span>
         {unit && (
           <span
             style={{
@@ -133,6 +161,11 @@ export default function MetricCard({
           style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}
         >
           {helper}
+        </div>
+      )}
+      {sparkline && sparkline.length >= 2 && (
+        <div style={{ marginTop: '8px', marginLeft: '-2px' }}>
+          <Sparkline data={sparkline} color={accent} width={120} height={28} />
         </div>
       )}
     </div>

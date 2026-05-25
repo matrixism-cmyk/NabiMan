@@ -12,6 +12,9 @@ export type { BarDatum } from './BarChart';
 export { default as DonutChart } from './DonutChart';
 export type { DonutSlice } from './DonutChart';
 
+export { default as Sparkline } from './Sparkline';
+export { default as LiveIndicator } from './LiveIndicator';
+
 export {
   default as PanelLayout,
   Section,

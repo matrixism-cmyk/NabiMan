@@ -317,7 +317,11 @@ function App() {
           {activeTab === 'enterpriseauth' && <EnterpriseAuthPanel />}
           {activeTab === 'multiserver' && <MultiServerDashboard />}
           {activeTab === 'remote' && <RemoteServersPanel onConnectSSH={handleConnectSSH} />}
-          {activeTab === 'mecDashboard' && <MecDashboardPanel />}
+          {activeTab === 'mecDashboard' && (
+            <MecDashboardPanel
+              onNavigate={(tab) => { setActiveCat('mec'); setActiveTab(tab as Tab); }}
+            />
+          )}
           {activeTab === 'mecTenants' && <TenantsPanel />}
           {activeTab === 'mecNodes' && <MecNodesPanel />}
           {activeTab === 'mecGpu' && <MecGpuPanel />}
