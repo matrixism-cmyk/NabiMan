@@ -81,6 +81,12 @@ fn create_tmux_session(name: &str, ssh_cmd: Option<&str>) -> Result<(), String> 
     if !out.status.success() {
         return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
     }
+    // Enable mouse so the wheel scrolls tmux's own history (copy-mode) like a
+    // native terminal — otherwise, in tmux's alternate screen, xterm.js turns
+    // the wheel into arrow keys, which bash treats as command-history nav.
+    let _ = std::process::Command::new("tmux")
+        .args(["set-option", "-t", name, "mouse", "on"])
+        .output();
     Ok(())
 }
 

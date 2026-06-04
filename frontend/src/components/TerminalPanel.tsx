@@ -163,28 +163,19 @@ export default function TerminalPanel({ sshTarget: externalSshTarget, onSshConne
     if (terminalRef.current) { terminalRef.current.options.fontSize = fontSize; fitRef.current?.fit(); }
   }, [fontSize]);
 
-  // Wheel behavior on the terminal:
-  //   Ctrl + wheel  → zoom terminal text (8..28)
-  //   Shift + wheel → xterm scrollback (past output) — explicit opt-in
-  //   wheel (alone) → scroll the surrounding page like any other web page,
-  //                   instead of xterm hijacking it for its scrollback
+  // Ctrl + wheel zooms the terminal text (8..28). A plain wheel is left for
+  // xterm to forward to the PTY: the session runs inside tmux with mouse mode
+  // on, so the wheel scrolls tmux's history (past output) like a native
+  // terminal. We intercept Ctrl in the capture phase so zoom isn't forwarded.
   useEffect(() => {
     const el = termRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey) {
-        e.preventDefault();
-        e.stopPropagation();
-        const delta = e.deltaY < 0 ? 1 : -1;
-        setFontSize((s) => Math.min(28, Math.max(8, s + delta)));
-        return;
-      }
-      if (e.shiftKey) return; // let xterm's scrollback take it
-      // Plain wheel: scroll the outer page, not xterm's scrollback.
+      if (!e.ctrlKey) return; // let xterm handle scroll → tmux
       e.preventDefault();
       e.stopPropagation();
-      const page = el.closest('.terminal-persist') as HTMLElement | null;
-      if (page) page.scrollTop += e.deltaY;
+      const delta = e.deltaY < 0 ? 1 : -1;
+      setFontSize((s) => Math.min(28, Math.max(8, s + delta)));
     };
     el.addEventListener('wheel', onWheel, { passive: false, capture: true });
     return () => el.removeEventListener('wheel', onWheel, { capture: true } as EventListenerOptions);
@@ -245,7 +236,7 @@ export default function TerminalPanel({ sshTarget: externalSshTarget, onSshConne
         <div className="terminal-controls">
           <span
             className="terminal-hint"
-            title="Ctrl+Shift+C/V: 복사·붙여넣기  ·  Shift+휠: 스크롤백  ·  Ctrl+휠: 확대/축소"
+            title="Ctrl+Shift+C/V: 복사·붙여넣기  ·  휠: 스크롤(과거 출력)  ·  Ctrl+휠: 확대/축소"
           >
             Ctrl+Shift+C/V
           </span>
