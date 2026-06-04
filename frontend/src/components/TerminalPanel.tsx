@@ -163,6 +163,22 @@ export default function TerminalPanel({ sshTarget: externalSshTarget, onSshConne
     if (terminalRef.current) { terminalRef.current.options.fontSize = fontSize; fitRef.current?.fit(); }
   }, [fontSize]);
 
+  // Ctrl + mouse wheel zooms the terminal text (8..28). Without Ctrl, xterm's
+  // own scrollback handles the wheel as usual.
+  useEffect(() => {
+    const el = termRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const delta = e.deltaY < 0 ? 1 : -1;
+      setFontSize((s) => Math.min(28, Math.max(8, s + delta)));
+    };
+    el.addEventListener('wheel', onWheel, { passive: false, capture: true });
+    return () => el.removeEventListener('wheel', onWheel, { capture: true } as EventListenerOptions);
+  }, []);
+
   useEffect(() => {
     connect();
     const handleResize = () => fitRef.current?.fit();
