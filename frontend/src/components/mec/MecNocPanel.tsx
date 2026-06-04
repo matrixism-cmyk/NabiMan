@@ -54,7 +54,8 @@ export default function MecNocPanel({ onNavigate, onEnterFocus }: Props) {
     () => (s ? { cpu: Math.round(s.cluster.cpu_percent), mem: Math.round(s.cluster.memory_percent) } : null),
     [s],
   );
-  const history = useMetricHistory('mec-noc-history', metrics);
+  // In-memory only: an always-on wall shouldn't write localStorage every tick.
+  const history = useMetricHistory('mec-noc-history', metrics, false);
   const { rollup, items } = useNocSignals(s ?? null, t);
 
   const events = useMemo(() => s?.events || [], [s]);

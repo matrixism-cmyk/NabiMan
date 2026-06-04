@@ -5,15 +5,18 @@ const MAX_SAMPLES = 30;
 export type MetricHistory = Record<string, number[]>;
 
 /**
- * Keeps a rolling, localStorage-persisted history of named numeric metrics.
- * A new sample is appended whenever the supplied values change, so sparklines
- * survive page reloads and reflect recent trend direction.
+ * Keeps a rolling history of named numeric metrics for sparklines.
+ * With `persist` (default), the series survives reloads via localStorage.
+ * Pass `persist: false` for an always-on wall (NOC) to keep it in-memory and
+ * avoid continuous localStorage writes over a weeks-long uptime.
  */
 export function useMetricHistory(
   storageKey: string,
   current: Record<string, number> | null,
+  persist = true,
 ): MetricHistory {
   const [history, setHistory] = useState<MetricHistory>(() => {
+    if (!persist) return {};
     try {
       return JSON.parse(localStorage.getItem(storageKey) || '{}');
     } catch {
@@ -33,14 +36,16 @@ export function useMetricHistory(
       for (const [k, v] of Object.entries(current)) {
         next[k] = [...(prev[k] || []), v].slice(-MAX_SAMPLES);
       }
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(next));
-      } catch {
-        /* quota / privacy mode — ignore */
+      if (persist) {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(next));
+        } catch {
+          /* quota / privacy mode — ignore */
+        }
       }
       return next;
     });
-  }, [current, storageKey]);
+  }, [current, storageKey, persist]);
 
   return history;
 }
