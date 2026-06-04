@@ -62,6 +62,23 @@ export function tone(value: string | boolean | undefined | null): StatusTone {
   }
 }
 
+/// Shape/symbol channel so severity never relies on color alone (CVD-safe,
+/// WCAG). Pair with tone() color + a text label for the full 3 channels.
+const TONE_GLYPHS: Record<StatusTone, string> = {
+  success: '●',
+  warning: '▲',
+  error: '✖',
+  info: 'ℹ',
+  neutral: '■',
+  running: '◐',
+};
+
+export function severityGlyph(value: StatusTone | string | boolean | null): string {
+  const resolved: StatusTone =
+    typeof value === 'string' && value in TONE_GLYPHS ? (value as StatusTone) : tone(value as any);
+  return TONE_GLYPHS[resolved];
+}
+
 interface Props {
   children: React.ReactNode;
   tone?: StatusTone | string | boolean | null;

@@ -129,6 +129,10 @@ pub struct PodInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeMetrics {
     pub name: String,
+    /// "Ready" | "NotReady" | "Unknown" — merged from node inventory so the NOC
+    /// can show DOWN nodes that metrics-server omits.
+    #[serde(default)]
+    pub status: String,
     pub cpu_usage_millicores: u64,
     pub cpu_capacity_millicores: u64,
     pub memory_usage_bytes: u64,

@@ -221,6 +221,40 @@ body {
   .mec-live-dot, .mec-fade-in-up, .mec-row-in { animation: none; }
 }
 
+/* ── MEC NOC wall ───────────────────────────────────────────────────── */
+.noc-tile-down {
+  background-image: repeating-linear-gradient(
+    45deg, rgba(239,68,68,0.12), rgba(239,68,68,0.12) 6px,
+    transparent 6px, transparent 12px) !important;
+}
+.noc-marquee {
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.noc-marquee-ok { color: #10b981; }
+.noc-marquee-crit { border-color: rgba(239,68,68,0.5); }
+.noc-marquee-warn { border-color: rgba(245,158,11,0.5); }
+.noc-marquee-track {
+  display: inline-block;
+  white-space: nowrap;
+  will-change: transform;
+  animation: noc-marquee-scroll 30s linear infinite;
+}
+.noc-marquee:hover .noc-marquee-track { animation-play-state: paused; }
+@keyframes noc-marquee-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .noc-marquee-track { animation: none; }
+}
+
 /* ── Focus mode: show only the content frame (hide top bars + sidebar) ── */
 .app.focus-mode .app-header,
 .app.focus-mode .cat-nav,

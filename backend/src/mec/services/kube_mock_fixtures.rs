@@ -11,6 +11,7 @@ const GIB: u64 = 1_073_741_824;
 pub fn sample_node_metrics() -> Vec<NodeMetrics> {
     let mk = |name: &str, cpu_u: u64, cpu_c: u64, mem_u: u64, mem_c: u64| NodeMetrics {
         name: name.into(),
+        status: "Ready".into(),
         cpu_usage_millicores: cpu_u,
         cpu_capacity_millicores: cpu_c,
         memory_usage_bytes: mem_u * GIB,

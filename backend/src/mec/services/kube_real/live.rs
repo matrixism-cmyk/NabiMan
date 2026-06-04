@@ -12,6 +12,13 @@ fn metrics_resource(kind: &str, plural: &str) -> ApiResource {
     ApiResource::from_gvk_with_plural(&gvk, plural)
 }
 
+/// Bound list responses so a very large cluster can't blow memory / a single
+/// response. 5000 covers realistic MEC clusters without paging; beyond that
+/// the tail is dropped (documented cap, not silent truncation of small sets).
+fn capped() -> ListParams {
+    ListParams::default().limit(5000)
+}
+
 /// k8s CPU quantity (e.g. "123456789n", "250m", "2") -> millicores.
 fn cpu_millicores(s: &str) -> u64 {
     let s = s.trim();
@@ -71,7 +78,7 @@ pub async fn node_metrics(client: &Client) -> ServiceResult<Vec<NodeMetrics>> {
     }
 
     let api: Api<DynamicObject> = Api::all_with(client.clone(), &metrics_resource("NodeMetrics", "nodes"));
-    let list = api.list(&ListParams::default()).await.map_err(upstream_err)?;
+    let list = api.list(&capped()).await.map_err(upstream_err)?;
     let mut out = Vec::new();
     for item in list {
         let name = item.metadata.name.clone().unwrap_or_default();
@@ -81,6 +88,7 @@ pub async fn node_metrics(client: &Client) -> ServiceResult<Vec<NodeMetrics>> {
         let (cpu_cap, mem_cap) = cap.get(&name).copied().unwrap_or((0, 0));
         out.push(NodeMetrics {
             name,
+            status: String::new(), // merged from inventory in build_live
             cpu_usage_millicores: cpu,
             cpu_capacity_millicores: cpu_cap,
             memory_usage_bytes: mem,
@@ -96,7 +104,7 @@ pub async fn node_metrics(client: &Client) -> ServiceResult<Vec<NodeMetrics>> {
 
 pub async fn tenant_usage(client: &Client) -> ServiceResult<Vec<TenantUsage>> {
     let api: Api<DynamicObject> = Api::all_with(client.clone(), &metrics_resource("PodMetrics", "pods"));
-    let list = api.list(&ListParams::default()).await.map_err(upstream_err)?;
+    let list = api.list(&capped()).await.map_err(upstream_err)?;
     let mut agg: BTreeMap<String, (u64, u64, u32)> = BTreeMap::new();
     for item in list {
         let ns = item.metadata.namespace.clone().unwrap_or_default();
@@ -128,7 +136,7 @@ pub async fn tenant_usage(client: &Client) -> ServiceResult<Vec<TenantUsage>> {
 
 pub async fn pod_phase_summary(client: &Client) -> ServiceResult<PodPhaseSummary> {
     let api: Api<Pod> = Api::all(client.clone());
-    let list = api.list(&ListParams::default()).await.map_err(upstream_err)?;
+    let list = api.list(&capped()).await.map_err(upstream_err)?;
     let mut s = PodPhaseSummary::default();
     for p in list {
         s.total += 1;
@@ -145,7 +153,7 @@ pub async fn pod_phase_summary(client: &Client) -> ServiceResult<PodPhaseSummary
 
 pub async fn list_events(client: &Client, limit: u32) -> ServiceResult<Vec<ClusterEvent>> {
     let api: Api<Event> = Api::all(client.clone());
-    let list = api.list(&ListParams::default()).await.map_err(upstream_err)?;
+    let list = api.list(&capped()).await.map_err(upstream_err)?;
     let mut events: Vec<(chrono::DateTime<chrono::Utc>, ClusterEvent)> = list
         .into_iter()
         .map(|e| {

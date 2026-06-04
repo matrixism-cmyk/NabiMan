@@ -158,6 +158,7 @@ export interface AuditLog {
 
 export interface NodeMetrics {
   name: string;
+  status: string; // "Ready" | "NotReady" | "Unknown"
   cpu_usage_millicores: number;
   cpu_capacity_millicores: number;
   memory_usage_bytes: number;
@@ -165,6 +166,14 @@ export interface NodeMetrics {
   cpu_usage_percent: number;
   memory_usage_percent: number;
   gpu_usage_percent: number | null;
+}
+
+export interface ClusterHealth {
+  nodes_ready: number;
+  nodes_total: number;
+  gpu_total_slots: number;
+  gpu_allocated_slots: number;
+  gpu_available_slots: number;
 }
 
 export interface ClusterUsage {
@@ -206,6 +215,7 @@ export interface ClusterEvent {
 
 export interface LiveSnapshot {
   cluster: ClusterUsage;
+  health: ClusterHealth;
   nodes: NodeMetrics[];
   pods: PodPhaseSummary;
   tenants: TenantUsage[];

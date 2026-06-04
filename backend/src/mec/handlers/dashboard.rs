@@ -1,8 +1,9 @@
 use super::util::{from_service_error, ok_response};
 use crate::mec::MecState;
-use crate::models::mec::{ClusterUsage, LiveSnapshot};
+use crate::models::mec::{ClusterHealth, ClusterUsage, LiveSnapshot, NodeMetrics, NodeStatus};
 use actix_web::{web, HttpResponse};
 use serde::Serialize;
+use std::collections::HashMap;
 
 pub async fn summary(state: web::Data<MecState>) -> HttpResponse {
     match build_summary(&state).await {
@@ -26,11 +27,62 @@ pub async fn live(state: web::Data<MecState>) -> HttpResponse {
 }
 
 async fn build_live(state: &MecState) -> crate::mec::services::ServiceResult<LiveSnapshot> {
-    let nodes = state.services.kube.node_metrics().await?;
+    // Node inventory (authoritative status + GPU slots) merged with metrics-server
+    // usage, so NotReady/DOWN nodes — which metrics-server omits — still appear.
+    let inventory = state.services.kube.list_nodes().await?;
+    let metrics = state.services.kube.node_metrics().await?;
     let pods = state.services.kube.pod_phase_summary().await?;
     let mut tenants = state.services.kube.tenant_usage().await?;
     tenants.truncate(12);
     let events = state.services.kube.list_events(25).await?;
+
+    let mut by_name: HashMap<String, NodeMetrics> =
+        metrics.into_iter().map(|m| (m.name.clone(), m)).collect();
+    let nodes: Vec<NodeMetrics> = inventory
+        .iter()
+        .map(|inv| {
+            let status = match inv.status {
+                NodeStatus::Ready => "Ready",
+                NodeStatus::NotReady => "NotReady",
+                NodeStatus::Unknown => "Unknown",
+            };
+            let mut nm = by_name.remove(&inv.name).unwrap_or_else(|| NodeMetrics {
+                name: inv.name.clone(),
+                status: String::new(),
+                cpu_usage_millicores: 0,
+                cpu_capacity_millicores: 0,
+                memory_usage_bytes: 0,
+                memory_capacity_bytes: 0,
+                cpu_usage_percent: 0.0,
+                memory_usage_percent: 0.0,
+                gpu_usage_percent: None,
+            });
+            nm.status = status.to_string();
+            nm
+        })
+        .collect();
+
+    let health = ClusterHealth {
+        nodes_total: inventory.len() as u32,
+        nodes_ready: inventory
+            .iter()
+            .filter(|n| matches!(n.status, NodeStatus::Ready))
+            .count() as u32,
+        gpu_total_slots: inventory
+            .iter()
+            .filter_map(|n| n.gpu_info.as_ref().map(|g| g.total_slots))
+            .sum(),
+        gpu_allocated_slots: inventory
+            .iter()
+            .filter(|n| n.current_tenant.is_some())
+            .filter_map(|n| n.gpu_info.as_ref().map(|g| g.total_slots))
+            .sum(),
+        gpu_available_slots: 0,
+    };
+    let health = ClusterHealth {
+        gpu_available_slots: health.gpu_total_slots.saturating_sub(health.gpu_allocated_slots),
+        ..health
+    };
 
     let mut cluster = ClusterUsage {
         node_count: nodes.len() as u32,
@@ -46,7 +98,7 @@ async fn build_live(state: &MecState) -> crate::mec::services::ServiceResult<Liv
     cluster.cpu_percent = pct(cluster.cpu_used_millicores, cluster.cpu_capacity_millicores);
     cluster.memory_percent = pct(cluster.memory_used_bytes, cluster.memory_capacity_bytes);
 
-    Ok(LiveSnapshot { cluster, nodes, pods, tenants, events })
+    Ok(LiveSnapshot { cluster, health, nodes, pods, tenants, events })
 }
 
 #[derive(Serialize)]

@@ -1,7 +1,7 @@
 export { default as SortableTable } from './SortableTable';
 export type { Column } from './SortableTable';
 
-export { default as StatusBadge, Dot, tone } from './StatusBadge';
+export { default as StatusBadge, Dot, tone, severityGlyph } from './StatusBadge';
 export type { StatusTone } from './StatusBadge';
 
 export { default as MetricCard, MetricGrid } from './MetricCard';

@@ -14,6 +14,17 @@ pub struct ClusterUsage {
     pub node_count: u32,
 }
 
+/// Authoritative node readiness + GPU slot accounting, merged into the live
+/// snapshot so the NOC wall has it without a second endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ClusterHealth {
+    pub nodes_ready: u32,
+    pub nodes_total: u32,
+    pub gpu_total_slots: u32,
+    pub gpu_allocated_slots: u32,
+    pub gpu_available_slots: u32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PodPhaseSummary {
     pub running: u32,
@@ -51,6 +62,7 @@ pub struct ClusterEvent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LiveSnapshot {
     pub cluster: ClusterUsage,
+    pub health: ClusterHealth,
     pub nodes: Vec<NodeMetrics>,
     pub pods: PodPhaseSummary,
     pub tenants: Vec<TenantUsage>,
