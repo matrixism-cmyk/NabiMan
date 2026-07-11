@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '../../i18n';
 import { useMecApi } from '../../hooks/mec/useMecApi';
+import { useDashboardStream } from '../../hooks/mec/useDashboardStream';
 import { useMetricHistory } from '../../hooks/mec/useMetricHistory';
 import { useNocSignals } from '../../hooks/mec/useNocSignals';
 import { useStaleWatchdog } from '../../hooks/mec/useStaleWatchdog';
@@ -42,8 +43,12 @@ function PlaceholderBand({ title, hint }: { title: string; hint: string }) {
 
 export default function MecNocPanel({ onNavigate, onEnterFocus }: Props) {
   const { t } = useT();
-  const q = useMecApi<LiveSnapshot>('/api/mec/v1/dashboard/live', REFRESH);
-  const s = q.data;
+  // Primary: one shared server-pushed stream (all walls share a single kube poll
+  // set). Fallback: if the stream can't hold a connection, poll /live directly.
+  const stream = useDashboardStream<LiveSnapshot>('/api/mec/v1/dashboard/live/stream');
+  const poll = useMecApi<LiveSnapshot>(stream.degraded ? '/api/mec/v1/dashboard/live' : '', REFRESH);
+  const s = stream.data ?? poll.data;
+  const err = stream.degraded ? (poll.error || stream.error) : null;
 
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   useEffect(() => { if (s) setLastUpdated(Date.now()); }, [s]);
@@ -82,14 +87,14 @@ export default function MecNocPanel({ onNavigate, onEnterFocus }: Props) {
       actions={
         <>
           <SeverityRollup normal={rollup.normal} caution={rollup.caution} critical={rollup.critical} />
-          <LiveIndicator lastUpdated={lastUpdated} intervalMs={REFRESH} refreshing={q.loading} />
+          <LiveIndicator lastUpdated={lastUpdated} intervalMs={REFRESH} refreshing={stream.degraded ? poll.loading : !stream.connected} />
           {onEnterFocus && <button className="btn btn-secondary" title={t('noc.fullscreen')} onClick={onEnterFocus}>⛶</button>}
-          <button className="btn btn-secondary" onClick={() => q.refetch()}>{t('noc.refresh')}</button>
+          <button className="btn btn-secondary" onClick={() => poll.refetch()}>{t('noc.refresh')}</button>
         </>
       }
     >
-      <ErrorBanner error={q.error || undefined} />
-      {!s && q.loading && <div style={{ color: 'var(--text-secondary)' }}>{t('noc.loading')}</div>}
+      <ErrorBanner error={err || undefined} />
+      {!s && !err && <div style={{ color: 'var(--text-secondary)' }}>{t('noc.loading')}</div>}
 
       {s && (
         <div className="mec-fade-in-up" style={stale ? { opacity: 0.5, filter: 'grayscale(0.6)', transition: 'opacity 0.3s' } : { transition: 'opacity 0.3s' }}>

@@ -1,6 +1,6 @@
 use super::handlers::{
-    audit, dashboard, discover, docs, firewall, gpu, health, jobs, jobs_sse, members, network,
-    nodes, preflight, settings, storage, tenants, users,
+    audit, dashboard, dashboard_sse, discover, docs, firewall, gpu, health, jobs, jobs_sse, members,
+    network, nodes, preflight, settings, storage, tenants, users,
 };
 use actix_web::web;
 
@@ -11,7 +11,8 @@ pub fn config(cfg: &mut web::ServiceConfig) {
                 web::scope("/dashboard")
                     .route("/summary", web::get().to(dashboard::summary))
                     .route("/activity", web::get().to(dashboard::activity))
-                    .route("/live", web::get().to(dashboard::live)),
+                    .route("/live", web::get().to(dashboard::live))
+                    .route("/live/stream", web::get().to(dashboard_sse::stream)),
             )
             .service(tenant_scope())
             .service(node_scope())

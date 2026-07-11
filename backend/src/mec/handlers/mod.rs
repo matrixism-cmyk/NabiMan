@@ -1,6 +1,7 @@
 pub mod util;
 pub mod audit_helper;
 pub mod dashboard;
+pub mod dashboard_sse;
 pub mod tenants;
 pub mod nodes;
 pub mod gpu;

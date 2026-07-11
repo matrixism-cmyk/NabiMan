@@ -5,8 +5,10 @@ use super::db::{
 };
 use super::job_runner::JobRunner;
 use super::services::ServiceBundle;
+use crate::models::mec::LiveSnapshot;
 use crate::notifications::ChannelStore;
 use std::sync::Arc;
+use tokio::sync::watch;
 
 pub struct MecState {
     #[allow(dead_code)]
@@ -19,6 +21,10 @@ pub struct MecState {
     pub audit_store: Arc<AuditStore>,
     pub docs_store: Arc<DocsStore>,
     pub channels: Option<ChannelStore>,
+    /// Latest dashboard snapshot, refreshed by one shared background poller and
+    /// fanned out to every SSE subscriber (see handlers::dashboard_sse). `None`
+    /// until the first successful poll.
+    pub live_tx: watch::Sender<Option<LiveSnapshot>>,
 }
 
 impl MecState {
@@ -30,6 +36,7 @@ impl MecState {
         let docs_store = Arc::new(DocsStore::new(db.clone()));
         let audit = Arc::new(AuditLogger::new(audit_store.clone()));
         let jobs = Arc::new(JobRunner::new(job_store.clone()));
+        let (live_tx, _) = watch::channel(None);
         Self {
             db,
             services,
@@ -40,6 +47,7 @@ impl MecState {
             audit_store,
             docs_store,
             channels: None,
+            live_tx,
         }
     }
 

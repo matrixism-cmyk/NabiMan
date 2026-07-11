@@ -174,6 +174,9 @@ async fn main() -> std::io::Result<()> {
     let mec_state = web::Data::new(
         mec::MecState::new(mec_db, mec_services).with_channels(channel_store.clone()),
     );
+    // One shared poller feeds all dashboard SSE subscribers (single set of kube
+    // calls regardless of how many walls are open).
+    mec::handlers::dashboard_sse::start_poller(&mec_state);
     // Shared (cross-worker) throttle for recording MEC read access as audit views.
     let mec_view_throttle = mec::safety::new_view_throttle();
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useMecApi } from '../../hooks/mec/useMecApi';
+import { useDashboardStream } from '../../hooks/mec/useDashboardStream';
 import { useMetricHistory } from '../../hooks/mec/useMetricHistory';
 import { ClusterEvent, LiveSnapshot } from '../../types/mec';
 import {
@@ -23,8 +24,11 @@ const eventKey = (e: ClusterEvent) =>
   `${e.reason}|${e.kind}|${e.namespace || ''}/${e.name}|${e.last_time || ''}`;
 
 export default function MecLivePanel() {
-  const q = useMecApi<LiveSnapshot>('/api/mec/v1/dashboard/live', REFRESH_INTERVAL);
-  const s = q.data;
+  // Shared server-pushed stream; falls back to direct polling if it degrades.
+  const stream = useDashboardStream<LiveSnapshot>('/api/mec/v1/dashboard/live/stream');
+  const poll = useMecApi<LiveSnapshot>(stream.degraded ? '/api/mec/v1/dashboard/live' : '', REFRESH_INTERVAL);
+  const s = stream.data ?? poll.data;
+  const err = stream.degraded ? (poll.error || stream.error) : null;
 
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   useEffect(() => { if (s) setLastUpdated(Date.now()); }, [s]);
@@ -57,13 +61,13 @@ export default function MecLivePanel() {
       subtitle="metrics-server 기반 실제 자원 사용률과 라이브 클러스터 이벤트"
       actions={
         <>
-          <LiveIndicator lastUpdated={lastUpdated} intervalMs={REFRESH_INTERVAL} refreshing={q.loading} />
-          <button className="btn btn-secondary" onClick={() => q.refetch()}>새로고침</button>
+          <LiveIndicator lastUpdated={lastUpdated} intervalMs={REFRESH_INTERVAL} refreshing={stream.degraded ? poll.loading : !stream.connected} />
+          <button className="btn btn-secondary" onClick={() => poll.refetch()}>새로고침</button>
         </>
       }
     >
-      <ErrorBanner error={q.error || undefined} />
-      {!s && q.loading && <div style={{ color: '#6b7280' }}>로딩 중...</div>}
+      <ErrorBanner error={err || undefined} />
+      {!s && !err && <div style={{ color: '#6b7280' }}>로딩 중...</div>}
 
       {s && (
         <div className="mec-fade-in-up">

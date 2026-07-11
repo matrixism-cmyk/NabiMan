@@ -1,4 +1,5 @@
 use super::util::{from_service_error, ok_response};
+use crate::mec::services::ServiceBundle;
 use crate::mec::MecState;
 use crate::models::mec::{ClusterHealth, ClusterUsage, LiveSnapshot, NodeMetrics, NodeStatus};
 use actix_web::{web, HttpResponse};
@@ -20,21 +21,21 @@ pub async fn activity(state: web::Data<MecState>) -> HttpResponse {
 }
 
 pub async fn live(state: web::Data<MecState>) -> HttpResponse {
-    match build_live(&state).await {
+    match build_live(&state.services).await {
         Ok(s) => ok_response(s),
         Err(e) => from_service_error(e),
     }
 }
 
-async fn build_live(state: &MecState) -> crate::mec::services::ServiceResult<LiveSnapshot> {
+pub async fn build_live(services: &ServiceBundle) -> crate::mec::services::ServiceResult<LiveSnapshot> {
     // Node inventory (authoritative status + GPU slots) merged with metrics-server
     // usage, so NotReady/DOWN nodes — which metrics-server omits — still appear.
-    let inventory = state.services.kube.list_nodes().await?;
-    let metrics = state.services.kube.node_metrics().await?;
-    let pods = state.services.kube.pod_phase_summary().await?;
-    let mut tenants = state.services.kube.tenant_usage().await?;
+    let inventory = services.kube.list_nodes().await?;
+    let metrics = services.kube.node_metrics().await?;
+    let pods = services.kube.pod_phase_summary().await?;
+    let mut tenants = services.kube.tenant_usage().await?;
     tenants.truncate(12);
-    let events = state.services.kube.list_events(25).await?;
+    let events = services.kube.list_events(25).await?;
 
     let mut by_name: HashMap<String, NodeMetrics> =
         metrics.into_iter().map(|m| (m.name.clone(), m)).collect();
