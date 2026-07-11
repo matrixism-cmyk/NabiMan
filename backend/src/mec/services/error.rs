@@ -5,6 +5,7 @@ pub enum ServiceError {
     NotFound(String),
     Conflict(String),
     Upstream { source: String, message: String },
+    #[allow(dead_code)]
     Unauthorized(String),
     InvalidInput(String),
     Unavailable(String),
@@ -56,6 +57,7 @@ impl ServiceError {
         }
     }
 
+    #[allow(dead_code)]
     pub fn upstream(source: &str, message: impl Into<String>) -> Self {
         Self::Upstream {
             source: source.to_string(),

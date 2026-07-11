@@ -66,16 +66,6 @@ fn save_hash_to_file(hash: &str) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-fn create_jwt(secret: &str, username: &str, role: &str) -> Result<String, String> {
-    let now = chrono::Utc::now().timestamp() as usize;
-    let claims = Claims { sub: username.into(), role: role.into(), iat: now, exp: now + 86400 };
-    jsonwebtoken::encode(
-        &jsonwebtoken::Header::default(),
-        &claims,
-        &jsonwebtoken::EncodingKey::from_secret(secret.as_bytes()),
-    ).map_err(|e| e.to_string())
-}
-
 fn verify_jwt(secret: &str, token: &str) -> Option<Claims> {
     jsonwebtoken::decode::<Claims>(
         token, &jsonwebtoken::DecodingKey::from_secret(secret.as_bytes()),
@@ -231,6 +221,17 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Test-only 24h token minter (production code uses jwt_sessions::create_token_pair).
+    fn create_jwt(secret: &str, username: &str, role: &str) -> Result<String, String> {
+        let now = chrono::Utc::now().timestamp() as usize;
+        let claims = Claims { sub: username.into(), role: role.into(), iat: now, exp: now + 86400 };
+        jsonwebtoken::encode(
+            &jsonwebtoken::Header::default(),
+            &claims,
+            &jsonwebtoken::EncodingKey::from_secret(secret.as_bytes()),
+        ).map_err(|e| e.to_string())
+    }
 
     #[test]
     fn test_jwt_create_and_verify() {

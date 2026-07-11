@@ -88,6 +88,7 @@ impl TenantStore {
         Ok(n > 0)
     }
 
+    #[allow(dead_code)]
     pub fn set_status(&self, id: &str, status: &TenantStatus) -> rusqlite::Result<()> {
         let conn = self.db.lock().unwrap();
         conn.execute(

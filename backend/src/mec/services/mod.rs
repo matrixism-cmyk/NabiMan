@@ -16,9 +16,9 @@ pub mod bootstrap;
 
 pub use error::{ServiceError, ServiceResult};
 pub use kube_service::{KubeService, KubeServiceArc};
-pub use rancher_service::{RancherService, RancherServiceArc};
-pub use axgate_service::{AxgateService, AxgateServiceArc};
-pub use harbor_service::{HarborService, HarborServiceArc};
+pub use rancher_service::RancherServiceArc;
+pub use axgate_service::AxgateServiceArc;
+pub use harbor_service::HarborServiceArc;
 
 pub use kube_mock::KubeMock;
 pub use rancher_mock::RancherMock;
@@ -35,6 +35,7 @@ pub struct ServiceBundle {
 }
 
 impl ServiceBundle {
+    #[allow(dead_code)]
     pub fn mocks() -> Self {
         Self {
             kube: Arc::new(KubeMock::new()),

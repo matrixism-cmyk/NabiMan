@@ -127,6 +127,7 @@ pub struct KubeHealth {
     pub error: Option<String>,
 }
 
+#[allow(dead_code)]
 pub fn unavailable<T>(msg: &str) -> ServiceResult<T> {
     Err(ServiceError::Unavailable(msg.to_string()))
 }

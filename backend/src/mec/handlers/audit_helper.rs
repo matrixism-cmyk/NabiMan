@@ -22,6 +22,7 @@ pub fn begin_audit(
 }
 
 /// Helper for the common "finalize with one-shot success/failure" pattern.
+#[allow(dead_code)]
 pub fn finalize<T, E>(
     builder: AuditBuilder,
     result: Result<T, E>,

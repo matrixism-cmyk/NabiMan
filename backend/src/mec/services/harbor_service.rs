@@ -9,6 +9,7 @@ pub type HarborServiceArc = Arc<dyn HarborService + Send + Sync>;
 pub trait HarborService: Send + Sync {
     async fn list_projects(&self) -> ServiceResult<Vec<HarborProject>>;
     async fn create_project(&self, name: &str, public: bool) -> ServiceResult<HarborProject>;
+    #[allow(dead_code)]
     async fn delete_project(&self, name: &str) -> ServiceResult<()>;
     async fn list_repositories(&self, project: &str) -> ServiceResult<Vec<HarborRepository>>;
     async fn health_check(&self) -> ServiceResult<HarborHealth>;

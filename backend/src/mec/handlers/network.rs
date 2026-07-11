@@ -1,4 +1,4 @@
-use super::util::{from_service_error, list_response, ok_response};
+use super::util::{from_service_error, list_response};
 use crate::mec::MecState;
 use actix_web::{web, HttpResponse};
 use crate::models::mec::LbIpPool;

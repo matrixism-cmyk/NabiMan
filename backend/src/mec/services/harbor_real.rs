@@ -84,6 +84,7 @@ struct ProjectWire {
 #[derive(Debug, Deserialize)]
 struct RepoWire {
     name: String,
+    #[allow(dead_code)]
     project_id: u32,
     #[serde(default)]
     pull_count: Option<u64>,

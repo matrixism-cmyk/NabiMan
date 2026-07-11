@@ -164,6 +164,7 @@ impl AxgateSession {
         Ok(combined)
     }
 
+    #[allow(dead_code)]
     pub async fn run_command(&mut self, command: &str) -> ServiceResult<String> {
         self.run_commands(&[command]).await
     }

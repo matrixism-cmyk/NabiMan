@@ -115,6 +115,7 @@ pub struct TenantOptions {
     pub ingress_domain: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct UpdateTenantRequest {
     pub display_name: Option<String>,
@@ -123,6 +124,7 @@ pub struct UpdateTenantRequest {
     pub quota: Option<ResourceQuota>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TenantSummary {
     pub id: String,

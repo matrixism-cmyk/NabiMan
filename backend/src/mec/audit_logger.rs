@@ -70,6 +70,7 @@ impl AuditBuilder {
         self
     }
 
+    #[allow(dead_code)]
     pub fn log_op(&self, name: &str, target: &str, status: &str, duration_ms: u64) {
         self.operations.lock().unwrap().push(OperationLog {
             name: name.into(),
@@ -80,6 +81,7 @@ impl AuditBuilder {
         });
     }
 
+    #[allow(dead_code)]
     pub fn id(&self) -> &str {
         &self.id
     }

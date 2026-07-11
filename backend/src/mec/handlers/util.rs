@@ -15,6 +15,7 @@ pub fn created<T: Serialize>(data: T) -> HttpResponse {
     HttpResponse::Created().json(MecResponse::ok(data))
 }
 
+#[allow(dead_code)]
 pub fn accepted<T: Serialize>(data: T) -> HttpResponse {
     HttpResponse::Accepted().json(MecResponse::ok(data))
 }

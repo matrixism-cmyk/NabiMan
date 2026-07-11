@@ -10,10 +10,12 @@ pub struct LbIpPool {
 }
 
 impl LbIpPool {
+    #[allow(dead_code)]
     pub fn free_ips(&self) -> u32 {
         self.total_ips.saturating_sub(self.used_ips)
     }
 
+    #[allow(dead_code)]
     pub fn usage_percent(&self) -> f32 {
         if self.total_ips == 0 {
             0.0
@@ -42,6 +44,7 @@ pub struct ServicePort {
     pub protocol: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IngressRule {
     pub namespace: String,
@@ -52,6 +55,7 @@ pub struct IngressRule {
     pub tls: Vec<IngressTls>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IngressPath {
     pub path: String,
@@ -60,12 +64,14 @@ pub struct IngressPath {
     pub backend_port: u16,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IngressTls {
     pub hosts: Vec<String>,
     pub secret_name: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateIngressRequest {
     pub namespace: String,
@@ -78,10 +84,12 @@ pub struct CreateIngressRequest {
     pub class: String,
 }
 
+#[allow(dead_code)]
 fn default_ingress_class() -> String {
     "nginx".to_string()
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExtendPoolRequest {
     pub additional_ranges: Vec<String>,

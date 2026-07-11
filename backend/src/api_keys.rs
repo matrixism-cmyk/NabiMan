@@ -113,6 +113,7 @@ fn generate_id() -> String {
     format!("ak_{}", id)
 }
 
+#[allow(dead_code)]
 pub fn validate_api_key(key: &str, store: &ApiKeyStore) -> Option<(String, String)> {
     if !key.starts_with("nbm_") {
         return None;

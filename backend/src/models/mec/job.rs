@@ -58,6 +58,7 @@ impl JobStatus {
         )
     }
 
+    #[allow(dead_code)]
     pub fn as_tag(&self) -> &'static str {
         match self {
             Self::Pending => "pending",
@@ -109,6 +110,7 @@ impl JobStep {
         }
     }
 
+    #[allow(dead_code)]
     pub fn mark_failed(&mut self, reason: String) {
         let now = Utc::now();
         self.status = JobStepStatus::Failed;

@@ -23,6 +23,7 @@ pub struct CreateUserRequest {
     pub username: String,
     pub password: String,
     #[serde(default)]
+    #[allow(dead_code)]
     pub display_name: Option<String>,
 }
 

@@ -9,6 +9,7 @@ use std::time::Instant;
 
 pub struct KubeRealConfig {
     pub kubeconfig_path: Option<String>,
+    #[allow(dead_code)]
     pub default_namespace: String,
 }
 
@@ -33,6 +34,7 @@ impl KubeReal {
         Ok(Self { client, endpoint })
     }
 
+    #[allow(dead_code)]
     pub fn client(&self) -> &Client {
         &self.client
     }

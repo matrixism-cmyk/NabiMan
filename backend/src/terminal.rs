@@ -19,6 +19,7 @@ pub struct TmuxSession {
     tmux_name: String,
     owner: String,
     label: String,
+    #[allow(dead_code)]
     ssh_cmd: Option<String>,
     created_at: Instant,
     last_active: Instant,
@@ -48,6 +49,7 @@ pub fn start_pty_cleanup(store: PtyStore) {
     });
 }
 
+#[allow(dead_code)]
 pub fn kill_user_sessions(store: &PtyStore, username: &str) {
     let mut map = store.lock().unwrap();
     let ids: Vec<String> = map.iter().filter(|(_, s)| s.owner == username).map(|(id, _)| id.clone()).collect();

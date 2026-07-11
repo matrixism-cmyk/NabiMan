@@ -193,6 +193,7 @@ pub async fn guide_download_docx(
     }
 }
 
+#[allow(dead_code)]
 pub async fn create_job_placeholder() -> HttpResponse {
     accepted(serde_json::json!({
         "message": "deprecated; use POST /api/mec/v1/tenants",

@@ -161,6 +161,7 @@ fn save_templates(t: &[NotificationTemplate]) {
 }
 
 /// Render template with variable substitution: {{hostname}}, {{metric}}, {{value}}, {{threshold}}, {{timestamp}}
+#[allow(dead_code)]
 pub fn render_template(template: &str, vars: &std::collections::HashMap<String, String>) -> String {
     let mut result = template.to_string();
     for (k, v) in vars {
@@ -170,6 +171,7 @@ pub fn render_template(template: &str, vars: &std::collections::HashMap<String, 
 }
 
 /// Send notification using a named template, falling back to raw subject/body
+#[allow(dead_code)]
 pub fn send_notification_with_template(
     channels: &[NotificationChannel], template_name: &str,
     vars: &std::collections::HashMap<String, String>,

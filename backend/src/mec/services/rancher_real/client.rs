@@ -35,6 +35,7 @@ pub struct RancherReal {
     pub(super) http: Client,
     pub(super) base_url: String,
     pub(super) token: String,
+    #[allow(dead_code)]
     pub(super) cluster_id: String,
 }
 

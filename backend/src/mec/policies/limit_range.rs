@@ -2,6 +2,7 @@ use crate::models::mec::ResourceQuota;
 use serde_json::{json, Value};
 
 pub struct LimitRangeTemplate {
+    #[allow(dead_code)]
     pub name: String,
     pub spec: Value,
 }

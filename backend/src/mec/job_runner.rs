@@ -26,6 +26,7 @@ pub enum JobEvent {
         duration_ms: u64,
         message: Option<String>,
     },
+    #[allow(dead_code)]
     StepFailed {
         job_id: String,
         step: String,
@@ -114,6 +115,7 @@ impl JobRunner {
         );
     }
 
+    #[allow(dead_code)]
     pub fn mark_step_failed(&self, job_id: &str, steps: &mut [JobStep], name: &str, reason: String) {
         if let Some(s) = steps.iter_mut().find(|s| s.name == name) {
             s.mark_failed(reason.clone());
@@ -168,6 +170,7 @@ impl JobRunner {
         }
     }
 
+    #[allow(dead_code)]
     pub fn store(&self) -> &JobStore {
         &self.store
     }

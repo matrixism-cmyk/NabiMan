@@ -112,8 +112,6 @@ fn health_check() -> DnsHealthCheck {
     }
 }
 
-const DB_CONN: &str = "mysql://nabidns:Nabi48dc79a162b27a27aec2eb28@127.0.0.1:3306/nabidns";
-
 fn mysql_query(sql: &str) -> String {
     std::process::Command::new("mysql")
         .args(["-u", "nabidns", "-pNabi48dc79a162b27a27aec2eb28", "-h", "127.0.0.1", "nabidns", "-BNe", sql])

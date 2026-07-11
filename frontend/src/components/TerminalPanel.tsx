@@ -227,7 +227,6 @@ export default function TerminalPanel({ sshTarget: externalSshTarget, onSshConne
     await apiPost(`/api/terminal/sessions/${sid}/timeout`, { timeout_secs });
     refreshSessions();
   };
-  const timeoutLabel = (secs: number) => secs === 0 ? '∞' : secs === 1800 ? '30m' : secs === 3600 ? '1h' : secs === 86400 ? '24h' : `${secs}s`;
 
   return (
     <div className="panel terminal-panel">

@@ -2,6 +2,7 @@ use serde_json::{json, Value};
 
 pub struct NetworkPolicyTemplate {
     pub name: String,
+    #[allow(dead_code)]
     pub description: String,
     pub spec: Value,
 }

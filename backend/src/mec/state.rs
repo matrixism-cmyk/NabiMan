@@ -9,6 +9,7 @@ use crate::notifications::ChannelStore;
 use std::sync::Arc;
 
 pub struct MecState {
+    #[allow(dead_code)]
     pub db: DbHandle,
     pub services: Arc<ServiceBundle>,
     pub audit: Arc<AuditLogger>,
@@ -47,6 +48,7 @@ impl MecState {
         self
     }
 
+    #[allow(dead_code)]
     pub fn mocks() -> Self {
         let db = super::db::open_in_memory().expect("in-memory db");
         Self::new(db, ServiceBundle::mocks())
