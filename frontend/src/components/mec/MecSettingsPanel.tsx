@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useT } from '../../i18n';
 import { useMecApi } from '../../hooks/mec/useMecApi';
 import { ThemeSelector } from '../../theme';
 
@@ -82,6 +83,7 @@ function Row({
 }
 
 export default function MecSettingsPanel() {
+  const { t } = useT();
   const { data, loading, error, refetch } = useMecApi<Snapshot>(
     '/api/mec/v1/settings/snapshot',
     60_000,
@@ -98,14 +100,14 @@ export default function MecSettingsPanel() {
   return (
     <div className="panel">
       <div className="panel-header">
-        <h2>MEC 연동 설정</h2>
+        <h2>{t('mec.settings.title')}</h2>
         <button className="btn btn-secondary" onClick={refetch}>
-          새로고침
+          {t('mec.action.refresh')}
         </button>
       </div>
 
       {error && <div className="panel-error">{error}</div>}
-      {loading && !data && <div className="panel-loading">로딩 중...</div>}
+      {loading && !data && <div className="panel-loading">{t('mec.state.loading')}</div>}
 
       {data && (
         <>
@@ -118,20 +120,22 @@ export default function MecSettingsPanel() {
                 marginBottom: '16px',
               }}
             >
-              <strong>🔒 Read-only 모드가 켜져 있습니다.</strong> 모든 변경 작업이 차단됩니다.
-              안전한 첫 연결을 위해 권장되는 상태이며, 조회가 모두 정상이면{' '}
-              <code>NABIMAN_MEC_READ_ONLY=false</code> 로 변경 후 재시작하세요.
+              <strong>🔒 {t('mec.settings.readOnlyBanner')}</strong> {t('mec.settings.readOnlyBody')}{' '}
+              <code>NABIMAN_MEC_READ_ONLY=false</code> {t('mec.settings.readOnlyBodyAfter')}
             </div>
           )}
           <div className="panel-card" style={{ marginBottom: '16px' }}>
             <h3 style={{ marginTop: 0 }}>
-              현재 설정 ({data.mode} 모드
-              {data.read_only ? ', 🔒 read-only' : ''}
-              {data.skip_confirm ? ', confirm skipped' : ''})
+              {t('mec.settings.currentTitle', {
+                mode: data.mode,
+                flags:
+                  (data.read_only ? t('mec.settings.flagReadOnly') : '') +
+                  (data.skip_confirm ? t('mec.settings.flagConfirmSkipped') : ''),
+              })}
             </h3>
             <Row
               label="Kubernetes"
-              value={data.kubernetes.kubeconfig_path || '(in-cluster 추론)'}
+              value={data.kubernetes.kubeconfig_path || t('mec.settings.kubeInCluster')}
               badges={
                 <>
                   <Badge ok={data.kubernetes.configured} label="configured" />
@@ -180,24 +184,22 @@ export default function MecSettingsPanel() {
             className="panel-card"
             style={{ marginBottom: '16px' }}
           >
-            <h3 style={{ marginTop: 0 }}>색상 테마</h3>
+            <h3 style={{ marginTop: 0 }}>{t('mec.settings.themeTitle')}</h3>
             <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '12px' }}>
-              클릭으로 즉시 전환됩니다. 선택한 테마는 브라우저에 저장되어 다음 로그인에도 유지됩니다.
-              (상단 헤더의 셀렉트 박스에서도 동일하게 변경 가능)
+              {t('mec.settings.themeBody')}
             </p>
             <ThemeSelector />
           </div>
 
           <div className="panel-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0 }}>systemd drop-in 템플릿</h3>
+              <h3 style={{ margin: 0 }}>{t('mec.settings.dropinTitle')}</h3>
               <button className="btn btn-secondary btn-small" onClick={copyDropin}>
-                {copied ? '복사됨!' : '복사'}
+                {copied ? t('mec.settings.copied') : t('mec.settings.copy')}
               </button>
             </div>
             <p style={{ color: '#6b7280', fontSize: '13px' }}>
-              아래 내용을 <code>/etc/systemd/system/nabiman.service.d/mec.conf</code> 에 저장한 뒤
-              적용 명령을 실행하세요. 비밀값(*** 부분)은 실제 값으로 교체해야 합니다.
+              {t('mec.settings.dropinBodyBefore')} <code>/etc/systemd/system/nabiman.service.d/mec.conf</code> {t('mec.settings.dropinBodyAfter')}
             </p>
             <pre
               style={{

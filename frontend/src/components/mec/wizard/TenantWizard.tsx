@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useT } from '../../../i18n';
 import { mecPost } from '../../../hooks/mec/useMecApi';
 import { Tenant } from '../../../types/mec';
 import Step1Basic from './Step1Basic';
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export default function TenantWizard({ onCreated, onCancel }: Props) {
+  const { t } = useT();
   const [step, setStep] = useState(1);
   const [state, setState] = useState<WizardState>(initialState());
   const [err, setErr] = useState<string | null>(null);
@@ -29,7 +31,7 @@ export default function TenantWizard({ onCreated, onCancel }: Props) {
     const validate = [validateStep1, validateStep2, validateStep3][step - 1];
     const msg = validate ? validate(state) : null;
     if (msg) {
-      setErr(msg);
+      setErr(t(msg));
       return;
     }
     setErr(null);
@@ -47,7 +49,7 @@ export default function TenantWizard({ onCreated, onCancel }: Props) {
       validateStep2(state) ||
       validateStep3(state);
     if (msg) {
-      setErr(msg);
+      setErr(t(msg));
       return;
     }
     setBusy(true);
@@ -97,7 +99,7 @@ export default function TenantWizard({ onCreated, onCancel }: Props) {
               fontWeight: s === step ? 600 : 400,
             }}
           >
-            {s}. {['기본', '노드', '쿼터', '옵션'][s - 1]}
+            {s}. {t(['mec.wizard.step.basic', 'mec.wizard.step.node', 'mec.wizard.step.quota', 'mec.wizard.step.options'][s - 1])}
           </div>
         ))}
       </div>
@@ -111,17 +113,17 @@ export default function TenantWizard({ onCreated, onCancel }: Props) {
 
       <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
         <button type="button" className="btn btn-secondary" onClick={onCancel}>
-          취소
+          {t('mec.wizard.cancel')}
         </button>
         <div style={{ flex: 1 }} />
         {step > 1 && (
           <button type="button" className="btn btn-secondary" onClick={back}>
-            ← 이전
+            {t('mec.wizard.prev')}
           </button>
         )}
         {step < 4 && (
           <button type="button" className="btn btn-primary" onClick={next}>
-            다음 →
+            {t('mec.wizard.next')}
           </button>
         )}
         {step === 4 && (
@@ -131,7 +133,7 @@ export default function TenantWizard({ onCreated, onCancel }: Props) {
             disabled={busy}
             onClick={submit}
           >
-            {busy ? '생성 중...' : '✓ 생성'}
+            {busy ? t('mec.wizard.creating') : t('mec.wizard.create')}
           </button>
         )}
       </div>

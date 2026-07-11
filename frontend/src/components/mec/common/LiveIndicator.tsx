@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useT } from '../../../i18n';
 
 interface Props {
   /** Timestamp (ms) of the last successful data load. */
@@ -9,16 +10,15 @@ interface Props {
   refreshing?: boolean;
 }
 
-function agoText(secs: number): string {
-  if (secs < 2) return '방금 갱신';
-  if (secs < 60) return `${secs}초 전 갱신`;
-  const m = Math.floor(secs / 60);
-  return `${m}분 전 갱신`;
-}
-
 /// "LIVE" pill with a pulsing dot and a self-ticking "n초 전 갱신" label so the
 /// dashboard reads as live even between polls.
 export default function LiveIndicator({ lastUpdated, intervalMs, refreshing }: Props) {
+  const { t } = useT();
+  const agoText = (secs: number): string => {
+    if (secs < 2) return t('mec.live.justNow');
+    if (secs < 60) return t('mec.live.secsAgo', { s: secs });
+    return t('mec.live.minsAgo', { m: Math.floor(secs / 60) });
+  };
   const [, force] = useState(0);
   useEffect(() => {
     const id = setInterval(() => force((x) => x + 1), 1000);
@@ -52,7 +52,7 @@ export default function LiveIndicator({ lastUpdated, intervalMs, refreshing }: P
         }}
       />
       <span style={{ fontWeight: 600, color, letterSpacing: '0.04em' }}>LIVE</span>
-      <span>· {lastUpdated ? agoText(secs) : '연결 중…'}</span>
+      <span>· {lastUpdated ? agoText(secs) : t('mec.live.connecting')}</span>
     </span>
   );
 }

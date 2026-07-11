@@ -4,6 +4,13 @@ import management from './management';
 import security from './security';
 import mec from './mec';
 import mecLive from './mec-live';
+import mecDashboard from './mec-dashboard';
+import mecTenants from './mec-tenants';
+import mecNodes from './mec-nodes';
+import mecGpuStorage from './mec-gpu-storage';
+import mecFirewall from './mec-firewall';
+import mecOps from './mec-ops';
+import mecWizard from './mec-wizard';
 import noc from './noc';
 
 export type Lang = 'ko' | 'en' | 'ja';
@@ -21,6 +28,13 @@ const translations: Record<string, Record<Lang, string>> = {
   ...security,
   ...mec,
   ...mecLive,
+  ...mecDashboard,
+  ...mecTenants,
+  ...mecNodes,
+  ...mecGpuStorage,
+  ...mecFirewall,
+  ...mecOps,
+  ...mecWizard,
   ...noc,
 };
 

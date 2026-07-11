@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useT } from '../../i18n';
 import { useMecList, mecPost } from '../../hooks/mec/useMecApi';
 import {
   ErrorBanner,
@@ -17,6 +18,7 @@ interface DiscoveredTenant {
 }
 
 export default function MecDiscoveryPanel() {
+  const { t } = useT();
   const { data, loading, error, refetch } = useMecList<DiscoveredTenant>(
     '/api/mec/v1/tenants/discover',
     60_000,
@@ -47,11 +49,11 @@ export default function MecDiscoveryPanel() {
 
   return (
     <PanelLayout
-      title="테넌트 Discovery"
-      subtitle={`발견 ${rows.length} · 미등록 ${unmanaged} · Import 로 기존 리소스를 재생성 없이 등록`}
+      title={t('mec.disc.title')}
+      subtitle={t('mec.disc.subtitle', { found: rows.length, unmanaged })}
       actions={
         <button className="btn btn-secondary" onClick={refetch}>
-          다시 스캔
+          {t('mec.disc.rescan')}
         </button>
       }
     >
@@ -69,40 +71,39 @@ export default function MecDiscoveryPanel() {
           marginBottom: '12px',
         }}
       >
-        ℹ️ <strong>Discovery</strong>는 클러스터에서 <code>-poc/-dev/-prod</code>{' '}
-        접미사 또는 <code>tenant</code> 라벨이 있는 네임스페이스를 자동 탐색합니다.
-        Import 시 기존 K8s / Rancher 리소스를 건드리지 않고 NabiMan DB 에만
-        등록합니다.
+        ℹ️ <strong>Discovery</strong>{t('mec.disc.infoIsProbe')}{' '}
+        <code>-poc/-dev/-prod</code>{t('mec.disc.infoSuffix')}{' '}
+        <code>tenant</code>{t('mec.disc.infoLabel')}
       </div>
 
       <Toolbar>
         <input
-          placeholder="필터 (네임스페이스)"
+          placeholder={t('mec.disc.filterPlaceholder')}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           style={{ padding: '6px 10px', minWidth: '240px' }}
         />
       </Toolbar>
 
-      {loading && !data && <div style={{ color: '#6b7280' }}>스캔 중...</div>}
+      {loading && !data && <div style={{ color: '#6b7280' }}>{t('mec.disc.scanning')}</div>}
 
       <SortableTable<DiscoveredTenant>
         data={rows}
         filter={filter}
         defaultSortKey="namespace"
         rowKey={(r) => r.id}
-        emptyMessage="발견된 미관리 테넌트가 없습니다."
+        emptyMessage={t('mec.disc.noResults')}
         columns={[
           {
             key: 'namespace',
-            header: '네임스페이스',
+            header: t('mec.disc.colNamespace'),
             accessor: (r) => r.namespace,
             render: (r) => <code>{r.namespace}</code>,
             sortable: true,
           },
           {
             key: 'labels',
-            header: 'Labels (일부)',
+            header: t('mec.disc.colLabels'),
             accessor: (r) =>
               Object.entries(r.labels)
                 .slice(0, 4)
@@ -125,7 +126,7 @@ export default function MecDiscoveryPanel() {
           },
           {
             key: 'status',
-            header: '상태',
+            header: t('mec.disc.colStatus'),
             accessor: (r) => (r.already_managed ? 'imported' : 'unmanaged'),
             render: (r) => (
               <StatusBadge tone={r.already_managed ? 'success' : 'warning'}>
@@ -144,7 +145,7 @@ export default function MecDiscoveryPanel() {
             render: (r) =>
               r.already_managed ? (
                 <span style={{ color: '#9ca3af', fontSize: '12px' }}>
-                  등록됨
+                  {t('mec.disc.registered')}
                 </span>
               ) : (
                 <button
@@ -152,7 +153,7 @@ export default function MecDiscoveryPanel() {
                   disabled={busyId === r.id}
                   onClick={() => importOne(r.id)}
                 >
-                  {busyId === r.id ? 'Import 중...' : 'Import'}
+                  {busyId === r.id ? t('mec.disc.importing') : 'Import'}
                 </button>
               ),
           },

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { useT } from '../../i18n';
 import { useMecList } from '../../hooks/mec/useMecApi';
 import { AuditLog } from '../../types/mec';
 import { ErrorBanner, PanelLayout, SortableTable, StatusBadge, Toolbar } from './common';
 
 export default function MecAuditPanel() {
+  const { t } = useT();
   const [filter, setFilter] = useState('');
   const { data, loading, error, refetch } = useMecList<AuditLog>(
     '/api/mec/v1/audit/logs?limit=200',
@@ -16,11 +18,11 @@ export default function MecAuditPanel() {
 
   return (
     <PanelLayout
-      title="MEC Audit Log"
-      subtitle={`최근 ${logs.length}건 · 성공 ${successCount} · 실패 ${failedCount}`}
+      title={t('mec.audit.title')}
+      subtitle={t('mec.audit.subtitle', { total: logs.length, success: successCount, failed: failedCount })}
       actions={
         <button className="btn btn-secondary" onClick={refetch}>
-          새로고침
+          {t('mec.action.refresh')}
         </button>
       }
     >
@@ -28,14 +30,14 @@ export default function MecAuditPanel() {
 
       <Toolbar>
         <input
-          placeholder="필터 (action, user, resource)"
+          placeholder={t('mec.audit.filterPlaceholder')}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           style={{ padding: '6px 10px', minWidth: '280px' }}
         />
       </Toolbar>
 
-      {loading && !data && <div style={{ color: '#6b7280' }}>로딩 중...</div>}
+      {loading && !data && <div style={{ color: '#6b7280' }}>{t('mec.state.loading')}</div>}
 
       <SortableTable<AuditLog>
         data={logs}
@@ -43,11 +45,11 @@ export default function MecAuditPanel() {
         defaultSortKey="timestamp"
         defaultSortDir="desc"
         rowKey={(r) => r.id}
-        emptyMessage="감사로그가 없습니다."
+        emptyMessage={t('mec.audit.empty')}
         columns={[
           {
             key: 'timestamp',
-            header: '시간',
+            header: t('mec.col.time'),
             accessor: (r) => r.timestamp,
             render: (r) => new Date(r.timestamp).toLocaleString(),
             width: '170px',
@@ -55,21 +57,21 @@ export default function MecAuditPanel() {
           },
           {
             key: 'user',
-            header: '사용자',
+            header: t('mec.audit.colUser'),
             accessor: (r) => r.user,
             width: '100px',
             sortable: true,
           },
           {
             key: 'action',
-            header: '작업',
+            header: t('mec.audit.colAction'),
             accessor: (r) => r.action,
             render: (r) => <code style={{ fontSize: '12px' }}>{r.action}</code>,
             sortable: true,
           },
           {
             key: 'resource',
-            header: '리소스',
+            header: t('mec.audit.colResource'),
             accessor: (r) => `${r.resource_type}/${r.resource_id}`,
             render: (r) => (
               <>
@@ -82,7 +84,7 @@ export default function MecAuditPanel() {
           },
           {
             key: 'status',
-            header: '결과',
+            header: t('mec.audit.colResult'),
             accessor: (r) => r.status,
             render: (r) => <StatusBadge tone={r.status}>{r.status}</StatusBadge>,
             width: '100px',
@@ -90,7 +92,7 @@ export default function MecAuditPanel() {
           },
           {
             key: 'duration_ms',
-            header: '소요',
+            header: t('mec.audit.colDuration'),
             accessor: (r) => r.duration_ms,
             render: (r) => `${r.duration_ms}ms`,
             align: 'right',
@@ -99,7 +101,7 @@ export default function MecAuditPanel() {
           },
           {
             key: 'ops',
-            header: 'Ops',
+            header: t('mec.audit.colOps'),
             accessor: (r) => r.operations.length,
             render: (r) =>
               r.operations.length > 0 ? (

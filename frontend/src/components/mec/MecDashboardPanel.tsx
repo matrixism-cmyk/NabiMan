@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useT } from '../../i18n';
 import { useMecApi, useMecList } from '../../hooks/mec/useMecApi';
 import { useMetricHistory, trendOf } from '../../hooks/mec/useMetricHistory';
 import { AuditLog, DashboardSummary } from '../../types/mec';
@@ -27,6 +28,7 @@ function pct(x: number, total: number): number {
 }
 
 export default function MecDashboardPanel({ onNavigate }: Props) {
+  const { t } = useT();
   const summaryQuery = useMecApi<DashboardSummary>(
     '/api/mec/v1/dashboard/summary',
     REFRESH_INTERVAL,
@@ -83,8 +85,8 @@ export default function MecDashboardPanel({ onNavigate }: Props) {
 
   return (
     <PanelLayout
-      title="MEC 통합 대시보드"
-      subtitle="실시간 클러스터 자원 현황과 최근 운영 활동 요약"
+      title={t('mec.dash.title')}
+      subtitle={t('mec.dash.subtitle')}
       actions={
         <>
           <LiveIndicator
@@ -93,7 +95,7 @@ export default function MecDashboardPanel({ onNavigate }: Props) {
             refreshing={summaryQuery.loading}
           />
           <button className="btn btn-secondary" onClick={refresh}>
-            새로고침
+            {t('mec.action.refresh')}
           </button>
         </>
       }
@@ -101,55 +103,55 @@ export default function MecDashboardPanel({ onNavigate }: Props) {
       <ErrorBanner error={summaryQuery.error || undefined} />
 
       {!s && summaryQuery.loading && (
-        <div style={{ color: '#6b7280' }}>로딩 중...</div>
+        <div style={{ color: '#6b7280' }}>{t('mec.state.loading')}</div>
       )}
 
       {s && (
         <div className="mec-fade-in-up">
           <MetricGrid>
             <MetricCard
-              label="테넌트"
+              label={t('mec.dash.tenants')}
               value={s.tenants.active}
               unit={`/ ${s.tenants.total}`}
-              helper={`활성 ${s.tenants.active}곳 · 전체 ${s.tenants.total}곳`}
+              helper={t('mec.dash.tenantsHelper', { active: s.tenants.active, total: s.tenants.total })}
               tone={s.tenants.active === s.tenants.total ? 'success' : 'info'}
               trend={trendOf(history.tenants)}
               sparkline={history.tenants}
               onClick={() => go('mecTenants')}
             />
             <MetricCard
-              label="노드 Ready"
+              label={t('mec.dash.nodesReady')}
               value={s.nodes.ready}
               unit={`/ ${s.nodes.total}`}
-              helper={`${pct(s.nodes.ready, s.nodes.total)}% 정상`}
+              helper={t('mec.dash.nodesReadyHelper', { pct: pct(s.nodes.ready, s.nodes.total) })}
               tone={s.nodes.ready === s.nodes.total ? 'success' : 'warning'}
               trend={trendOf(history.nodes)}
               sparkline={history.nodes}
               onClick={() => go('mecNodes')}
             />
             <MetricCard
-              label="GPU Slot"
+              label={t('mec.dash.gpuSlot')}
               value={s.gpu.allocated_slots}
               unit={`/ ${s.gpu.total_slots}`}
-              helper={`여유 ${s.gpu.available_slots} slots`}
+              helper={t('mec.dash.gpuSlotHelper', { available: s.gpu.available_slots })}
               tone={s.gpu.available_slots === 0 ? 'error' : 'info'}
               trend={trendOf(history.gpu)}
               sparkline={history.gpu}
               onClick={() => go('mecGpu')}
             />
             <MetricCard
-              label="LB Services"
+              label={t('mec.dash.lbServices')}
               value={s.network.lb_services}
-              helper={`공인 IP 할당 ${s.network.public_ips_assigned}개`}
+              helper={t('mec.dash.lbServicesHelper', { count: s.network.public_ips_assigned })}
               tone="info"
               trend={trendOf(history.lb)}
               sparkline={history.lb}
               onClick={() => go('mecIngress')}
             />
             <MetricCard
-              label="NAT 규칙"
+              label={t('mec.dash.natRules')}
               value={s.firewall.nat_rules}
-              helper={`보안 정책 ${s.firewall.security_policies}개`}
+              helper={t('mec.dash.natRulesHelper', { count: s.firewall.security_policies })}
               tone="info"
               trend={trendOf(history.nat)}
               sparkline={history.nat}
@@ -165,11 +167,11 @@ export default function MecDashboardPanel({ onNavigate }: Props) {
               marginTop: '20px',
             }}
           >
-            <Section title="GPU Slot 할당">
+            <Section title={t('mec.dash.gpuAllocation')}>
               <DonutChart
                 slices={[
-                  { label: '할당', value: s.gpu.allocated_slots, color: '#3b82f6' },
-                  { label: '여유', value: s.gpu.available_slots, color: '#e5e7eb' },
+                  { label: t('mec.dash.gpuAllocated'), value: s.gpu.allocated_slots, color: '#3b82f6' },
+                  { label: t('mec.dash.gpuAvailable'), value: s.gpu.available_slots, color: '#e5e7eb' },
                 ]}
                 centerLabel={`${pct(s.gpu.allocated_slots, s.gpu.total_slots)}%`}
                 centerSublabel={`${s.gpu.allocated_slots}/${s.gpu.total_slots}`}
@@ -177,7 +179,7 @@ export default function MecDashboardPanel({ onNavigate }: Props) {
               />
             </Section>
 
-            <Section title="노드 상태">
+            <Section title={t('mec.dash.nodeStatus')}>
               <DonutChart
                 slices={[
                   { label: 'Ready', value: s.nodes.ready, color: '#10b981' },
@@ -188,12 +190,12 @@ export default function MecDashboardPanel({ onNavigate }: Props) {
                   },
                 ]}
                 centerLabel={`${s.nodes.ready}`}
-                centerSublabel={`총 ${s.nodes.total} 노드`}
+                centerSublabel={t('mec.dash.nodeTotal', { total: s.nodes.total })}
                 legend="side"
               />
             </Section>
 
-            <Section title="자원 사용률">
+            <Section title={t('mec.dash.resourceUsage')}>
               <BarChart
                 data={[
                   {
@@ -202,12 +204,12 @@ export default function MecDashboardPanel({ onNavigate }: Props) {
                     max: s.gpu.total_slots,
                   },
                   {
-                    label: '활성 테넌트',
+                    label: t('mec.dash.activeTenants'),
                     value: s.tenants.active,
                     max: Math.max(1, s.tenants.total),
                   },
                   {
-                    label: '정상 노드',
+                    label: t('mec.dash.healthyNodes'),
                     value: s.nodes.ready,
                     max: Math.max(1, s.nodes.total),
                   },
@@ -216,7 +218,7 @@ export default function MecDashboardPanel({ onNavigate }: Props) {
             </Section>
           </div>
 
-          <Section title="최근 활동" marginTop="24px">
+          <Section title={t('mec.dash.recentActivity')} marginTop="24px">
             {activityQuery.error && (
               <div style={{ color: '#ef4444', fontSize: '13px' }}>
                 {activityQuery.error}
@@ -228,11 +230,11 @@ export default function MecDashboardPanel({ onNavigate }: Props) {
               defaultSortDir="desc"
               rowKey={(r) => r.id}
               highlightRowKeys={newKeys}
-              emptyMessage="기록된 활동이 없습니다."
+              emptyMessage={t('mec.dash.noActivity')}
               columns={[
                 {
                   key: 'timestamp',
-                  header: '시간',
+                  header: t('mec.col.time'),
                   accessor: (r) => r.timestamp,
                   render: (r) => new Date(r.timestamp).toLocaleString(),
                   width: '170px',
@@ -240,21 +242,21 @@ export default function MecDashboardPanel({ onNavigate }: Props) {
                 },
                 {
                   key: 'user',
-                  header: '사용자',
+                  header: t('mec.dash.colUser'),
                   accessor: (r) => r.user,
                   width: '100px',
                   sortable: true,
                 },
                 {
                   key: 'action',
-                  header: '작업',
+                  header: t('mec.dash.colAction'),
                   accessor: (r) => r.action,
                   render: (r) => <code style={{ fontSize: '12px' }}>{r.action}</code>,
                   sortable: true,
                 },
                 {
                   key: 'resource',
-                  header: '대상',
+                  header: t('mec.col.object'),
                   accessor: (r) => `${r.resource_type}:${r.resource_id}`,
                   render: (r) => (
                     <>
@@ -267,7 +269,7 @@ export default function MecDashboardPanel({ onNavigate }: Props) {
                 },
                 {
                   key: 'duration_ms',
-                  header: '소요',
+                  header: t('mec.dash.colDuration'),
                   accessor: (r) => r.duration_ms,
                   render: (r) => `${r.duration_ms}ms`,
                   align: 'right',
@@ -276,7 +278,7 @@ export default function MecDashboardPanel({ onNavigate }: Props) {
                 },
                 {
                   key: 'status',
-                  header: '결과',
+                  header: t('mec.dash.colResult'),
                   accessor: (r) => r.status,
                   render: (r) => <StatusBadge tone={r.status}>{r.status}</StatusBadge>,
                   width: '90px',

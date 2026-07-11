@@ -1,4 +1,5 @@
 import React from 'react';
+import { useT } from '../../../i18n';
 import {
   applyQuotaTemplate,
   QUOTA_TEMPLATES,
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export default function Step3Quota({ state, setState }: Props) {
+  const { t } = useT();
   const setTemplate = (tpl: WizardState['quotaTemplate']) => {
     setState(applyQuotaTemplate(state, tpl));
   };
@@ -19,10 +21,10 @@ export default function Step3Quota({ state, setState }: Props) {
 
   return (
     <div>
-      <h3>Step 3 / 4: 리소스 쿼터</h3>
+      <h3>{t('mec.wizard.s3.title')}</h3>
 
       <label style={{ display: 'block', marginBottom: '8px' }}>
-        템플릿
+        {t('mec.wizard.s3.template')}
         <select
           value={state.quotaTemplate}
           onChange={(e) =>
@@ -30,12 +32,12 @@ export default function Step3Quota({ state, setState }: Props) {
           }
           style={{ width: '100%' }}
         >
-          {QUOTA_TEMPLATES.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.label}
+          {QUOTA_TEMPLATES.map((tpl) => (
+            <option key={tpl.id} value={tpl.id}>
+              {t(tpl.labelKey)}
             </option>
           ))}
-          <option value="custom">커스텀 (직접 편집)</option>
+          <option value="custom">{t('mec.wizard.s3.custom')}</option>
         </select>
       </label>
 

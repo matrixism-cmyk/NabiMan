@@ -1,4 +1,5 @@
 import React from 'react';
+import { useT } from '../../i18n';
 import { useMecList } from '../../hooks/mec/useMecApi';
 import { AuditLog } from '../../types/mec';
 import { ErrorBanner, SortableTable, StatusBadge } from './common';
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export default function TenantAuditTab({ tenantId }: Props) {
+  const { t } = useT();
   const { data, loading, error, refetch } = useMecList<AuditLog>(
     `/api/mec/v1/audit/logs?resource_type=tenant&resource_id=${encodeURIComponent(tenantId)}&limit=100`,
     30_000,
@@ -23,11 +25,11 @@ export default function TenantAuditTab({ tenantId }: Props) {
         }}
       >
         <button className="btn btn-secondary btn-small" onClick={refetch}>
-          새로고침
+          {t('mec.action.refresh')}
         </button>
       </div>
       {loading && !data && (
-        <div style={{ color: 'var(--text-secondary)' }}>로딩 중...</div>
+        <div style={{ color: 'var(--text-secondary)' }}>{t('mec.state.loading')}</div>
       )}
       <ErrorBanner error={error || undefined} />
 
@@ -36,11 +38,11 @@ export default function TenantAuditTab({ tenantId }: Props) {
         defaultSortKey="timestamp"
         defaultSortDir="desc"
         rowKey={(r) => r.id}
-        emptyMessage="이 테넌트의 감사 기록이 없습니다."
+        emptyMessage={t('mec.tenant.audit.empty')}
         columns={[
           {
             key: 'timestamp',
-            header: '시간',
+            header: t('mec.col.time'),
             accessor: (r) => r.timestamp,
             render: (r) => new Date(r.timestamp).toLocaleString(),
             width: '170px',
@@ -48,21 +50,21 @@ export default function TenantAuditTab({ tenantId }: Props) {
           },
           {
             key: 'user',
-            header: '사용자',
+            header: t('mec.tenant.audit.colUser'),
             accessor: (r) => r.user,
             width: '100px',
             sortable: true,
           },
           {
             key: 'action',
-            header: '작업',
+            header: t('mec.tenant.audit.colAction'),
             accessor: (r) => r.action,
             render: (r) => <code>{r.action}</code>,
             sortable: true,
           },
           {
             key: 'status',
-            header: '결과',
+            header: t('mec.tenant.audit.colResult'),
             accessor: (r) => r.status,
             render: (r) => <StatusBadge tone={r.status}>{r.status}</StatusBadge>,
             width: '100px',
@@ -70,7 +72,7 @@ export default function TenantAuditTab({ tenantId }: Props) {
           },
           {
             key: 'duration_ms',
-            header: '소요',
+            header: t('mec.tenant.audit.colDuration'),
             accessor: (r) => r.duration_ms,
             render: (r) => `${r.duration_ms}ms`,
             align: 'right',

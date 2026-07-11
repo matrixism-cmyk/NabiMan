@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useT } from '../../i18n';
 import { mecPost } from '../../hooks/mec/useMecApi';
 import { PublicIp } from '../../types/mec';
 import { ErrorBanner } from './common';
@@ -17,6 +18,7 @@ export default function FirewallNatForm({
   onCreated,
   onCancel,
 }: Props) {
+  const { t } = useT();
   const [form, setForm] = useState({
     label: '',
     public_ip: prefillPublicIp || '',
@@ -41,7 +43,7 @@ export default function FirewallNatForm({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.public_ip) {
-      setErr('공인 IP 를 선택하거나 입력하세요.');
+      setErr(t('mec.fw.formPublicIpRequired'));
       return;
     }
     setBusy(true);
@@ -81,7 +83,7 @@ export default function FirewallNatForm({
         color: 'var(--text)',
       }}
     >
-      <h3 style={{ marginTop: 0 }}>NAT 규칙 추가</h3>
+      <h3 style={{ marginTop: 0 }}>{t('mec.fw.formTitle')}</h3>
       <ErrorBanner error={err || undefined} />
 
       <div
@@ -97,7 +99,7 @@ export default function FirewallNatForm({
             required
             value={form.label}
             onChange={(e) => setForm({ ...form, label: e.target.value })}
-            placeholder="예: app-service-443"
+            placeholder={t('mec.fw.formLabelPlaceholder')}
           />
         </label>
 
@@ -109,7 +111,7 @@ export default function FirewallNatForm({
               alignItems: 'center',
             }}
           >
-            <span>공인 IP (가용 {availableIps.length}개)</span>
+            <span>{t('mec.fw.formPublicIp', { count: availableIps.length })}</span>
             <button
               type="button"
               className="btn btn-secondary btn-small"
@@ -118,7 +120,7 @@ export default function FirewallNatForm({
               }
               style={{ padding: '0 6px', fontSize: '11px' }}
             >
-              {form.custom_public_ip ? '목록에서 선택' : '직접 입력'}
+              {form.custom_public_ip ? t('mec.fw.formSelectFromList') : t('mec.fw.formEnterManually')}
             </button>
           </div>
           {form.custom_public_ip ? (
@@ -134,21 +136,21 @@ export default function FirewallNatForm({
               value={form.public_ip}
               onChange={(e) => setForm({ ...form, public_ip: e.target.value })}
             >
-              <option value="">-- 가용 IP 선택 --</option>
+              <option value="">{t('mec.fw.formSelectAvailableIp')}</option>
               {availableIps.map((p) => (
                 <option key={p.ip} value={p.ip}>
                   {p.ip}
                 </option>
               ))}
               {availableIps.length === 0 && (
-                <option disabled>가용 IP 없음 — 직접 입력 이용</option>
+                <option disabled>{t('mec.fw.formNoAvailableIp')}</option>
               )}
             </select>
           )}
         </div>
 
         <label>
-          내부 IP
+          {t('mec.fw.formPrivateIp')}
           <input
             required
             value={form.private_ip}
@@ -157,7 +159,7 @@ export default function FirewallNatForm({
           />
         </label>
         <label>
-          프로토콜
+          {t('mec.fw.formProtocol')}
           <select
             value={form.protocol}
             onChange={(e) =>
@@ -173,7 +175,7 @@ export default function FirewallNatForm({
           </select>
         </label>
         <label>
-          포트 (쉼표 구분)
+          {t('mec.fw.formPorts')}
           <input
             value={form.ports}
             onChange={(e) => setForm({ ...form, ports: e.target.value })}
@@ -190,7 +192,7 @@ export default function FirewallNatForm({
             setForm({ ...form, create_proxy_arp: e.target.checked })
           }
         />{' '}
-        proxy-arp 생성 (AXGATE 외부 광고)
+        {t('mec.fw.formProxyArp')}
       </label>
       <label style={{ display: 'block' }}>
         <input
@@ -200,15 +202,15 @@ export default function FirewallNatForm({
             setForm({ ...form, enable_immediately: e.target.checked })
           }
         />{' '}
-        즉시 활성화
+        {t('mec.fw.formEnableImmediately')}
       </label>
 
       <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
         <button type="submit" className="btn btn-primary" disabled={busy}>
-          {busy ? '적용 중...' : '추가'}
+          {busy ? t('mec.fw.formApplying') : t('mec.fw.formAdd')}
         </button>
         <button type="button" className="btn btn-secondary" onClick={onCancel}>
-          취소
+          {t('mec.fw.cancel')}
         </button>
       </div>
     </form>

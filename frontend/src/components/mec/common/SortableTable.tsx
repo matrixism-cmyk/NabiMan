@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useT } from '../../../i18n';
 
 export interface Column<T> {
   key: string;
@@ -54,7 +55,7 @@ export default function SortableTable<T>({
   columns,
   rowKey,
   onRowClick,
-  emptyMessage = '데이터가 없습니다.',
+  emptyMessage,
   defaultSortKey,
   defaultSortDir = 'asc',
   dense = false,
@@ -63,6 +64,7 @@ export default function SortableTable<T>({
   filter,
   highlightRowKeys,
 }: Props<T>) {
+  const { t } = useT();
   const [sortKey, setSortKey] = useState<string | null>(defaultSortKey ?? null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>(defaultSortDir);
 
@@ -172,7 +174,7 @@ export default function SortableTable<T>({
                   fontStyle: 'italic',
                 }}
               >
-                {emptyMessage}
+                {emptyMessage ?? t('mec.table.empty')}
               </td>
             </tr>
           )}

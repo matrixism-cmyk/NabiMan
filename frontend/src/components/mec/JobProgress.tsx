@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useT } from '../../i18n';
 import { useJobStream, JobStreamEvent } from '../../hooks/mec/useJobStream';
 
 interface StepState {
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export default function JobProgress({ jobId }: Props) {
+  const { t } = useT();
   const [steps, setSteps] = useState<Record<string, StepState>>({});
   const [order, setOrder] = useState<string[]>([]);
   const [finalStatus, setFinalStatus] = useState<'running' | 'completed' | 'failed'>(
@@ -98,9 +100,11 @@ export default function JobProgress({ jobId }: Props) {
       </div>
 
       <div style={{ fontSize: '13px', marginBottom: '8px' }}>
-        상태:{' '}
+        {t('mec.jobs.statusLabel')}{' '}
         <strong style={{ color: barColor(finalStatus) }}>
-          {finalStatus === 'running' ? (isOpen ? 'running' : 'connecting') : finalStatus}
+          {finalStatus === 'running'
+            ? (isOpen ? t('mec.jobs.stateRunning') : t('mec.jobs.stateConnecting'))
+            : finalStatus}
         </strong>
         {error && <span style={{ color: '#ef4444' }}> — {error}</span>}
         {terminalError && (
@@ -111,7 +115,7 @@ export default function JobProgress({ jobId }: Props) {
               fontSize: '12px',
             }}
           >
-            에러: {terminalError}
+            {t('mec.jobs.errorLabel')} {terminalError}
           </div>
         )}
       </div>

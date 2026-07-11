@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useT } from '../../i18n';
 import { useMecList, mecPost } from '../../hooks/mec/useMecApi';
 import {
   BarChart,
@@ -46,6 +47,7 @@ function humanizeSec(secs: number): string {
 }
 
 export default function MecStoragePanel() {
+  const { t } = useT();
   const pools = useMecList<LbPool>('/api/mec/v1/network/lb-pools', 30_000);
   const pvcs = useMecList<Pvc>('/api/mec/v1/storage/pvcs', 60_000);
   const harbor = useMecList<HarborProject>(
@@ -95,11 +97,17 @@ export default function MecStoragePanel() {
 
   return (
     <PanelLayout
-      title="스토리지 / LB Pool / Harbor"
-      subtitle={`LB ${usedIps}/${totalIps} · PVC ${pvcData.length}개 (Bound ${boundPvcs}) · Harbor ${harborData.length}개 프로젝트`}
+      title={t('mec.storage.title')}
+      subtitle={t('mec.storage.subtitle', {
+        used: usedIps,
+        total: totalIps,
+        pvcs: pvcData.length,
+        bound: boundPvcs,
+        projects: harborData.length,
+      })}
       actions={
         <button className="btn btn-secondary" onClick={refreshAll}>
-          새로고침
+          {t('mec.action.refresh')}
         </button>
       }
     >
@@ -107,26 +115,26 @@ export default function MecStoragePanel() {
 
       <MetricGrid>
         <MetricCard
-          label="LB IP 사용"
+          label={t('mec.storage.lbIpUsage')}
           value={usedIps}
           unit={`/ ${totalIps}`}
-          helper={`${poolData.length}개 Pool`}
+          helper={t('mec.storage.lbPoolsHelper', { count: poolData.length })}
           tone={usedIps / Math.max(1, totalIps) > 0.9 ? 'error' : 'info'}
         />
         <MetricCard
-          label="PVC"
+          label={t('mec.storage.pvc')}
           value={pvcData.length}
-          helper={`Bound ${boundPvcs}`}
+          helper={t('mec.storage.pvcBoundHelper', { bound: boundPvcs })}
           tone="info"
         />
         <MetricCard
-          label="Harbor 프로젝트"
+          label={t('mec.storage.harborProjects')}
           value={harborData.length}
           tone="info"
         />
       </MetricGrid>
 
-      <Section title="MetalLB IP Pool" marginTop="24px">
+      <Section title={t('mec.storage.metallbPool')} marginTop="24px">
         {pools.error && (
           <div style={{ color: 'var(--danger)', fontSize: '13px' }}>
             {pools.error}
@@ -147,16 +155,16 @@ export default function MecStoragePanel() {
             <div
               style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}
             >
-              Pool 이 없습니다.
+              {t('mec.storage.noPool')}
             </div>
           )
         )}
       </Section>
 
-      <Section title="PersistentVolumeClaim" marginTop="24px">
+      <Section title={t('mec.storage.pvcSection')} marginTop="24px">
         <Toolbar>
           <input
-            placeholder="필터 (ns, name, storage-class)"
+            placeholder={t('mec.storage.pvcFilterPlaceholder')}
             value={pvcFilter}
             onChange={(e) => setPvcFilter(e.target.value)}
             style={{ padding: '6px 10px', minWidth: '240px' }}
@@ -167,7 +175,7 @@ export default function MecStoragePanel() {
           filter={pvcFilter}
           defaultSortKey="namespace"
           rowKey={(p) => `${p.namespace}/${p.name}`}
-          emptyMessage="PVC 가 없습니다."
+          emptyMessage={t('mec.storage.noPvc')}
           columns={[
             {
               key: 'namespace',
@@ -177,14 +185,14 @@ export default function MecStoragePanel() {
             },
             {
               key: 'name',
-              header: '이름',
+              header: t('mec.storage.colName'),
               accessor: (p) => p.name,
               render: (p) => <code>{p.name}</code>,
               sortable: true,
             },
             {
               key: 'phase',
-              header: '상태',
+              header: t('mec.storage.colPhase'),
               accessor: (p) => p.phase,
               render: (p) => <StatusBadge tone={p.phase}>{p.phase}</StatusBadge>,
               width: '100px',
@@ -192,7 +200,7 @@ export default function MecStoragePanel() {
             },
             {
               key: 'size',
-              header: '요청',
+              header: t('mec.storage.colRequest'),
               accessor: (p) => p.storage_request,
               align: 'right',
               sortable: true,
@@ -227,7 +235,7 @@ export default function MecStoragePanel() {
         />
       </Section>
 
-      <Section title="Harbor 프로젝트" marginTop="24px">
+      <Section title={t('mec.storage.harborSection')} marginTop="24px">
         <form
           onSubmit={createProject}
           style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}
@@ -235,7 +243,7 @@ export default function MecStoragePanel() {
           <input
             value={newProject}
             onChange={(e) => setNewProject(e.target.value)}
-            placeholder="프로젝트 이름 (예: ygram-poc)"
+            placeholder={t('mec.storage.newProjectPlaceholder')}
             style={{ flex: 1, padding: '6px 10px' }}
           />
           <button
@@ -243,14 +251,14 @@ export default function MecStoragePanel() {
             className="btn btn-primary"
             disabled={busy || !newProject}
           >
-            {busy ? '생성 중...' : '+ 프로젝트'}
+            {busy ? t('mec.storage.creating') : t('mec.storage.addProject')}
           </button>
         </form>
         <SortableTable<HarborProject>
           data={harborData}
           defaultSortKey="id"
           rowKey={(p) => p.id}
-          emptyMessage="Harbor 프로젝트가 없습니다."
+          emptyMessage={t('mec.storage.noHarbor')}
           columns={[
             {
               key: 'id',
@@ -262,14 +270,14 @@ export default function MecStoragePanel() {
             },
             {
               key: 'name',
-              header: '이름',
+              header: t('mec.storage.colHarborName'),
               accessor: (p) => p.name,
               render: (p) => <code>{p.name}</code>,
               sortable: true,
             },
             {
               key: 'public',
-              header: '공개',
+              header: t('mec.storage.colPublic'),
               accessor: (p) => p.public,
               render: (p) => (
                 <StatusBadge tone={p.public ? 'info' : 'neutral'}>
@@ -281,7 +289,7 @@ export default function MecStoragePanel() {
             },
             {
               key: 'repos',
-              header: '저장소',
+              header: t('mec.storage.colRepos'),
               accessor: (p) => p.repo_count,
               align: 'right',
               width: '80px',
@@ -289,7 +297,7 @@ export default function MecStoragePanel() {
             },
             {
               key: 'created',
-              header: '생성',
+              header: t('mec.storage.colCreated'),
               accessor: (p) => p.created_at,
               render: (p) => new Date(p.created_at).toLocaleDateString(),
               width: '120px',

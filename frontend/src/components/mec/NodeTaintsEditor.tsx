@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useT } from '../../i18n';
 import { Taint } from '../../types/mec';
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function NodeTaintsEditor({ taints, onPatch }: Props) {
+  const { t } = useT();
   const [key, setKey] = useState('tenant');
   const [value, setValue] = useState('');
   const [effect, setEffect] = useState<Taint['effect']>('NoSchedule');
@@ -30,11 +32,18 @@ export default function NodeTaintsEditor({ taints, onPatch }: Props) {
     }
   };
 
-  const remove = async (t: Taint) => {
-    if (!window.confirm(`Taint ${t.key}${t.value ? '=' + t.value : ''}:${t.effect} 제거?`)) return;
+  const remove = async (taintToRemove: Taint) => {
+    if (
+      !window.confirm(
+        t('mec.node.taints.confirmRemove', {
+          taint: `${taintToRemove.key}${taintToRemove.value ? '=' + taintToRemove.value : ''}:${taintToRemove.effect}`,
+        }),
+      )
+    )
+      return;
     setBusy(true);
     try {
-      await onPatch([], [{ key: t.key, effect: t.effect }]);
+      await onPatch([], [{ key: taintToRemove.key, effect: taintToRemove.effect }]);
     } finally {
       setBusy(false);
     }
@@ -48,29 +57,29 @@ export default function NodeTaintsEditor({ taints, onPatch }: Props) {
             <th>Key</th>
             <th>Value</th>
             <th>Effect</th>
-            <th>작업</th>
+            <th>{t('mec.node.taints.actions')}</th>
           </tr>
         </thead>
         <tbody>
           {taints.length === 0 ? (
             <tr>
               <td colSpan={4} style={{ color: '#6b7280', fontStyle: 'italic' }}>
-                Taint 없음
+                {t('mec.node.taints.empty')}
               </td>
             </tr>
           ) : (
-            taints.map((t, i) => (
-              <tr key={`${t.key}-${i}`}>
-                <td><code>{t.key}</code></td>
-                <td>{t.value || '-'}</td>
-                <td>{t.effect}</td>
+            taints.map((taint, i) => (
+              <tr key={`${taint.key}-${i}`}>
+                <td><code>{taint.key}</code></td>
+                <td>{taint.value || '-'}</td>
+                <td>{taint.effect}</td>
                 <td>
                   <button
                     className="btn btn-danger btn-small"
                     disabled={busy}
-                    onClick={() => remove(t)}
+                    onClick={() => remove(taint)}
                   >
-                    제거
+                    {t('mec.node.taints.remove')}
                   </button>
                 </td>
               </tr>
@@ -93,7 +102,7 @@ export default function NodeTaintsEditor({ taints, onPatch }: Props) {
           />
         </label>
         <label style={{ flex: '1 1 140px' }}>
-          <div style={{ fontSize: '11px', color: '#6b7280' }}>Value (선택)</div>
+          <div style={{ fontSize: '11px', color: '#6b7280' }}>{t('mec.node.taints.valueOptional')}</div>
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
@@ -113,7 +122,7 @@ export default function NodeTaintsEditor({ taints, onPatch }: Props) {
           </select>
         </label>
         <button type="submit" className="btn btn-primary" disabled={busy}>
-          {busy ? '적용 중...' : '+ Taint'}
+          {busy ? t('mec.node.taints.applying') : t('mec.node.taints.addBtn')}
         </button>
       </form>
     </div>

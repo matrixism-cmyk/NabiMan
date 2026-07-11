@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useT } from '../../i18n';
 import { useMecList, mecDelete } from '../../hooks/mec/useMecApi';
 import { NatRule, PublicIp } from '../../types/mec';
 import FirewallNatForm from './FirewallNatForm';
@@ -26,6 +27,7 @@ function findRulesForIp(rules: NatRule[], ip: string): NatRule[] {
 }
 
 export default function MecFirewallPanel() {
+  const { t } = useT();
   const rules = useMecList<NatRule>('/api/mec/v1/firewall/nat-rules', 60_000);
   const ips = useMecList<PublicIp>('/api/mec/v1/firewall/public-ips', 60_000);
   const [showAdd, setShowAdd] = useState(false);
@@ -56,22 +58,22 @@ export default function MecFirewallPanel() {
   const onReleaseClick = async (ip: string) => {
     const matched = findRulesForIp(natRules, ip);
     if (matched.length === 0) {
-      setErr(`공인 IP ${ip} 에 매핑된 NAT 규칙을 찾지 못했습니다.`);
+      setErr(t('mec.fw.releaseNoRule', { ip }));
       return;
     }
     const summary = [
-      `⚠️ 공인 IP '${ip}' 할당 해제`,
+      t('mec.fw.releasePromptTitle', { ip }),
       '',
-      `연결된 NAT 규칙 ${matched.length}건이 삭제됩니다:`,
+      t('mec.fw.releasePromptRules', { count: matched.length }),
       ...matched.map((r) => `  • ${r.id} (${r.label || '-'}) → ${r.translated_to}`),
       '',
-      'proxy-arp 도 같이 해제됩니다 (AXGATE add_nat_rule delete 흐름).',
+      t('mec.fw.releasePromptProxyArp'),
       '',
-      '확인을 위해 IP 를 다시 입력하세요:',
+      t('mec.fw.releasePromptConfirm'),
     ].join('\n');
     const typed = window.prompt(summary, '');
     if (typed !== ip) {
-      if (typed !== null) setErr('입력 IP 가 일치하지 않아 해제 취소.');
+      if (typed !== null) setErr(t('mec.fw.releaseMismatch'));
       return;
     }
     setBusyIp(ip);
@@ -90,11 +92,11 @@ export default function MecFirewallPanel() {
 
   const onDeleteRule = async (id: string) => {
     const typed = window.prompt(
-      `⚠️ NAT 규칙 '${id}' 삭제 (외부 접근 끊길 수 있음). ID 재입력:`,
+      t('mec.fw.deletePrompt', { id }),
       '',
     );
     if (typed !== id) {
-      if (typed !== null) setErr('입력 ID 가 일치하지 않아 삭제 취소.');
+      if (typed !== null) setErr(t('mec.fw.deleteMismatch'));
       return;
     }
     try {
@@ -107,12 +109,17 @@ export default function MecFirewallPanel() {
 
   return (
     <PanelLayout
-      title="AXGATE 방화벽"
-      subtitle={`NAT ${activeNat}/${natRules.length} 활성 · 공인 IP 할당 ${assignedIp} · 가용 ${availableIp}`}
+      title={t('mec.fw.title')}
+      subtitle={t('mec.fw.subtitle', {
+        active: activeNat,
+        total: natRules.length,
+        assigned: assignedIp,
+        available: availableIp,
+      })}
       actions={
         <>
           <button className="btn btn-secondary" onClick={refresh}>
-            새로고침
+            {t('mec.action.refresh')}
           </button>
           <button
             className="btn btn-primary"
@@ -121,7 +128,7 @@ export default function MecFirewallPanel() {
               setShowAdd((v) => !v);
             }}
           >
-            {showAdd ? '취소' : '+ NAT 규칙'}
+            {showAdd ? t('mec.fw.cancel') : t('mec.fw.addRule')}
           </button>
         </>
       }
@@ -130,17 +137,17 @@ export default function MecFirewallPanel() {
 
       <MetricGrid>
         <MetricCard
-          label="NAT 규칙"
+          label={t('mec.fw.natRulesCard')}
           value={activeNat}
           unit={`/ ${natRules.length}`}
-          helper={`${natRules.length - activeNat}개 비활성`}
+          helper={t('mec.fw.natInactive', { count: natRules.length - activeNat })}
           tone="info"
         />
         <MetricCard
-          label="공인 IP 할당"
+          label={t('mec.fw.publicIpCard')}
           value={assignedIp}
           unit={`/ ${publicIps.length}`}
-          helper={`${availableIp}개 가용`}
+          helper={t('mec.fw.ipAvailable', { count: availableIp })}
           tone={availableIp === 0 ? 'warning' : 'info'}
         />
       </MetricGrid>
@@ -161,10 +168,10 @@ export default function MecFirewallPanel() {
         />
       )}
 
-      <Section title="공인 IP" marginTop="24px">
+      <Section title={t('mec.fw.publicIpSection')} marginTop="24px">
         <Toolbar>
           <input
-            placeholder="필터 (IP, 상태)"
+            placeholder={t('mec.fw.ipFilter')}
             value={ipFilter}
             onChange={(e) => setIpFilter(e.target.value)}
             style={{ padding: '6px 10px', minWidth: '240px' }}
@@ -175,7 +182,7 @@ export default function MecFirewallPanel() {
           filter={ipFilter}
           defaultSortKey="ip"
           rowKey={(p) => p.ip}
-          emptyMessage="공인 IP 정보가 없습니다."
+          emptyMessage={t('mec.fw.noPublicIp')}
           columns={[
             {
               key: 'ip',
@@ -186,7 +193,7 @@ export default function MecFirewallPanel() {
             },
             {
               key: 'status',
-              header: '상태',
+              header: t('mec.fw.colStatus'),
               accessor: (p) => p.status,
               render: (p) => <StatusBadge tone={p.status}>{p.status}</StatusBadge>,
               width: '140px',
@@ -194,7 +201,7 @@ export default function MecFirewallPanel() {
             },
             {
               key: 'assigned',
-              header: '용도',
+              header: t('mec.fw.colUsage'),
               accessor: (p) => p.assigned_to || '',
               render: (p) => {
                 const matched = findRulesForIp(natRules, p.ip);
@@ -242,7 +249,7 @@ export default function MecFirewallPanel() {
                     <span
                       style={{ color: 'var(--text-secondary)', fontSize: '12px' }}
                     >
-                      시스템 예약
+                      {t('mec.fw.systemReserved')}
                     </span>
                   );
                 }
@@ -252,7 +259,7 @@ export default function MecFirewallPanel() {
                       className="btn btn-primary btn-small"
                       onClick={() => onAssignClick(p.ip)}
                     >
-                      할당
+                      {t('mec.fw.assign')}
                     </button>
                   );
                 }
@@ -262,7 +269,7 @@ export default function MecFirewallPanel() {
                     disabled={busyIp === p.ip}
                     onClick={() => onReleaseClick(p.ip)}
                   >
-                    {busyIp === p.ip ? '해제 중...' : '해제'}
+                    {busyIp === p.ip ? t('mec.fw.releasing') : t('mec.fw.release')}
                   </button>
                 );
               },
@@ -271,10 +278,10 @@ export default function MecFirewallPanel() {
         />
       </Section>
 
-      <Section title="NAT 규칙" marginTop="24px">
+      <Section title={t('mec.fw.natRulesSection')} marginTop="24px">
         <Toolbar>
           <input
-            placeholder="필터 (ID, label, IP, zone)"
+            placeholder={t('mec.fw.natFilter')}
             value={natFilter}
             onChange={(e) => setNatFilter(e.target.value)}
             style={{ padding: '6px 10px', minWidth: '240px' }}
@@ -285,7 +292,7 @@ export default function MecFirewallPanel() {
           filter={natFilter}
           defaultSortKey="id"
           rowKey={(r) => `${r.from_zone}-${r.to_zone}-${r.id}`}
-          emptyMessage="NAT 규칙이 없습니다."
+          emptyMessage={t('mec.fw.noNatRules')}
           columns={[
             {
               key: 'id',
@@ -330,7 +337,7 @@ export default function MecFirewallPanel() {
             },
             {
               key: 'dst',
-              header: '공인 IP',
+              header: t('mec.fw.colPublicIp'),
               accessor: (r) => r.destination.join(','),
               render: (r) => r.destination.join(', ') || '-',
               sortable: true,
@@ -381,7 +388,7 @@ export default function MecFirewallPanel() {
                   className="btn btn-danger btn-small"
                   onClick={() => onDeleteRule(r.id)}
                 >
-                  삭제
+                  {t('mec.fw.delete')}
                 </button>
               ),
             },

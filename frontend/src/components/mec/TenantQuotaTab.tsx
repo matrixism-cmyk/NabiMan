@@ -1,4 +1,5 @@
 import React from 'react';
+import { useT } from '../../i18n';
 import { useMecApi } from '../../hooks/mec/useMecApi';
 import { BarChart, ErrorBanner, Section } from './common';
 
@@ -31,6 +32,7 @@ function parseNumeric(s: string): number {
 }
 
 export default function TenantQuotaTab({ tenantId }: Props) {
+  const { t } = useT();
   const { data, loading, error, refetch } = useMecApi<QuotaUsage>(
     `/api/mec/v1/tenants/${encodeURIComponent(tenantId)}/quota-usage`,
     15_000,
@@ -46,16 +48,16 @@ export default function TenantQuotaTab({ tenantId }: Props) {
         }}
       >
         <button className="btn btn-secondary btn-small" onClick={refetch}>
-          새로고침
+          {t('mec.action.refresh')}
         </button>
       </div>
       {loading && !data && (
-        <div style={{ color: 'var(--text-secondary)' }}>로딩 중...</div>
+        <div style={{ color: 'var(--text-secondary)' }}>{t('mec.state.loading')}</div>
       )}
       <ErrorBanner error={error || undefined} />
 
       {data && (
-        <Section title="ResourceQuota 사용률">
+        <Section title={t('mec.tenant.quota.usage')}>
           <BarChart
             data={[
               {

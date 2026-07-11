@@ -1,4 +1,5 @@
 import React from 'react';
+import { useT } from '../../i18n';
 import { useMecApi } from '../../hooks/mec/useMecApi';
 import { ErrorBanner, Section, SortableTable, StatusBadge } from './common';
 
@@ -46,6 +47,7 @@ function humanize(secs: number): string {
 }
 
 export default function TenantResourcesTab({ tenantId }: Props) {
+  const { t } = useT();
   const { data, loading, error, refetch } = useMecApi<ResourcesResponse>(
     `/api/mec/v1/tenants/${encodeURIComponent(tenantId)}/resources`,
     15_000,
@@ -61,11 +63,11 @@ export default function TenantResourcesTab({ tenantId }: Props) {
         }}
       >
         <button className="btn btn-secondary btn-small" onClick={refetch}>
-          새로고침
+          {t('mec.action.refresh')}
         </button>
       </div>
       {loading && !data && (
-        <div style={{ color: 'var(--text-secondary)' }}>로딩 중...</div>
+        <div style={{ color: 'var(--text-secondary)' }}>{t('mec.state.loading')}</div>
       )}
       <ErrorBanner error={error || undefined} />
 
@@ -74,11 +76,11 @@ export default function TenantResourcesTab({ tenantId }: Props) {
           data={data?.pods || []}
           defaultSortKey="name"
           rowKey={(p) => p.name}
-          emptyMessage="실행 중인 Pod가 없습니다."
+          emptyMessage={t('mec.tenant.resources.podsEmpty')}
           columns={[
             {
               key: 'name',
-              header: '이름',
+              header: t('mec.tenant.resources.colName'),
               accessor: (p) => p.name,
               render: (p) => <code>{p.name}</code>,
               sortable: true,
@@ -93,7 +95,7 @@ export default function TenantResourcesTab({ tenantId }: Props) {
             },
             {
               key: 'node',
-              header: '노드',
+              header: t('mec.tenant.resources.colNode'),
               accessor: (p) => p.node_name || '',
               render: (p) =>
                 p.node_name || (
@@ -132,7 +134,7 @@ export default function TenantResourcesTab({ tenantId }: Props) {
             },
             {
               key: 'containers',
-              header: '컨테이너',
+              header: t('mec.tenant.resources.colContainers'),
               accessor: (p) => p.ready_containers,
               render: (p) => `${p.ready_containers}/${p.containers}`,
               align: 'right',
@@ -148,11 +150,11 @@ export default function TenantResourcesTab({ tenantId }: Props) {
           data={data?.services || []}
           defaultSortKey="name"
           rowKey={(s) => s.name}
-          emptyMessage="Service 가 없습니다."
+          emptyMessage={t('mec.tenant.resources.servicesEmpty')}
           columns={[
             {
               key: 'name',
-              header: '이름',
+              header: t('mec.tenant.resources.colName'),
               accessor: (s) => s.name,
               render: (s) => <code>{s.name}</code>,
               sortable: true,

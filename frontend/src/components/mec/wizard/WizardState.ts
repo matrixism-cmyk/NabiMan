@@ -52,7 +52,7 @@ export function initialState(): WizardState {
 
 export interface QuotaTemplate {
   id: WizardState['quotaTemplate'];
-  label: string;
+  labelKey: string;
   cpuReq: string;
   cpuLim: string;
   memReq: string;
@@ -66,7 +66,7 @@ export interface QuotaTemplate {
 export const QUOTA_TEMPLATES: QuotaTemplate[] = [
   {
     id: 'standard',
-    label: '표준 (CPU 32/64, Mem 64Gi/128Gi, GPU 2)',
+    labelKey: 'mec.wizard.tpl.standard',
     cpuReq: '32',
     cpuLim: '64',
     memReq: '64Gi',
@@ -78,7 +78,7 @@ export const QUOTA_TEMPLATES: QuotaTemplate[] = [
   },
   {
     id: 'dedicated_node',
-    label: '노드 전체 단독 (CPU 64/70, Mem 400Gi/500Gi, GPU 7)',
+    labelKey: 'mec.wizard.tpl.dedicatedNode',
     cpuReq: '64',
     cpuLim: '70',
     memReq: '400Gi',
@@ -90,7 +90,7 @@ export const QUOTA_TEMPLATES: QuotaTemplate[] = [
   },
   {
     id: 'large',
-    label: '대용량 (CPU 64/128, Mem 128Gi/256Gi, GPU 4)',
+    labelKey: 'mec.wizard.tpl.large',
     cpuReq: '64',
     cpuLim: '128',
     memReq: '128Gi',
@@ -160,20 +160,20 @@ export function toRequestBody(state: WizardState): object {
 
 export function validateStep1(s: WizardState): string | null {
   if (!s.tenantId.match(/^[a-z][a-z0-9-]{0,62}[a-z0-9]$/)) {
-    return '테넌트 ID는 소문자/숫자/하이픈만, 영문자로 시작 - 영문자/숫자로 끝나야 합니다.';
+    return 'mec.wizard.err.tenantId';
   }
-  if (!s.displayName) return '기업명을 입력하세요.';
+  if (!s.displayName) return 'mec.wizard.err.displayName';
   return null;
 }
 
 export function validateStep2(s: WizardState): string | null {
   if (s.allocationType === 'dedicated' && !s.node) {
-    return '단독 할당 선택 시 노드를 지정하세요.';
+    return 'mec.wizard.err.dedicatedNode';
   }
   return null;
 }
 
 export function validateStep3(s: WizardState): string | null {
-  if (s.gpu < 0 || s.pods < 1) return '잘못된 자원 값입니다.';
+  if (s.gpu < 0 || s.pods < 1) return 'mec.wizard.err.badResources';
   return null;
 }

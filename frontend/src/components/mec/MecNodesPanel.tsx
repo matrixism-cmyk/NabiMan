@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useT } from '../../i18n';
 import { useMecList } from '../../hooks/mec/useMecApi';
 import { MecNode } from '../../types/mec';
 import MecNodeDetail from './MecNodeDetail';
@@ -39,6 +40,7 @@ function parseMemoryGi(s: string): number {
 }
 
 export default function MecNodesPanel() {
+  const { t } = useT();
   const { data, loading, error, refetch } = useMecList<MecNode>(
     '/api/mec/v1/nodes',
     30_000,
@@ -67,18 +69,18 @@ export default function MecNodesPanel() {
 
   return (
     <PanelLayout
-      title="MEC 노드"
-      subtitle={`${nodes.length}개 노드 · Ready ${ready} · GPU ${allocatedGpu}/${totalGpu} slots`}
+      title={t('mec.node.title')}
+      subtitle={t('mec.node.subtitle', { count: nodes.length, ready, allocated: allocatedGpu, total: totalGpu })}
       actions={
         <button className="btn btn-secondary" onClick={refetch}>
-          새로고침
+          {t('mec.action.refresh')}
         </button>
       }
     >
       <ErrorBanner error={error || undefined} />
 
       {nodes.length > 0 && totalGpu > 0 && (
-        <Section title="노드별 GPU slot (할당 vs 전체)">
+        <Section title={t('mec.node.gpuSlotSection')}>
           <BarChart
             data={nodes
               .filter((n) => (n.gpu_info?.total_slots ?? 0) > 0)
@@ -88,7 +90,7 @@ export default function MecNodesPanel() {
                 max: n.gpu_info!.total_slots,
                 helper: n.current_tenant
                   ? `tenant: ${n.current_tenant}`
-                  : '미할당',
+                  : t('mec.node.unallocated'),
               }))}
             showValue
           />
@@ -97,14 +99,14 @@ export default function MecNodesPanel() {
 
       <Toolbar marginBottom="12px">
         <input
-          placeholder="필터 (이름/GPU/tenant)"
+          placeholder={t('mec.node.filterPlaceholder')}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           style={{ padding: '6px 10px', minWidth: '240px' }}
         />
       </Toolbar>
 
-      {loading && !data && <div style={{ color: '#6b7280' }}>로딩 중...</div>}
+      {loading && !data && <div style={{ color: '#6b7280' }}>{t('mec.state.loading')}</div>}
 
       <SortableTable<MecNode>
         data={nodes}
@@ -112,18 +114,18 @@ export default function MecNodesPanel() {
         defaultSortKey="name"
         rowKey={(n) => n.name}
         onRowClick={(n) => setSelected(n.name)}
-        emptyMessage="노드가 없습니다."
+        emptyMessage={t('mec.node.empty')}
         columns={[
           {
             key: 'name',
-            header: '노드',
+            header: t('mec.node.col.node'),
             accessor: (n) => n.name,
             render: (n) => <code>{n.name}</code>,
             sortable: true,
           },
           {
             key: 'status',
-            header: '상태',
+            header: t('mec.node.col.status'),
             accessor: (n) => n.status,
             render: (n) => <StatusBadge tone={n.status}>{n.status}</StatusBadge>,
             width: '100px',
@@ -131,7 +133,7 @@ export default function MecNodesPanel() {
           },
           {
             key: 'roles',
-            header: '역할',
+            header: t('mec.node.col.roles'),
             accessor: (n) => n.roles.join(','),
             render: (n) => (
               <span style={{ color: '#6b7280' }}>
@@ -201,7 +203,7 @@ export default function MecNodesPanel() {
               n.current_tenant ? (
                 <StatusBadge tone="info">{n.current_tenant}</StatusBadge>
               ) : (
-                <span style={{ color: '#9ca3af' }}>미할당</span>
+                <span style={{ color: '#9ca3af' }}>{t('mec.node.unallocated')}</span>
               ),
             sortable: true,
           },
@@ -242,7 +244,7 @@ export default function MecNodesPanel() {
                   setSelected(n.name);
                 }}
               >
-                상세
+                {t('mec.node.detail')}
               </button>
             ),
           },

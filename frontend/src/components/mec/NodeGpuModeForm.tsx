@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useT } from '../../i18n';
 
 interface Props {
   currentMode: string;
@@ -6,13 +7,14 @@ interface Props {
 }
 
 const MODES = [
-  { value: 'container', label: 'Container (단독 할당)' },
-  { value: 'time-slicing', label: 'Time-Slicing (공유)' },
-  { value: 'mig', label: 'MIG (H100/A100)' },
-  { value: 'vm-passthrough', label: 'VFIO Passthrough (VM)' },
+  { value: 'container', labelKey: 'mec.node.gpuMode.container' },
+  { value: 'time-slicing', labelKey: 'mec.node.gpuMode.timeSlicing' },
+  { value: 'mig', labelKey: 'mec.node.gpuMode.mig' },
+  { value: 'vm-passthrough', labelKey: 'mec.node.gpuMode.vmPassthrough' },
 ];
 
 export default function NodeGpuModeForm({ currentMode, onSwitch }: Props) {
+  const { t } = useT();
   const [mode, setMode] = useState(currentMode);
   const [replicas, setReplicas] = useState(2);
   const [busy, setBusy] = useState(false);
@@ -24,7 +26,7 @@ export default function NodeGpuModeForm({ currentMode, onSwitch }: Props) {
     }
     if (
       !window.confirm(
-        `GPU 모드를 ${currentMode} → ${mode} 로 전환합니다. 이 노드의 파드가 재스케줄될 수 있습니다. 계속하시겠습니까?`,
+        t('mec.node.gpuMode.confirm', { from: currentMode, to: mode }),
       )
     ) {
       return;
@@ -43,7 +45,7 @@ export default function NodeGpuModeForm({ currentMode, onSwitch }: Props) {
       style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}
     >
       <label style={{ flex: '1 1 180px' }}>
-        <div style={{ fontSize: '11px', color: '#6b7280' }}>새 모드</div>
+        <div style={{ fontSize: '11px', color: '#6b7280' }}>{t('mec.node.gpuMode.newMode')}</div>
         <select
           value={mode}
           onChange={(e) => setMode(e.target.value)}
@@ -51,7 +53,7 @@ export default function NodeGpuModeForm({ currentMode, onSwitch }: Props) {
         >
           {MODES.map((m) => (
             <option key={m.value} value={m.value}>
-              {m.label}
+              {t(m.labelKey)}
             </option>
           ))}
         </select>
@@ -74,7 +76,7 @@ export default function NodeGpuModeForm({ currentMode, onSwitch }: Props) {
         className="btn btn-primary"
         disabled={busy || mode === currentMode}
       >
-        {busy ? '전환 중...' : '전환'}
+        {busy ? t('mec.node.gpuMode.switching') : t('mec.node.gpuMode.switch')}
       </button>
     </form>
   );

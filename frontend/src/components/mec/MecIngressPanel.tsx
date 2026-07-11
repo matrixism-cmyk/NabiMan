@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useT } from '../../i18n';
 import { useMecList, mecPost, mecDelete } from '../../hooks/mec/useMecApi';
 import {
   ErrorBanner,
@@ -32,6 +33,7 @@ function humanize(secs: number): string {
 }
 
 export default function MecIngressPanel() {
+  const { t } = useT();
   const { data, loading, error, refetch } = useMecList<IngressRow>(
     '/api/mec/v1/network/ingresses',
     60_000,
@@ -81,11 +83,11 @@ export default function MecIngressPanel() {
 
   const remove = async (ns: string, name: string) => {
     const typed = window.prompt(
-      `⚠️ Ingress ${ns}/${name} 을(를) 삭제합니다.\n확인을 위해 이름을 다시 입력하세요:`,
+      t('mec.ingress.deletePrompt', { ns, name }),
       '',
     );
     if (typed !== name) {
-      if (typed !== null) setErr('입력 이름이 일치하지 않아 삭제 취소.');
+      if (typed !== null) setErr(t('mec.ingress.deleteMismatch'));
       return;
     }
     try {
@@ -101,15 +103,15 @@ export default function MecIngressPanel() {
 
   return (
     <PanelLayout
-      title="Ingress 규칙"
-      subtitle={`${data?.length || 0}개 규칙`}
+      title={t('mec.ingress.title')}
+      subtitle={t('mec.ingress.subtitle', { count: data?.length || 0 })}
       actions={
         <>
           <button className="btn btn-secondary" onClick={refetch}>
-            새로고침
+            {t('mec.action.refresh')}
           </button>
           <button className="btn btn-primary" onClick={() => setShowAdd((v) => !v)}>
-            {showAdd ? '취소' : '+ Ingress'}
+            {showAdd ? t('mec.ingress.cancel') : t('mec.ingress.add')}
           </button>
         </>
       }
@@ -127,7 +129,7 @@ export default function MecIngressPanel() {
             marginBottom: '12px',
           }}
         >
-          <h3 style={{ marginTop: 0 }}>Ingress 추가</h3>
+          <h3 style={{ marginTop: 0 }}>{t('mec.ingress.formTitle')}</h3>
           <div
             style={{
               display: 'grid',
@@ -144,7 +146,7 @@ export default function MecIngressPanel() {
               />
             </label>
             <label>
-              이름
+              {t('mec.ingress.name')}
               <input
                 required
                 value={form.name}
@@ -198,7 +200,7 @@ export default function MecIngressPanel() {
               />
             </label>
             <label>
-              TLS Secret (선택)
+              {t('mec.ingress.tlsSecret')}
               <input
                 value={form.tls_secret_name}
                 onChange={(e) =>
@@ -209,7 +211,7 @@ export default function MecIngressPanel() {
           </div>
           <div style={{ marginTop: '12px' }}>
             <button type="submit" className="btn btn-primary" disabled={busy}>
-              {busy ? '생성 중...' : '생성'}
+              {busy ? t('mec.ingress.creating') : t('mec.ingress.create')}
             </button>
           </div>
         </form>
@@ -217,21 +219,21 @@ export default function MecIngressPanel() {
 
       <Toolbar>
         <input
-          placeholder="필터 (host, backend, namespace)"
+          placeholder={t('mec.ingress.filter')}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           style={{ padding: '6px 10px', minWidth: '240px' }}
         />
       </Toolbar>
 
-      {loading && !data && <div style={{ color: '#6b7280' }}>로딩 중...</div>}
+      {loading && !data && <div style={{ color: '#6b7280' }}>{t('mec.state.loading')}</div>}
 
       <SortableTable<IngressRow>
         data={data || []}
         filter={filter}
         defaultSortKey="namespace"
         rowKey={(i) => `${i.namespace}/${i.name}`}
-        emptyMessage="Ingress 규칙이 없습니다."
+        emptyMessage={t('mec.ingress.noRules')}
         columns={[
           {
             key: 'namespace',
@@ -241,7 +243,7 @@ export default function MecIngressPanel() {
           },
           {
             key: 'name',
-            header: '이름',
+            header: t('mec.ingress.name'),
             accessor: (i) => i.name,
             render: (i) => <code>{i.name}</code>,
             sortable: true,
@@ -291,7 +293,7 @@ export default function MecIngressPanel() {
                 className="btn btn-danger btn-small"
                 onClick={() => remove(i.namespace, i.name)}
               >
-                삭제
+                {t('mec.ingress.delete')}
               </button>
             ),
           },

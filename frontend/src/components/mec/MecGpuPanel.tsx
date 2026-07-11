@@ -1,4 +1,5 @@
 import React from 'react';
+import { useT } from '../../i18n';
 import { useMecApi } from '../../hooks/mec/useMecApi';
 import { GpuOverview } from '../../types/mec';
 import {
@@ -27,6 +28,7 @@ function modelColor(m: string): string {
 }
 
 export default function MecGpuPanel() {
+  const { t } = useT();
   const { data, loading, error, refetch } = useMecApi<GpuOverview>(
     '/api/mec/v1/gpu/overview',
     30_000,
@@ -38,40 +40,40 @@ export default function MecGpuPanel() {
 
   return (
     <PanelLayout
-      title="GPU 자원"
-      subtitle={data ? `총 ${data.total_slots} slots · ${pct}% 할당` : '로딩 중...'}
+      title={t('mec.gpu.title')}
+      subtitle={data ? t('mec.gpu.subtitle', { total: data.total_slots, pct }) : t('mec.state.loading')}
       actions={
         <button className="btn btn-secondary" onClick={refetch}>
-          새로고침
+          {t('mec.action.refresh')}
         </button>
       }
     >
       <ErrorBanner error={error || undefined} />
-      {loading && !data && <div style={{ color: '#6b7280' }}>로딩 중...</div>}
+      {loading && !data && <div style={{ color: '#6b7280' }}>{t('mec.state.loading')}</div>}
 
       {data && (
         <>
           <MetricGrid>
             <MetricCard
-              label="전체 Slots"
+              label={t('mec.gpu.totalSlots')}
               value={data.total_slots}
-              helper="GPU 공유 전략 반영"
+              helper={t('mec.gpu.totalSlotsHelper')}
               tone="info"
             />
             <MetricCard
-              label="할당"
+              label={t('mec.gpu.allocated')}
               value={data.allocated_slots}
-              helper={`${pct}% 사용`}
+              helper={t('mec.gpu.allocatedHelper', { pct })}
               tone={pct >= 90 ? 'error' : pct >= 70 ? 'warning' : 'info'}
             />
             <MetricCard
-              label="가용"
+              label={t('mec.gpu.available')}
               value={data.available_slots}
-              helper="즉시 할당 가능"
+              helper={t('mec.gpu.availableHelper')}
               tone={data.available_slots === 0 ? 'error' : 'success'}
             />
             <MetricCard
-              label="GPU 모델 종류"
+              label={t('mec.gpu.modelKinds')}
               value={data.by_model.length}
               helper={data.by_model.map((m) => m.model).join(', ')}
               tone="neutral"
@@ -86,11 +88,11 @@ export default function MecGpuPanel() {
               marginTop: '20px',
             }}
           >
-            <Section title="전체 GPU 사용률">
+            <Section title={t('mec.gpu.overallUsage')}>
               <DonutChart
                 slices={[
-                  { label: '할당', value: data.allocated_slots, color: '#3b82f6' },
-                  { label: '가용', value: data.available_slots, color: '#e5e7eb' },
+                  { label: t('mec.gpu.sliceAllocated'), value: data.allocated_slots, color: '#3b82f6' },
+                  { label: t('mec.gpu.sliceAvailable'), value: data.available_slots, color: '#e5e7eb' },
                 ]}
                 centerLabel={`${pct}%`}
                 centerSublabel={`${data.allocated_slots}/${data.total_slots}`}
@@ -98,7 +100,7 @@ export default function MecGpuPanel() {
               />
             </Section>
 
-            <Section title="모델별 slots 분포">
+            <Section title={t('mec.gpu.modelDistribution')}>
               <DonutChart
                 slices={data.by_model.map((m) => ({
                   label: `${m.model} (${m.allocated_slots}/${m.total_slots})`,
@@ -106,20 +108,20 @@ export default function MecGpuPanel() {
                   color: modelColor(m.model),
                 }))}
                 centerLabel={data.by_model.length.toString()}
-                centerSublabel="모델"
+                centerSublabel={t('mec.gpu.modelCenter')}
                 legend="side"
               />
             </Section>
           </div>
 
-          <Section title="모델별 상세" marginTop="24px">
+          <Section title={t('mec.gpu.modelDetail')} marginTop="24px">
             <BarChart
               data={data.by_model.map((m) => ({
                 label: `${m.model}  (${m.sharing_strategy})`,
                 value: m.allocated_slots,
                 max: m.total_slots,
                 color: modelColor(m.model),
-                helper: `노드: ${m.nodes.join(', ') || '-'}`,
+                helper: t('mec.gpu.nodesHelper', { nodes: m.nodes.join(', ') || '-' }),
               }))}
               showValue
             />

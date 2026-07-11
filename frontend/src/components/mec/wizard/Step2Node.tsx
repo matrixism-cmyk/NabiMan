@@ -1,4 +1,5 @@
 import React from 'react';
+import { useT } from '../../../i18n';
 import { useMecList } from '../../../hooks/mec/useMecApi';
 import { MecNode } from '../../../types/mec';
 import { WizardState } from './WizardState';
@@ -9,11 +10,12 @@ interface Props {
 }
 
 export default function Step2Node({ state, setState }: Props) {
+  const { t } = useT();
   const { data, loading } = useMecList<MecNode>('/api/mec/v1/nodes');
 
   return (
     <div>
-      <h3>Step 2 / 4: 노드 할당</h3>
+      <h3>{t('mec.wizard.s2.title')}</h3>
       <div style={{ marginBottom: '12px' }}>
         <label style={{ marginRight: '16px' }}>
           <input
@@ -22,7 +24,7 @@ export default function Step2Node({ state, setState }: Props) {
             checked={state.allocationType === 'dedicated'}
             onChange={() => setState({ ...state, allocationType: 'dedicated' })}
           />{' '}
-          단독 할당 (Taint + NoSchedule)
+          {t('mec.wizard.s2.dedicated')}
         </label>
         <label>
           <input
@@ -31,23 +33,23 @@ export default function Step2Node({ state, setState }: Props) {
             checked={state.allocationType === 'shared'}
             onChange={() => setState({ ...state, allocationType: 'shared' })}
           />{' '}
-          공유 할당 (nodeSelector만)
+          {t('mec.wizard.s2.shared')}
         </label>
       </div>
 
-      <h4>노드 선택 (단독 할당 시 필수)</h4>
-      {loading && !data && <div className="panel-loading">노드 로딩 중...</div>}
+      <h4>{t('mec.wizard.s2.selectNode')}</h4>
+      {loading && !data && <div className="panel-loading">{t('mec.wizard.s2.loading')}</div>}
       {data && (
         <table className="panel-table">
           <thead>
             <tr>
-              <th>선택</th>
-              <th>노드</th>
+              <th>{t('mec.wizard.s2.col.select')}</th>
+              <th>{t('mec.wizard.s2.col.node')}</th>
               <th>Role</th>
               <th>CPU</th>
               <th>Memory</th>
               <th>GPU</th>
-              <th>현재 Tenant</th>
+              <th>{t('mec.wizard.s2.col.currentTenant')}</th>
             </tr>
           </thead>
           <tbody>
@@ -87,7 +89,7 @@ export default function Step2Node({ state, setState }: Props) {
                     {n.current_tenant ? (
                       <span style={{ color: '#ef4444' }}>{n.current_tenant}</span>
                     ) : (
-                      <span style={{ color: '#10b981' }}>가용</span>
+                      <span style={{ color: '#10b981' }}>{t('mec.wizard.s2.available')}</span>
                     )}
                   </td>
                 </tr>
@@ -98,7 +100,7 @@ export default function Step2Node({ state, setState }: Props) {
       )}
 
       <label style={{ display: 'block', marginTop: '16px' }}>
-        GPU 라벨
+        {t('mec.wizard.s2.gpuLabel')}
         <input
           value={state.gpuLabel}
           onChange={(e) => setState({ ...state, gpuLabel: e.target.value })}

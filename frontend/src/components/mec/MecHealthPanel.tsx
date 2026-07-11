@@ -1,4 +1,5 @@
 import React from 'react';
+import { useT } from '../../i18n';
 import { useMecApi } from '../../hooks/mec/useMecApi';
 import { ErrorBanner, PanelLayout, StatusBadge } from './common';
 
@@ -109,6 +110,7 @@ function StatusCard({
 }
 
 export default function MecHealthPanel() {
+  const { t } = useT();
   const { data, loading, error, refetch } = useMecApi<HealthSummary>(
     '/api/mec/v1/health/summary',
     30_000,
@@ -122,18 +124,20 @@ export default function MecHealthPanel() {
 
   return (
     <PanelLayout
-      title="외부 시스템 연결 상태"
+      title={t('mec.health.title')}
       subtitle={
-        data ? `모드: ${data.mode} · 실제 연결 ${connected} / 4` : '검사 중...'
+        data
+          ? t('mec.health.subtitle', { mode: data.mode, connected })
+          : t('mec.health.checking')
       }
       actions={
         <button className="btn btn-secondary" onClick={refetch}>
-          재검사
+          {t('mec.health.recheck')}
         </button>
       }
     >
       <ErrorBanner error={error || undefined} />
-      {loading && !data && <div style={{ color: '#6b7280' }}>검사 중...</div>}
+      {loading && !data && <div style={{ color: '#6b7280' }}>{t('mec.health.checking')}</div>}
 
       {data && (
         <div

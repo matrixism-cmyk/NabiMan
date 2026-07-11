@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useT } from '../../i18n';
 
 interface Props {
   labels: Record<string, string>;
@@ -6,6 +7,7 @@ interface Props {
 }
 
 export default function NodeLabelsEditor({ labels, onPatch }: Props) {
+  const { t } = useT();
   const [key, setKey] = useState('');
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
@@ -24,7 +26,7 @@ export default function NodeLabelsEditor({ labels, onPatch }: Props) {
   };
 
   const remove = async (k: string) => {
-    if (!window.confirm(`Label ${k} 제거?`)) return;
+    if (!window.confirm(t('mec.node.labels.confirmRemove', { key: k }))) return;
     setBusy(true);
     try {
       await onPatch({}, [k]);
@@ -42,14 +44,14 @@ export default function NodeLabelsEditor({ labels, onPatch }: Props) {
           <tr>
             <th>Key</th>
             <th>Value</th>
-            <th>작업</th>
+            <th>{t('mec.node.labels.actions')}</th>
           </tr>
         </thead>
         <tbody>
           {entries.length === 0 ? (
             <tr>
               <td colSpan={3} style={{ color: '#6b7280', fontStyle: 'italic' }}>
-                Label 없음
+                {t('mec.node.labels.empty')}
               </td>
             </tr>
           ) : (
@@ -62,9 +64,9 @@ export default function NodeLabelsEditor({ labels, onPatch }: Props) {
                     className="btn btn-danger btn-small"
                     disabled={busy || isSystemLabel(k)}
                     onClick={() => remove(k)}
-                    title={isSystemLabel(k) ? '시스템 label은 제거 불가' : ''}
+                    title={isSystemLabel(k) ? t('mec.node.labels.systemLabelTip') : ''}
                   >
-                    제거
+                    {t('mec.node.labels.remove')}
                   </button>
                 </td>
               </tr>
@@ -97,7 +99,7 @@ export default function NodeLabelsEditor({ labels, onPatch }: Props) {
           />
         </label>
         <button type="submit" className="btn btn-primary" disabled={busy}>
-          {busy ? '적용 중...' : '+ Label'}
+          {busy ? t('mec.node.labels.applying') : t('mec.node.labels.addBtn')}
         </button>
       </form>
     </div>

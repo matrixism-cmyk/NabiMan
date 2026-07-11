@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useT } from '../../i18n';
 import {
   useMecList,
   mecPost,
@@ -31,6 +32,7 @@ function randomPassword(len = 16): string {
 }
 
 export default function MecUsersPanel() {
+  const { t } = useT();
   const { data, loading, error, refetch } = useMecList<RancherUser>(
     '/api/mec/v1/users',
     60_000,
@@ -51,7 +53,7 @@ export default function MecUsersPanel() {
       if (res.error) setErr(res.error.message);
       else {
         setToast(
-          `사용자 ${form.username} 생성됨. 초기 비밀번호: ${form.password} (한 번만 표시)`,
+          t('mec.users.createdToast', { username: form.username, password: form.password }),
         );
         setShowAdd(false);
         setForm({ username: '', password: randomPassword() });
@@ -66,11 +68,11 @@ export default function MecUsersPanel() {
 
   const remove = async (u: RancherUser) => {
     const typed = window.prompt(
-      `⚠️ 사용자 '${u.username}' (${u.id}) 을(를) 삭제합니다.\n확인을 위해 ID 를 다시 입력하세요:`,
+      t('mec.users.deletePrompt', { username: u.username, id: u.id }),
       '',
     );
     if (typed !== u.id) {
-      if (typed !== null) setErr('입력 ID 가 일치하지 않아 삭제 취소.');
+      if (typed !== null) setErr(t('mec.users.deleteMismatch'));
       return;
     }
     try {
@@ -83,7 +85,7 @@ export default function MecUsersPanel() {
 
   const resetPassword = async (u: RancherUser) => {
     const newPw = window.prompt(
-      `${u.username} 의 새 비밀번호 (비우면 자동 생성):`,
+      t('mec.users.resetPrompt', { username: u.username }),
       randomPassword(),
     );
     if (newPw === null) return;
@@ -101,7 +103,7 @@ export default function MecUsersPanel() {
           body: JSON.stringify({ new_password: final }),
         },
       );
-      setToast(`${u.username} 비밀번호 리셋: ${final} (한 번만 표시)`);
+      setToast(t('mec.users.resetToast', { username: u.username, password: final }));
     } catch (e) {
       setErr(String(e));
     }
@@ -112,15 +114,15 @@ export default function MecUsersPanel() {
 
   return (
     <PanelLayout
-      title="Rancher 사용자"
-      subtitle={`${users.length}명 · 활성 ${enabled}`}
+      title={t('mec.users.title')}
+      subtitle={t('mec.users.subtitle', { total: users.length, enabled })}
       actions={
         <>
           <button className="btn btn-secondary" onClick={refetch}>
-            새로고침
+            {t('mec.action.refresh')}
           </button>
           <button className="btn btn-primary" onClick={() => setShowAdd((v) => !v)}>
-            {showAdd ? '취소' : '+ 사용자'}
+            {showAdd ? t('mec.users.cancel') : t('mec.users.addUser')}
           </button>
         </>
       }
@@ -144,7 +146,7 @@ export default function MecUsersPanel() {
             className="btn btn-secondary btn-small"
             onClick={() => setToast(null)}
           >
-            닫기
+            {t('mec.users.close')}
           </button>
         </div>
       )}
@@ -160,7 +162,7 @@ export default function MecUsersPanel() {
             marginBottom: '12px',
           }}
         >
-          <h3 style={{ marginTop: 0 }}>사용자 생성</h3>
+          <h3 style={{ marginTop: 0 }}>{t('mec.users.createTitle')}</h3>
           <div
             style={{
               display: 'flex',
@@ -181,7 +183,7 @@ export default function MecUsersPanel() {
             </label>
             <label style={{ flex: '1 1 200px' }}>
               <div style={{ fontSize: '11px', color: '#6b7280' }}>
-                초기 비밀번호
+                {t('mec.users.initialPassword')}
               </div>
               <input
                 required
@@ -195,10 +197,10 @@ export default function MecUsersPanel() {
               className="btn btn-secondary btn-small"
               onClick={() => setForm({ ...form, password: randomPassword() })}
             >
-              🎲 자동
+              {t('mec.users.auto')}
             </button>
             <button type="submit" className="btn btn-primary" disabled={busy}>
-              {busy ? '생성 중...' : '생성'}
+              {busy ? t('mec.users.creating') : t('mec.users.create')}
             </button>
           </div>
         </form>
@@ -206,21 +208,21 @@ export default function MecUsersPanel() {
 
       <Toolbar>
         <input
-          placeholder="필터 (ID, username)"
+          placeholder={t('mec.users.filterPlaceholder')}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           style={{ padding: '6px 10px', minWidth: '240px' }}
         />
       </Toolbar>
 
-      {loading && !data && <div style={{ color: '#6b7280' }}>로딩 중...</div>}
+      {loading && !data && <div style={{ color: '#6b7280' }}>{t('mec.state.loading')}</div>}
 
       <SortableTable<RancherUser>
         data={users}
         filter={filter}
         defaultSortKey="username"
         rowKey={(u) => u.id}
-        emptyMessage="사용자가 없습니다."
+        emptyMessage={t('mec.users.empty')}
         columns={[
           {
             key: 'id',
@@ -238,7 +240,7 @@ export default function MecUsersPanel() {
           },
           {
             key: 'display_name',
-            header: '표시명',
+            header: t('mec.users.colDisplayName'),
             accessor: (u) => u.display_name || '',
             render: (u) =>
               u.display_name || <span style={{ color: '#d1d5db' }}>-</span>,
@@ -246,7 +248,7 @@ export default function MecUsersPanel() {
           },
           {
             key: 'enabled',
-            header: '활성',
+            header: t('mec.users.colEnabled'),
             accessor: (u) => u.enabled,
             render: (u) => (
               <StatusBadge tone={u.enabled}>
@@ -268,13 +270,13 @@ export default function MecUsersPanel() {
                   className="btn btn-secondary btn-small"
                   onClick={() => resetPassword(u)}
                 >
-                  비번 리셋
+                  {t('mec.users.resetPassword')}
                 </button>
                 <button
                   className="btn btn-danger btn-small"
                   onClick={() => remove(u)}
                 >
-                  삭제
+                  {t('mec.users.delete')}
                 </button>
               </div>
             ),

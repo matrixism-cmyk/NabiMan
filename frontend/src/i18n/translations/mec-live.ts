@@ -6,6 +6,13 @@ import { Lang } from './index';
 const mecLive: Record<string, Record<Lang, string>> = {
   'mec.action.refresh': { ko: '새로고침', en: 'Refresh', ja: '更新' },
   'mec.state.loading': { ko: '로딩 중...', en: 'Loading…', ja: '読み込み中…' },
+  'mec.table.empty': { ko: '데이터가 없습니다.', en: 'No data.', ja: 'データがありません。' },
+
+  // LiveIndicator (shared primitive) relative-time label
+  'mec.live.justNow': { ko: '방금 갱신', en: 'just now', ja: 'たった今更新' },
+  'mec.live.secsAgo': { ko: '{s}초 전 갱신', en: '{s}s ago', ja: '{s}秒前更新' },
+  'mec.live.minsAgo': { ko: '{m}분 전 갱신', en: '{m}m ago', ja: '{m}分前更新' },
+  'mec.live.connecting': { ko: '연결 중…', en: 'Connecting…', ja: '接続中…' },
 
   'mec.col.time': { ko: '시간', en: 'Time', ja: '時刻' },
   'mec.col.type': { ko: '유형', en: 'Type', ja: '種別' },

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useT } from '../../i18n';
 import { useMecList, mecGet, mecDelete } from '../../hooks/mec/useMecApi';
 import { Tenant } from '../../types/mec';
 import TenantWizard from './wizard/TenantWizard';
@@ -32,6 +33,7 @@ function tenantStatusLabel(t: Tenant): string {
 }
 
 export default function TenantsPanel() {
+  const { t } = useT();
   const { data, loading, error, refetch } = useMecList<Tenant>(
     '/api/mec/v1/tenants',
     30_000,
@@ -67,22 +69,30 @@ export default function TenantsPanel() {
       }
       const info = pf.data;
       if (!info) {
-        setActionError('삭제 사전 검사 응답이 비어 있습니다.');
+        setActionError(t('mec.tenant.delete.emptyResponse'));
         return;
       }
 
       const summary = [
-        `테넌트 '${id}' 완전 삭제`,
+        t('mec.tenant.delete.heading', { id }),
         '',
-        `• 실행 중 Pod: ${info.running_pods}개`,
-        `• LoadBalancer 서비스: ${info.lb_services}개`,
-        `• Starter Kit: ${info.has_starter_kit ? '있음' : '없음'}`,
-        `• Rancher Project: ${info.rancher_project_exists ? '있음 (삭제됨)' : '없음'}`,
-        info.dedicated_node ? `• 단독 노드: ${info.dedicated_node}` : '',
+        t('mec.tenant.delete.runningPods', { count: info.running_pods }),
+        t('mec.tenant.delete.lbServices', { count: info.lb_services }),
+        t('mec.tenant.delete.starterKit', {
+          value: info.has_starter_kit ? t('mec.tenant.present') : t('mec.tenant.absent'),
+        }),
+        t('mec.tenant.delete.rancherProject', {
+          value: info.rancher_project_exists
+            ? t('mec.tenant.presentDeleted')
+            : t('mec.tenant.absent'),
+        }),
+        info.dedicated_node
+          ? t('mec.tenant.delete.dedicatedNode', { node: info.dedicated_node })
+          : '',
         '',
         ...info.warnings.map((w) => `⚠️ ${w}`),
         '',
-        '확인을 위해 테넌트 ID를 그대로 입력하세요:',
+        t('mec.tenant.delete.confirmPrompt'),
       ]
         .filter(Boolean)
         .join('\n');
@@ -90,7 +100,7 @@ export default function TenantsPanel() {
       const typed = window.prompt(summary, '');
       if (typed !== id) {
         if (typed !== null) {
-          setActionError('입력한 이름이 테넌트 ID와 일치하지 않아 삭제를 취소했습니다.');
+          setActionError(t('mec.tenant.delete.mismatch'));
         }
         return;
       }
@@ -131,18 +141,18 @@ export default function TenantsPanel() {
 
   return (
     <PanelLayout
-      title="테넌트"
-      subtitle={`${tenants.length}개 등록 · 활성 ${active} · Discovery 탭에서 미등록 테넌트 Import 가능`}
+      title={t('mec.tenant.title')}
+      subtitle={t('mec.tenant.subtitle', { count: tenants.length, active })}
       actions={
         <>
           <button className="btn btn-secondary" onClick={refetch}>
-            새로고침
+            {t('mec.action.refresh')}
           </button>
           <button
             className="btn btn-primary"
             onClick={() => setShowNew((v) => !v)}
           >
-            {showNew ? '취소' : '+ 신규 테넌트'}
+            {showNew ? t('mec.tenant.cancel') : t('mec.tenant.new')}
           </button>
         </>
       }
@@ -161,68 +171,68 @@ export default function TenantsPanel() {
 
       <Toolbar marginBottom="12px">
         <input
-          placeholder="필터 (ID, 기업명, 노드, GPU)"
+          placeholder={t('mec.tenant.filter')}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           style={{ padding: '6px 10px', minWidth: '240px' }}
         />
       </Toolbar>
 
-      {loading && !data && <div style={{ color: '#6b7280' }}>로딩 중...</div>}
+      {loading && !data && <div style={{ color: '#6b7280' }}>{t('mec.state.loading')}</div>}
 
       <SortableTable<Tenant>
         data={tenants}
         filter={filter}
         defaultSortKey="id"
-        rowKey={(t) => t.id}
-        onRowClick={(t) => setSelectedId(t.id)}
-        emptyMessage='등록된 테넌트가 없습니다. "+ 신규 테넌트" 또는 Discovery 탭에서 Import.'
+        rowKey={(row) => row.id}
+        onRowClick={(row) => setSelectedId(row.id)}
+        emptyMessage={t('mec.tenant.empty')}
         columns={[
           {
             key: 'id',
-            header: '테넌트 ID',
-            accessor: (t) => t.id,
-            render: (t) => <code>{t.id}</code>,
+            header: t('mec.tenant.col.id'),
+            accessor: (row) => row.id,
+            render: (row) => <code>{row.id}</code>,
             sortable: true,
           },
           {
             key: 'display_name',
-            header: '기업명',
-            accessor: (t) => t.display_name,
+            header: t('mec.tenant.col.company'),
+            accessor: (row) => row.display_name,
             sortable: true,
           },
           {
             key: 'namespace',
-            header: '네임스페이스',
-            accessor: (t) => t.namespace,
-            render: (t) => (
-              <span style={{ color: '#6b7280' }}>{t.namespace}</span>
+            header: t('mec.tenant.col.namespace'),
+            accessor: (row) => row.namespace,
+            render: (row) => (
+              <span style={{ color: '#6b7280' }}>{row.namespace}</span>
             ),
             sortable: true,
           },
           {
             key: 'node',
-            header: '노드',
-            accessor: (t) => t.allocation.node || '',
-            render: (t) =>
-              t.allocation.node ? (
-                <StatusBadge tone="info">{t.allocation.node}</StatusBadge>
+            header: t('mec.tenant.col.node'),
+            accessor: (row) => row.allocation.node || '',
+            render: (row) =>
+              row.allocation.node ? (
+                <StatusBadge tone="info">{row.allocation.node}</StatusBadge>
               ) : (
-                <span style={{ color: '#9ca3af' }}>공유</span>
+                <span style={{ color: '#9ca3af' }}>{t('mec.tenant.shared')}</span>
               ),
             sortable: true,
           },
           {
             key: 'gpu',
             header: 'GPU',
-            accessor: (t) => t.quota.gpu,
-            render: (t) =>
-              t.quota.gpu > 0 ? (
+            accessor: (row) => row.quota.gpu,
+            render: (row) =>
+              row.quota.gpu > 0 ? (
                 <span>
                   <span style={{ color: '#6b7280' }}>
-                    {t.allocation.gpu_label || ''}
+                    {row.allocation.gpu_label || ''}
                   </span>{' '}
-                  × <strong>{t.quota.gpu}</strong>
+                  × <strong>{row.quota.gpu}</strong>
                 </span>
               ) : (
                 <span style={{ color: '#d1d5db' }}>-</span>
@@ -233,27 +243,27 @@ export default function TenantsPanel() {
           {
             key: 'cpu',
             header: 'CPU (req/lim)',
-            accessor: (t) => parseFloat(t.quota.cpu_requests) || 0,
-            render: (t) => `${t.quota.cpu_requests} / ${t.quota.cpu_limits}`,
+            accessor: (row) => parseFloat(row.quota.cpu_requests) || 0,
+            render: (row) => `${row.quota.cpu_requests} / ${row.quota.cpu_limits}`,
             align: 'right',
             sortable: true,
           },
           {
             key: 'mem',
             header: 'Memory (req/lim)',
-            accessor: (t) => t.quota.memory_requests,
-            render: (t) =>
-              `${t.quota.memory_requests} / ${t.quota.memory_limits}`,
+            accessor: (row) => row.quota.memory_requests,
+            render: (row) =>
+              `${row.quota.memory_requests} / ${row.quota.memory_limits}`,
             align: 'right',
             sortable: true,
           },
           {
             key: 'status',
-            header: '상태',
-            accessor: (t) => tenantStatusLabel(t),
-            render: (t) => (
-              <StatusBadge tone={tenantStatusLabel(t)}>
-                {tenantStatusLabel(t)}
+            header: t('mec.tenant.col.status'),
+            accessor: (row) => tenantStatusLabel(row),
+            render: (row) => (
+              <StatusBadge tone={tenantStatusLabel(row)}>
+                {tenantStatusLabel(row)}
               </StatusBadge>
             ),
             width: '100px',
@@ -265,24 +275,24 @@ export default function TenantsPanel() {
             accessor: () => '',
             sortable: false,
             width: '280px',
-            render: (t) => (
+            render: (row) => (
               <div style={{ display: 'flex', gap: '4px' }}>
                 <button
                   className="btn btn-primary btn-small"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setSelectedId(t.id);
+                    setSelectedId(row.id);
                   }}
                 >
-                  상세
+                  {t('mec.tenant.action.detail')}
                 </button>
                 <button
                   className="btn btn-secondary btn-small"
                   onClick={(e) => {
                     e.stopPropagation();
-                    downloadGuide(t.id, 'docx');
+                    downloadGuide(row.id, 'docx');
                   }}
-                  title="Word 문서"
+                  title={t('mec.tenant.title.docx')}
                 >
                   docx
                 </button>
@@ -290,21 +300,21 @@ export default function TenantsPanel() {
                   className="btn btn-secondary btn-small"
                   onClick={(e) => {
                     e.stopPropagation();
-                    downloadGuide(t.id, 'txt');
+                    downloadGuide(row.id, 'txt');
                   }}
-                  title="텍스트"
+                  title={t('mec.tenant.title.txt')}
                 >
                   txt
                 </button>
                 <button
                   className="btn btn-danger btn-small"
-                  disabled={busyId === t.id}
+                  disabled={busyId === row.id}
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleDelete(t.id);
+                    handleDelete(row.id);
                   }}
                 >
-                  {busyId === t.id ? '...' : '삭제'}
+                  {busyId === row.id ? '...' : t('mec.tenant.action.delete')}
                 </button>
               </div>
             ),

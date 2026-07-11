@@ -1,4 +1,5 @@
 import React from 'react';
+import { useT } from '../../../i18n';
 import { WizardState } from './WizardState';
 
 interface Props {
@@ -7,9 +8,10 @@ interface Props {
 }
 
 export default function Step4Options({ state, setState }: Props) {
+  const { t } = useT();
   return (
     <div>
-      <h3>Step 4 / 4: 추가 옵션</h3>
+      <h3>{t('mec.wizard.s4.title')}</h3>
       <label style={{ display: 'block', marginBottom: '8px' }}>
         <input
           type="checkbox"
@@ -18,7 +20,7 @@ export default function Step4Options({ state, setState }: Props) {
             setState({ ...state, deployStarterKit: e.target.checked })
           }
         />{' '}
-        스타터킷 배포 (Ubuntu SSH + VS Code) — 생성 후 별도 단계에서 배포됩니다
+        {t('mec.wizard.s4.starterKit')}
       </label>
       <label style={{ display: 'block', marginBottom: '8px' }}>
         <input
@@ -28,7 +30,7 @@ export default function Step4Options({ state, setState }: Props) {
             setState({ ...state, createHarborProject: e.target.checked })
           }
         />{' '}
-        Harbor 프로젝트 자동 생성
+        {t('mec.wizard.s4.harbor')}
       </label>
       <label style={{ display: 'block', marginBottom: '8px' }}>
         <input
@@ -38,7 +40,7 @@ export default function Step4Options({ state, setState }: Props) {
             setState({ ...state, generateGuide: e.target.checked })
           }
         />{' '}
-        접속 가이드 docx 자동 생성
+        {t('mec.wizard.s4.guide')}
       </label>
       <label style={{ display: 'block', marginBottom: '8px' }}>
         <input
@@ -48,27 +50,27 @@ export default function Step4Options({ state, setState }: Props) {
             setState({ ...state, includeEgressPolicy: e.target.checked })
           }
         />{' '}
-        Egress 허용 NetworkPolicy 포함 (기본 ON)
+        {t('mec.wizard.s4.egress')}
       </label>
 
       <div
         className="panel-card"
         style={{ marginTop: '16px', background: '#f3f4f6' }}
       >
-        <h4 style={{ marginTop: 0 }}>확인</h4>
+        <h4 style={{ marginTop: 0 }}>{t('mec.wizard.s4.confirm')}</h4>
         <dl style={{ margin: 0, fontSize: '13px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <dt>테넌트 ID</dt>
+            <dt>{t('mec.wizard.s4.tenantId')}</dt>
             <dd style={{ margin: 0 }}>
               <code>{state.tenantId}</code>
             </dd>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <dt>할당</dt>
+            <dt>{t('mec.wizard.s4.allocation')}</dt>
             <dd style={{ margin: 0 }}>
               {state.allocationType === 'dedicated'
-                ? `단독 (${state.node})`
-                : '공유'}
+                ? t('mec.wizard.s4.dedicatedSummary', { node: state.node })
+                : t('mec.wizard.s4.sharedSummary')}
               {state.gpuLabel ? ` · GPU ${state.gpuLabel}` : ''}
             </dd>
           </div>

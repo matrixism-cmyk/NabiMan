@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useT } from '../../i18n';
 import { useMecList } from '../../hooks/mec/useMecApi';
 import JobProgress from './JobProgress';
 import {
@@ -55,6 +56,7 @@ function ProgressBar({ value, tone }: { value: number; tone: string }) {
 }
 
 export default function MecJobsPanel() {
+  const { t } = useT();
   const { data, loading, error, refetch } = useMecList<JobSummary>(
     '/api/mec/v1/jobs',
     5_000,
@@ -69,11 +71,11 @@ export default function MecJobsPanel() {
 
   return (
     <PanelLayout
-      title="MEC Jobs"
-      subtitle={`${jobs.length}건 · 진행 중 ${running}건`}
+      title={t('mec.jobs.title')}
+      subtitle={t('mec.jobs.subtitle', { total: jobs.length, running })}
       actions={
         <button className="btn btn-secondary" onClick={refetch}>
-          새로고침
+          {t('mec.action.refresh')}
         </button>
       }
     >
@@ -98,13 +100,13 @@ export default function MecJobsPanel() {
             }}
           >
             <h3 style={{ margin: 0, fontSize: '14px' }}>
-              실시간 진행: <code>{streamingId}</code>
+              {t('mec.jobs.liveProgress')}: <code>{streamingId}</code>
             </h3>
             <button
               className="btn btn-secondary btn-small"
               onClick={() => setStreamingId(null)}
             >
-              닫기
+              {t('mec.jobs.close')}
             </button>
           </div>
           <JobProgress jobId={streamingId} />
@@ -113,14 +115,14 @@ export default function MecJobsPanel() {
 
       <Toolbar>
         <input
-          placeholder="필터 (ID, 종류, 상태)"
+          placeholder={t('mec.jobs.filterPlaceholder')}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           style={{ padding: '6px 10px', minWidth: '240px' }}
         />
       </Toolbar>
 
-      {loading && !data && <div style={{ color: '#6b7280' }}>로딩 중...</div>}
+      {loading && !data && <div style={{ color: '#6b7280' }}>{t('mec.state.loading')}</div>}
 
       <SortableTable<JobSummary>
         data={jobs}
@@ -128,25 +130,25 @@ export default function MecJobsPanel() {
         defaultSortKey="started_at"
         defaultSortDir="desc"
         rowKey={(j) => j.id}
-        emptyMessage="Job 기록이 없습니다."
+        emptyMessage={t('mec.jobs.empty')}
         columns={[
           {
             key: 'id',
-            header: 'Job ID',
+            header: t('mec.jobs.colId'),
             accessor: (j) => j.id,
             render: (j) => <code>{j.id}</code>,
             sortable: true,
           },
           {
             key: 'kind',
-            header: '종류',
+            header: t('mec.jobs.colKind'),
             accessor: (j) => j.kind,
             render: (j) => <code style={{ fontSize: '12px' }}>{j.kind}</code>,
             sortable: true,
           },
           {
             key: 'status',
-            header: '상태',
+            header: t('mec.jobs.colStatus'),
             accessor: (j) => j.status.state,
             render: (j) => (
               <div>
@@ -171,7 +173,7 @@ export default function MecJobsPanel() {
           },
           {
             key: 'progress',
-            header: '진행률',
+            header: t('mec.jobs.colProgress'),
             accessor: (j) => j.progress_percent,
             render: (j) => (
               <ProgressBar value={j.progress_percent} tone={j.status.state} />
@@ -181,7 +183,7 @@ export default function MecJobsPanel() {
           },
           {
             key: 'steps',
-            header: 'Steps',
+            header: t('mec.jobs.colSteps'),
             accessor: (j) =>
               j.steps.filter((s) => s.status === 'completed').length,
             render: (j) => (
@@ -196,7 +198,7 @@ export default function MecJobsPanel() {
           },
           {
             key: 'started_at',
-            header: '시작',
+            header: t('mec.jobs.colStarted'),
             accessor: (j) => j.started_at,
             render: (j) => new Date(j.started_at).toLocaleString(),
             width: '170px',
@@ -204,7 +206,7 @@ export default function MecJobsPanel() {
           },
           {
             key: 'completed_at',
-            header: '완료',
+            header: t('mec.jobs.colCompleted'),
             accessor: (j) => j.completed_at || '',
             render: (j) =>
               j.completed_at ? (
@@ -231,8 +233,8 @@ export default function MecJobsPanel() {
                 onClick={() => setStreamingId(j.id)}
               >
                 {j.status.state === 'running' || j.status.state === 'pending'
-                  ? '실시간'
-                  : '기록'}
+                  ? t('mec.jobs.actionLive')
+                  : t('mec.jobs.actionHistory')}
               </button>
             ),
           },
