@@ -13,6 +13,7 @@ pub mod harbor_service;
 pub mod harbor_mock;
 pub mod harbor_real;
 pub mod bootstrap;
+pub mod kubeconfig_expiry;
 
 pub use error::{ServiceError, ServiceResult};
 pub use kube_service::{KubeService, KubeServiceArc};

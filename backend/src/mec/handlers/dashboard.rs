@@ -79,6 +79,7 @@ pub async fn build_live(services: &ServiceBundle) -> crate::mec::services::Servi
             .filter_map(|n| n.gpu_info.as_ref().map(|g| g.total_slots))
             .sum(),
         gpu_available_slots: 0,
+        kubeconfig_days: crate::mec::services::kubeconfig_expiry::days_until_expiry_from_env(),
     };
     let health = ClusterHealth {
         gpu_available_slots: health.gpu_total_slots.saturating_sub(health.gpu_allocated_slots),

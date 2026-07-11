@@ -64,6 +64,11 @@ const noc: Record<string, Record<Lang, string>> = {
   'noc.sig.tenantMem': { ko: '테넌트 메모리 과다', en: 'Tenant memory high', ja: 'テナントメモリ過多' },
   'noc.sig.gpuIdle': { ko: 'GPU 유휴 {n} 슬롯', en: '{n} idle GPU slots', ja: 'GPU空き {n} スロット' },
   'noc.sig.eventWarn': { ko: '경고 이벤트 다발', en: 'Warning events', ja: '警告イベント多発' },
+  'noc.sig.kubeExpiry': {
+    ko: 'kubeconfig 토큰 만료 D-{n} (교체 필요)',
+    en: 'kubeconfig token expires in {n}d (rotate it)',
+    ja: 'kubeconfigトークン期限 残り{n}日（要更新）',
+  },
 };
 
 export default noc;

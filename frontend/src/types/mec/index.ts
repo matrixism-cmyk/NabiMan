@@ -174,6 +174,8 @@ export interface ClusterHealth {
   gpu_total_slots: number;
   gpu_allocated_slots: number;
   gpu_available_slots: number;
+  /** Days until the kubeconfig token expires; null when unknown/opaque. */
+  kubeconfig_days?: number | null;
 }
 
 export interface ClusterUsage {

@@ -85,4 +85,18 @@ describe('useNocSignals', () => {
     expect(result.current.items).toHaveLength(0);
     expect(result.current.rollup).toEqual({ normal: 0, caution: 0, critical: 0 });
   });
+
+  it('warns before the kubeconfig token expires (caution < 14d, critical <= 3d)', () => {
+    const near = snap({ health: { ...snap({}).health, kubeconfig_days: 2 } });
+    const q = renderHook(() => useNocSignals(near, t)).result.current;
+    expect(q.items.find((i) => i.id === 'kubeconfig:expiry')?.severity).toBe('critical');
+
+    const soon = snap({ health: { ...snap({}).health, kubeconfig_days: 10 } });
+    const q2 = renderHook(() => useNocSignals(soon, t)).result.current;
+    expect(q2.items.find((i) => i.id === 'kubeconfig:expiry')?.severity).toBe('caution');
+
+    const far = snap({ health: { ...snap({}).health, kubeconfig_days: 40 } });
+    const q3 = renderHook(() => useNocSignals(far, t)).result.current;
+    expect(q3.items.find((i) => i.id === 'kubeconfig:expiry')).toBeUndefined();
+  });
 });

@@ -22,6 +22,20 @@
 
 **총평**: 기능·안정성은 양호(빌드·타입·테스트 그린, 배포 최신). 부채는 ① 백엔드 하드리미트 2파일 ② dead-code 48건 ③ MEC 패널 i18n 공백 ④ 프론트 테스트 공백 ⑤ MEC 패널의 디자인시스템 부분 적용. 신규 가치는 ⑥ 실시간 스트리밍(SSE) ⑦ 관측성 심화(GPU/VPN) ⑧ 제품 UX 고도화(명령 팔레트·딥링크·임베디드 콘솔).
 
+## 0.1 구현 현황 (2026-07-11)
+
+| WS | 상태 | 요약 |
+|----|------|------|
+| WS-C | ✅ 완료 | oauth/ldap 모듈 분해, dead-code 48→0(하드코딩 DB 비번 상수 삭제 포함), eslint 경고 0 |
+| WS-D | ✅ 완료(핵심) | 프론트 단위 안전망(useNocSignals·trendOf·useMetricHistory·i18n)+App 스모크; 패널별 스모크는 WS-B와 병행 잔여 |
+| WS-A | ✅ 완료 | 단일 SSE 스트림(dashboard_sse + watch 폴러 + useDashboardStream, /live 폴백). Playwright 검증 |
+| WS-B | ✅ 완료 | MEC 패널 전체 ko/en/ja(useT); t() 키 391개 전부 정의, 사용자 표시 한글 0. EN 런타임 검증 |
+| WS-F | ✅ 완료 | Cmd+K 명령 팔레트 + URL 딥링크(#cat/tab). Playwright 검증 |
+| WS-G | ✅ 완료(코어) | kubeconfig 만료 D-n 조기경보(JWT exp 디코드; opaque 토큰은 정직하게 unknown) → NOC 주의 큐. HTTPS 전제는 아래 §HTTPS |
+| WS-E | ⏸ 보류(인프라) | GPU%(dcgm-exporter)·VPN(AXGate 라이브 세션) 미확보 → NOC 정직한 플레이스홀더 유지. 코드 슬롯 준비됨 |
+
+**HTTPS/프록시 전제(WS-A/WS-G)**: 단일 SSE는 리버스 프록시에서 `proxy_buffering off`(nginx) 또는 HTTP/2가 필요하다. Wake Lock API는 HTTPS(보안 컨텍스트)에서만 동작한다. 미충족 시 SSE는 자동으로 `/live` 폴링으로 폴백하므로 무중단이다.
+
 ---
 
 ## 1. 업그레이드 원칙 (전 워크스트림 공통)

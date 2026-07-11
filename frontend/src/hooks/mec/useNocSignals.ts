@@ -8,6 +8,8 @@ const CPU_WARN = 70;
 const MEM_CRIT = 90;
 const MEM_WARN = 70;
 const WARN_EVENTS_CAUTION = 5;
+const KUBECONFIG_CRIT_DAYS = 3; // expiry this close = incident risk
+const KUBECONFIG_WARN_DAYS = 14;
 
 export type Severity = 'critical' | 'caution' | 'ok';
 
@@ -73,6 +75,14 @@ export function useNocSignals(snap: LiveSnapshot | null, t: T): NocSignals {
     if (warnEvents >= WARN_EVENTS_CAUTION) {
       items.push({ id: 'events:warn', severity: 'caution', tone: 'warning',
         text: `${t('noc.sig.eventWarn')} (${warnEvents})`, target: 'mecLive' });
+    }
+    // Early warning before an expired kubeconfig token 401s every MEC call.
+    const kd = snap.health.kubeconfig_days;
+    if (kd != null && kd <= KUBECONFIG_WARN_DAYS) {
+      const crit = kd <= KUBECONFIG_CRIT_DAYS;
+      items.push({ id: 'kubeconfig:expiry', severity: crit ? 'critical' : 'caution',
+        tone: crit ? 'error' : 'warning',
+        text: t('noc.sig.kubeExpiry', { n: kd }), target: 'mecSettings' });
     }
 
     items.sort((a, b) => (a.severity === b.severity ? 0 : a.severity === 'critical' ? -1 : 1));

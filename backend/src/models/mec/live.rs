@@ -23,6 +23,10 @@ pub struct ClusterHealth {
     pub gpu_total_slots: u32,
     pub gpu_allocated_slots: u32,
     pub gpu_available_slots: u32,
+    /// Days until the kubeconfig token expires; `None` when unknown (opaque
+    /// token / not configured). Drives the early-warning signal on the NOC wall.
+    #[serde(default)]
+    pub kubeconfig_days: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
