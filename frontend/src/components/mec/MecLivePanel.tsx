@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useT } from '../../i18n';
 import { useMecApi } from '../../hooks/mec/useMecApi';
 import { useDashboardStream } from '../../hooks/mec/useDashboardStream';
 import { useMetricHistory } from '../../hooks/mec/useMetricHistory';
@@ -24,6 +25,7 @@ const eventKey = (e: ClusterEvent) =>
   `${e.reason}|${e.kind}|${e.namespace || ''}/${e.name}|${e.last_time || ''}`;
 
 export default function MecLivePanel() {
+  const { t } = useT();
   // Shared server-pushed stream; falls back to direct polling if it degrades.
   const stream = useDashboardStream<LiveSnapshot>('/api/mec/v1/dashboard/live/stream');
   const poll = useMecApi<LiveSnapshot>(stream.degraded ? '/api/mec/v1/dashboard/live' : '', REFRESH_INTERVAL);
@@ -57,23 +59,23 @@ export default function MecLivePanel() {
 
   return (
     <PanelLayout
-      title="실시간 모니터링"
-      subtitle="metrics-server 기반 실제 자원 사용률과 라이브 클러스터 이벤트"
+      title={t('mec.live.title')}
+      subtitle={t('mec.live.subtitle')}
       actions={
         <>
           <LiveIndicator lastUpdated={lastUpdated} intervalMs={REFRESH_INTERVAL} refreshing={stream.degraded ? poll.loading : !stream.connected} />
-          <button className="btn btn-secondary" onClick={() => poll.refetch()}>새로고침</button>
+          <button className="btn btn-secondary" onClick={() => poll.refetch()}>{t('mec.action.refresh')}</button>
         </>
       }
     >
       <ErrorBanner error={err || undefined} />
-      {!s && !err && <div style={{ color: '#6b7280' }}>로딩 중...</div>}
+      {!s && !err && <div style={{ color: '#6b7280' }}>{t('mec.state.loading')}</div>}
 
       {s && (
         <div className="mec-fade-in-up">
           <MetricGrid>
             <MetricCard
-              label="클러스터 CPU"
+              label={t('mec.live.cpuCard')}
               value={Math.round(s.cluster.cpu_percent)}
               unit="%"
               helper={`${cores(s.cluster.cpu_used_millicores)} / ${cores(s.cluster.cpu_capacity_millicores)} cores`}
@@ -81,7 +83,7 @@ export default function MecLivePanel() {
               sparkline={history.cpu}
             />
             <MetricCard
-              label="클러스터 메모리"
+              label={t('mec.live.memCard')}
               value={Math.round(s.cluster.memory_percent)}
               unit="%"
               helper={`${gib(s.cluster.memory_used_bytes)} / ${gib(s.cluster.memory_capacity_bytes)} GiB`}
@@ -89,16 +91,16 @@ export default function MecLivePanel() {
               sparkline={history.mem}
             />
             <MetricCard
-              label="실행 중 파드"
+              label={t('mec.live.podsRunning')}
               value={s.pods.running}
               unit={`/ ${s.pods.total}`}
-              helper={`대기 ${s.pods.pending} · 실패 ${s.pods.failed} · 완료 ${s.pods.succeeded}`}
+              helper={t('mec.live.podsHelper', { pending: s.pods.pending, failed: s.pods.failed, succeeded: s.pods.succeeded })}
               tone={s.pods.failed > 0 ? 'warning' : 'success'}
             />
             <MetricCard
-              label="노드"
+              label={t('mec.live.nodes')}
               value={s.cluster.node_count}
-              helper="metrics-server 수집 노드"
+              helper={t('mec.live.nodesHelper')}
               tone="info"
             />
           </MetricGrid>
@@ -111,7 +113,7 @@ export default function MecLivePanel() {
               marginTop: '20px',
             }}
           >
-            <Section title="노드별 CPU 사용률">
+            <Section title={t('mec.live.nodeCpu')}>
               <BarChart
                 data={s.nodes.map((n) => ({
                   label: n.name,
@@ -121,7 +123,7 @@ export default function MecLivePanel() {
                 }))}
               />
             </Section>
-            <Section title="노드별 메모리 사용률">
+            <Section title={t('mec.live.nodeMem')}>
               <BarChart
                 data={s.nodes.map((n) => ({
                   label: n.name,
@@ -131,7 +133,7 @@ export default function MecLivePanel() {
                 }))}
               />
             </Section>
-            <Section title="파드 상태 분포">
+            <Section title={t('mec.live.podDist')}>
               <DonutChart
                 slices={[
                   { label: 'Running', value: s.pods.running, color: '#10b981' },
@@ -140,13 +142,13 @@ export default function MecLivePanel() {
                   { label: 'Succeeded', value: s.pods.succeeded, color: '#3b82f6' },
                 ]}
                 centerLabel={`${s.pods.running}`}
-                centerSublabel={`총 ${s.pods.total} 파드`}
+                centerSublabel={t('mec.live.podTotal', { total: s.pods.total })}
                 legend="side"
               />
             </Section>
           </div>
 
-          <Section title="네임스페이스별 자원 소비 (CPU 상위)" marginTop="24px">
+          <Section title={t('mec.live.nsConsumption')} marginTop="24px">
             <BarChart
               data={s.tenants.map((t) => ({
                 label: t.namespace,
@@ -157,18 +159,18 @@ export default function MecLivePanel() {
             />
           </Section>
 
-          <Section title="라이브 클러스터 이벤트" marginTop="24px">
+          <Section title={t('mec.live.events')} marginTop="24px">
             <SortableTable<ClusterEvent>
               data={events}
               rowKey={eventKey}
               highlightRowKeys={newKeys}
               defaultSortKey="time"
               defaultSortDir="desc"
-              emptyMessage="이벤트가 없습니다."
+              emptyMessage={t('mec.live.noEvents')}
               columns={[
                 {
                   key: 'time',
-                  header: '시간',
+                  header: t('mec.col.time'),
                   accessor: (e) => e.last_time || '',
                   render: (e) => (e.last_time ? new Date(e.last_time).toLocaleTimeString() : '-'),
                   width: '90px',
@@ -176,7 +178,7 @@ export default function MecLivePanel() {
                 },
                 {
                   key: 'type',
-                  header: '유형',
+                  header: t('mec.col.type'),
                   accessor: (e) => e.event_type,
                   render: (e) => (
                     <span
@@ -194,7 +196,7 @@ export default function MecLivePanel() {
                 },
                 {
                   key: 'reason',
-                  header: '사유',
+                  header: t('mec.col.reason'),
                   accessor: (e) => e.reason,
                   render: (e) => <code style={{ fontSize: '12px' }}>{e.reason}</code>,
                   width: '120px',
@@ -202,7 +204,7 @@ export default function MecLivePanel() {
                 },
                 {
                   key: 'object',
-                  header: '대상',
+                  header: t('mec.col.object'),
                   accessor: (e) => `${e.kind}/${e.name}`,
                   render: (e) => (
                     <>
@@ -215,7 +217,7 @@ export default function MecLivePanel() {
                 },
                 {
                   key: 'message',
-                  header: '메시지',
+                  header: t('mec.col.message'),
                   accessor: (e) => e.message,
                   wrap: true,
                   sortable: false,
