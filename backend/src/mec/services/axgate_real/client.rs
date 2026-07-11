@@ -189,6 +189,27 @@ impl AxgateService for AxgateReal {
             }),
         }
     }
+
+    async fn list_vpn_sessions(&self) -> ServiceResult<Vec<crate::models::mec::VpnSession>> {
+        // Opt-in only: querying SSL-VPN state runs extra AXGATE CLI commands,
+        // which risk the 600s lockout. Default is dark (empty → honest
+        // placeholder). The parser is provisional until validated against a
+        // live capture, so unparseable output degrades to an empty list.
+        if std::env::var("NABIMAN_MEC_AXGATE_VPN").is_err() {
+            return Ok(vec![]);
+        }
+        let output = AxgateSession::connect(
+            &self.config.host,
+            self.config.port,
+            &self.config.username,
+            &self.config.password,
+            Duration::from_secs(self.config.timeout_secs),
+        )
+        .await?
+        .run_commands(&["show sslvpn tunnel"])
+        .await?;
+        Ok(super::parser::parse_vpn_sessions(&output))
+    }
 }
 
 pub(super) fn upstream<E: std::fmt::Display>(e: E) -> ServiceError {

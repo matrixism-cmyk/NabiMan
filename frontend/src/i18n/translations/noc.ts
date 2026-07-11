@@ -50,6 +50,10 @@ const noc: Record<string, Record<Lang, string>> = {
   'noc.gpuHint': { ko: 'dcgm-exporter 연동 필요', en: 'requires dcgm-exporter', ja: 'dcgm-exporter 連携が必要' },
   'noc.sessionBand': { ko: 'VPN / 사용자 세션', en: 'VPN / User Sessions', ja: 'VPN / ユーザーセッション' },
   'noc.sessionHint': { ko: 'AxgateService 연동 필요', en: 'requires AxgateService', ja: 'AxgateService 連携が必要' },
+  'noc.vpnActive': { ko: '활성 VPN 세션', en: 'active VPN sessions', ja: 'アクティブVPNセッション' },
+  'noc.vpnUser': { ko: '사용자', en: 'User', ja: 'ユーザー' },
+  'noc.vpnIp': { ko: '터널 IP', en: 'Tunnel IP', ja: 'トンネルIP' },
+  'noc.vpnSource': { ko: '출발지 IP', en: 'Source IP', ja: '送信元IP' },
 
   // marquee
   'noc.allHealthy': { ko: '모든 시스템 정상', en: 'All systems normal', ja: '全システム正常' },

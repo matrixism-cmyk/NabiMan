@@ -37,6 +37,10 @@ pub async fn build_live(services: &ServiceBundle) -> crate::mec::services::Servi
     tenants.truncate(12);
     let events = services.kube.list_events(25).await?;
 
+    // Real GPU utilization%, if a dcgm-exporter is wired up (else empty → the
+    // gpu_usage_percent stays None and the UI shows its honest placeholder).
+    let gpu_util = crate::mec::services::gpu_dcgm::node_gpu_util().await;
+
     let mut by_name: HashMap<String, NodeMetrics> =
         metrics.into_iter().map(|m| (m.name.clone(), m)).collect();
     let nodes: Vec<NodeMetrics> = inventory
@@ -59,6 +63,9 @@ pub async fn build_live(services: &ServiceBundle) -> crate::mec::services::Servi
                 gpu_usage_percent: None,
             });
             nm.status = status.to_string();
+            if let Some(util) = gpu_util.get(&inv.name) {
+                nm.gpu_usage_percent = Some(*util);
+            }
             nm
         })
         .collect();
@@ -100,7 +107,11 @@ pub async fn build_live(services: &ServiceBundle) -> crate::mec::services::Servi
     cluster.cpu_percent = pct(cluster.cpu_used_millicores, cluster.cpu_capacity_millicores);
     cluster.memory_percent = pct(cluster.memory_used_bytes, cluster.memory_capacity_bytes);
 
-    Ok(LiveSnapshot { cluster, health, nodes, pods, tenants, events })
+    // VPN sessions are best-effort: an AXGATE outage must not sink the whole
+    // wall, so a failure degrades to an empty list (honest placeholder).
+    let vpn_sessions = services.axgate.list_vpn_sessions().await.unwrap_or_default();
+
+    Ok(LiveSnapshot { cluster, health, nodes, pods, tenants, events, vpn_sessions })
 }
 
 #[derive(Serialize)]

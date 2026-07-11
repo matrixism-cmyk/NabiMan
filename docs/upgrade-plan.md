@@ -32,7 +32,7 @@
 | WS-B | ✅ 완료 | MEC 패널 전체 ko/en/ja(useT); t() 키 391개 전부 정의, 사용자 표시 한글 0. EN 런타임 검증 |
 | WS-F | ✅ 완료 | Cmd+K 명령 팔레트 + URL 딥링크(#cat/tab). Playwright 검증 |
 | WS-G | ✅ 완료(코어) | kubeconfig 만료 D-n 조기경보(JWT exp 디코드; opaque 토큰은 정직하게 unknown) → NOC 주의 큐. HTTPS 전제는 아래 §HTTPS |
-| WS-E | ⏸ 보류(인프라) | GPU%(dcgm-exporter)·VPN(AXGate 라이브 세션) 미확보 → NOC 정직한 플레이스홀더 유지. 코드 슬롯 준비됨 |
+| WS-E | ✅ 완료(코드) | GPU%(dcgm-exporter 스크래퍼, env-gated)·VPN(AXGate 세션, 600초 잠금 회피 위해 기본 OFF) 전체 코드 경로 구현. 데이터 소스 연결 시 NOC 자동 점등, 미연결 시 정직한 플레이스홀더. 인프라 프로비저닝만 사용자 몫 |
 
 **HTTPS/프록시 전제(WS-A/WS-G)**: 단일 SSE는 리버스 프록시에서 `proxy_buffering off`(nginx) 또는 HTTP/2가 필요하다. Wake Lock API는 HTTPS(보안 컨텍스트)에서만 동작한다. 미충족 시 SSE는 자동으로 `/live` 폴링으로 폴백하므로 무중단이다.
 
@@ -83,10 +83,11 @@
 - **렌더 스모크**: 각 패널 최소 1개 "데이터 빈/부분/정상" 무크래시 렌더 테스트.
 - **목표**: 핵심 훅 100% + 패널 스모크. CI에서 `tsc`+`eslint`+`test` 게이트.
 
-### WS-E · 관측성 심화 [보류: 인프라 의존]
-- **GPU 가동률%**: dcgm-exporter(또는 NVML) → `NodeMetrics.gpu_usage_percent`(이미 `Option`). 배포 시점이 블로커.
-- **VPN/사용자 세션**: `AxgateService::list_vpn_sessions()` — **600초 잠금 가드** 필수, 형식은 라이브 세션 1개 캡처 후 확정([`memory: axgate-vpn-cli`]). NOC 세션 밴드 플레이스홀더 점등.
-- 둘 다 optional 필드 추가라 클라이언트 재작성 불필요. 일정 독립.
+### WS-E · 관측성 심화 [코드 완결 · 데이터 소스 연결 시 자동 점등]
+- **GPU 가동률%**: `services/gpu_dcgm.rs` — dcgm-exporter의 표준 `DCGM_FI_DEV_GPU_UTIL` Prometheus 지표를 스크래핑(env `NABIMAN_MEC_DCGM_URL`, 미설정 시 빈 맵→플레이스홀더). `build_live`가 노드별 `gpu_usage_percent`를 채우고 NOC가 GPU 가동률 바를 렌더. 파서 단위테스트 완비.
+- **VPN/사용자 세션**: `AxgateService::list_vpn_sessions()` (트레이트+mock 샘플+real). real은 **600초 잠금 회피 위해 기본 OFF**(env `NABIMAN_MEC_AXGATE_VPN`); 활성 시 `show sslvpn tunnel`을 방어적 파서로 처리(형식 미확정 → 미매칭 시 빈 리스트, 라이브 캡처 후 정밀화). NOC 세션 밴드/KPI가 세션을 표시.
+- 소스별 오류 격리: VPN 실패는 `unwrap_or_default()`로 강등, 벽 생존. optional 필드라 클라이언트 재작성 불필요.
+- **남은 것은 인프라 프로비저닝뿐**: dcgm-exporter 배포 + `NABIMAN_MEC_DCGM_URL` 설정 / (검증 후) `NABIMAN_MEC_AXGATE_VPN` 활성화. 붙이는 즉시 실데이터로 전환된다.
 
 ### WS-F · 제품 UX 고도화
 - **Cmd+K 명령 팔레트**: 탭 전환·테넌트/노드 점프·작업 실행. `nav.ts` 메타 재사용.

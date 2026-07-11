@@ -1,5 +1,6 @@
 use crate::models::mec::{
     AnyMarker, NatRule, NatSource, NatType, PolicyAction, PublicIp, PublicIpStatus, SecurityPolicy,
+    VpnSession,
 };
 use chrono::Utc;
 
@@ -228,9 +229,68 @@ fn finalize_policy(b: Block) -> Option<SecurityPolicy> {
     })
 }
 
+fn looks_like_ipv4(s: &str) -> bool {
+    let mut parts = 0;
+    for p in s.split('.') {
+        if p.is_empty() || p.len() > 3 || !p.bytes().all(|b| b.is_ascii_digit()) {
+            return false;
+        }
+        if p.parse::<u8>().is_err() {
+            return false;
+        }
+        parts += 1;
+    }
+    parts == 4
+}
+
+/// Best-effort parse of `show sslvpn tunnel` output into VPN sessions.
+///
+/// PROVISIONAL: the exact AXGATE column layout is unconfirmed (see the
+/// axgate-vpn-cli note). We conservatively treat any line that has a
+/// non-IP first token plus at least one IPv4 as a session, and return an
+/// empty list otherwise — we never invent rows. Refine once a live capture
+/// pins down the format.
+pub fn parse_vpn_sessions(output: &str) -> Vec<VpnSession> {
+    let mut out = Vec::new();
+    for line in output.lines() {
+        let fields: Vec<&str> = line.split_whitespace().collect();
+        if fields.len() < 2 || looks_like_ipv4(fields[0]) {
+            continue;
+        }
+        let ips: Vec<&str> = fields.iter().copied().filter(|f| looks_like_ipv4(f)).collect();
+        if ips.is_empty() {
+            continue;
+        }
+        out.push(VpnSession {
+            user: fields[0].to_string(),
+            ip: ips[0].to_string(),
+            source_ip: ips.get(1).unwrap_or(&"").to_string(),
+            connected_since: None,
+            state: "connected".into(),
+        });
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_vpn_sessions_conservatively() {
+        let sample = "User        VirtualIP     ClientIP\npoc-user01  10.8.0.12     203.0.113.24\nops-admin   10.8.0.5      198.51.100.7\n";
+        let s = parse_vpn_sessions(sample);
+        assert_eq!(s.len(), 2);
+        assert_eq!(s[0].user, "poc-user01");
+        assert_eq!(s[0].ip, "10.8.0.12");
+        assert_eq!(s[0].source_ip, "203.0.113.24");
+    }
+
+    #[test]
+    fn vpn_no_sessions_when_no_data() {
+        assert!(parse_vpn_sessions("No active tunnels\n").is_empty());
+        assert!(parse_vpn_sessions("").is_empty());
+    }
 
     const REAL_SAMPLE: &str = r#"
 ip nat policy from trust to untrust 10 id 1

@@ -215,6 +215,14 @@ export interface ClusterEvent {
   count: number;
 }
 
+export interface VpnSession {
+  user: string;
+  ip: string;
+  source_ip: string;
+  connected_since?: string | null;
+  state: string;
+}
+
 export interface LiveSnapshot {
   cluster: ClusterUsage;
   health: ClusterHealth;
@@ -222,4 +230,5 @@ export interface LiveSnapshot {
   pods: PodPhaseSummary;
   tenants: TenantUsage[];
   events: ClusterEvent[];
+  vpn_sessions?: VpnSession[];
 }

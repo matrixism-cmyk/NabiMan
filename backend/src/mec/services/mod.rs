@@ -14,6 +14,7 @@ pub mod harbor_mock;
 pub mod harbor_real;
 pub mod bootstrap;
 pub mod kubeconfig_expiry;
+pub mod gpu_dcgm;
 
 pub use error::{ServiceError, ServiceResult};
 pub use kube_service::{KubeService, KubeServiceArc};

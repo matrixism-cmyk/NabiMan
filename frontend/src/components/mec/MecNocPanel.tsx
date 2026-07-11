@@ -6,7 +6,7 @@ import { useMetricHistory } from '../../hooks/mec/useMetricHistory';
 import { useNocSignals } from '../../hooks/mec/useNocSignals';
 import { useStaleWatchdog } from '../../hooks/mec/useStaleWatchdog';
 import { useWakeLock } from '../../hooks/mec/useWakeLock';
-import { ClusterEvent, LiveSnapshot } from '../../types/mec';
+import { ClusterEvent, LiveSnapshot, VpnSession } from '../../types/mec';
 import {
   BarChart, DonutChart, ErrorBanner, LiveIndicator, MetricCard, MetricGrid,
   PanelLayout, Section, SortableTable, StatusBadge,
@@ -64,6 +64,10 @@ export default function MecNocPanel({ onNavigate, onEnterFocus }: Props) {
   const { rollup, items } = useNocSignals(s ?? null, t);
 
   const events = useMemo(() => s?.events || [], [s]);
+  // WS-E data sources light up automatically when connected; otherwise the
+  // honest placeholders stay. GPU% needs dcgm-exporter; VPN needs AXGATE.
+  const gpuNodes = useMemo(() => (s?.nodes || []).filter((n) => n.gpu_usage_percent != null), [s]);
+  const vpn = useMemo<VpnSession[]>(() => s?.vpn_sessions || [], [s]);
   const seen = useRef<Set<string>>(new Set());
   const [newKeys, setNewKeys] = useState<Set<string>>(new Set());
   useEffect(() => {
@@ -112,7 +116,9 @@ export default function MecNocPanel({ onNavigate, onEnterFocus }: Props) {
               tone={s.health.nodes_ready === s.health.nodes_total ? 'success' : 'error'} />
             <MetricCard label={t('noc.kpi.gpu')} value={s.health.gpu_allocated_slots} unit={`/ ${s.health.gpu_total_slots}`}
               helper={t('noc.kpi.gpuHelper', { idle: s.health.gpu_available_slots })} tone="info" />
-            <MetricCard label={t('noc.kpi.sessions')} value="—" helper={t('noc.notConnected')} tone="neutral" />
+            <MetricCard label={t('noc.kpi.sessions')} value={vpn.length > 0 ? vpn.length : '—'}
+              helper={vpn.length > 0 ? t('noc.vpnActive') : t('noc.notConnected')}
+              tone={vpn.length > 0 ? 'info' : 'neutral'} />
           </MetricGrid>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(260px, 1fr)', gap: '16px', marginTop: '20px' }}>
@@ -140,8 +146,30 @@ export default function MecNocPanel({ onNavigate, onEnterFocus }: Props) {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginTop: '16px' }}>
-            <PlaceholderBand title={t('noc.gpuBand')} hint={t('noc.gpuHint')} />
-            <PlaceholderBand title={t('noc.sessionBand')} hint={t('noc.sessionHint')} />
+            {gpuNodes.length > 0 ? (
+              <Section title={t('noc.gpuBand')}>
+                <BarChart showValue data={gpuNodes.map((n) => ({
+                  label: n.name, value: Math.round(n.gpu_usage_percent as number), max: 100,
+                }))} />
+              </Section>
+            ) : (
+              <PlaceholderBand title={t('noc.gpuBand')} hint={t('noc.gpuHint')} />
+            )}
+            {vpn.length > 0 ? (
+              <Section title={t('noc.sessionBand')}>
+                <SortableTable<VpnSession>
+                  data={vpn} rowKey={(v) => `${v.user}|${v.ip}`} defaultSortKey="user" maxHeight="220px"
+                  columns={[
+                    { key: 'user', header: t('noc.vpnUser'), accessor: (v) => v.user, sortable: true },
+                    { key: 'ip', header: t('noc.vpnIp'), accessor: (v) => v.ip,
+                      render: (v) => <code>{v.ip}</code> },
+                    { key: 'source', header: t('noc.vpnSource'), accessor: (v) => v.source_ip,
+                      render: (v) => <code>{v.source_ip}</code> },
+                  ]} />
+              </Section>
+            ) : (
+              <PlaceholderBand title={t('noc.sessionBand')} hint={t('noc.sessionHint')} />
+            )}
           </div>
 
           <Section title={t('noc.events')} marginTop="20px">

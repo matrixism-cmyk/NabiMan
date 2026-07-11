@@ -129,6 +129,18 @@ pub struct UpdateNatRuleRequest {
     pub ports: Option<Vec<u16>>,
 }
 
+/// An active SSL-VPN user session on the AXGATE firewall.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VpnSession {
+    pub user: String,
+    /// Tunnel-assigned virtual IP.
+    pub ip: String,
+    /// Client's public/source IP.
+    pub source_ip: String,
+    pub connected_since: Option<String>,
+    pub state: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

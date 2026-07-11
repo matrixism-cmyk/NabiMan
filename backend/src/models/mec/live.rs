@@ -71,4 +71,8 @@ pub struct LiveSnapshot {
     pub pods: PodPhaseSummary,
     pub tenants: Vec<TenantUsage>,
     pub events: Vec<ClusterEvent>,
+    /// Active SSL-VPN sessions from AXGATE. Empty when the source is not
+    /// connected/enabled (honest placeholder, never fabricated).
+    #[serde(default)]
+    pub vpn_sessions: Vec<super::VpnSession>,
 }

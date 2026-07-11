@@ -184,6 +184,25 @@ impl AxgateService for AxgateMock {
             error: None,
         })
     }
+
+    async fn list_vpn_sessions(&self) -> ServiceResult<Vec<crate::models::mec::VpnSession>> {
+        Ok(vec![
+            crate::models::mec::VpnSession {
+                user: "poc-user01".into(),
+                ip: "10.8.0.12".into(),
+                source_ip: "203.0.113.24".into(),
+                connected_since: Some("2026-07-11T09:14:00Z".into()),
+                state: "connected".into(),
+            },
+            crate::models::mec::VpnSession {
+                user: "ops-admin".into(),
+                ip: "10.8.0.5".into(),
+                source_ip: "198.51.100.7".into(),
+                connected_since: Some("2026-07-11T08:02:00Z".into()),
+                state: "connected".into(),
+            },
+        ])
+    }
 }
 
 fn protocol_prefix(p: &Protocol) -> &'static str {
