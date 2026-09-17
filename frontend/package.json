@@ -21,11 +21,12 @@
   },
   "scripts": {
     "start": "rsbuild dev",
-    "build": "rsbuild build",
+    "build": "rsbuild build && node scripts/check-bundle.js",
     "preview": "rsbuild preview",
     "test": "jest",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "smoke": "node scripts/smoke-browser.js"
   },
   "browserslist": {
     "production": [
@@ -54,6 +55,7 @@
     "identity-obj-proxy": "^3.0.0",
     "jest": "^30.5.1",
     "jest-environment-jsdom": "^30.5.1",
+    "playwright": "^1.63.0",
     "typescript-eslint": "^8.70.0",
     "whatwg-fetch": "^3.6.20"
   }

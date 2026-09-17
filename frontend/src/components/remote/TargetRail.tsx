@@ -69,7 +69,7 @@ export default function TargetRail({
           })}
           {servers.length === 0 && <p className="rw-rail-empty">{t('remote.noServers')}</p>}
           <button className={`rw-item rw-item-add ${selection.kind === 'new' ? 'is-active' : ''}`}
-            onClick={() => onSelect({ kind: 'new' })}>+ {t('remote.addServer')}</button>
+            onClick={() => onSelect({ kind: 'new' })}>{t('remote.addServer')}</button>
 
           <div className="rw-rail-label">{t('remote.otherGroup')}</div>
           <button className={`rw-item ${selection.kind === 'local' ? 'is-active' : ''}`}
