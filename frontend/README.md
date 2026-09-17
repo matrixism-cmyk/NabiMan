@@ -13,6 +13,7 @@ as static files — see the repository `Makefile`.
 | `npm run preview` | Serve the built output locally |
 | `npm test` | Jest + Testing Library (`npm test -- --watch` to iterate) |
 | `npm run typecheck` | `tsc --noEmit` over `src/` |
+| `npm run lint` | ESLint over `src/` (hook rules, unused symbols, TS checks) |
 
 ## Configuration
 
@@ -21,5 +22,7 @@ as static files — see the repository `Makefile`.
   `process.env.PUBLIC_URL` resolves to the site root.
 - `public/index.html` — the HTML template. `<%= assetPrefix %>` stands in for
   the asset root, and Rsbuild injects the script and stylesheet tags.
+- `eslint.config.js` — lint rules, replacing the `react-app` preset that used
+  to arrive with react-scripts.
 - `jest.config.js` — test runner: jsdom, `src/setupTests.ts`, CSS and static
   imports stubbed, mock implementations reset between tests.

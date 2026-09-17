@@ -15,6 +15,7 @@ deploy:
 
 test:
 	cd backend && cargo test
+	cd frontend && npm run lint
 	cd frontend && npm test -- --watchAll=false
 
 clean:

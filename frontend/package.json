@@ -24,7 +24,8 @@
     "build": "rsbuild build",
     "preview": "rsbuild preview",
     "test": "jest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
   },
   "browserslist": {
     "production": [
@@ -43,12 +44,17 @@
     "@babel/preset-env": "^7.29.7",
     "@babel/preset-react": "^7.29.7",
     "@babel/preset-typescript": "^7.29.7",
+    "@eslint/js": "^10.0.1",
     "@rsbuild/core": "^2.2.7",
     "@rsbuild/plugin-react": "^2.1.0",
     "babel-jest": "^30.5.1",
+    "eslint": "^10.10.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.12.0",
     "identity-obj-proxy": "^3.0.0",
     "jest": "^30.5.1",
     "jest-environment-jsdom": "^30.5.1",
+    "typescript-eslint": "^8.70.0",
     "whatwg-fetch": "^3.6.20"
   }
 }
