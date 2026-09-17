@@ -100,6 +100,7 @@ export default function LoginScreen({ onLogin }: Props) {
   return (
     <div className="login-screen">
       <form className="login-form" onSubmit={handleSubmit}>
+        <img className="login-mark" src={`${process.env.PUBLIC_URL}/favicon.svg`} alt="" width="64" height="64" />
         <h1>{t('app.title')}</h1>
         <p className="login-subtitle">{t('app.subtitle')}</p>
         {error && <div className="login-error">{error}</div>}
@@ -114,12 +115,12 @@ export default function LoginScreen({ onLogin }: Props) {
         )}
 
         {!needs2fa ? (<>
-          <input type="text" placeholder={loginMode === 'ldap' ? t('login.ldapUsername') : t('login.username')}
+          <input type="text" aria-label={t('login.username')} autoComplete="username" placeholder={loginMode === 'ldap' ? t('login.ldapUsername') : t('login.username')}
             value={username} onChange={e => setUsername(e.target.value)} autoFocus required />
-          <input type="password" placeholder={t('login.password')} value={password}
+          <input type="password" aria-label={t('login.password')} autoComplete="current-password" placeholder={t('login.password')} value={password}
             onChange={e => setPassword(e.target.value)} required />
         </>) : (
-          <input type="text" placeholder={t('login.totpCode')} value={totpCode}
+          <input type="text" aria-label={t('login.totpCode')} autoComplete="one-time-code" inputMode="numeric" placeholder={t('login.totpCode')} value={totpCode}
             onChange={e => setTotpCode(e.target.value)} autoFocus required
             maxLength={6} style={{ textAlign: 'center', fontSize: '24px', letterSpacing: '8px' }} />
         )}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import './App.css';
 import './components.css';
+import './design.css';
 import LoginScreen from './components/LoginScreen';
 import TerminalPanel from './components/TerminalPanel';
 import PanelOutlet from './components/PanelOutlet';
