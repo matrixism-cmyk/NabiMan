@@ -185,6 +185,8 @@ export interface RemoteServer {
   created_at: string;
   last_checked: string;
   status: string;
+  /** True when an SSH password is stored (encrypted) for this server. */
+  has_password?: boolean;
 }
 
 export interface RemoteServerStatus {

@@ -1,0 +1,222 @@
+/* Floating terminal windows: a desktop-style layer above the dashboard. */
+
+.term-window-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  pointer-events: none;
+}
+
+.term-window {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  min-width: 320px;
+  min-height: 200px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+/* Minimised windows stay mounted (and connected) but off-screen, so the
+   screen contents and scrollback survive. */
+.term-window-minimized {
+  visibility: hidden;
+  pointer-events: none;
+  left: -10000px !important;
+  top: 0 !important;
+}
+
+.term-window-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+}
+
+.term-window-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  flex: 0 0 auto;
+}
+.term-window-dot-connected { background: var(--success); }
+.term-window-dot-connecting,
+.term-window-dot-reconnecting { background: var(--warning); }
+.term-window-dot-disconnected { background: var(--danger); }
+.term-window-dot-ended { background: var(--text-secondary); }
+
+.term-window-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 45%;
+}
+
+.term-window-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.term-window-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+}
+
+.term-window-actions button {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.term-window-actions button:hover { background: rgba(255, 255, 255, 0.08); color: var(--text); }
+.term-window-actions .term-window-close:hover { background: var(--danger); color: #fff; }
+
+.term-window-body {
+  flex: 1;
+  min-height: 0;
+  background: #0f1923;
+}
+
+.terminal-view {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.terminal-view-screen {
+  width: 100%;
+  height: 100%;
+  padding: 4px 6px;
+  box-sizing: border-box;
+}
+
+.terminal-view-status {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  font-size: 11px;
+  font-family: inherit;
+  padding: 3px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.72);
+  color: var(--warning);
+  cursor: pointer;
+}
+.terminal-view-status:hover { border-color: var(--primary); }
+.terminal-view-status-connecting,
+.terminal-view-status-reconnecting { cursor: default; }
+.terminal-view-status-disconnected { color: var(--danger); }
+.terminal-view-status-ended { color: var(--text-secondary); }
+
+.term-resize { position: absolute; touch-action: none; }
+.term-resize-e { right: 0; top: 28px; bottom: 12px; width: 6px; cursor: ew-resize; }
+.term-resize-s { left: 12px; right: 12px; bottom: 0; height: 6px; cursor: ns-resize; }
+.term-resize-se { right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; }
+
+.term-taskbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  background: rgba(15, 25, 35, 0.92);
+  border-top: 1px solid var(--border);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+  overflow-x: auto;
+}
+
+.term-taskbar-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex: 0 0 auto;
+}
+
+.term-taskbar-item,
+.term-taskbar-btn {
+  flex: 0 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.term-taskbar-item:hover,
+.term-taskbar-btn:hover { border-color: var(--primary); }
+.term-taskbar-item.minimized { color: var(--text-secondary); }
+
+.term-taskbar-spacer { flex: 1 1 auto; }
+
+.term-settings-overlay { z-index: 1000; }
+.term-settings { max-width: 560px; }
+.term-settings .form-group { margin-bottom: 14px; }
+.term-settings small { display: block; margin-top: 4px; font-size: 11px; }
+.term-settings label { display: block; margin-bottom: 6px; font-size: 13px; color: var(--text); }
+.term-settings input[type="checkbox"] { width: auto; margin: 0 4px 0 0; vertical-align: middle; }
+.term-settings .filter-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.term-settings .filter-input { margin-bottom: 0; }
+
+@media (max-width: 720px) {
+  .term-window:not(.term-window-minimized) {
+    left: 0 !important;
+    top: 0 !important;
+    width: 100vw !important;
+    height: calc(100vh - 44px) !important;
+  }
+  .term-resize { display: none; }
+}
+
+/* Inline "edit server" form on a remote-server card. */
+.server-edit-form {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px;
+}
+.server-edit-form h4 { margin: 0 0 10px; font-size: 13px; color: var(--primary); }
+.server-edit-form label { display: block; margin-bottom: 4px; font-size: 12px; color: var(--text-secondary); }
+
+/* Session list inside the docked terminal panel. */
+.terminal-sessions {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+  overflow-x: auto;
+}

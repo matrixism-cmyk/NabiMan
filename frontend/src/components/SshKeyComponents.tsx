@@ -90,7 +90,8 @@ export function DeployKeyDialog({ server, onClose }: { server: RemoteServer; onC
   const [keyWorks, setKeyWorks] = useState<boolean | null>(null);
 
   const handleDeploy = async () => {
-    if (!password) return;
+    // With a password saved on the server record, an empty box means "use it".
+    if (!password && !server.has_password) return;
     setDeploying(true);
     setResult('');
     const res = await apiPost<string>(`/api/remote-servers/${server.id}/deploy-key`, { password });
@@ -134,11 +135,11 @@ export function DeployKeyDialog({ server, onClose }: { server: RemoteServer; onC
             <input
               type="password" value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder={t('deployKey.passwordPlaceholder')}
+              placeholder={server.has_password ? t('deployKey.useSavedPassword') : t('deployKey.passwordPlaceholder')}
               className="filter-input" style={{ flex: 1 }}
               onKeyDown={e => e.key === 'Enter' && handleDeploy()}
             />
-            <button className="btn btn-primary btn-sm" onClick={handleDeploy} disabled={deploying || !password}>
+            <button className="btn btn-primary btn-sm" onClick={handleDeploy} disabled={deploying || (!password && !server.has_password)}>
               {deploying ? t('deployKey.deploying') : t('deployKey.deploy')}
             </button>
           </div>

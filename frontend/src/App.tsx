@@ -26,7 +26,7 @@ function App() {
   const [loggedIn, setLoggedIn] = useState(!!sessionStorage.getItem('nabiman_token'));
   const [activeTab, setActiveTab] = useState<Tab>('server');
   const [activeCat, setActiveCat] = useState<Category>('dashboard');
-  const [sshTarget, setSshTarget] = useState<{ host: string; port: number; user: string } | null>(null);
+  const [sshTarget, setSshTarget] = useState<{ host: string; port: number; user: string; serverId?: string } | null>(null);
   const [showChangePw, setShowChangePw] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
   const [hiddenTabs, setHiddenTabs] = useState<Set<Tab>>(new Set());
@@ -109,8 +109,8 @@ function App() {
   }, [hiddenTabs]);
 
   const handleLogout = () => { clearToken(); setLoggedIn(false); };
-  const handleConnectSSH = (host: string, port: number, user: string) => {
-    setSshTarget({ host, port, user });
+  const handleConnectSSH = (host: string, port: number, user: string, serverId?: string) => {
+    setSshTarget({ host, port, user, serverId });
     setActiveCat('system');
     setActiveTab('terminal');
   };

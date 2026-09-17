@@ -23,6 +23,7 @@ jsonwebtoken = "9"
 rand = "0.8"
 totp-rs = { version = "5", features = ["qr"] }
 base32 = "0.5"
+aes-gcm = "0.10"
 
 # MEC Management 모듈
 kube = { version = "0.95", features = ["runtime", "derive", "rustls-tls"], default-features = false }

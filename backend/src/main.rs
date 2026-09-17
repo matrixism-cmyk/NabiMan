@@ -45,6 +45,8 @@ mod oauth;
 mod ip_block;
 mod openapi;
 mod models;
+mod secret_store;
+mod ssh_auth;
 mod mec;
 
 use actix_cors::Cors;
@@ -160,6 +162,7 @@ async fn main() -> std::io::Result<()> {
     let schedule_store = backup::new_schedule_store();
     backup::start_backup_scheduler(schedule_store.clone());
     let pty_store = terminal::new_pty_store();
+    terminal::restore_sessions(&pty_store);
     terminal::start_pty_cleanup(pty_store.clone());
 
     // MEC Management module state. Services pick real/mock based on

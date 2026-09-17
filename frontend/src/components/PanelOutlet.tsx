@@ -52,7 +52,7 @@ import MecUsersPanel from './mec/MecUsersPanel';
 
 interface Props {
   activeTab: Tab;
-  onConnectSSH: (host: string, port: number, user: string) => void;
+  onConnectSSH: (host: string, port: number, user: string, serverId?: string) => void;
   onNavigate: (tab: Tab) => void;
   onEnterFocus: () => void;
 }

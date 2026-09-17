@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import { I18nProvider } from './i18n';
+import { TerminalSettingsProvider } from './components/terminal/settings';
+import { TerminalWindowsProvider } from './components/terminal/TerminalWindows';
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(
@@ -11,7 +13,11 @@ const root = ReactDOM.createRoot(
 root.render(
   <React.StrictMode>
     <I18nProvider>
-      <App />
+      <TerminalSettingsProvider>
+        <TerminalWindowsProvider>
+          <App />
+        </TerminalWindowsProvider>
+      </TerminalSettingsProvider>
     </I18nProvider>
   </React.StrictMode>
 );

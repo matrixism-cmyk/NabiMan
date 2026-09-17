@@ -2,6 +2,7 @@ use actix_web::{web, HttpResponse};
 use std::fs;
 use std::process::Command;
 use crate::models::{ApiResponse, RemoteServer, SshKeyInfo, DeployKeyRequest};
+use crate::ssh_auth;
 
 fn data_dir_path() -> String {
     std::env::var("NABIMAN_DATA_DIR")
@@ -79,10 +80,14 @@ pub fn deploy_key_to_server(server: &RemoteServer, password: &str) -> Result<Str
     let has_sshpass = Command::new("which").arg("sshpass").output()
         .map(|o| o.status.success()).unwrap_or(false);
 
+    // The password goes through a 0600 file rather than argv, so it is never
+    // visible in `ps` while ssh-copy-id runs.
+    let pw_file = ssh_auth::write_password_file(password)?;
+
     if has_sshpass {
         let key_path = nabiman_pubkey_path();
         let output = Command::new("sshpass")
-            .args(["-p", password, "ssh-copy-id", "-i", &key_path,
+            .args(["-f", pw_file.path(), "ssh-copy-id", "-i", &key_path,
                    "-o", "StrictHostKeyChecking=accept-new", "-p", &port_str, &target])
             .output()
             .map_err(|e| format!("sshpass failed: {}", e))?;
@@ -105,7 +110,7 @@ pub fn deploy_key_to_server(server: &RemoteServer, password: &str) -> Result<Str
     );
 
     let output = Command::new("sshpass")
-        .args(["-p", password, "ssh", "-o", "StrictHostKeyChecking=accept-new",
+        .args(["-f", pw_file.path(), "ssh", "-o", "StrictHostKeyChecking=accept-new",
                "-p", &port_str, &target, &remote_cmd])
         .output();
 
@@ -177,10 +182,16 @@ pub async fn deploy_key(
         Some(s) => s,
         None => return HttpResponse::Ok().json(ApiResponse::<String>::error("Server not found")),
     };
-    if body.password.is_empty() {
-        return HttpResponse::Ok().json(ApiResponse::<String>::error("Password required"));
-    }
-    match deploy_key_to_server(srv, &body.password) {
+    // Fall back to the password saved on the server record, if there is one.
+    let password = if body.password.is_empty() {
+        match super::remote_servers::server_password(srv) {
+            Some(pw) => pw,
+            None => return HttpResponse::Ok().json(ApiResponse::<String>::error("Password required")),
+        }
+    } else {
+        body.password.clone()
+    };
+    match deploy_key_to_server(srv, &password) {
         Ok(msg) => HttpResponse::Ok().json(ApiResponse::ok(msg)),
         Err(e) => HttpResponse::Ok().json(ApiResponse::<String>::error(&e)),
     }

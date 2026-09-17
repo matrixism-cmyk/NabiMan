@@ -15,6 +15,15 @@ pub struct RemoteServer {
     pub last_checked: String,
     #[serde(default)]
     pub status: String,
+    /// Password encrypted at rest (see `secret_store`). Written to the data
+    /// file, but blanked before any API response — only `has_password` leaves
+    /// the server.
+    #[serde(default)]
+    pub password_enc: String,
+    /// Derived from `password_enc` on every save/list so the UI can show
+    /// whether a password is stored without ever receiving it.
+    #[serde(default)]
+    pub has_password: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -42,6 +51,8 @@ pub struct AddRemoteServerRequest {
     pub auth_method: Option<String>,
     pub tags: Option<Vec<String>>,
     pub memo: Option<String>,
+    /// Optional SSH password, stored encrypted.
+    pub password: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -53,6 +64,9 @@ pub struct UpdateRemoteServerRequest {
     pub auth_method: Option<String>,
     pub tags: Option<Vec<String>>,
     pub memo: Option<String>,
+    /// `Some("")` clears the stored password, `Some(pw)` replaces it,
+    /// `None` leaves it untouched.
+    pub password: Option<String>,
 }
 
 #[derive(Deserialize)]

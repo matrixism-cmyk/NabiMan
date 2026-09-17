@@ -2372,6 +2372,7 @@ dependencies = [
  "actix-test",
  "actix-web",
  "actix-web-actors",
+ "aes-gcm",
  "async-trait",
  "base32",
  "bcrypt",

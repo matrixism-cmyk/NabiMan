@@ -12,6 +12,7 @@ import mecFirewall from './mec-firewall';
 import mecOps from './mec-ops';
 import mecWizard from './mec-wizard';
 import noc from './noc';
+import terminal from './terminal';
 
 export type Lang = 'ko' | 'en' | 'ja';
 
@@ -36,6 +37,7 @@ const translations: Record<string, Record<Lang, string>> = {
   ...mecOps,
   ...mecWizard,
   ...noc,
+  ...terminal,
 };
 
 export default translations;

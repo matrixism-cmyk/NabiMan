@@ -1,0 +1,134 @@
+type Lang = 'ko' | 'en' | 'ja';
+type T = Record<string, Record<Lang, string>>;
+
+// Terminal windows, terminal settings, and stored remote-server passwords.
+const t: T = {
+  // --- Saved passwords on remote servers ---
+  'remote.password': { ko: '비밀번호', en: 'Password', ja: 'パスワード' },
+  'remote.passwordPlaceholder': { ko: 'SSH 비밀번호 저장 (선택)', en: 'Save SSH password (optional)', ja: 'SSHパスワードを保存 (任意)' },
+  'remote.passwordHint': {
+    ko: '서버에 암호화되어 저장되며, 접속·점검·터미널에서 자동으로 사용됩니다.',
+    en: 'Stored encrypted on the server and used automatically for checks, exec and terminals.',
+    ja: 'サーバー上で暗号化して保存され、接続・チェック・ターミナルで自動的に使用されます。',
+  },
+  'remote.passwordKeep': { ko: '비밀번호 변경 (비우면 유지)', en: 'New password (blank = keep)', ja: '新しいパスワード (空欄で維持)' },
+  'remote.passwordStored': { ko: '비밀번호 저장됨', en: 'password saved', ja: 'パスワード保存済' },
+  'remote.passwordStoredHint': {
+    ko: '이 서버의 SSH 비밀번호가 암호화되어 저장되어 있습니다.',
+    en: 'An SSH password is stored (encrypted) for this server.',
+    ja: 'このサーバーのSSHパスワードが暗号化して保存されています。',
+  },
+  'remote.clearPassword': { ko: '비밀번호 삭제', en: 'Clear password', ja: 'パスワード削除' },
+  'remote.clearPasswordConfirm': {
+    ko: '저장된 비밀번호를 삭제할까요? 이후에는 SSH 키로만 접속합니다.',
+    en: 'Delete the stored password? Connections will then use the SSH key only.',
+    ja: '保存されたパスワードを削除しますか？以後はSSH鍵のみで接続します。',
+  },
+  'remote.terminalWindow': { ko: '터미널 창', en: 'Terminal window', ja: 'ターミナル窓' },
+  'remote.openTerminalWindow': {
+    ko: '이 서버를 별도 터미널 창으로 열기 (여러 개 동시에 열 수 있음)',
+    en: 'Open this server in its own terminal window (several can be open at once)',
+    ja: 'このサーバーを独立したターミナル窓で開く (複数同時に開けます)',
+  },
+
+  // --- Terminal windows / settings ---
+  'terminal.reconnecting': { ko: '재연결 중', en: 'Reconnecting', ja: '再接続中' },
+  'terminal.openWindow': { ko: '새 창', en: 'New window', ja: '新しい窓' },
+  'terminal.newSession': { ko: '새 세션', en: 'New session', ja: '新しいセッション' },
+  'terminal.sessions': { ko: '세션 목록', en: 'Sessions', ja: 'セッション一覧' },
+  'terminal.activeSessions': { ko: '실행 중인 세션 (tmux)', en: 'Active sessions (tmux)', ja: '実行中のセッション (tmux)' },
+  'terminal.noSessions': { ko: '실행 중인 세션이 없습니다', en: 'No active sessions', ja: 'アクティブなセッションはありません' },
+  'terminal.label': { ko: '이름', en: 'Label', ja: 'ラベル' },
+  'terminal.viewers': { ko: '접속자', en: 'Viewers', ja: '接続数' },
+  'terminal.age': { ko: '경과', en: 'Age', ja: '経過' },
+  'terminal.scrollbackShort': { ko: '스크롤백', en: 'Scrollback', ja: 'スクロールバック' },
+  'terminal.join': { ko: '참여', en: 'Join', ja: '参加' },
+  'terminal.share': { ko: '공유', en: 'Share', ja: '共有' },
+  'terminal.shared': { ko: '공유됨', en: 'Shared', ja: '共有中' },
+  'terminal.settings': { ko: '터미널 설정', en: 'Terminal settings', ja: 'ターミナル設定' },
+  'terminal.scrollbackLines': { ko: '스크롤백 줄 수', en: 'Scrollback lines', ja: 'スクロールバック行数' },
+  'terminal.scrollbackHint': {
+    ko: '연결이 끊겨도 이 줄 수만큼의 이전 화면을 기억합니다. 기본값 5,000줄. 화면에는 즉시 적용되고, 서버(tmux) 기록은 새로 여는 세션부터 적용됩니다.',
+    en: 'How many lines of earlier output are kept, even across a disconnect. Default 5,000. Applies to the screen at once; the server-side (tmux) history applies to sessions started afterwards.',
+    ja: '切断後もこの行数だけ過去の画面を保持します。既定は5,000行。画面には即時、サーバー側(tmux)の履歴は新しいセッションから適用されます。',
+  },
+  'terminal.keepalive': { ko: '연결 유지 (자동 종료 안 함)', en: 'Keep alive (never auto-close)', ja: '接続維持 (自動切断しない)' },
+  'terminal.keepaliveHint': {
+    ko: '세션이 서버에서 계속 실행되고, 끊기면 자동으로 다시 연결합니다.',
+    en: 'The session keeps running on the server and the browser reconnects to it automatically.',
+    ja: 'セッションはサーバー上で動き続け、切断時は自動的に再接続します。',
+  },
+  'terminal.keepaliveInterval': { ko: 'Keep-alive 간격 (초)', en: 'Keep-alive interval (sec)', ja: 'Keep-alive 間隔 (秒)' },
+  'terminal.keepaliveIntervalHint': {
+    ko: 'SSH ServerAliveInterval 값입니다. 방화벽이 유휴 연결을 끊는 것을 막습니다.',
+    en: "SSH ServerAliveInterval — stops firewalls from dropping an idle connection.",
+    ja: 'SSHのServerAliveInterval値です。ファイアウォールによる切断を防ぎます。',
+  },
+  'terminal.idleTimeout': { ko: '유휴 세션 유지 시간', en: 'Idle session lifetime', ja: 'アイドルセッション保持時間' },
+  'terminal.idleTimeoutHint': {
+    ko: '창을 닫은 뒤 세션을 얼마나 살려둘지 정합니다.',
+    en: 'How long a session survives after its window is closed.',
+    ja: '窓を閉じた後、セッションをどれだけ維持するかを指定します。',
+  },
+  'terminal.permanent': { ko: '영구', en: 'Permanent', ja: '無期限' },
+  'terminal.restoreScrollback': { ko: '다시 열 때 이전 출력 복원', en: 'Restore previous output when reopening', ja: '再オープン時に以前の出力を復元' },
+  'terminal.restoreScrollbackHint': {
+    ko: '창을 다시 열면 서버에 남아 있는 이전 화면을 불러옵니다.',
+    en: 'Pulls the history the server still holds when a window is reopened.',
+    ja: '窓を開き直したとき、サーバーに残る履歴を読み込みます。',
+  },
+  'terminal.fontSize': { ko: '글자 크기', en: 'Font size', ja: '文字サイズ' },
+  'terminal.sessionEnded': { ko: '세션이 종료되었습니다', en: 'session ended', ja: 'セッションが終了しました' },
+  'terminal.statusConnecting': { ko: '연결 중…', en: 'Connecting…', ja: '接続中…' },
+  'terminal.statusReconnecting': { ko: '재연결 중…', en: 'Reconnecting…', ja: '再接続中…' },
+  'terminal.statusDisconnected': { ko: '연결 끊김 · 클릭하면 재연결', en: 'Disconnected · click to retry', ja: '切断 · クリックで再接続' },
+  'terminal.statusEnded': { ko: '세션 종료됨 · 클릭하면 새 세션', en: 'Session ended · click for a new one', ja: 'セッション終了 · クリックで新規' },
+  'terminal.clickToRetry': { ko: '클릭하면 다시 연결합니다', en: 'Click to connect again', ja: 'クリックで再接続します' },
+  'terminal.reconnect': { ko: '재연결', en: 'Reconnect', ja: '再接続' },
+  'terminal.minimize': { ko: '최소화', en: 'Minimise', ja: '最小化' },
+  'terminal.maximize': { ko: '최대화', en: 'Maximise', ja: '最大化' },
+  'terminal.restoreSize': { ko: '이전 크기', en: 'Restore size', ja: '元のサイズ' },
+  'terminal.tile': { ko: '정렬', en: 'Tile', ja: '整列' },
+  'terminal.cascade': { ko: '계단식', en: 'Cascade', ja: 'カスケード' },
+  'terminal.endSessionHint': {
+    ko: '세션 종료 (원격 셸까지 함께 종료)',
+    en: 'End session (also closes the remote shell)',
+    ja: 'セッション終了 (リモートシェルも終了)',
+  },
+  'terminal.endSessionConfirm': {
+    ko: '"{name}" 세션을 완전히 종료할까요? 실행 중인 원격 셸도 함께 종료됩니다.',
+    en: 'End the "{name}" session for good? The running remote shell is closed too.',
+    ja: '「{name}」セッションを完全に終了しますか？実行中のリモートシェルも終了します。',
+  },
+  'terminal.closeWindowHint': {
+    ko: '창 닫기 (세션은 서버에서 계속 실행)',
+    en: 'Close window (the session keeps running on the server)',
+    ja: '窓を閉じる (セッションはサーバーで継続)',
+  },
+  'deployKey.useSavedPassword': {
+    ko: '저장된 비밀번호 사용 (비워두면 자동)',
+    en: 'Use the saved password (leave blank)',
+    ja: '保存済みパスワードを使用 (空欄で自動)',
+  },
+  'remote.manualPassword': { ko: '직접 입력', en: 'Type password', ja: '手入力' },
+  'remote.manualPasswordHint': {
+    ko: '저장된 비밀번호를 쓰지 않고 터미널에서 직접 입력해 접속합니다 (OTP·2단계 인증 서버용).',
+    en: 'Connect without the saved password and type it in the pane (for OTP/2FA servers).',
+    ja: '保存済みパスワードを使わず、ターミナルで直接入力して接続します (OTP・2要素認証向け)。',
+  },
+  'remote.passwordVerifying': { ko: '저장된 비밀번호로 접속을 확인하는 중...', en: 'Verifying the saved password...', ja: '保存したパスワードで接続確認中...' },
+  'remote.passwordVerified': { ko: '저장된 비밀번호로 접속이 확인되었습니다.', en: 'The saved password authenticates correctly.', ja: '保存したパスワードで接続を確認しました。' },
+  'remote.passwordVerifyFailed': { ko: '저장된 비밀번호로 접속하지 못했습니다:', en: 'Could not connect with the saved password:', ja: '保存したパスワードで接続できませんでした:' },
+  'remote.passwordWhitespace': {
+    ko: '⚠ 앞뒤에 공백이 있습니다. 복사·붙여넣기 중 섞여 들어간 것은 아닌지 확인하세요.',
+    en: '⚠ There is leading/trailing whitespace — check whether it was picked up while pasting.',
+    ja: '⚠ 前後に空白があります。貼り付け時に混入していないか確認してください。',
+  },
+  'remote.editServer': { ko: '서버 정보 수정', en: 'Edit server', ja: 'サーバー情報の編集' },
+  'remote.hostRequired': { ko: '호스트를 입력하세요.', en: 'Host is required.', ja: 'ホストを入力してください。' },
+  'remote.userRequired': { ko: '사용자를 입력하세요.', en: 'User is required.', ja: 'ユーザーを入力してください。' },
+  'remote.portInvalid': { ko: '포트는 1~65535 사이여야 합니다.', en: 'Port must be between 1 and 65535.', ja: 'ポートは1〜65535の範囲で指定してください。' },
+  'terminal.resetDefaults': { ko: '기본값', en: 'Defaults', ja: '既定値' },
+};
+
+export default t;
