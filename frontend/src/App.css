@@ -87,27 +87,6 @@ body {
   background: var(--bg);
 }
 
-/* Terminal persistence: always rendered at full size, z-index controls visibility.
-   Canvas/WebGL content is preserved because the element is never hidden. */
-.terminal-persist {
-  position: absolute;
-  top: 0; right: 0; bottom: 0;
-  left: 180px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  background: var(--bg);
-}
-.terminal-persist-visible {
-  z-index: 50;
-}
-.terminal-persist-hidden {
-  z-index: -1;
-  pointer-events: none;
-}
-@media (max-width: 768px) {
-  .terminal-persist { left: 0; }
-}
-
 .sidebar {
   width: 180px;
   min-width: 180px;
@@ -259,7 +238,6 @@ body {
 .app.focus-mode .app-header,
 .app.focus-mode .cat-nav,
 .app.focus-mode .sidebar { display: none; }
-.app.focus-mode .terminal-persist { left: 0; }
 
 .focus-exit-btn {
   position: fixed;

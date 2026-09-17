@@ -3,7 +3,6 @@ import './App.css';
 import './components.css';
 import './design.css';
 import LoginScreen from './components/LoginScreen';
-import TerminalPanel from './components/TerminalPanel';
 import PanelOutlet from './components/PanelOutlet';
 import ChangePasswordModal from './components/ChangePasswordModal';
 import CommandPalette from './components/CommandPalette';
@@ -16,6 +15,10 @@ import { ThemeProvider, ThemeSelector } from './theme';
 /** Parse the URL hash (#category/tab) into a valid cat/tab pair, or null. */
 function parseHash(): { cat: Category; tab: Tab } | null {
   const [catKey, tabKey] = window.location.hash.replace(/^#/, '').split('/');
+  // The terminal and the fleet summary now live inside the remote workspace.
+  if ((catKey === 'system' && tabKey === 'terminal') || (catKey === 'dashboard' && tabKey === 'multiserver')) {
+    return { cat: 'remote', tab: 'remote' };
+  }
   const cat = categories.find((c) => c.key === catKey);
   if (!cat) return null;
   const tab = cat.tabs.find((tb) => tb.key === tabKey);
@@ -27,7 +30,6 @@ function App() {
   const [loggedIn, setLoggedIn] = useState(!!sessionStorage.getItem('nabiman_token'));
   const [activeTab, setActiveTab] = useState<Tab>('server');
   const [activeCat, setActiveCat] = useState<Category>('dashboard');
-  const [sshTarget, setSshTarget] = useState<{ host: string; port: number; user: string; serverId?: string } | null>(null);
   const [showChangePw, setShowChangePw] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
   const [hiddenTabs, setHiddenTabs] = useState<Set<Tab>>(new Set());
@@ -110,11 +112,6 @@ function App() {
   }, [hiddenTabs]);
 
   const handleLogout = () => { clearToken(); setLoggedIn(false); };
-  const handleConnectSSH = (host: string, port: number, user: string, serverId?: string) => {
-    setSshTarget({ host, port, user, serverId });
-    setActiveCat('system');
-    setActiveTab('terminal');
-  };
   const handleNavigate = (tab: Tab) => { setActiveCat('mec'); setActiveTab(tab); };
   const navigateTo = (cat: Category, tab: Tab) => { setActiveCat(cat); setActiveTab(tab); };
   const handleCatClick = (cat: CatDef) => {
@@ -129,7 +126,10 @@ function App() {
   return (
     <div className={`app ${focusMode ? 'focus-mode' : ''}`}>
       <header className="app-header">
-        <h1 className="logo-link" onClick={() => { setActiveCat('dashboard'); setActiveTab('server'); }}>{t('app.title')}</h1>
+        <h1><button className="logo-link" onClick={() => navigateTo('dashboard', 'server')}>
+          <img src={`${process.env.PUBLIC_URL}/favicon.svg`} alt="" width="32" height="32" />
+          {t('app.title')}
+        </button></h1>
         <span className="subtitle">{t('app.subtitle')}</span>
         <div className="header-actions">
           <ThemeSelector compact />
@@ -146,6 +146,7 @@ function App() {
             key={cat.key}
             className={`cat-btn ${activeCat === cat.key ? 'active' : ''}`}
             onClick={() => handleCatClick(cat)}
+            aria-current={activeCat === cat.key ? 'page' : undefined}
           >
             {t(cat.labelKey)}
           </button>
@@ -154,11 +155,13 @@ function App() {
       <div className="app-body">
         {currentCat.tabs.length > 1 && (
           <aside className="sidebar">
+            <div className="sidebar-heading">{t(currentCat.labelKey)}</div>
             {currentCat.tabs.map((tab) => (
               <button
                 key={tab.key}
                 className={`sidebar-btn ${activeTab === tab.key ? 'active' : ''}`}
                 onClick={() => setActiveTab(tab.key)}
+                aria-current={activeTab === tab.key ? 'page' : undefined}
               >
                 {t(tab.labelKey)}
               </button>
@@ -168,16 +171,10 @@ function App() {
         <main className={`main-content ${currentCat.tabs.length <= 1 ? 'full-width' : ''}`}>
           <PanelOutlet
             activeTab={activeTab}
-            onConnectSSH={handleConnectSSH}
             onNavigate={handleNavigate}
             onEnterFocus={enterFocus}
           />
         </main>
-        {/* Terminal: always mounted, positioned over main when active.
-            Uses visibility+offscreen instead of display:none to keep xterm.js buffer intact. */}
-        <div className={`terminal-persist ${activeTab === 'terminal' ? 'terminal-persist-visible' : 'terminal-persist-hidden'}`}>
-          <TerminalPanel sshTarget={sshTarget} onSshConnected={() => setSshTarget(null)} isVisible={activeTab === 'terminal'} />
-        </div>
       </div>
       {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
       {showPalette && (

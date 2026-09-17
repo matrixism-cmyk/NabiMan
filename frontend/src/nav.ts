@@ -4,9 +4,9 @@
 export type Tab =
   | 'server' | 'charts' | 'network' | 'accounts' | 'config' | 'traffic' | 'packages'
   | 'containers' | 'services' | 'firewall' | 'logs' | 'cron' | 'processes' | 'disks'
-  | 'remote' | 'terminal' | 'updates' | 'diagnostics' | 'ssl'
+  | 'remote' | 'updates' | 'diagnostics' | 'ssl'
   | 'files' | 'backup' | 'audit' | 'database' | 'mail' | 'swap' | 'sessions' | 'dns' | 'usermgmt'
-  | 'notifications' | 'alertrules' | 'vhost' | 'ipblock' | 'license' | 'enterpriseauth' | 'multiserver'
+  | 'notifications' | 'alertrules' | 'vhost' | 'ipblock' | 'license' | 'enterpriseauth'
   | 'mecDashboard' | 'mecNoc' | 'mecLive' | 'mecTenants' | 'mecNodes' | 'mecGpu' | 'mecFirewall'
   | 'mecStorage' | 'mecIngress' | 'mecJobs' | 'mecAudit' | 'mecHealth'
   | 'mecSettings' | 'mecDiscovery' | 'mecUsers';
@@ -24,7 +24,6 @@ export const categories: CatDef[] = [
   { key: 'dashboard', labelKey: 'cat.dashboard', tabs: [
     { key: 'server', labelKey: 'tab.serverStatus' },
     { key: 'charts', labelKey: 'tab.charts' },
-    { key: 'multiserver', labelKey: 'tab.multiServer' },
   ]},
   { key: 'monitoring', labelKey: 'cat.monitoring', tabs: [
     { key: 'processes', labelKey: 'tab.processes' },
@@ -62,11 +61,12 @@ export const categories: CatDef[] = [
     { key: 'logs', labelKey: 'tab.logs' },
     { key: 'cron', labelKey: 'tab.cron' },
     { key: 'files', labelKey: 'tab.files' },
-    { key: 'terminal', labelKey: 'tab.terminal' },
     { key: 'license', labelKey: 'tab.license' },
   ]},
+  // One workspace: the server list, the terminal and the fleet summary used to
+  // live in three different categories.
   { key: 'remote', labelKey: 'cat.remote', tabs: [
-    { key: 'remote', labelKey: 'tab.remoteServers' },
+    { key: 'remote', labelKey: 'tab.remoteWorkspace' },
   ]},
   { key: 'mec', labelKey: 'cat.mec', tabs: [
     { key: 'mecNoc', labelKey: 'tab.mecNoc' },

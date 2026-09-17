@@ -1,0 +1,177 @@
+/* Remote workspace: connection targets on the left, the work on the right. */
+
+.rw {
+  display: flex;
+  gap: 12px;
+  height: 100%;
+  min-height: 480px;
+}
+
+/* ── Rail ───────────────────────────────────────────────────────────── */
+.rw-rail {
+  width: 248px;
+  flex: 0 0 248px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.rw-rail-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.rw-rail-count { font-size: 12px; color: var(--text-secondary); }
+.rw-rail-count strong { color: var(--success); font-size: 14px; }
+.rw-rail-head .btn { margin-left: auto; }
+
+.rw-rail-filter { margin: 10px 12px 0; width: calc(100% - 24px); }
+
+.rw-rail-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rw-rail-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 10px 8px 4px;
+}
+
+.rw-rail-empty { font-size: 12px; color: var(--text-secondary); padding: 4px 8px 8px; }
+
+.rw-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 2px 8px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 7px 10px;
+  cursor: pointer;
+  color: var(--text);
+  font: inherit;
+}
+.rw-item:hover { background: rgba(255, 255, 255, 0.04); }
+.rw-item.is-active { background: rgba(59, 130, 246, 0.12); border-color: var(--primary); }
+.rw-item:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+.rw-item-name { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rw-item-sub {
+  grid-column: 2 / -1;
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rw-item-count {
+  font-size: 10px;
+  font-weight: 600;
+  min-width: 18px;
+  text-align: center;
+  padding: 1px 5px;
+  border-radius: 9px;
+  background: rgba(59, 130, 246, 0.2);
+  color: var(--primary);
+}
+.rw-item-add { grid-template-columns: 1fr; color: var(--text-secondary); font-size: 12px; }
+.rw-item-add:hover { color: var(--text); }
+
+.rw-lamp { width: 8px; height: 8px; border-radius: 50%; background: var(--text-secondary); }
+.rw-lamp-up { background: var(--success); }
+.rw-lamp-down { background: var(--danger); }
+.rw-lamp-unknown { background: var(--text-secondary); opacity: .5; }
+.rw-lamp-local { background: var(--primary); }
+
+/* ── Work area ──────────────────────────────────────────────────────── */
+.rw-work {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.rw-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.rw-head-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.rw-head-title h2 { font-size: 16px; margin: 0; color: var(--text); }
+.rw-head-title code { font-size: 12px; color: var(--text-secondary); }
+.rw-head-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+.rw-tabs { display: flex; gap: 2px; flex-wrap: wrap; }
+.rw-tabs button {
+  font: inherit;
+  font-size: 12.5px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+.rw-tabs button:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); }
+.rw-tabs button.is-active { color: var(--primary); background: rgba(59, 130, 246, 0.12); font-weight: 500; }
+.rw-tabs button em { font-style: normal; opacity: .7; margin-left: 4px; }
+.rw-tabs button:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+.rw-body { position: relative; flex: 1; min-height: 0; background: var(--bg); }
+
+.rw-view { position: absolute; inset: 0; }
+.rw-view-scroll { overflow-y: auto; padding: 14px; }
+.rw-view-terminal { padding: 4px; background: #0f1923; }
+/* Hidden panes stay mounted (and connected) but out of the way. */
+.rw-view-hidden { visibility: hidden; z-index: -1; pointer-events: none; }
+
+.rw-section { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+.rw-section-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.rw-section-head h3 { font-size: 14px; margin: 0; color: var(--text); }
+.rw-section-head .btn-group, .rw-section-head .btn { margin-left: auto; }
+.rw-section .panel { margin-bottom: 0; }
+
+.rw-form { display: flex; flex-direction: column; gap: 10px; }
+.rw-form .form-grid { margin-bottom: 0; }
+
+.rw-connect { display: flex; align-items: center; justify-content: center; padding: 24px; }
+.rw-connect-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 28px 32px;
+  max-width: 420px;
+}
+.rw-connect-card h3 { font-size: 16px; margin: 0; }
+.rw-connect-card code { font-size: 12px; color: var(--text-secondary); }
+.rw-connect-card p { font-size: 13px; margin: 0; }
+
+@media (max-width: 860px) {
+  .rw { flex-direction: column; height: auto; }
+  .rw-rail { width: 100%; flex: none; max-height: 260px; }
+  .rw-work { min-height: 460px; }
+}

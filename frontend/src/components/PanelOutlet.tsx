@@ -13,7 +13,7 @@ import LogsPanel from './LogsPanel';
 import CronPanel from './CronPanel';
 import ProcessesPanel from './ProcessesPanel';
 import DisksPanel from './DisksPanel';
-import RemoteServersPanel from './RemoteServersPanel';
+import RemoteWorkspace from './remote/RemoteWorkspace';
 import UpdatesPanel from './UpdatesPanel';
 import DiagnosticsPanel from './DiagnosticsPanel';
 import SslPanel from './SslPanel';
@@ -33,7 +33,6 @@ import VhostPanel from './VhostPanel';
 import IpBlockPanel from './IpBlockPanel';
 import LicensePanel from './LicensePanel';
 import EnterpriseAuthPanel from './EnterpriseAuthPanel';
-import MultiServerDashboard from './MultiServerDashboard';
 import MecDashboardPanel from './mec/MecDashboardPanel';
 import MecNocPanel from './mec/MecNocPanel';
 import MecLivePanel from './mec/MecLivePanel';
@@ -52,15 +51,13 @@ import MecUsersPanel from './mec/MecUsersPanel';
 
 interface Props {
   activeTab: Tab;
-  onConnectSSH: (host: string, port: number, user: string, serverId?: string) => void;
   onNavigate: (tab: Tab) => void;
   onEnterFocus: () => void;
 }
 
 /// Renders the panel for the active tab. Extracted from App.tsx so the shell
-/// stays within the line budget; the terminal panel stays in App because it is
-/// always-mounted (persistent xterm buffer).
-export default function PanelOutlet({ activeTab, onConnectSSH, onNavigate, onEnterFocus }: Props) {
+/// stays within the line budget.
+export default function PanelOutlet({ activeTab, onNavigate, onEnterFocus }: Props) {
   switch (activeTab) {
     case 'server': return <ServerStatusPanel />;
     case 'network': return <NetworkPanel />;
@@ -94,8 +91,7 @@ export default function PanelOutlet({ activeTab, onConnectSSH, onNavigate, onEnt
     case 'ipblock': return <IpBlockPanel />;
     case 'license': return <LicensePanel />;
     case 'enterpriseauth': return <EnterpriseAuthPanel />;
-    case 'multiserver': return <MultiServerDashboard />;
-    case 'remote': return <RemoteServersPanel onConnectSSH={onConnectSSH} />;
+    case 'remote': return <RemoteWorkspace />;
     case 'mecNoc': return <MecNocPanel onNavigate={(tab) => onNavigate(tab as Tab)} onEnterFocus={onEnterFocus} />;
     case 'mecDashboard': return <MecDashboardPanel onNavigate={(tab) => onNavigate(tab as Tab)} />;
     case 'mecLive': return <MecLivePanel />;
