@@ -11,35 +11,12 @@ import MultiServerDashboard from '../MultiServerDashboard';
 import ServerForm from './ServerForm';
 import { ServerStatusView, ServerExecView, ServerSettingsView } from './ServerDetail';
 import SessionsView, { SessionInfo } from './SessionsView';
+import TargetRail from './TargetRail';
+import {
+  OverviewView, readSelection, rememberSelection, Selection, ServerView, sessionLabel,
+} from './workspaceState';
 import './remote-workspace.css';
 
-type Selection =
-  | { kind: 'overview' }
-  | { kind: 'new' }
-  | { kind: 'local' }
-  | { kind: 'adhoc' }
-  | { kind: 'server'; id: string };
-
-type ServerView = 'terminal' | 'status' | 'exec' | 'settings';
-type OverviewView = 'summary' | 'sessions' | 'keys';
-
-const SELECTION_KEY = 'nabiman_remote_selection';
-
-function readSelection(): Selection {
-  try {
-    const raw = localStorage.getItem(SELECTION_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed.kind === 'string') return parsed as Selection;
-    }
-  } catch { /* ignore */ }
-  return { kind: 'overview' };
-}
-
-/** The tmux label the backend gives a session for this target. */
-function sessionLabel(server: RemoteServer): string {
-  return `ssh:${server.user}@${server.host}:${server.port}`;
-}
 
 /**
  * One place for everything remote: the list of things you can connect to on
@@ -73,9 +50,7 @@ export default function RemoteWorkspace() {
   const [adhocForm, setAdhocForm] = useState({ host: '', port: '22', user: 'root' });
   const [adhocTarget, setAdhocTarget] = useState<{ host: string; port: number; user: string } | null>(null);
 
-  useEffect(() => {
-    try { localStorage.setItem(SELECTION_KEY, JSON.stringify(selection)); } catch { /* ignore */ }
-  }, [selection]);
+  useEffect(() => { rememberSelection(selection); }, [selection]);
 
   const selectedServer = selection.kind === 'server'
     ? servers.find(s => s.id === selection.id)
@@ -171,11 +146,6 @@ export default function RemoteWorkspace() {
   };
 
   const online = servers.filter(s => s.status === 'online').length;
-  const query = filter.trim().toLowerCase();
-  const visibleServers = query
-    ? servers.filter(s => s.name.toLowerCase().includes(query) || s.host.toLowerCase().includes(query)
-        || s.tags.some(tag => tag.toLowerCase().includes(query)) || s.memo.toLowerCase().includes(query))
-    : servers;
 
   const countFor = (server: RemoteServer) =>
     sessions.filter(s => s.label === sessionLabel(server) && s.alive).length;
@@ -202,62 +172,18 @@ export default function RemoteWorkspace() {
 
   return (
     <div className="rw">
-      <aside className="rw-rail">
-        <div className="rw-rail-head">
-          <span className="rw-rail-count">
-            <strong>{online}</strong>/{servers.length} {t('common.online')}
-          </span>
-          <button className="btn btn-secondary btn-sm" onClick={checkAll} disabled={checkingAll || servers.length === 0}>
-            {checkingAll ? t('remote.checking') : t('remote.checkAll')}
-          </button>
-        </div>
-
-        {servers.length > 5 && (
-          <input className="filter-input rw-rail-filter" value={filter} onChange={e => setFilter(e.target.value)}
-            placeholder={t('remote.filterPlaceholder')} />
-        )}
-
-        <div className="rw-rail-list">
-          <button className={`rw-item ${selection.kind === 'overview' ? 'is-active' : ''}`}
-            onClick={() => select({ kind: 'overview' })}>
-            <span className="rw-item-name">{t('remote.overview')}</span>
-            <span className="rw-item-sub">{t('remote.overviewHint')}</span>
-          </button>
-
-          <div className="rw-rail-label">{t('remote.serversGroup')}</div>
-          {visibleServers.map(server => {
-            const count = countFor(server);
-            const state = server.status === 'online' ? 'up' : server.status === 'offline' ? 'down' : 'unknown';
-            return (
-              <button key={server.id}
-                className={`rw-item ${selection.kind === 'server' && selection.id === server.id ? 'is-active' : ''}`}
-                onClick={() => select({ kind: 'server', id: server.id })}>
-                <span className={`rw-lamp rw-lamp-${state}`} />
-                <span className="rw-item-name">{server.name}</span>
-                {count > 0 && <span className="rw-item-count" title={t('remote.liveSessions')}>{count}</span>}
-                <span className="rw-item-sub">{server.user}@{server.host}:{server.port}</span>
-              </button>
-            );
-          })}
-          {servers.length === 0 && <p className="rw-rail-empty">{t('remote.noServers')}</p>}
-          <button className={`rw-item rw-item-add ${selection.kind === 'new' ? 'is-active' : ''}`}
-            onClick={() => select({ kind: 'new' })}>+ {t('remote.addServer')}</button>
-
-          <div className="rw-rail-label">{t('remote.otherGroup')}</div>
-          <button className={`rw-item ${selection.kind === 'local' ? 'is-active' : ''}`}
-            onClick={() => select({ kind: 'local' })}>
-            <span className="rw-lamp rw-lamp-local" />
-            <span className="rw-item-name">{t('remote.localShell')}</span>
-            {localCount > 0 && <span className="rw-item-count">{localCount}</span>}
-            <span className="rw-item-sub">{t('remote.localShellHint')}</span>
-          </button>
-          <button className={`rw-item ${selection.kind === 'adhoc' ? 'is-active' : ''}`}
-            onClick={() => select({ kind: 'adhoc' })}>
-            <span className="rw-item-name">{t('remote.adhoc')}</span>
-            <span className="rw-item-sub">{t('remote.adhocHint')}</span>
-          </button>
-        </div>
-      </aside>
+      <TargetRail
+        servers={servers}
+        selection={selection}
+        online={online}
+        filter={filter}
+        checkingAll={checkingAll}
+        localSessions={localCount}
+        sessionsFor={countFor}
+        onSelect={select}
+        onFilter={setFilter}
+        onCheckAll={checkAll}
+      />
 
       <section className="rw-work">
         <header className="rw-head">

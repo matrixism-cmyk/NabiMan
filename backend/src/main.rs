@@ -13,6 +13,7 @@ mod logs;
 mod cron;
 mod processes;
 mod disks;
+mod remote_probe;
 mod remote_servers;
 mod ssh_keys;
 mod updates;
