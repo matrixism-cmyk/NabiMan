@@ -5,7 +5,8 @@ import { apiRequest } from '../../hooks/useApi';
 import { attachClipboard, attachWheelZoom, createTerminal } from './terminalChrome';
 import { buildTerminalUrl } from './terminalUrl';
 import {
-  bufKey, MAX_BUFFER_CHARS, readStored, sidKey, writeStored,
+  bufKey, forgetFontSize, MAX_BUFFER_CHARS, readFontSize, readStored, sidKey, writeFontSize,
+  writeStored,
 } from './terminalStorage';
 import { useT } from '../../i18n';
 import { TerminalSettings } from './settings';
@@ -81,6 +82,8 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
   const retryTimerRef = useRef<number | null>(null);
   const sessionIdRef = useRef<string>('');
   const settingsRef = useRef(settings);
+  /** The settings size this pane last applied, so a zoom is not undone by it. */
+  const appliedFontRef = useRef(settings.font_size);
   const targetRef = useRef(target);
   const joinRef = useRef(joinSessionId);
   const [status, setStatus] = useState<TerminalStatus>('connecting');
@@ -225,7 +228,12 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
 
   // Create the terminal once, restore the saved screen, then connect.
   useEffect(() => {
-    const { term, fit: fitAddon } = createTerminal(settingsRef.current);
+    // A pane reopens at the size it was zoomed to, not at the settings size.
+    const zoom = readFontSize(storageKey);
+    const { term, fit: fitAddon } = createTerminal(
+      zoom ? { ...settingsRef.current, font_size: zoom } : settingsRef.current,
+    );
+    appliedFontRef.current = settingsRef.current.font_size;
     termRef.current = term;
     fitRef.current = fitAddon;
     closedRef.current = false;
@@ -298,10 +306,15 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
   useEffect(() => {
     const term = termRef.current;
     if (!term) return;
-    term.options.fontSize = settings.font_size;
     term.options.scrollback = settings.scrollback_lines;
+    // Changing the size in settings is deliberate, so it clears a pane's zoom.
+    if (settings.font_size !== appliedFontRef.current) {
+      appliedFontRef.current = settings.font_size;
+      term.options.fontSize = settings.font_size;
+      forgetFontSize(storageKey);
+    }
     try { fitRef.current?.fit(); } catch { /* ignore */ }
-  }, [settings.font_size, settings.scrollback_lines]);
+  }, [settings.font_size, settings.scrollback_lines, storageKey]);
 
   useEffect(() => {
     if (!active) return;
@@ -316,10 +329,13 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    return attachWheelZoom(el, () => termRef.current, () => {
-      try { fitRef.current?.fit(); } catch { /* ignore */ }
-    });
-  }, []);
+    return attachWheelZoom(
+      el,
+      () => termRef.current,
+      () => { try { fitRef.current?.fit(); } catch { /* ignore */ } },
+      (size) => writeFontSize(storageKey, size),
+    );
+  }, [storageKey]);
 
   useImperativeHandle(ref, () => ({
     focus: () => termRef.current?.focus(),

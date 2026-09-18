@@ -29,42 +29,70 @@ export function createTerminal(settings: TerminalSettings): { term: Terminal; fi
 }
 
 /**
- * Copy and paste the way a terminal user expects: Ctrl+Shift+C/V, and a
- * right-click that copies a selection or pastes when there is none — the
- * habits PuTTY taught. Returns a cleanup function.
+ * Clipboard behaviour, in the shape terminal users expect:
+ *
+ * - selecting with the mouse copies straight away (drag, double-click a word,
+ *   triple-click a line),
+ * - right-click pastes,
+ * - Ctrl+Shift+C / Ctrl+Shift+V still work.
+ *
+ * The selection usually belongs to tmux rather than to xterm — tmux runs with
+ * mouse mode on so the wheel scrolls its history — so tmux is configured to
+ * hand the copied text over as an OSC 52 sequence, which is what the handler
+ * below turns into a clipboard write. The xterm-side selection is copied too,
+ * for panes where tmux is not in the way (a Shift-drag, for instance).
  */
 export function attachClipboard(
   term: Terminal,
   container: HTMLElement | null,
   send: (data: string) => void,
 ): () => void {
+  const copy = (text: string) => {
+    if (text) navigator.clipboard.writeText(text).catch(() => {});
+  };
   const paste = () => {
     navigator.clipboard.readText().then(send).catch(() => {});
   };
 
+  // tmux (and any other full-screen app) asks the terminal to set the clipboard
+  // with OSC 52; xterm.js leaves that to the embedder for safety.
+  const oscDispose = term.parser.registerOscHandler(52, (data: string) => {
+    const payload = data.slice(data.indexOf(';') + 1);
+    try {
+      const binary = atob(payload);
+      const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+      copy(new TextDecoder().decode(bytes));
+    } catch { /* not base64: nothing to copy */ }
+    return true;
+  });
+
+  const copyLocalSelection = () => {
+    if (term.hasSelection()) copy(term.getSelection());
+  };
+
   term.attachCustomKeyEventHandler((ev: KeyboardEvent) => {
     if (ev.type !== 'keydown') return true;
-    if (ev.ctrlKey && ev.shiftKey && ev.key === 'C') {
-      const sel = term.getSelection();
-      if (sel) navigator.clipboard.writeText(sel).catch(() => {});
-      return false;
-    }
+    if (ev.ctrlKey && ev.shiftKey && ev.key === 'C') { copyLocalSelection(); return false; }
     if (ev.ctrlKey && ev.shiftKey && ev.key === 'V') { paste(); return false; }
     return true;
   });
 
   const onContextMenu = (ev: MouseEvent) => {
     ev.preventDefault();
-    const sel = term.getSelection();
-    if (sel) {
-      navigator.clipboard.writeText(sel).catch(() => {});
-      term.clearSelection();
-    } else {
-      paste();
-    }
+    paste();
   };
+  const onMouseUp = () => copyLocalSelection();
+
   container?.addEventListener('contextmenu', onContextMenu);
-  return () => container?.removeEventListener('contextmenu', onContextMenu);
+  container?.addEventListener('mouseup', onMouseUp);
+  container?.addEventListener('dblclick', onMouseUp);
+
+  return () => {
+    oscDispose.dispose();
+    container?.removeEventListener('contextmenu', onContextMenu);
+    container?.removeEventListener('mouseup', onMouseUp);
+    container?.removeEventListener('dblclick', onMouseUp);
+  };
 }
 
 /**
@@ -75,6 +103,7 @@ export function attachWheelZoom(
   container: HTMLElement,
   getTerm: () => Terminal | null,
   fit: () => void,
+  onZoom?: (size: number) => void,
 ): () => void {
   const onWheel = (e: WheelEvent) => {
     if (!e.ctrlKey) return;
@@ -82,7 +111,9 @@ export function attachWheelZoom(
     e.stopPropagation();
     const term = getTerm();
     if (!term) return;
-    term.options.fontSize = Math.min(28, Math.max(8, (term.options.fontSize || 14) + (e.deltaY < 0 ? 1 : -1)));
+    const size = Math.min(28, Math.max(8, (term.options.fontSize || 14) + (e.deltaY < 0 ? 1 : -1)));
+    term.options.fontSize = size;
+    onZoom?.(size);
     fit();
   };
   container.addEventListener('wheel', onWheel, { passive: false, capture: true });

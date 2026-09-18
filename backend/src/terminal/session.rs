@@ -75,6 +75,11 @@ pub fn restore_sessions(store: &PtyStore) {
     }
     if !map.is_empty() {
         println!("Terminal: restored {} live tmux session(s)", map.len());
+        // Mouse and clipboard bindings live on the tmux server, so sessions
+        // started by an older build pick up the current ones here.
+        if let Some(path) = write_tmux_conf(default_scrollback()) {
+            let _ = std::process::Command::new("tmux").args(["source-file", &path]).output();
+        }
     }
     persist(&map);
     ssh_auth::cleanup_password_files();
@@ -133,12 +138,50 @@ pub(crate) fn tmux_session_exists(name: &str) -> bool {
         .output().map(|o| o.status.success()).unwrap_or(false)
 }
 
+/// Options and mouse bindings every NabiMan tmux session runs with.
+///
+/// The mouse bindings differ from tmux's defaults in one way: a selection is
+/// copied *without* leaving copy-mode, so the highlight stays on screen instead
+/// of blinking out the moment the button is released. `set-clipboard on` makes
+/// tmux hand that copied text to the browser as an OSC 52 sequence.
+fn tmux_conf_body(scrollback: u32) -> String {
+    // Keeping the highlight means staying in copy-mode, where keystrokes go to
+    // copy-mode instead of the shell — so a click of either button leaves it
+    // again, which is also what makes a right-click paste land.
+    //
+    // `copy-pipe-no-clear "tmux load-buffer -w -"` is what actually reaches the
+    // browser: it keeps the highlight on screen after the button comes up, and
+    // -w makes tmux hand the text over as an OSC 52 sequence, which the
+    // frontend turns into a clipboard write. set-clipboard alone does not do
+    // it for tmux's own copy commands.
+    let copy = r#"send -X copy-pipe-no-clear "tmux load-buffer -w -""#;
+    format!(
+        "set -g history-limit {scrollback}\n\
+         set -g mouse on\n\
+         set -g set-clipboard on\n\
+         set -as terminal-features ',xterm*:clipboard'\n\
+         bind -T copy-mode    MouseDragEnd1Pane {copy}\n\
+         bind -T copy-mode-vi MouseDragEnd1Pane {copy}\n\
+         bind -T copy-mode    DoubleClick1Pane send -X select-word \\; {copy}\n\
+         bind -T copy-mode-vi DoubleClick1Pane send -X select-word \\; {copy}\n\
+         bind -T copy-mode    TripleClick1Pane send -X select-line \\; {copy}\n\
+         bind -T copy-mode-vi TripleClick1Pane send -X select-line \\; {copy}\n\
+         bind -T root DoubleClick1Pane select-pane \\; copy-mode -H \\; send -X select-word \\; {copy}\n\
+         bind -T root TripleClick1Pane select-pane \\; copy-mode -H \\; send -X select-line \\; {copy}\n\
+         bind -T copy-mode    MouseDown1Pane send -X cancel\n\
+         bind -T copy-mode-vi MouseDown1Pane send -X cancel\n\
+         bind -T copy-mode    MouseDown3Pane send -X cancel\n\
+         bind -T copy-mode-vi MouseDown3Pane send -X cancel\n",
+        scrollback = scrollback,
+        copy = copy,
+    )
+}
+
 /// Seed options for a tmux server this process may be about to start.
-pub(crate) fn write_tmux_conf(scrollback: u32) -> Option<String> {
+fn write_tmux_conf(scrollback: u32) -> Option<String> {
     let path = format!("{}/tmux.conf", data_dir());
-    let body = format!("set -g history-limit {}\nset -g mouse on\n", scrollback);
     std::fs::create_dir_all(data_dir()).ok()?;
-    std::fs::write(&path, body).ok()?;
+    std::fs::write(&path, tmux_conf_body(scrollback)).ok()?;
     Some(path)
 }
 
@@ -149,6 +192,11 @@ pub(crate) fn create_tmux_session(name: &str, command: Option<&str>, scrollback:
     // (the first session after a reboot), and set-option -g covers every later
     // session on an already running server.
     let conf = write_tmux_conf(scrollback);
+    // -f only applies when this command starts the server, so a server that is
+    // already up gets the same file sourced explicitly.
+    if let Some(ref path) = conf {
+        let _ = std::process::Command::new("tmux").args(["source-file", path]).output();
+    }
     let _ = std::process::Command::new("tmux")
         .args(["set-option", "-g", "history-limit", &scrollback.to_string()])
         .output();
