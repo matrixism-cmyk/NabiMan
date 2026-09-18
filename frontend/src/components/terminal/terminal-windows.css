@@ -210,3 +210,52 @@
 }
 .server-edit-form h4 { margin: 0 0 10px; font-size: 13px; color: var(--primary); }
 .server-edit-form label { display: block; margin-bottom: 4px; font-size: 12px; color: var(--text-secondary); }
+
+/* ── Share links ─────────────────────────────────────────────────────── */
+.share-dialog { max-width: 620px; max-height: 88vh; overflow-y: auto; }
+.share-dialog label { display: block; margin-bottom: 6px; font-size: 13px; }
+.share-dialog small { display: block; margin-top: 4px; font-size: 11px; }
+.share-dialog input[type="checkbox"] { width: auto; margin: 0 4px 0 0; vertical-align: middle; }
+.share-dialog .filter-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.share-dialog .filter-input { margin-bottom: 0; }
+.share-warning {
+  font-size: 12px;
+  color: var(--warning);
+  background: rgba(243, 156, 18, 0.1);
+  border: 1px solid rgba(243, 156, 18, 0.3);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 10px 0 14px;
+}
+.share-created {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  background: rgba(59, 130, 246, 0.08);
+}
+.share-list { margin-top: 18px; overflow-x: auto; }
+.share-list code { font-size: 11px; }
+
+/* The visitor's page: the shared terminal and nothing else. */
+.share-page { display: flex; flex-direction: column; height: 100vh; background: var(--bg); }
+.share-page-center { align-items: center; justify-content: center; }
+.share-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.share-head strong { font-size: 14px; }
+.share-head code { font-size: 12px; color: var(--text-secondary); }
+.share-head-spacer { flex: 1; }
+.share-body { flex: 1; min-height: 0; padding: 6px; }
+.share-gate {
+  display: flex; flex-direction: column; gap: 12px; width: 340px; max-width: 90vw;
+  padding: 32px; text-align: center;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+}
+.share-gate h1 { font-size: 20px; color: var(--text); }
+.share-gate input {
+  padding: 10px 14px; text-align: center; font-size: 14px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text);
+}
+.share-gate input:focus { outline: none; border-color: var(--primary); }

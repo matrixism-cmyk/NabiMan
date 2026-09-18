@@ -63,6 +63,8 @@ pub(crate) struct WsBridge {
     pub(crate) child_pid: nix::unistd::Pid,
     /// Set once the shell really exited, so the browser stops reconnecting.
     pub(crate) ended: bool,
+    /// A share link may watch without typing; input is dropped on the way in.
+    pub(crate) read_only: bool,
 }
 
 /// Sent to the browser when the session is gone for good (the shell exited, or
@@ -152,6 +154,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsBridge {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         match msg {
             Ok(ws::Message::Text(text)) => {
+                if self.read_only { return; }
                 if text.starts_with("\x01RESIZE:") {
                     let parts: Vec<&str> = text[8..].split(':').collect();
                     if parts.len() == 2 {
@@ -165,7 +168,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsBridge {
                 }
                 if let Some(f) = self.master_file.as_mut() { let _ = f.write_all(text.as_bytes()); }
             }
-            Ok(ws::Message::Binary(data)) => { if let Some(f) = self.master_file.as_mut() { let _ = f.write_all(&data); } }
+            Ok(ws::Message::Binary(data)) => {
+                if self.read_only { return; }
+                if let Some(f) = self.master_file.as_mut() { let _ = f.write_all(&data); }
+            }
             Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
             Ok(ws::Message::Close(_)) => ctx.stop(),
             _ => {}
@@ -176,6 +182,15 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsBridge {
 /// Spawn a PTY running `tmux attach -t <name>` and return (master_fd, child_pid)
 pub(crate) fn attach_tmux(name: &str, size: (u16, u16)) -> Result<(i32, nix::unistd::Pid), String> {
     let cmd = ShellCommand { program: "tmux".into(), args: vec!["attach-session".into(), "-t".into(), name.into()] };
+    spawn_pty(cmd, size)
+}
+
+/// The same attach, with tmux refusing input from this client.
+pub(crate) fn attach_tmux_readonly(name: &str, size: (u16, u16)) -> Result<(i32, nix::unistd::Pid), String> {
+    let cmd = ShellCommand {
+        program: "tmux".into(),
+        args: vec!["attach-session".into(), "-r".into(), "-t".into(), name.into()],
+    };
     spawn_pty(cmd, size)
 }
 

@@ -6,6 +6,7 @@ import TerminalView, { TerminalStatus, TerminalTarget, TerminalViewHandle } from
 import { useTerminalSettings } from '../terminal/settings';
 import { useTerminalWindows } from '../terminal/TerminalWindows';
 import TerminalSettingsModal from '../terminal/TerminalSettingsModal';
+import ShareDialog from '../terminal/ShareDialog';
 import { SshKeyPanel } from '../SshKeyComponents';
 import MultiServerDashboard from '../MultiServerDashboard';
 import ServerForm from './ServerForm';
@@ -45,6 +46,7 @@ export default function RemoteWorkspace() {
   const [currentSessionId, setCurrentSessionId] = useState('');
   const [termStatus, setTermStatus] = useState<TerminalStatus>('connecting');
   const [showSettings, setShowSettings] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const [filter, setFilter] = useState('');
   const [checkingAll, setCheckingAll] = useState(false);
   const [adhocForm, setAdhocForm] = useState({ host: '', port: '22', user: 'root' });
@@ -225,6 +227,11 @@ export default function RemoteWorkspace() {
                 </span>
                 <button className="btn btn-secondary btn-sm" onClick={() => viewRef.current?.newSession()}>{t('terminal.newSession')}</button>
                 <button className="btn btn-secondary btn-sm" onClick={detach} title={t('remote.detachHint')}>⧉ {t('remote.detach')}</button>
+                {currentSessionId && (
+                  <button className="btn btn-secondary btn-sm" onClick={() => setShowShare(true)} title={t('share.hint')}>
+                    🔗 {t('share.button')}
+                  </button>
+                )}
               </>
             )}
             <button className="btn btn-secondary btn-sm" onClick={() => setShowSettings(true)} title={t('terminal.settings')}>⚙</button>
@@ -333,6 +340,13 @@ export default function RemoteWorkspace() {
       </section>
 
       {showSettings && <TerminalSettingsModal onClose={() => setShowSettings(false)} />}
+      {showShare && currentSessionId && (
+        <ShareDialog
+          sessionId={currentSessionId}
+          sessionLabel={`${headTitle} · ${headSub}`}
+          onClose={() => setShowShare(false)}
+        />
+      )}
     </div>
   );
 }

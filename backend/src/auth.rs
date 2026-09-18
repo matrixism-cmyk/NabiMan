@@ -172,8 +172,10 @@ fn extract_username(req: &actix_web::HttpRequest) -> String {
 // --- Middleware auth check (JWT + RBAC) ---
 pub fn check_auth(req: &ServiceRequest, secret: &JwtSecret) -> bool {
     let path = req.path();
+    // Share links carry their own secret and are checked in terminal::share.
     if path == "/api/auth/login" || path == "/api/auth/refresh" || path == "/api/auth/2fa/verify"
         || path == "/api/auth/oauth/callback" || path == "/api/auth/ldap/login"
+        || path.starts_with("/api/share/")
         || !path.starts_with("/api/") {
         return true;
     }

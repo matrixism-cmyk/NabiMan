@@ -5,19 +5,29 @@ import App from './App';
 import { I18nProvider } from './i18n';
 import { TerminalSettingsProvider } from './components/terminal/settings';
 import { TerminalWindowsProvider } from './components/terminal/TerminalWindows';
+import SharePage from './components/terminal/SharePage';
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
+// /share/<token> opens one shared terminal for someone without an account.
+const shareToken = window.location.pathname.startsWith('/share/')
+  ? window.location.pathname.slice('/share/'.length).replace(/\/$/, '')
+  : '';
+
 root.render(
   <React.StrictMode>
     <I18nProvider>
-      <TerminalSettingsProvider>
-        <TerminalWindowsProvider>
-          <App />
-        </TerminalWindowsProvider>
-      </TerminalSettingsProvider>
+      {shareToken ? (
+        <SharePage token={shareToken} />
+      ) : (
+        <TerminalSettingsProvider>
+          <TerminalWindowsProvider>
+            <App />
+          </TerminalWindowsProvider>
+        </TerminalSettingsProvider>
+      )}
     </I18nProvider>
   </React.StrictMode>
 );

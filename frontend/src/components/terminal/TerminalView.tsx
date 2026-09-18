@@ -3,6 +3,7 @@ import { Terminal } from 'xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { apiRequest } from '../../hooks/useApi';
 import { attachClipboard, attachWheelZoom, createTerminal } from './terminalChrome';
+import TerminalStatusPill from './TerminalStatusPill';
 import { buildTerminalUrl } from './terminalUrl';
 import {
   bufKey, forgetFontSize, MAX_BUFFER_CHARS, readFontSize, readStored, sidKey, writeFontSize,
@@ -42,6 +43,8 @@ interface Props {
   /** Attach to this existing session instead of the stored/new one. */
   joinSessionId?: string;
   active?: boolean;
+  /** Opened through a share link: no account, no session bookkeeping. */
+  share?: { token: string; ticket: string };
   onStatus?: (status: TerminalStatus) => void;
   onSessionId?: (id: string) => void;
 }
@@ -66,7 +69,7 @@ const MAX_COLD_ATTEMPTS = 8;
 const ENDED_MSG = '\x02ENDED';
 
 const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView(
-  { target, storageKey, settings, joinSessionId, active, onStatus, onSessionId }, ref,
+  { target, storageKey, settings, joinSessionId, active, share, onStatus, onSessionId }, ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
@@ -86,12 +89,14 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
   const appliedFontRef = useRef(settings.font_size);
   const targetRef = useRef(target);
   const joinRef = useRef(joinSessionId);
+  const shareRef = useRef(share);
   const [status, setStatus] = useState<TerminalStatus>('connecting');
   const { t } = useT();
 
   settingsRef.current = settings;
   targetRef.current = target;
   joinRef.current = joinSessionId;
+  shareRef.current = share;
 
   const report = useCallback((s: TerminalStatus) => {
     setStatus(s);
@@ -116,6 +121,7 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
   }, []);
 
   const buildUrl = useCallback((sessionId: string) => buildTerminalUrl({
+    share: shareRef.current,
     settings: settingsRef.current,
     target: targetRef.current,
     sessionId,
@@ -138,14 +144,16 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
     endedRef.current = false;
     report(attemptsRef.current > 0 ? 'reconnecting' : 'connecting');
 
-    if (attemptsRef.current > 0) {
+    if (attemptsRef.current > 0 && !shareRef.current) {
       // A long-lived pane can outlive its access token. One authenticated REST
       // call refreshes it (see fetchWithRefresh) before the socket carries it.
       await apiRequest('/api/terminal/settings');
       if (closedRef.current) return;
     }
 
-    const sessionId = joinRef.current || sessionIdRef.current || readStored(sidKey(storageKey));
+    const sessionId = shareRef.current
+      ? ''
+      : joinRef.current || sessionIdRef.current || readStored(sidKey(storageKey));
 
     // Reopening a window with an empty screen: pull the history tmux kept
     // while nothing was attached, so the previous output is there again.
@@ -363,16 +371,10 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
     sessionId: () => sessionIdRef.current,
   }), [connect, saveBuffer, storageKey]);
 
-  const statusLabel = status === 'reconnecting' ? t('terminal.statusReconnecting')
-    : status === 'connecting' ? t('terminal.statusConnecting')
-    : status === 'ended' ? t('terminal.statusEnded')
-    : t('terminal.statusDisconnected');
-
   const retry = () => {
     attemptsRef.current = 0;
     if (status === 'ended') {
       // A finished session cannot be re-attached; start a fresh one.
-      endedRef.current = false;
       everConnectedRef.current = false;
       chunksRef.current = [];
       termRef.current?.reset();
@@ -384,16 +386,7 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
   return (
     <div className="terminal-view">
       <div ref={containerRef} className="terminal-view-screen" />
-      {status !== 'connected' && (
-        <button
-          type="button"
-          className={`terminal-view-status terminal-view-status-${status}`}
-          onClick={retry}
-          title={t('terminal.clickToRetry')}
-        >
-          {statusLabel}
-        </button>
-      )}
+      <TerminalStatusPill status={status} onRetry={retry} />
     </div>
   );
 });

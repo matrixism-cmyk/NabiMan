@@ -3,6 +3,8 @@ import { TerminalTarget } from './TerminalView';
 
 interface UrlOptions {
   settings: TerminalSettings;
+  /** Set when the pane is opened through a share link instead of an account. */
+  share?: { token: string; ticket: string };
   target: TerminalTarget;
   /** Session to attach to; empty starts a new one. */
   sessionId: string;
@@ -13,9 +15,16 @@ interface UrlOptions {
 }
 
 /** The WebSocket address for one pane, including how it wants to connect. */
-export function buildTerminalUrl({ settings, target, sessionId, join, cols, rows }: UrlOptions): string {
+export function buildTerminalUrl({ settings, target, sessionId, join, cols, rows, share }: UrlOptions): string {
   const token = sessionStorage.getItem('nabiman_token') || '';
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  if (share) {
+    // A visitor has no account: the link (and its ticket) is the credential.
+    let url = `${protocol}//${window.location.host}/api/share/${encodeURIComponent(share.token)}/ws`;
+    url += `?ticket=${encodeURIComponent(share.ticket)}`;
+    if (cols > 0 && rows > 0) url += `&cols=${cols}&rows=${rows}`;
+    return url;
+  }
   let url = `${protocol}//${window.location.host}/api/terminal?token=${encodeURIComponent(token)}`;
   url += `&scrollback=${settings.scrollback_lines}`;
   // Create/attach at the size this pane already has: a mismatch would make tmux

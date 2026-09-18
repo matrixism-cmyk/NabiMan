@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import TerminalView, { TerminalStatus, TerminalViewHandle } from './TerminalView';
 import { useTerminalSettings } from './settings';
 import { useT } from '../../i18n';
+import ShareDialog from './ShareDialog';
 import { clamp, MIN_H, MIN_W, TASKBAR_H, TermWindow } from './windowGeometry';
 
 interface FrameProps {
@@ -17,6 +18,8 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
   const { settings } = useTerminalSettings();
   const viewRef = useRef<TerminalViewHandle>(null);
   const [status, setStatus] = useState<TerminalStatus>('connecting');
+  const [sessionId, setSessionId] = useState('');
+  const [showShare, setShowShare] = useState(false);
 
   const beginDrag = (e: React.PointerEvent) => {
     // Pointer-down on a title-bar button must not start a drag: capturing the
@@ -113,6 +116,9 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
         <span className="term-window-actions">
           <button title={t('terminal.reconnect')} onClick={(e) => { e.stopPropagation(); viewRef.current?.reconnect(); }}>↻</button>
           <button title={t('terminal.newSession')} onClick={(e) => { e.stopPropagation(); viewRef.current?.newSession(); }}>+</button>
+          {sessionId && (
+            <button title={t('share.hint')} onClick={(e) => { e.stopPropagation(); setShowShare(true); }}>🔗</button>
+          )}
           <button title={t('terminal.minimize')} onClick={(e) => { e.stopPropagation(); onUpdate(win.id, { minimized: true }); }}>─</button>
           <button title={win.maximized ? t('terminal.restoreSize') : t('terminal.maximize')} onClick={(e) => { e.stopPropagation(); toggleMaximize(); }}>▢</button>
           <button
@@ -139,8 +145,12 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
           settings={settings}
           active={!win.minimized}
           onStatus={setStatus}
+          onSessionId={setSessionId}
         />
       </div>
+      {showShare && sessionId && (
+        <ShareDialog sessionId={sessionId} sessionLabel={`${win.title} · ${win.subtitle}`} onClose={() => setShowShare(false)} />
+      )}
       <div className="term-resize term-resize-e" onPointerDown={(e) => beginResize(e, 'e')} />
       <div className="term-resize term-resize-s" onPointerDown={(e) => beginResize(e, 's')} />
       <div className="term-resize term-resize-se" onPointerDown={(e) => beginResize(e, 'se')} />
