@@ -145,6 +145,9 @@ pub(crate) fn tmux_session_exists(name: &str) -> bool {
 /// of blinking out the moment the button is released. `set-clipboard on` makes
 /// tmux hand that copied text to the browser as an OSC 52 sequence.
 fn tmux_conf_body(scrollback: u32) -> String {
+    // window-size latest keeps a watching share viewer from shrinking the pane
+    // for whoever is actually working in it.
+    //
     // Keeping the highlight means staying in copy-mode, where keystrokes go to
     // copy-mode instead of the shell — so a click of either button leaves it
     // again, which is also what makes a right-click paste land.
@@ -159,6 +162,7 @@ fn tmux_conf_body(scrollback: u32) -> String {
         "set -g history-limit {scrollback}\n\
          set -g mouse on\n\
          set -g set-clipboard on\n\
+         set -g window-size latest\n\
          set -as terminal-features ',xterm*:clipboard'\n\
          bind -T copy-mode    MouseDragEnd1Pane {copy}\n\
          bind -T copy-mode-vi MouseDragEnd1Pane {copy}\n\
@@ -234,6 +238,27 @@ pub(crate) fn create_tmux_session(name: &str, command: Option<&str>, scrollback:
         .args(["set-option", "-t", name, "destroy-unattached", "off"])
         .output();
     Ok(())
+}
+
+fn tmux_size(args: &[&str]) -> Option<(u16, u16)> {
+    let out = std::process::Command::new("tmux").args(args).output().ok()?;
+    let text = String::from_utf8_lossy(&out.stdout);
+    let mut parts = text.split_whitespace();
+    let cols = parts.next()?.parse().ok()?;
+    let rows = parts.next()?.parse().ok()?;
+    Some((cols, rows))
+}
+
+/// The terminal size a share viewer should open with: whatever the person
+/// already attached is using, status line included. Matching the pane instead
+/// would cost a row to the status bar and quietly shrink the session.
+pub(crate) fn client_size(name: &str) -> Option<(u16, u16)> {
+    tmux_size(&["list-clients", "-t", name, "-F", "#{client_width} #{client_height}"])
+        .or_else(|| {
+            // Nobody is watching: the pane plus the status line it draws under it.
+            tmux_size(&["display-message", "-p", "-t", name, "#{pane_width} #{pane_height}"])
+                .map(|(c, r)| (c, r + 1))
+        })
 }
 
 /// Read back the pane history (ANSI colours included) so a reopened window can

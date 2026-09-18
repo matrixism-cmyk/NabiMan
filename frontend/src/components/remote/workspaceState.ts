@@ -12,7 +12,7 @@ export type Selection =
 export type ServerView = 'terminal' | 'status' | 'exec' | 'settings';
 
 /** Which view of the fleet overview is showing. */
-export type OverviewView = 'summary' | 'sessions' | 'keys';
+export type OverviewView = 'summary' | 'sessions' | 'links' | 'keys';
 
 const SELECTION_KEY = 'nabiman_remote_selection';
 

@@ -96,6 +96,57 @@ export function attachClipboard(
 }
 
 /**
+ * Wire the terminal's output back to whoever is carrying it: keystrokes,
+ * pasted bytes, and (for panes that own their session) resizes.
+ */
+export function attachTerminalIo(
+  term: Terminal,
+  send: (data: string | ArrayBuffer) => void,
+  sendResize: ((cols: number, rows: number) => void) | null,
+): void {
+  term.onData((data) => send(data));
+  term.onBinary((data) => {
+    const buf = new Uint8Array(data.length);
+    for (let i = 0; i < data.length; i++) buf[i] = data.charCodeAt(i);
+    send(buf.buffer);
+  });
+  term.onResize(({ cols, rows }) => sendResize?.(cols, rows));
+}
+
+/**
+ * Fit a grid of `cols x rows` into the container by changing the font size
+ * rather than the number of cells — what a share viewer needs, since resizing
+ * would reshape the terminal its owner is working in.
+ *
+ * The measurement comes from the fit addon, which knows what a cell actually
+ * costs at the current font; guessing from the font size alone is off by
+ * enough to clip a line.
+ */
+export function fitFontToPane(term: Terminal, fit: FitAddon, cols: number, rows: number): void {
+  if (!cols || !rows) return;
+  const fits = () => {
+    const proposed = fit.proposeDimensions();
+    return Boolean(proposed && proposed.cols >= cols && proposed.rows >= rows);
+  };
+
+  let size = term.options.fontSize || 14;
+  if (fits()) {
+    // Room to spare: grow until one more step would clip.
+    while (size < 28) {
+      term.options.fontSize = size + 0.5;
+      if (!fits()) { term.options.fontSize = size; return; }
+      size += 0.5;
+    }
+    return;
+  }
+  while (size > 6) {
+    size -= 0.5;
+    term.options.fontSize = size;
+    if (fits()) return;
+  }
+}
+
+/**
  * Ctrl + wheel zooms the text. A plain wheel is left alone so xterm forwards it
  * to tmux, which scrolls its own history like a native terminal.
  */

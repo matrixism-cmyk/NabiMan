@@ -11,6 +11,8 @@ export interface ShareLink {
   read_only: boolean;
   last_used_unix: number;
   needs_password: boolean;
+  /** Whether the session behind the link is still running. */
+  alive?: boolean;
 }
 
 const EXPIRY_CHOICES: { labelKey: string; secs: number }[] = [

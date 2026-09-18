@@ -9,7 +9,6 @@
 use actix_web::{web, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::os::unix::io::FromRawFd;
 
@@ -17,7 +16,8 @@ use crate::auth::JwtSecret;
 use crate::models::ApiResponse;
 
 use super::pty::{attach_tmux, parse_size, WsBridge};
-use super::session::{data_dir, now_unix, tmux_session_exists, PtyStore};
+use super::session::{client_size, data_dir, now_unix, tmux_session_exists, PtyStore};
+use super::share_ticket;
 
 /// How long a password ticket stays valid — long enough to open the page, not
 /// long enough to be worth passing around.
@@ -44,6 +44,9 @@ pub struct ShareLink {
     /// Filled in for the API so the owner can see it without the hash.
     #[serde(default)]
     pub needs_password: bool,
+    /// Whether the session behind the link is still running. API-only.
+    #[serde(default)]
+    pub alive: bool,
 }
 
 fn shares_file() -> String {
@@ -84,36 +87,6 @@ fn public_view(mut link: ShareLink) -> ShareLink {
     link.needs_password = link.password_hash.is_some();
     link.password_hash = None;
     link
-}
-
-// --- Tickets -------------------------------------------------------------
-
-/// A password check is proved with `<expiry>.<hmac>`, signed by the server
-/// secret, so nothing has to be remembered between requests.
-fn sign_ticket(secret: &str, token: &str, expires: u64) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(secret.as_bytes());
-    hasher.update(b"share-ticket");
-    hasher.update(token.as_bytes());
-    hasher.update(expires.to_string().as_bytes());
-    // Closing with the secret as well keeps the digest from being extended.
-    hasher.update(secret.as_bytes());
-    format!("{}.{}", expires, hex::encode(hasher.finalize()))
-}
-
-fn ticket_valid(secret: &str, token: &str, ticket: &str) -> bool {
-    let (exp_str, _) = match ticket.split_once('.') {
-        Some(parts) => parts,
-        None => return false,
-    };
-    let expires: u64 = match exp_str.parse() {
-        Ok(v) => v,
-        Err(_) => return false,
-    };
-    if now_unix() > expires {
-        return false;
-    }
-    sign_ticket(secret, token, expires) == ticket
 }
 
 // --- Owner-side API ------------------------------------------------------
@@ -176,6 +149,7 @@ async fn create_share(
         read_only: body.read_only,
         last_used_unix: 0,
         needs_password: false,
+        alive: true,
     };
 
     let mut shares = load_shares();
@@ -184,13 +158,20 @@ async fn create_share(
     HttpResponse::Ok().json(ApiResponse::ok(public_view(link)))
 }
 
-async fn list_shares(req: HttpRequest) -> HttpResponse {
+async fn list_shares(store: web::Data<PtyStore>, req: HttpRequest) -> HttpResponse {
     let username = super::handlers::extract_username_header(&req);
     let shares = load_shares();
+    let sessions = store.lock().unwrap();
     let mut list: Vec<ShareLink> = shares
         .into_values()
         .filter(|l| l.owner == username && !expired(l))
-        .map(public_view)
+        .map(|l| {
+            let alive = sessions
+                .get(&l.session_id)
+                .map(|s| tmux_session_exists(&s.tmux_name))
+                .unwrap_or(false);
+            ShareLink { alive, ..public_view(l) }
+        })
         .collect();
     list.sort_by_key(|l| std::cmp::Reverse(l.created_unix));
     HttpResponse::Ok().json(ApiResponse::ok(list))
@@ -220,6 +201,10 @@ struct ShareInfo {
     expires_unix: u64,
     /// False once the shell behind the link has exited.
     alive: bool,
+    /// The pane's grid, so the viewer can match it before it attaches — a
+    /// resize afterwards would leave the screen blank until tmux repaints.
+    cols: u16,
+    rows: u16,
 }
 
 async fn share_info(path: web::Path<String>, store: web::Data<PtyStore>) -> HttpResponse {
@@ -228,16 +213,24 @@ async fn share_info(path: web::Path<String>, store: web::Data<PtyStore>) -> Http
         Some(l) => l,
         None => return HttpResponse::Ok().json(ApiResponse::<()>::error("This link is no longer valid")),
     };
-    let alive = {
+    let tmux_name = {
         let map = store.lock().unwrap();
-        map.get(&link.session_id).map(|s| tmux_session_exists(&s.tmux_name)).unwrap_or(false)
+        map.get(&link.session_id).map(|s| s.tmux_name.clone())
     };
+    let alive = tmux_name.as_deref().map(tmux_session_exists).unwrap_or(false);
+    let (cols, rows) = tmux_name
+        .as_deref()
+        .filter(|_| alive)
+        .and_then(client_size)
+        .unwrap_or((0, 0));
     HttpResponse::Ok().json(ApiResponse::ok(ShareInfo {
         label: link.label,
         needs_password: link.password_hash.is_some(),
         read_only: link.read_only,
         expires_unix: link.expires_unix,
         alive,
+        cols,
+        rows,
     }))
 }
 
@@ -268,7 +261,7 @@ async fn share_auth(
     if !bcrypt::verify(&body.password, &hash).unwrap_or(false) {
         return HttpResponse::Ok().json(ApiResponse::<()>::error("Wrong password"));
     }
-    let ticket = sign_ticket(&secret, &token, now_unix() + TICKET_TTL_SECS);
+    let ticket = share_ticket::sign(&secret, &token, now_unix() + TICKET_TTL_SECS);
     HttpResponse::Ok().json(ApiResponse::ok(TicketResponse { ticket }))
 }
 
@@ -295,7 +288,7 @@ async fn share_ws(
 
     if link.password_hash.is_some() {
         let ticket = super::parse_query_param(query, "ticket").unwrap_or_default();
-        if !ticket_valid(&secret, &token, &ticket) {
+        if !share_ticket::valid(&secret, &token, &ticket) {
             return Ok(ws::start(
                 super::pty::NoticeSocket::new("비밀번호 확인이 필요합니다 / password required"),
                 &req, stream,
@@ -315,7 +308,10 @@ async fn share_ws(
         )?),
     };
 
-    let (fd, pid) = match attach_tmux_shared(&tmux_name, parse_size(query), link.read_only) {
+    // Attach at the pane's own size: opening the pseudo-terminal at the
+    // visitor's size would reshape the session for the person working in it.
+    let size = client_size(&tmux_name).unwrap_or_else(|| parse_size(query));
+    let (fd, pid) = match attach_tmux_shared(&tmux_name, size, link.read_only) {
         Ok(r) => r,
         Err(e) => return Ok(HttpResponse::InternalServerError().json(ApiResponse::<()>::error(&e))),
     };
@@ -344,6 +340,7 @@ async fn share_ws(
             child_pid: pid,
             ended: false,
             read_only: link.read_only,
+            mirror_size: true,
         },
         &req,
         stream,

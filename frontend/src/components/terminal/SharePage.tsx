@@ -11,6 +11,9 @@ interface ShareInfo {
   read_only: boolean;
   expires_unix: number;
   alive: boolean;
+  /** The shared pane's grid, mirrored so the owner's layout is preserved. */
+  cols: number;
+  rows: number;
 }
 
 /**
@@ -101,6 +104,7 @@ export default function SharePage({ token }: { token: string }) {
           storageKey={`share_${token}`}
           settings={DEFAULT_TERMINAL_SETTINGS}
           share={{ token, ticket }}
+          grid={{ cols: info.cols, rows: info.rows }}
           active
         />
       </div>

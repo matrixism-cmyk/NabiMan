@@ -8,10 +8,12 @@ use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::time::Duration;
 
 use super::parse_query_param;
-use super::session::{now_unix, persist, tmux_session_exists, PtyStore};
+use super::session::{client_size, now_unix, persist, tmux_session_exists, PtyStore};
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 const PTY_READ_INTERVAL: Duration = Duration::from_millis(30);
+/// How often a mirroring client is told the pane size.
+const SIZE_POLL_INTERVAL: Duration = Duration::from_millis(1500);
 
 struct ShellCommand { program: String, args: Vec<String> }
 
@@ -65,7 +67,14 @@ pub(crate) struct WsBridge {
     pub(crate) ended: bool,
     /// A share link may watch without typing; input is dropped on the way in.
     pub(crate) read_only: bool,
+    /// A share viewer mirrors the pane instead of resizing it: its own window
+    /// must not reshape the terminal the owner is working in.
+    pub(crate) mirror_size: bool,
 }
+
+/// Tells a mirroring client how big the pane is, so it can match without
+/// sending a resize back.
+pub(crate) const SIZE_MSG: &str = "\x02SIZE:";
 
 /// Sent to the browser when the session is gone for good (the shell exited, or
 /// somebody killed it) as opposed to a network drop, which the browser retries.
@@ -134,6 +143,18 @@ impl Actor for WsBridge {
             }
         });
         ctx.run_interval(HEARTBEAT_INTERVAL, |_, ctx| { ctx.ping(b""); });
+        if self.mirror_size {
+            let mut last: Option<(u16, u16)> = None;
+            let name = self.tmux_name.clone();
+            ctx.run_interval(SIZE_POLL_INTERVAL, move |_, ctx| {
+                if let Some(size) = client_size(&name) {
+                    if last != Some(size) {
+                        last = Some(size);
+                        ctx.text(format!("{}{}:{}", SIZE_MSG, size.0, size.1));
+                    }
+                }
+            });
+        }
     }
     fn stopped(&mut self, _ctx: &mut Self::Context) {
         // Close PTY fd properly — this kills the tmux attach process, while the
@@ -156,6 +177,8 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsBridge {
             Ok(ws::Message::Text(text)) => {
                 if self.read_only { return; }
                 if text.starts_with("\x01RESIZE:") {
+                    // A viewer's window size is its own business.
+                    if self.mirror_size { return; }
                     let parts: Vec<&str> = text[8..].split(':').collect();
                     if parts.len() == 2 {
                         if let (Ok(cols), Ok(rows)) = (parts[0].parse::<u16>(), parts[1].parse::<u16>()) {

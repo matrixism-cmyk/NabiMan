@@ -2,12 +2,12 @@ import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef,
 import { Terminal } from 'xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { apiRequest } from '../../hooks/useApi';
-import { attachClipboard, attachWheelZoom, createTerminal } from './terminalChrome';
+import { attachClipboard, attachTerminalIo, attachWheelZoom, createTerminal, fitFontToPane } from './terminalChrome';
 import TerminalStatusPill from './TerminalStatusPill';
+import { useScreenBuffer } from './useScreenBuffer';
 import { buildTerminalUrl } from './terminalUrl';
 import {
-  bufKey, forgetFontSize, MAX_BUFFER_CHARS, readFontSize, readStored, sidKey, writeFontSize,
-  writeStored,
+  bufKey, forgetFontSize, readFontSize, readStored, sidKey, writeFontSize, writeStored,
 } from './terminalStorage';
 import { useT } from '../../i18n';
 import { TerminalSettings } from './settings';
@@ -45,6 +45,8 @@ interface Props {
   active?: boolean;
   /** Opened through a share link: no account, no session bookkeeping. */
   share?: { token: string; ticket: string };
+  /** Mirror this grid instead of fitting the window (share viewers). */
+  grid?: { cols: number; rows: number };
   onStatus?: (status: TerminalStatus) => void;
   onSessionId?: (id: string) => void;
 }
@@ -67,16 +69,16 @@ const MAX_RECONNECT_DELAY_MS = 15000;
 const MAX_COLD_ATTEMPTS = 8;
 /** The server says the session is gone for good; do not start a new one. */
 const ENDED_MSG = '\x02ENDED';
+/** The server telling a share viewer how big the owner's pane is. */
+const SIZE_MSG = '\x02SIZE:';
 
 const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView(
-  { target, storageKey, settings, joinSessionId, active, share, onStatus, onSessionId }, ref,
+  { target, storageKey, settings, joinSessionId, active, share, grid, onStatus, onSessionId }, ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const chunksRef = useRef<string[]>([]);
-  const dirtyRef = useRef(false);
   const decoderRef = useRef(new TextDecoder());
   const closedRef = useRef(false);
   const endedRef = useRef(false);
@@ -90,8 +92,11 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
   const targetRef = useRef(target);
   const joinRef = useRef(joinSessionId);
   const shareRef = useRef(share);
+  /** A viewer stops auto-scaling once it has zoomed by hand. */
+  const manualZoomRef = useRef(false);
   const [status, setStatus] = useState<TerminalStatus>('connecting');
   const { t } = useT();
+  const { chunksRef, record, saveBuffer, clearBuffer } = useScreenBuffer(storageKey, settingsRef);
 
   settingsRef.current = settings;
   targetRef.current = target;
@@ -102,23 +107,6 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
     setStatus(s);
     onStatus?.(s);
   }, [onStatus]);
-
-  const saveBuffer = useCallback(() => {
-    if (!dirtyRef.current) return;
-    dirtyRef.current = false;
-    let text = chunksRef.current.join('');
-    if (text.length > MAX_BUFFER_CHARS) text = text.slice(text.length - MAX_BUFFER_CHARS);
-    const limit = settingsRef.current.scrollback_lines;
-    const lines = text.split('\n');
-    if (lines.length > limit) text = lines.slice(lines.length - limit).join('\n');
-    chunksRef.current = [text];
-    writeStored(bufKey(storageKey), text);
-  }, [storageKey]);
-
-  const record = useCallback((text: string) => {
-    chunksRef.current.push(text);
-    dirtyRef.current = true;
-  }, []);
 
   const buildUrl = useCallback((sessionId: string) => buildTerminalUrl({
     share: shareRef.current,
@@ -144,6 +132,7 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
     endedRef.current = false;
     report(attemptsRef.current > 0 ? 'reconnecting' : 'connecting');
 
+    manualZoomRef.current = false;
     if (attemptsRef.current > 0 && !shareRef.current) {
       // A long-lived pane can outlive its access token. One authenticated REST
       // call refreshes it (see fetchWithRefresh) before the socket carries it.
@@ -196,6 +185,17 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
           report('ended');
           return;
         }
+        if (event.data.startsWith(SIZE_MSG)) {
+          // Match the owner's pane without resizing it: same grid, own font.
+          const [cols, rows] = event.data.slice(SIZE_MSG.length).split(':').map(Number);
+          if (cols > 0 && rows > 0) {
+            term.resize(cols, rows);
+            if (!manualZoomRef.current && fitRef.current) {
+              fitFontToPane(term, fitRef.current, cols, rows);
+            }
+          }
+          return;
+        }
         if (event.data.startsWith('\x02SESSION:')) {
           const sid = event.data.slice(9);
           sessionIdRef.current = sid;
@@ -232,7 +232,7 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
       report('reconnecting');
       retryTimerRef.current = window.setTimeout(() => { connect(); }, delay);
     };
-  }, [buildUrl, onSessionId, record, report, saveBuffer, storageKey, t]);
+  }, [buildUrl, chunksRef, onSessionId, record, report, saveBuffer, storageKey, t]);
 
   // Create the terminal once, restore the saved screen, then connect.
   useEffect(() => {
@@ -249,7 +249,14 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
 
     if (containerRef.current) {
       term.open(containerRef.current);
-      try { fitAddon.fit(); } catch { /* container not laid out yet */ }
+      if (grid && grid.cols > 0 && grid.rows > 0) {
+        // Match the shared pane before connecting: resizing after the attach
+        // redraw would clear the screen until tmux painted it again.
+        term.resize(grid.cols, grid.rows);
+        fitFontToPane(term, fitAddon, grid.cols, grid.rows);
+      } else {
+        try { fitAddon.fit(); } catch { /* container not laid out yet */ }
+      }
     }
 
     const saved = readStored(bufKey(storageKey));
@@ -263,19 +270,16 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
       if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(text);
     });
 
-    term.onData((data) => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(data);
-    });
-    term.onBinary((data) => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        const buf = new Uint8Array(data.length);
-        for (let i = 0; i < data.length; i++) buf[i] = data.charCodeAt(i);
-        wsRef.current.send(buf.buffer);
-      }
-    });
-    term.onResize(({ cols, rows }) => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(`\x01RESIZE:${cols}:${rows}`);
-    });
+    attachTerminalIo(
+      term,
+      (data) => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(data as string);
+      },
+      // A share viewer mirrors the pane; only the owner's panes may resize it.
+      shareRef.current ? null : (cols, rows) => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(`\x01RESIZE:${cols}:${rows}`);
+      },
+    );
 
     connect();
 
@@ -285,7 +289,6 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
       detachClipboard();
       window.clearInterval(saveTimer);
       if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
-      dirtyRef.current = true;
       saveBuffer();
       wsRef.current?.close();
       wsRef.current = null;
@@ -304,6 +307,12 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
     const observer = new ResizeObserver(() => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
+        const term = termRef.current;
+        if (shareRef.current && term && fitRef.current) {
+          // Keep the mirrored grid; grow or shrink the text instead.
+          if (!manualZoomRef.current) fitFontToPane(term, fitRef.current, term.cols, term.rows);
+          return;
+        }
         try { fitRef.current?.fit(); } catch { /* hidden container */ }
       });
     });
@@ -341,7 +350,7 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
       el,
       () => termRef.current,
       () => { try { fitRef.current?.fit(); } catch { /* ignore */ } },
-      (size) => writeFontSize(storageKey, size),
+      (size) => { manualZoomRef.current = true; writeFontSize(storageKey, size); },
     );
   }, [storageKey]);
 
@@ -350,9 +359,7 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
     fit: () => { try { fitRef.current?.fit(); } catch { /* ignore */ } },
     clear: () => {
       termRef.current?.clear();
-      chunksRef.current = [];
-      dirtyRef.current = true;
-      saveBuffer();
+      clearBuffer();
     },
     reconnect: () => { attemptsRef.current = 0; endedRef.current = false; connect(); },
     newSession: () => {
@@ -361,15 +368,13 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
       sessionIdRef.current = '';
       joinRef.current = undefined;
       writeStored(sidKey(storageKey), '');
-      chunksRef.current = [];
-      dirtyRef.current = true;
-      saveBuffer();
+      clearBuffer();
       termRef.current?.reset();
       attemptsRef.current = 0;
       connect();
     },
     sessionId: () => sessionIdRef.current,
-  }), [connect, saveBuffer, storageKey]);
+  }), [clearBuffer, connect, storageKey]);
 
   const retry = () => {
     attemptsRef.current = 0;

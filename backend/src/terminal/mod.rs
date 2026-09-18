@@ -3,6 +3,7 @@
 mod handlers;
 mod pty;
 pub mod share;
+mod share_ticket;
 mod session;
 mod settings;
 
@@ -147,7 +148,7 @@ async fn ws_terminal(
                             return ws::start(WsBridge {
                                 session_id: sid, tmux_name: name, store: store.get_ref().clone(),
                                 master_fd: fd, master_file: Some(file), child_pid: pid, ended: false,
-                                read_only: false,
+                                read_only: false, mirror_size: false,
                             }, &req, stream);
                         }
                         Err(e) => return Ok(HttpResponse::InternalServerError().json(crate::models::ApiResponse::<()>::error(&e))),
@@ -220,7 +221,7 @@ async fn ws_terminal(
     ws::start(WsBridge {
         session_id: sid, tmux_name, store: store.get_ref().clone(),
         master_fd: fd, master_file: Some(file), child_pid: pid, ended: false,
-        read_only: false,
+        read_only: false, mirror_size: false,
     }, &req, stream)
 }
 

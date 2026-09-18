@@ -7,6 +7,7 @@ import { useTerminalSettings } from '../terminal/settings';
 import { useTerminalWindows } from '../terminal/TerminalWindows';
 import TerminalSettingsModal from '../terminal/TerminalSettingsModal';
 import ShareDialog from '../terminal/ShareDialog';
+import ShareLinksPanel from '../terminal/ShareLinksPanel';
 import { SshKeyPanel } from '../SshKeyComponents';
 import MultiServerDashboard from '../MultiServerDashboard';
 import ServerForm from './ServerForm';
@@ -203,6 +204,7 @@ export default function RemoteWorkspace() {
               <>
                 <button className={overviewView === 'summary' ? 'is-active' : ''} onClick={() => setOverviewView('summary')}>{t('remote.summaryTab')}</button>
                 <button className={overviewView === 'sessions' ? 'is-active' : ''} onClick={() => setOverviewView('sessions')}>{t('remote.sessionsTab')} {sessions.length > 0 && <em>{sessions.length}</em>}</button>
+                <button className={overviewView === 'links' ? 'is-active' : ''} onClick={() => setOverviewView('links')}>{t('share.panelTab')}</button>
                 <button className={overviewView === 'keys' ? 'is-active' : ''} onClick={() => setOverviewView('keys')}>{t('remote.sshKey')}</button>
               </>
             )}
@@ -282,6 +284,7 @@ export default function RemoteWorkspace() {
                 <SessionsView sessions={sessions} currentSessionId={currentSessionId}
                   onRefresh={refetchSessions} onAttach={attachSession} onPopOut={popOutSession} />
               )}
+              {overviewView === 'links' && <ShareLinksPanel />}
               {overviewView === 'keys' && <SshKeyPanel />}
             </div>
           )}
