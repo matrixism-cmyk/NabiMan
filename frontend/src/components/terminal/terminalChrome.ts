@@ -114,13 +114,13 @@ export function attachTerminalIo(
 }
 
 /**
- * Fit a grid of `cols x rows` into the container by changing the font size
- * rather than the number of cells — what a share viewer needs, since resizing
- * would reshape the terminal its owner is working in.
+ * Fill the container with a grid of `cols x rows` without changing the grid.
  *
- * The measurement comes from the fit addon, which knows what a cell actually
- * costs at the current font; guessing from the font size alone is off by
- * enough to clip a line.
+ * The font size is chosen so the columns span the width, and the line height
+ * then stretches the rows down the remaining height. Stretching the spacing
+ * rather than the glyphs keeps the text undistorted while leaving no dead
+ * margin — a shared pane is usually a different shape from the window it is
+ * being watched in.
  */
 export function fitFontToPane(
   term: Terminal,
@@ -130,25 +130,41 @@ export function fitFontToPane(
   maxSize = 28,
 ): void {
   if (!cols || !rows) return;
-  const fits = () => {
-    const proposed = fit.proposeDimensions();
-    return Boolean(proposed && proposed.cols >= cols && proposed.rows >= rows);
-  };
+  const proposal = () => fit.proposeDimensions();
+  const widthFits = () => { const p = proposal(); return Boolean(p && p.cols >= cols); };
+  const heightFits = () => { const p = proposal(); return Boolean(p && p.rows >= rows); };
 
+  // 1. The widest text that still shows every column.
+  term.options.lineHeight = 1;
   let size = term.options.fontSize || 14;
-  if (fits()) {
-    // Room to spare: grow until one more step would clip.
+  if (widthFits()) {
     while (size < maxSize) {
       term.options.fontSize = size + 0.5;
-      if (!fits()) { term.options.fontSize = size; return; }
+      if (!widthFits()) { term.options.fontSize = size; break; }
       size += 0.5;
     }
-    return;
+  } else {
+    while (size > 6) {
+      size -= 0.5;
+      term.options.fontSize = size;
+      if (widthFits()) break;
+    }
   }
-  while (size > 6) {
-    size -= 0.5;
-    term.options.fontSize = size;
-    if (fits()) return;
+
+  // 2. Spread the rows over whatever height is left.
+  let lineHeight = 1;
+  if (!heightFits()) {
+    // Too tall even packed tight: give the height priority and shrink the text.
+    while (size > 6 && !heightFits()) {
+      size -= 0.5;
+      term.options.fontSize = size;
+    }
+  } else {
+    while (lineHeight < 2.4) {
+      term.options.lineHeight = lineHeight + 0.05;
+      if (!heightFits()) { term.options.lineHeight = lineHeight; break; }
+      lineHeight += 0.05;
+    }
   }
 }
 
