@@ -341,6 +341,8 @@ async fn share_ws(
             ended: false,
             read_only: link.read_only,
             mirror_size: true,
+            last_size: Some(size),
+            client_tty: super::pty::slave_tty(fd),
         },
         &req,
         stream,

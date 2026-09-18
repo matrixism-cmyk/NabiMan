@@ -17,6 +17,13 @@ const SIZE_POLL_INTERVAL: Duration = Duration::from_millis(1500);
 
 struct ShellCommand { program: String, args: Vec<String> }
 
+/// The path tmux will report for a client running on this pseudo-terminal.
+pub(crate) fn slave_tty(master_fd: i32) -> Option<String> {
+    let name = unsafe { libc::ptsname(master_fd) };
+    if name.is_null() { return None; }
+    unsafe { std::ffi::CStr::from_ptr(name) }.to_str().ok().map(str::to_string)
+}
+
 fn spawn_pty(cmd: ShellCommand, size: (u16, u16)) -> Result<(i32, nix::unistd::Pid), String> {
     let winsize = nix::pty::Winsize { ws_row: size.1, ws_col: size.0, ws_xpixel: 0, ws_ypixel: 0 };
     let pty = nix::pty::openpty(Some(&winsize), None).map_err(|e| format!("openpty: {}", e))?;
@@ -67,9 +74,20 @@ pub(crate) struct WsBridge {
     pub(crate) ended: bool,
     /// A share link may watch without typing; input is dropped on the way in.
     pub(crate) read_only: bool,
+    /// The tty tmux knows this connection by, used to force a repaint.
+    pub(crate) client_tty: Option<String>,
     /// A share viewer mirrors the pane instead of resizing it: its own window
     /// must not reshape the terminal the owner is working in.
     pub(crate) mirror_size: bool,
+    /// Last size a mirroring viewer was moved to.
+    pub(crate) last_size: Option<(u16, u16)>,
+}
+
+/// After a mirrored client changes size, tmux may leave the old frame on
+/// screen — padded out with its "client too big" filler. Asking for a refresh
+/// of that one client paints the real thing.
+fn refresh_tmux_client(tty: &str) {
+    let _ = std::process::Command::new("tmux").args(["refresh-client", "-t", tty]).output();
 }
 
 /// Tells a mirroring client how big the pane is, so it can match without
@@ -106,6 +124,16 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for NoticeSocket {
 }
 
 impl WsBridge {
+    /// Resize the pseudo-terminal and let the process inside know.
+    fn set_winsize(&self, (cols, rows): (u16, u16)) {
+        let ws = nix::pty::Winsize { ws_row: rows, ws_col: cols, ws_xpixel: 0, ws_ypixel: 0 };
+        unsafe { libc::ioctl(self.master_fd, libc::TIOCSWINSZ, &ws) };
+        let _ = nix::sys::signal::kill(self.child_pid, nix::sys::signal::Signal::SIGWINCH);
+        if let Some(tty) = self.client_tty.as_deref() {
+            refresh_tmux_client(tty);
+        }
+    }
+
     /// The PTY hit EOF: either the tmux session ended (shell exited / killed)
     /// or the attach died. Tell the browser which one before closing, so a
     /// deliberate exit is not answered with an automatic new session.
@@ -144,15 +172,18 @@ impl Actor for WsBridge {
         });
         ctx.run_interval(HEARTBEAT_INTERVAL, |_, ctx| { ctx.ping(b""); });
         if self.mirror_size {
-            let mut last: Option<(u16, u16)> = None;
-            let name = self.tmux_name.clone();
-            ctx.run_interval(SIZE_POLL_INTERVAL, move |_, ctx| {
-                if let Some(size) = client_size(&name) {
-                    if last != Some(size) {
-                        last = Some(size);
-                        ctx.text(format!("{}{}:{}", SIZE_MSG, size.0, size.1));
-                    }
-                }
+            ctx.run_interval(SIZE_POLL_INTERVAL, |act, ctx| {
+                let size = match client_size(&act.tmux_name) {
+                    Some(s) => s,
+                    None => return,
+                };
+                if act.last_size == Some(size) { return; }
+                act.last_size = Some(size);
+                // Follow the owner on this end too. Telling only the browser
+                // leaves tmux drawing for a client of the old size, which is
+                // what made a shared view go stale the moment anyone zoomed.
+                act.set_winsize(size);
+                ctx.text(format!("{}{}:{}", SIZE_MSG, size.0, size.1));
             });
         }
     }
@@ -182,9 +213,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsBridge {
                     let parts: Vec<&str> = text[8..].split(':').collect();
                     if parts.len() == 2 {
                         if let (Ok(cols), Ok(rows)) = (parts[0].parse::<u16>(), parts[1].parse::<u16>()) {
-                            let ws = nix::pty::Winsize { ws_row: rows, ws_col: cols, ws_xpixel: 0, ws_ypixel: 0 };
-                            unsafe { libc::ioctl(self.master_fd, libc::TIOCSWINSZ, &ws) };
-                            let _ = nix::sys::signal::kill(self.child_pid, nix::sys::signal::Signal::SIGWINCH);
+                            self.set_winsize((cols, rows));
                         }
                     }
                     return;

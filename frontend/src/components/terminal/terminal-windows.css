@@ -266,3 +266,12 @@
 .share-left-soon { border-left: 2px solid var(--warning); color: var(--warning); }
 .share-left-critical { border-left: 2px solid var(--danger); color: var(--danger); }
 .status-badge.warn { background: rgba(243, 156, 18, 0.16); color: var(--warning); }
+
+/* A mirrored pane keeps the owner's grid, so centre whatever space is left
+   over instead of hugging the top-left corner. */
+.share-page .terminal-view-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}

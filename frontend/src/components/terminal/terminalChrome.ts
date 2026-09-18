@@ -122,7 +122,13 @@ export function attachTerminalIo(
  * costs at the current font; guessing from the font size alone is off by
  * enough to clip a line.
  */
-export function fitFontToPane(term: Terminal, fit: FitAddon, cols: number, rows: number): void {
+export function fitFontToPane(
+  term: Terminal,
+  fit: FitAddon,
+  cols: number,
+  rows: number,
+  maxSize = 28,
+): void {
   if (!cols || !rows) return;
   const fits = () => {
     const proposed = fit.proposeDimensions();
@@ -132,7 +138,7 @@ export function fitFontToPane(term: Terminal, fit: FitAddon, cols: number, rows:
   let size = term.options.fontSize || 14;
   if (fits()) {
     // Room to spare: grow until one more step would clip.
-    while (size < 28) {
+    while (size < maxSize) {
       term.options.fontSize = size + 0.5;
       if (!fits()) { term.options.fontSize = size; return; }
       size += 0.5;
@@ -144,6 +150,16 @@ export function fitFontToPane(term: Terminal, fit: FitAddon, cols: number, rows:
     term.options.fontSize = size;
     if (fits()) return;
   }
+}
+
+/**
+ * Take on another terminal's grid and scale the text to the window. A mirrored
+ * pane may grow past the normal zoom cap: filling the window is the point.
+ */
+export function mirrorGrid(term: Terminal, fit: FitAddon, cols: number, rows: number): void {
+  if (cols <= 0 || rows <= 0) return;
+  term.resize(cols, rows);
+  fitFontToPane(term, fit, cols, rows, 44);
 }
 
 /**

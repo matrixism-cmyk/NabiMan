@@ -2,7 +2,7 @@ import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef,
 import { Terminal } from 'xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { apiRequest } from '../../hooks/useApi';
-import { attachClipboard, attachTerminalIo, attachWheelZoom, createTerminal, fitFontToPane } from './terminalChrome';
+import { attachClipboard, attachTerminalIo, attachWheelZoom, createTerminal, mirrorGrid } from './terminalChrome';
 import TerminalStatusPill from './TerminalStatusPill';
 import { useScreenBuffer } from './useScreenBuffer';
 import { buildTerminalUrl } from './terminalUrl';
@@ -188,12 +188,7 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
         if (event.data.startsWith(SIZE_MSG)) {
           // Match the owner's pane without resizing it: same grid, own font.
           const [cols, rows] = event.data.slice(SIZE_MSG.length).split(':').map(Number);
-          if (cols > 0 && rows > 0) {
-            term.resize(cols, rows);
-            if (!manualZoomRef.current && fitRef.current) {
-              fitFontToPane(term, fitRef.current, cols, rows);
-            }
-          }
+          if (!manualZoomRef.current && fitRef.current) mirrorGrid(term, fitRef.current, cols, rows);
           return;
         }
         if (event.data.startsWith('\x02SESSION:')) {
@@ -252,8 +247,7 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
       if (grid && grid.cols > 0 && grid.rows > 0) {
         // Match the shared pane before connecting: resizing after the attach
         // redraw would clear the screen until tmux painted it again.
-        term.resize(grid.cols, grid.rows);
-        fitFontToPane(term, fitAddon, grid.cols, grid.rows);
+        mirrorGrid(term, fitAddon, grid.cols, grid.rows);
       } else {
         try { fitAddon.fit(); } catch { /* container not laid out yet */ }
       }
@@ -310,7 +304,7 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
         const term = termRef.current;
         if (shareRef.current && term && fitRef.current) {
           // Keep the mirrored grid; grow or shrink the text instead.
-          if (!manualZoomRef.current) fitFontToPane(term, fitRef.current, term.cols, term.rows);
+          if (!manualZoomRef.current) mirrorGrid(term, fitRef.current, term.cols, term.rows);
           return;
         }
         try { fitRef.current?.fit(); } catch { /* hidden container */ }
