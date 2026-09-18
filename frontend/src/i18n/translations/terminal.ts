@@ -184,6 +184,8 @@ const t: T = {
   'share.inDays': { ko: '{n}일', en: '{n} days', ja: '{n}日' },
   'share.inHours': { ko: '{n}시간', en: '{n} hours', ja: '{n}時間' },
   'share.inMinutes': { ko: '{n}분', en: '{n} min', ja: '{n}分' },
+  'share.expiringSoon': { ko: '곧 만료', en: 'expiring soon', ja: 'まもなく期限' },
+  'share.expiringNow': { ko: '1시간 내 만료', en: 'under an hour', ja: '1時間以内' },
   'share.lastUsed': { ko: '마지막 접속', en: 'Last opened', ja: '最終アクセス' },
   'share.neverUsed': { ko: '아직 없음', en: 'never', ja: 'まだなし' },
   'share.revoked': { ko: '링크를 취소했습니다.', en: 'Link revoked.', ja: 'リンクを取り消しました。' },

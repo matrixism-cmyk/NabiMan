@@ -259,3 +259,10 @@
   background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text);
 }
 .share-gate input:focus { outline: none; border-color: var(--primary); }
+
+/* Links close to lapsing: the row carries the warning, not just the text. */
+.share-row-soon td { background: rgba(243, 156, 18, 0.07); }
+.share-row-critical td { background: rgba(231, 76, 60, 0.08); }
+.share-left-soon { border-left: 2px solid var(--warning); color: var(--warning); }
+.share-left-critical { border-left: 2px solid var(--danger); color: var(--danger); }
+.status-badge.warn { background: rgba(243, 156, 18, 0.16); color: var(--warning); }

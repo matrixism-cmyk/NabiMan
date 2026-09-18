@@ -5,6 +5,20 @@ import { ShareLink } from './ShareDialog';
 
 const shareUrl = (token: string) => `${window.location.origin}/share/${token}`;
 
+/** Links about to lapse are worth noticing before someone loses access. */
+const CRITICAL_SECS = 3600;
+const SOON_SECS = 6 * 3600;
+
+type Urgency = 'critical' | 'soon' | 'ok';
+
+function urgencyOf(expires: number): Urgency {
+  if (expires === 0) return 'ok';
+  const left = expires - Math.floor(Date.now() / 1000);
+  if (left <= CRITICAL_SECS) return 'critical';
+  if (left <= SOON_SECS) return 'soon';
+  return 'ok';
+}
+
 /** "in 3 days", "in 20 minutes" — how long this link has left. */
 function remaining(expires: number, t: (k: string) => string): string {
   if (expires === 0) return t('share.forever');
@@ -22,6 +36,10 @@ function used(unix: number, t: (k: string) => string): string {
   return unix === 0 ? t('share.neverUsed') : new Date(unix * 1000).toLocaleString();
 }
 
+function exactExpiry(expires: number, t: (k: string) => string): string {
+  return expires === 0 ? t('share.forever') : new Date(expires * 1000).toLocaleString();
+}
+
 /** Every link this account has handed out, wherever it was created. */
 export default function ShareLinksPanel() {
   const { t } = useT();
@@ -35,10 +53,14 @@ export default function ShareLinksPanel() {
     setLoading(false);
   }, []);
 
+  const [, setTick] = useState(0);
+
   useEffect(() => {
     load();
     const id = window.setInterval(load, 30000);
-    return () => window.clearInterval(id);
+    // Re-render between fetches so "45분" counts down rather than sitting still.
+    const tick = window.setInterval(() => setTick((n) => n + 1), 30000);
+    return () => { window.clearInterval(id); window.clearInterval(tick); };
   }, [load]);
 
   const revoke = async (link: ShareLink) => {
@@ -82,14 +104,24 @@ export default function ShareLinksPanel() {
                 </tr>
               </thead>
               <tbody>
-                {links.map((link) => (
-                  <tr key={link.token}>
+                {links.map((link) => {
+                  const urgency = urgencyOf(link.expires_unix);
+                  return (
+                  <tr key={link.token} className={urgency === 'ok' ? undefined : `share-row-${urgency}`}>
                     <td>
                       <strong>{link.label}</strong>
                       {!link.alive && <span className="status-badge down" style={{ marginLeft: 6 }}>{t('share.ended')}</span>}
                     </td>
                     <td><code>/share/{link.token.slice(0, 8)}…</code></td>
-                    <td>{remaining(link.expires_unix, t)}</td>
+                    <td className={urgency === 'ok' ? undefined : `share-left-${urgency}`}
+                      title={exactExpiry(link.expires_unix, t)}>
+                      {remaining(link.expires_unix, t)}
+                      {urgency !== 'ok' && (
+                        <span className={`status-badge ${urgency === 'critical' ? 'down' : 'warn'}`} style={{ marginLeft: 6 }}>
+                          {t(urgency === 'critical' ? 'share.expiringNow' : 'share.expiringSoon')}
+                        </span>
+                      )}
+                    </td>
                     <td>
                       {link.needs_password ? t('share.withPassword') : t('share.noPassword')}
                       {link.read_only ? ` · ${t('share.readOnly')}` : ''}
@@ -101,7 +133,8 @@ export default function ShareLinksPanel() {
                       <button className="btn btn-danger btn-sm" onClick={() => revoke(link)}>{t('share.revoke')}</button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
