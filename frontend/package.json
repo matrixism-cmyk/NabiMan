@@ -27,7 +27,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "smoke": "node scripts/smoke-browser.js",
-    "smoke:share": "node scripts/smoke-share.js"
+    "smoke:share": "node scripts/smoke-share.js",
+    "smoke:paste": "node scripts/smoke-paste.js"
   },
   "browserslist": {
     "production": [

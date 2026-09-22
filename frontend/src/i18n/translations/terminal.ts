@@ -45,6 +45,20 @@ const t: T = {
   'terminal.join': { ko: '참여', en: 'Join', ja: '参加' },
   'terminal.share': { ko: '공유', en: 'Share', ja: '共有' },
   'terminal.shared': { ko: '공유됨', en: 'Shared', ja: '共有中' },
+  'terminal.keepaliveShort': { ko: '유지', en: 'Keep', ja: '維持' },
+  'terminal.rename': { ko: '이름 바꾸기', en: 'Rename', ja: '名前を変更' },
+  'terminal.namePlaceholder': {
+    ko: '예: 배포용 셸 (비우면 주소로 표시)',
+    en: 'e.g. deploy shell (empty = show its address)',
+    ja: '例: デプロイ用シェル (空欄で接続先を表示)',
+  },
+  'terminal.thisPane': { ko: '지금 보는 중', en: 'open here', ja: '表示中' },
+  'terminal.previewHint': {
+    ko: '이 세션 화면의 마지막 줄들입니다.',
+    en: 'The last lines on this session\'s screen.',
+    ja: 'このセッション画面の最後の数行です。',
+  },
+  'terminal.noPreview': { ko: '(화면 없음)', en: '(no screen)', ja: '(画面なし)' },
   'terminal.settings': { ko: '터미널 설정', en: 'Terminal settings', ja: 'ターミナル設定' },
   'terminal.scrollbackLines': { ko: '스크롤백 줄 수', en: 'Scrollback lines', ja: 'スクロールバック行数' },
   'terminal.scrollbackHint': {

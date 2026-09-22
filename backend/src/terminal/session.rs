@@ -43,6 +43,9 @@ pub struct TmuxSession {
     pub(crate) scrollback: u32,
     #[serde(default)]
     pub(crate) keepalive: bool,
+    /// A name the operator gave this session; the label stays as its address.
+    #[serde(default)]
+    pub(crate) title: String,
 }
 
 pub type PtyStore = Arc<Mutex<HashMap<String, TmuxSession>>>;
@@ -78,7 +81,7 @@ pub fn restore_sessions(store: &PtyStore) {
         // Mouse and clipboard bindings live on the tmux server, so sessions
         // started by an older build pick up the current ones here.
         if let Some(path) = write_tmux_conf(default_scrollback()) {
-            let _ = std::process::Command::new("tmux").args(["source-file", &path]).output();
+            let _ = tmux().args(["source-file", &path]).output();
         }
     }
     persist(&map);
@@ -104,7 +107,7 @@ pub fn start_pty_cleanup(store: PtyStore) {
         let mut changed = false;
         for id in expired {
             if let Some(s) = map.remove(&id) {
-                let _ = std::process::Command::new("tmux").args(["kill-session", "-t", &s.tmux_name]).output();
+                let _ = tmux().args(["kill-session", "-t", &s.tmux_name]).output();
                 changed = true;
             }
         }
@@ -122,7 +125,7 @@ pub fn kill_user_sessions(store: &PtyStore, username: &str) {
     let ids: Vec<String> = map.iter().filter(|(_, s)| s.owner == username).map(|(id, _)| id.clone()).collect();
     for id in ids {
         if let Some(s) = map.remove(&id) {
-            let _ = std::process::Command::new("tmux").args(["kill-session", "-t", &s.tmux_name]).output();
+            let _ = tmux().args(["kill-session", "-t", &s.tmux_name]).output();
         }
     }
     persist(&map);
@@ -134,7 +137,7 @@ pub(crate) fn generate_session_id() -> String {
 }
 
 pub(crate) fn tmux_session_exists(name: &str) -> bool {
-    std::process::Command::new("tmux").args(["has-session", "-t", name])
+    tmux().args(["has-session", "-t", name])
         .output().map(|o| o.status.success()).unwrap_or(false)
 }
 
@@ -199,9 +202,9 @@ pub(crate) fn create_tmux_session(name: &str, command: Option<&str>, scrollback:
     // -f only applies when this command starts the server, so a server that is
     // already up gets the same file sourced explicitly.
     if let Some(ref path) = conf {
-        let _ = std::process::Command::new("tmux").args(["source-file", path]).output();
+        let _ = tmux().args(["source-file", path]).output();
     }
-    let _ = std::process::Command::new("tmux")
+    let _ = tmux()
         .args(["set-option", "-g", "history-limit", &scrollback.to_string()])
         .output();
 
@@ -219,7 +222,7 @@ pub(crate) fn create_tmux_session(name: &str, command: Option<&str>, scrollback:
     if let Some(cmd) = command {
         args.push(cmd);
     }
-    let out = std::process::Command::new("tmux").args(&args).output()
+    let out = tmux().args(&args).output()
         .map_err(|e| format!("tmux: {}", e))?;
     if !out.status.success() {
         return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
@@ -227,21 +230,30 @@ pub(crate) fn create_tmux_session(name: &str, command: Option<&str>, scrollback:
     // Enable mouse so the wheel scrolls tmux's own history (copy-mode) like a
     // native terminal — otherwise, in tmux's alternate screen, xterm.js turns
     // the wheel into arrow keys, which bash treats as command-history nav.
-    let _ = std::process::Command::new("tmux")
+    let _ = tmux()
         .args(["set-option", "-t", name, "mouse", "on"])
         .output();
-    let _ = std::process::Command::new("tmux")
+    let _ = tmux()
         .args(["set-option", "-t", name, "history-limit", &scrollback.to_string()])
         .output();
     // Detaching a browser must never tear the session down.
-    let _ = std::process::Command::new("tmux")
+    let _ = tmux()
         .args(["set-option", "-t", name, "destroy-unattached", "off"])
         .output();
     Ok(())
 }
 
+/// `tmux` with the inherited session variables cleared. Without this, a server
+/// started from inside a tmux pane would talk to that pane's socket instead of
+/// its own.
+pub(crate) fn tmux() -> std::process::Command {
+    let mut cmd = std::process::Command::new("tmux");
+    cmd.env_remove("TMUX").env_remove("TMUX_PANE");
+    cmd
+}
+
 fn tmux_size(args: &[&str]) -> Option<(u16, u16)> {
-    let out = std::process::Command::new("tmux").args(args).output().ok()?;
+    let out = tmux().args(args).output().ok()?;
     let text = String::from_utf8_lossy(&out.stdout);
     let mut parts = text.split_whitespace();
     let cols = parts.next()?.parse().ok()?;
@@ -261,11 +273,70 @@ pub(crate) fn client_size(name: &str) -> Option<(u16, u16)> {
         })
 }
 
+/// The last few lines on screen, as plain text — enough for a thumbnail in the
+/// session list without shipping a whole screen of escape codes.
+pub(crate) fn pane_preview(name: &str, lines: usize) -> String {
+    let out = match tmux().args(["capture-pane", "-p", "-J", "-t", name]).output() {
+        Ok(o) if o.status.success() => o.stdout,
+        _ => return String::new(),
+    };
+    let text = String::from_utf8_lossy(&out);
+    let kept: Vec<&str> = text
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .rev()
+        .take(lines)
+        .collect();
+    kept.into_iter()
+        .rev()
+        .map(|l| l.chars().take(200).collect::<String>())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Show the operator's name for a session in tmux's own status line too.
+pub(crate) fn rename_tmux_window(name: &str, title: &str) {
+    let _ = tmux().args(["rename-window", "-t", name, title]).output();
+}
+
+/// Hand text to a pane through tmux's own paste buffer.
+///
+/// Writing the bytes straight into the pseudo-terminal works until the pane is
+/// in copy-mode, where they are swallowed, and it loses the bracketed-paste
+/// markers that let an editor tell a paste from typing. tmux does both
+/// properly, so the paste goes through tmux.
+pub(crate) fn paste_into_pane(name: &str, text: &str) {
+    use std::io::Write;
+
+    // A selection left the pane in copy-mode; leave it before pasting.
+    if tmux_size(&["display-message", "-p", "-t", name, "#{pane_in_mode} 0"])
+        .map(|(mode, _)| mode == 1)
+        .unwrap_or(false)
+    {
+        let _ = tmux().args(["send-keys", "-X", "-t", name, "cancel"]).output();
+    }
+
+    let buffer = format!("nabiman-paste-{}", name);
+    let mut child = match tmux()
+        .args(["load-buffer", "-b", &buffer, "-"])
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+    if let Some(stdin) = child.stdin.as_mut() {
+        let _ = stdin.write_all(text.as_bytes());
+    }
+    let _ = child.wait();
+    let _ = tmux().args(["paste-buffer", "-d", "-b", &buffer, "-t", name]).output();
+}
+
 /// Read back the pane history (ANSI colours included) so a reopened window can
 /// show what scrolled past while it was closed.
 pub(crate) fn capture_scrollback(name: &str, lines: u32) -> Result<String, String> {
     let start = format!("-{}", lines.min(MAX_SCROLLBACK));
-    let out = std::process::Command::new("tmux")
+    let out = tmux()
         .args(["capture-pane", "-p", "-e", "-J", "-S", &start, "-t", name])
         .output().map_err(|e| format!("tmux: {}", e))?;
     if !out.status.success() {

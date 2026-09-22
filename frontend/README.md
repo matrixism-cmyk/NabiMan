@@ -15,6 +15,8 @@ as static files — see the repository `Makefile`.
 | `npm run typecheck` | `tsc --noEmit` over `src/` |
 | `npm run lint` | ESLint over `src/` (hook rules, unused symbols, TS checks) |
 | `npm run smoke` | Loads the built app in Chromium, signs in, opens the remote workspace |
+| `npm run smoke:share` | Share links end to end: password gate, read-only, revoke |
+| `npm run smoke:paste` | Every paste route in a terminal pane, images included |
 
 ## Configuration
 

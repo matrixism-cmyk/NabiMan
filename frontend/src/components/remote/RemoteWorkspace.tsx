@@ -48,12 +48,20 @@ export default function RemoteWorkspace() {
   const [termStatus, setTermStatus] = useState<TerminalStatus>('connecting');
   const [showSettings, setShowSettings] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [shareTarget, setShareTarget] = useState('');
   const [filter, setFilter] = useState('');
   const [checkingAll, setCheckingAll] = useState(false);
   const [adhocForm, setAdhocForm] = useState({ host: '', port: '22', user: 'root' });
   const [adhocTarget, setAdhocTarget] = useState<{ host: string; port: number; user: string } | null>(null);
 
   useEffect(() => { rememberSelection(selection); }, [selection]);
+
+  // Opening the session list, or starting a new shell, should show the current
+  // state rather than whatever the last poll happened to catch.
+  useEffect(() => {
+    if (selection.kind === 'overview' && overviewView === 'sessions') refetchSessions();
+  }, [selection.kind, overviewView, refetchSessions]);
+  useEffect(() => { if (currentSessionId) refetchSessions(); }, [currentSessionId, refetchSessions]);
 
   const selectedServer = selection.kind === 'server'
     ? servers.find(s => s.id === selection.id)
@@ -230,7 +238,8 @@ export default function RemoteWorkspace() {
                 <button className="btn btn-secondary btn-sm" onClick={() => viewRef.current?.newSession()}>{t('terminal.newSession')}</button>
                 <button className="btn btn-secondary btn-sm" onClick={detach} title={t('remote.detachHint')}>⧉ {t('remote.detach')}</button>
                 {currentSessionId && (
-                  <button className="btn btn-secondary btn-sm" onClick={() => setShowShare(true)} title={t('share.hint')}>
+                  <button className="btn btn-secondary btn-sm"
+                    onClick={() => { setShareTarget(currentSessionId); setShowShare(true); }} title={t('share.hint')}>
                     🔗 {t('share.button')}
                   </button>
                 )}
@@ -282,7 +291,8 @@ export default function RemoteWorkspace() {
               {overviewView === 'summary' && <MultiServerDashboard />}
               {overviewView === 'sessions' && (
                 <SessionsView sessions={sessions} currentSessionId={currentSessionId}
-                  onRefresh={refetchSessions} onAttach={attachSession} onPopOut={popOutSession} />
+                  onRefresh={refetchSessions} onAttach={attachSession} onPopOut={popOutSession}
+                  onShare={(session) => { setShareTarget(session.id); setShowShare(true); }} />
               )}
               {overviewView === 'links' && <ShareLinksPanel />}
               {overviewView === 'keys' && <SshKeyPanel />}
@@ -343,11 +353,12 @@ export default function RemoteWorkspace() {
       </section>
 
       {showSettings && <TerminalSettingsModal onClose={() => setShowSettings(false)} />}
-      {showShare && currentSessionId && (
+      {showShare && (shareTarget || currentSessionId) && (
         <ShareDialog
-          sessionId={currentSessionId}
-          sessionLabel={`${headTitle} · ${headSub}`}
-          onClose={() => setShowShare(false)}
+          sessionId={shareTarget || currentSessionId}
+          sessionLabel={sessions.find(s => s.id === (shareTarget || currentSessionId))?.title
+            || `${headTitle} · ${headSub}`}
+          onClose={() => { setShowShare(false); setShareTarget(''); }}
         />
       )}
     </div>

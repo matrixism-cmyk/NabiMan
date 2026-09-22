@@ -131,7 +131,8 @@ describe('remote workspace', () => {
     fireEvent.click(itemByName('전체 현황'));
     const tabs = within(document.querySelector('.rw-tabs') as HTMLElement);
     fireEvent.click(tabs.getByRole('button', { name: /세션/ }));
-    expect(screen.getByText('local')).toBeInTheDocument();
+    // A session card shows its name and its address, so "local" appears twice.
+    expect(screen.getAllByText('local').length).toBeGreaterThan(0);
     expect(tabs.getByRole('button', { name: 'SSH 키' })).toBeInTheDocument();
   });
 

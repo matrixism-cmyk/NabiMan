@@ -1,6 +1,7 @@
 //! The terminal WebSocket: one browser pane attached to one tmux session.
 
 mod handlers;
+mod paste_file;
 mod pty;
 pub mod share;
 mod share_ticket;
@@ -212,7 +213,7 @@ async fn ws_terminal(
         map.insert(sid.clone(), TmuxSession {
             tmux_name: tmux_name.clone(), owner: username, label, ssh_cmd: shell_cmd,
             created_unix: now_unix(), last_active_unix: now_unix(), ws_count: 1, shared: false,
-            timeout_secs, scrollback, keepalive,
+            timeout_secs, scrollback, keepalive, title: String::new(),
         });
         persist(&map);
     }
@@ -250,5 +251,6 @@ fn validate_ssh_input(s: &str) -> bool {
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(ws_terminal);
     handlers::configure(cfg);
+    paste_file::config(cfg);
     share::config(cfg);
 }

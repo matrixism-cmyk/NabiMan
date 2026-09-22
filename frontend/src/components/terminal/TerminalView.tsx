@@ -71,6 +71,8 @@ const MAX_COLD_ATTEMPTS = 8;
 const ENDED_MSG = '\x02ENDED';
 /** The server telling a share viewer how big the owner's pane is. */
 const SIZE_MSG = '\x02SIZE:';
+/** Clipboard text on its way out, for the server to hand to tmux. */
+const PASTE_MSG = '\x01PASTE:';
 
 const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView(
   { target, storageKey, settings, joinSessionId, active, share, grid, onStatus, onSessionId }, ref,
@@ -261,7 +263,7 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
     }
 
     const detachClipboard = attachClipboard(term, containerRef.current, (text) => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(text);
+      if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(PASTE_MSG + text);
     });
 
     attachTerminalIo(

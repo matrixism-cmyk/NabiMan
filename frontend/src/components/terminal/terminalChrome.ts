@@ -3,6 +3,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import 'xterm/css/xterm.css';
 import { TerminalSettings } from './settings';
+import { blobsFromClipboardItems, pathsForClipboardFiles } from './pasteFile';
 
 const THEME = {
   background: '#0f1923', foreground: '#e0e6ed', cursor: '#3b82f6', cursorAccent: '#0f1923',
@@ -33,25 +34,39 @@ export function createTerminal(settings: TerminalSettings): { term: Terminal; fi
  *
  * - selecting with the mouse copies straight away (drag, double-click a word,
  *   triple-click a line),
- * - right-click pastes,
- * - Ctrl+Shift+C / Ctrl+Shift+V still work.
+ * - Ctrl+V, Ctrl+Shift+V, right-click and middle-click all paste, once each,
+ * - and every paste is handed to the server as one piece, which passes it to
+ *   tmux. tmux leaves copy-mode first and brackets the paste, so pasting works
+ *   with a selection on screen and an editor can tell it from typing.
  *
- * The selection usually belongs to tmux rather than to xterm — tmux runs with
- * mouse mode on so the wheel scrolls its history — so tmux is configured to
- * hand the copied text over as an OSC 52 sequence, which is what the handler
- * below turns into a clipboard write. The xterm-side selection is copied too,
- * for panes where tmux is not in the way (a Shift-drag, for instance).
+ * The selection itself usually belongs to tmux rather than to xterm — tmux runs
+ * with mouse mode on so the wheel scrolls its history — so tmux hands the
+ * copied text over as an OSC 52 sequence, which the handler below turns into a
+ * clipboard write. The xterm-side selection is copied too, for panes where tmux
+ * is not in the way.
  */
 export function attachClipboard(
   term: Terminal,
   container: HTMLElement | null,
-  send: (data: string) => void,
+  sendPaste: (text: string) => void,
 ): () => void {
   const copy = (text: string) => {
     if (text) navigator.clipboard.writeText(text).catch(() => {});
   };
-  const paste = () => {
-    navigator.clipboard.readText().then(send).catch(() => {});
+  // Files on the clipboard (a screenshot, say) are uploaded and pasted as the
+  // path the server saved them at; see ./pasteFile.
+  const pasteFiles = (files: Array<File | Blob>) => {
+    pathsForClipboardFiles(files).then((paths) => { if (paths) sendPaste(paths); }).catch(() => {});
+  };
+  const pasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) { sendPaste(text); return; }
+    } catch { /* no text, or no permission: try the file side below */ }
+    if (!navigator.clipboard.read) return;
+    try {
+      pasteFiles(await blobsFromClipboardItems(await navigator.clipboard.read()));
+    } catch { /* nothing usable on the clipboard */ }
   };
 
   // tmux (and any other full-screen app) asks the terminal to set the clipboard
@@ -70,26 +85,78 @@ export function attachClipboard(
     if (term.hasSelection()) copy(term.getSelection());
   };
 
+  // Ctrl+Shift+V is also the browser's own "paste as plain text", so it usually
+  // arrives as a paste event by itself — pasting from the key handler as well
+  // put the clipboard in twice. So the key handler waits a moment: if no paste
+  // event turns up (some browsers keep the shortcut to themselves), it reads
+  // the clipboard instead.
+  let lastPasteEvent = 0;
+  let shortcutTimer: ReturnType<typeof setTimeout> | null = null;
+  const clearShortcutTimer = () => {
+    if (shortcutTimer) { clearTimeout(shortcutTimer); shortcutTimer = null; }
+  };
+  const onShortcutPaste = () => {
+    clearShortcutTimer();
+    shortcutTimer = setTimeout(() => {
+      shortcutTimer = null;
+      if (Date.now() - lastPasteEvent < 400) return;
+      pasteFromClipboard();
+    }, 250);
+  };
+
   term.attachCustomKeyEventHandler((ev: KeyboardEvent) => {
     if (ev.type !== 'keydown') return true;
-    if (ev.ctrlKey && ev.shiftKey && ev.key === 'C') { copyLocalSelection(); return false; }
-    if (ev.ctrlKey && ev.shiftKey && ev.key === 'V') { paste(); return false; }
+    if (ev.ctrlKey && ev.shiftKey && ev.key === 'C') {
+      ev.preventDefault();
+      copyLocalSelection();
+      return false;
+    }
+    if (ev.ctrlKey && ev.shiftKey && ev.key === 'V') { onShortcutPaste(); return false; }
     return true;
   });
 
+  // Ctrl+V / Cmd+V arrive as a paste event on xterm's textarea. Taking it here
+  // keeps every paste on the same path as the mouse ones.
+  const onPaste = (ev: ClipboardEvent) => {
+    lastPasteEvent = Date.now();
+    clearShortcutTimer();
+    const files = Array.from(ev.clipboardData?.files || []);
+    if (files.length) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      pasteFiles(files);
+      return;
+    }
+    const text = ev.clipboardData?.getData('text/plain');
+    if (!text) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    sendPaste(text);
+  };
   const onContextMenu = (ev: MouseEvent) => {
     ev.preventDefault();
-    paste();
+    pasteFromClipboard();
+  };
+  // Middle-click is the X11 habit; tmux does nothing with it, so it is ours.
+  const onMouseDown = (ev: MouseEvent) => {
+    if (ev.button !== 1) return;
+    ev.preventDefault();
+    pasteFromClipboard();
   };
   const onMouseUp = () => copyLocalSelection();
 
+  container?.addEventListener('paste', onPaste, true);
   container?.addEventListener('contextmenu', onContextMenu);
+  container?.addEventListener('mousedown', onMouseDown);
   container?.addEventListener('mouseup', onMouseUp);
   container?.addEventListener('dblclick', onMouseUp);
 
   return () => {
+    clearShortcutTimer();
     oscDispose.dispose();
+    container?.removeEventListener('paste', onPaste, true);
     container?.removeEventListener('contextmenu', onContextMenu);
+    container?.removeEventListener('mousedown', onMouseDown);
     container?.removeEventListener('mouseup', onMouseUp);
     container?.removeEventListener('dblclick', onMouseUp);
   };

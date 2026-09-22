@@ -1,10 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { apiPost, apiRequest } from '../../hooks/useApi';
 import { useT } from '../../i18n';
 
 export interface SessionInfo {
   id: string; label: string; owner: string; ws_count: number; shared: boolean;
   age_secs: number; timeout_secs: number; scrollback: number; keepalive: boolean; alive: boolean;
+  /** A name the operator gave it; empty means it goes by its label. */
+  title: string;
+  /** The last lines on screen, for the thumbnail. */
+  preview: string;
 }
 
 function formatAge(secs: number): string {
@@ -19,25 +23,37 @@ interface Props {
   onRefresh: () => void;
   onAttach: (session: SessionInfo) => void;
   onPopOut: (session: SessionInfo) => void;
+  onShare?: (session: SessionInfo) => void;
 }
 
-/** Every shell running on the server, wherever it was started from. */
-export default function SessionsView({ sessions, currentSessionId, onRefresh, onAttach, onPopOut }: Props) {
+/** Every shell running on the server, with a look at what is on each screen. */
+export default function SessionsView({
+  sessions, currentSessionId, onRefresh, onAttach, onPopOut, onShare,
+}: Props) {
   const { t } = useT();
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+
+  const startRename = (session: SessionInfo) => {
+    setRenaming(session.id);
+    setDraft(session.title || '');
+  };
+
+  const saveRename = async (session: SessionInfo) => {
+    await apiPost(`/api/terminal/sessions/${session.id}/name`, { name: draft });
+    setRenaming(null);
+    onRefresh();
+  };
 
   const kill = async (session: SessionInfo) => {
-    if (!window.confirm(t('terminal.endSessionConfirm', { name: session.label }))) return;
+    if (!window.confirm(t('terminal.endSessionConfirm', { name: session.title || session.label }))) return;
     await apiRequest(`/api/terminal/sessions/${session.id}`, { method: 'DELETE' });
     onRefresh();
   };
 
-  const toggleKeepalive = async (session: SessionInfo) => {
-    await apiPost(`/api/terminal/sessions/${session.id}/keepalive`, { keepalive: !session.keepalive });
-    onRefresh();
-  };
-
-  const toggleShare = async (session: SessionInfo) => {
-    await apiPost(`/api/terminal/sessions/${session.id}/share`, { shared: !session.shared });
+  const toggle = async (session: SessionInfo, what: 'keepalive' | 'share') => {
+    const body = what === 'keepalive' ? { keepalive: !session.keepalive } : { shared: !session.shared };
+    await apiPost(`/api/terminal/sessions/${session.id}/${what}`, body);
     onRefresh();
   };
 
@@ -56,48 +72,64 @@ export default function SessionsView({ sessions, currentSessionId, onRefresh, on
         <h3>{t('terminal.activeSessions')}</h3>
         <button className="btn btn-secondary btn-sm" onClick={onRefresh}>{t('common.refresh')}</button>
       </div>
-      <div style={{ overflowX: 'auto' }}>
-        <table className="data-table" style={{ fontSize: 12 }}>
-          <thead>
-            <tr>
-              <th>{t('terminal.label')}</th><th>{t('remote.user')}</th><th>{t('terminal.viewers')}</th>
-              <th>{t('terminal.age')}</th><th>{t('terminal.scrollbackShort')}</th>
-              <th>{t('terminal.keepalive')}</th><th>{t('common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sessions.map(s => (
-              <tr key={s.id} style={{ background: s.id === currentSessionId ? 'rgba(59,130,246,0.1)' : undefined }}>
-                <td>
-                  <strong>{s.label}</strong>
-                  {!s.alive && <span className="status-badge down" style={{ marginLeft: 6 }}>dead</span>}
-                </td>
-                <td>{s.owner}</td>
-                <td>{s.ws_count}</td>
-                <td>{formatAge(s.age_secs)}</td>
-                <td>{s.scrollback.toLocaleString()}</td>
-                <td>
-                  <button className={`btn btn-sm ${s.keepalive ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={() => toggleKeepalive(s)}>{s.keepalive ? 'ON' : 'OFF'}</button>
-                </td>
-                <td>
-                  {s.id !== currentSessionId && (
-                    <button className="btn btn-primary btn-sm" style={{ marginRight: 4 }} onClick={() => onAttach(s)}>
-                      {t('terminal.join')}
-                    </button>
-                  )}
-                  <button className="btn btn-secondary btn-sm" style={{ marginRight: 4 }}
-                    title={t('remote.detach')} onClick={() => onPopOut(s)}>⧉</button>
-                  <button className={`btn btn-sm ${s.shared ? 'btn-warning' : 'btn-secondary'}`}
-                    style={{ marginRight: 4 }} onClick={() => toggleShare(s)}>
-                    {s.shared ? t('terminal.shared') : t('terminal.share')}
+
+      <div className="session-grid">
+        {sessions.map(session => (
+          <div key={session.id} className={`session-card ${session.id === currentSessionId ? 'is-current' : ''}`}>
+            <div className="session-card-head">
+              {renaming === session.id ? (
+                <form className="session-rename" onSubmit={(e) => { e.preventDefault(); saveRename(session); }}>
+                  <input className="filter-input" value={draft} autoFocus maxLength={60}
+                    placeholder={t('terminal.namePlaceholder')}
+                    onChange={(e) => setDraft(e.target.value)} />
+                  <button className="btn btn-primary btn-sm" type="submit">{t('common.save')}</button>
+                  <button className="btn btn-secondary btn-sm" type="button" onClick={() => setRenaming(null)}>
+                    {t('common.cancel')}
                   </button>
-                  <button className="btn btn-danger btn-sm" onClick={() => kill(s)}>✕</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </form>
+              ) : (
+                <>
+                  <strong className="session-name">{session.title || session.label}</strong>
+                  <button className="session-rename-btn" title={t('terminal.rename')} onClick={() => startRename(session)}>✎</button>
+                  {!session.alive && <span className="status-badge down">{t('share.ended')}</span>}
+                  {session.id === currentSessionId && <span className="status-badge up">{t('terminal.thisPane')}</span>}
+                </>
+              )}
+            </div>
+
+            <code className="session-label">{session.label}</code>
+
+            <pre className="session-preview" title={t('terminal.previewHint')}>
+              {session.preview || t('terminal.noPreview')}
+            </pre>
+
+            <div className="session-meta">
+              <span>{t('terminal.viewers')} {session.ws_count}</span>
+              <span>{formatAge(session.age_secs)}</span>
+              <span>{session.scrollback.toLocaleString()}줄</span>
+              <span>{session.owner}</span>
+            </div>
+
+            <div className="session-actions">
+              {session.id !== currentSessionId && (
+                <button className="btn btn-primary btn-sm" onClick={() => onAttach(session)}>{t('terminal.join')}</button>
+              )}
+              <button className="btn btn-secondary btn-sm" title={t('remote.detachHint')} onClick={() => onPopOut(session)}>⧉</button>
+              {onShare && (
+                <button className="btn btn-secondary btn-sm" title={t('share.hint')} onClick={() => onShare(session)}>🔗</button>
+              )}
+              <button className={`btn btn-sm ${session.keepalive ? 'btn-primary' : 'btn-secondary'}`}
+                title={t('terminal.keepaliveHint')} onClick={() => toggle(session, 'keepalive')}>
+                {t('terminal.keepaliveShort')} {session.keepalive ? 'ON' : 'OFF'}
+              </button>
+              <button className={`btn btn-sm ${session.shared ? 'btn-warning' : 'btn-secondary'}`}
+                onClick={() => toggle(session, 'share')}>
+                {session.shared ? t('terminal.shared') : t('terminal.share')}
+              </button>
+              <button className="btn btn-danger btn-sm" onClick={() => kill(session)}>✕</button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

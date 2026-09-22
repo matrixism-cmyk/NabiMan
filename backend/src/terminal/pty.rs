@@ -8,7 +8,9 @@ use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::time::Duration;
 
 use super::parse_query_param;
-use super::session::{client_size, now_unix, persist, tmux_session_exists, PtyStore};
+use super::session::{
+    client_size, now_unix, paste_into_pane, persist, tmux, tmux_session_exists, PtyStore,
+};
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 const PTY_READ_INTERVAL: Duration = Duration::from_millis(30);
@@ -38,6 +40,8 @@ fn spawn_pty(cmd: ShellCommand, size: (u16, u16)) -> Result<(i32, nix::unistd::P
             let _ = nix::unistd::dup2(slave_fd, 1);
             let _ = nix::unistd::dup2(slave_fd, 2);
             if slave_fd > 2 { let _ = nix::unistd::close(slave_fd); }
+            std::env::remove_var("TMUX");
+            std::env::remove_var("TMUX_PANE");
             std::env::set_var("TERM", "xterm-256color");
             std::env::set_var("COLORTERM", "truecolor");
             std::env::set_var("LANG", "en_US.UTF-8");
@@ -87,12 +91,14 @@ pub(crate) struct WsBridge {
 /// screen — padded out with its "client too big" filler. Asking for a refresh
 /// of that one client paints the real thing.
 fn refresh_tmux_client(tty: &str) {
-    let _ = std::process::Command::new("tmux").args(["refresh-client", "-t", tty]).output();
+    let _ = tmux().args(["refresh-client", "-t", tty]).output();
 }
 
 /// Tells a mirroring client how big the pane is, so it can match without
 /// sending a resize back.
 pub(crate) const SIZE_MSG: &str = "\x02SIZE:";
+/// Clipboard text on its way in, to be handed over as a tmux paste.
+const PASTE_MSG: &str = "\x01PASTE:";
 
 /// Sent to the browser when the session is gone for good (the shell exited, or
 /// somebody killed it) as opposed to a network drop, which the browser retries.
@@ -207,6 +213,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsBridge {
         match msg {
             Ok(ws::Message::Text(text)) => {
                 if self.read_only { return; }
+                if let Some(pasted) = text.strip_prefix(PASTE_MSG) {
+                    paste_into_pane(&self.tmux_name, pasted);
+                    return;
+                }
                 if text.starts_with("\x01RESIZE:") {
                     // A viewer's window size is its own business.
                     if self.mirror_size { return; }
