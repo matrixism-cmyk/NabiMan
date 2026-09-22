@@ -2,7 +2,9 @@ import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef,
 import { Terminal } from 'xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { apiRequest } from '../../hooks/useApi';
-import { attachClipboard, attachTerminalIo, attachWheelZoom, createTerminal, mirrorGrid } from './terminalChrome';
+import {
+  adoptGrid, attachClipboard, attachTerminalIo, attachWheelZoom, createTerminal, mirrorGrid,
+} from './terminalChrome';
 import TerminalStatusPill from './TerminalStatusPill';
 import { useScreenBuffer } from './useScreenBuffer';
 import { buildTerminalUrl } from './terminalUrl';
@@ -32,6 +34,8 @@ export interface TerminalViewHandle {
   reconnect: () => void;
   /** Abandon the current tmux session and start a brand new one. */
   newSession: () => void;
+  /** Drop a hand-made zoom and go back to filling the window. */
+  resetZoom: () => void;
   sessionId: () => string;
 }
 
@@ -94,8 +98,14 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
   const targetRef = useRef(target);
   const joinRef = useRef(joinSessionId);
   const shareRef = useRef(share);
-  /** A viewer stops auto-scaling once it has zoomed by hand. */
-  const manualZoomRef = useRef(false);
+  /**
+   * A viewer stops auto-scaling once it has zoomed by hand, and a pane that
+   * reopens with a stored zoom counts as zoomed by hand — the text size a
+   * viewer picked is theirs, and is not shared with anyone else watching.
+   */
+  const manualZoomRef = useRef(readFontSize(storageKey) !== null);
+  /** The grid of the pane being watched, which a viewer always follows. */
+  const ownerGridRef = useRef(grid && grid.cols > 0 ? { ...grid } : null);
   const [status, setStatus] = useState<TerminalStatus>('connecting');
   const { t } = useT();
   const { chunksRef, record, saveBuffer, clearBuffer } = useScreenBuffer(storageKey, settingsRef);
@@ -109,6 +119,23 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
     setStatus(s);
     onStatus?.(s);
   }, [onStatus]);
+
+  /**
+   * Lay the pane out again after something moved: an owner's pane fits its
+   * container, a viewer keeps the owner's grid and — once it has zoomed by
+   * hand — its own text size. Zoom is never shared between viewers.
+   */
+  const relayout = useCallback(() => {
+    const term = termRef.current;
+    if (!term) return;
+    const owner = ownerGridRef.current;
+    if (shareRef.current && owner) {
+      if (manualZoomRef.current || !fitRef.current) adoptGrid(term, owner.cols, owner.rows);
+      else mirrorGrid(term, fitRef.current, owner.cols, owner.rows);
+      return;
+    }
+    try { fitRef.current?.fit(); } catch { /* hidden container */ }
+  }, []);
 
   const buildUrl = useCallback((sessionId: string) => buildTerminalUrl({
     share: shareRef.current,
@@ -134,7 +161,9 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
     endedRef.current = false;
     report(attemptsRef.current > 0 ? 'reconnecting' : 'connecting');
 
-    manualZoomRef.current = false;
+    // A reconnect keeps the text size the viewer chose; only the grid is
+    // taken from the owner again once the socket reports it.
+    manualZoomRef.current = readFontSize(storageKey) !== null;
     if (attemptsRef.current > 0 && !shareRef.current) {
       // A long-lived pane can outlive its access token. One authenticated REST
       // call refreshes it (see fetchWithRefresh) before the socket carries it.
@@ -188,9 +217,12 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
           return;
         }
         if (event.data.startsWith(SIZE_MSG)) {
-          // Match the owner's pane without resizing it: same grid, own font.
+          // Follow the owner's grid without resizing their pane. The text size
+          // stays local: a viewer who has zoomed keeps their own.
           const [cols, rows] = event.data.slice(SIZE_MSG.length).split(':').map(Number);
-          if (!manualZoomRef.current && fitRef.current) mirrorGrid(term, fitRef.current, cols, rows);
+          if (cols > 0 && rows > 0) ownerGridRef.current = { cols, rows };
+          if (manualZoomRef.current || !fitRef.current) adoptGrid(term, cols, rows);
+          else mirrorGrid(term, fitRef.current, cols, rows);
           return;
         }
         if (event.data.startsWith('\x02SESSION:')) {
@@ -249,7 +281,8 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
       if (grid && grid.cols > 0 && grid.rows > 0) {
         // Match the shared pane before connecting: resizing after the attach
         // redraw would clear the screen until tmux painted it again.
-        mirrorGrid(term, fitAddon, grid.cols, grid.rows);
+        if (manualZoomRef.current) adoptGrid(term, grid.cols, grid.rows);
+        else mirrorGrid(term, fitAddon, grid.cols, grid.rows);
       } else {
         try { fitAddon.fit(); } catch { /* container not laid out yet */ }
       }
@@ -302,19 +335,11 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
     let frame = 0;
     const observer = new ResizeObserver(() => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        const term = termRef.current;
-        if (shareRef.current && term && fitRef.current) {
-          // Keep the mirrored grid; grow or shrink the text instead.
-          if (!manualZoomRef.current) mirrorGrid(term, fitRef.current, term.cols, term.rows);
-          return;
-        }
-        try { fitRef.current?.fit(); } catch { /* hidden container */ }
-      });
+      frame = requestAnimationFrame(relayout);
     });
     observer.observe(el);
     return () => { cancelAnimationFrame(frame); observer.disconnect(); };
-  }, []);
+  }, [relayout]);
 
   useEffect(() => {
     const term = termRef.current;
@@ -326,17 +351,17 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
       term.options.fontSize = settings.font_size;
       forgetFontSize(storageKey);
     }
-    try { fitRef.current?.fit(); } catch { /* ignore */ }
-  }, [settings.font_size, settings.scrollback_lines, storageKey]);
+    relayout();
+  }, [relayout, settings.font_size, settings.scrollback_lines, storageKey]);
 
   useEffect(() => {
     if (!active) return;
     const id = window.setTimeout(() => {
-      try { fitRef.current?.fit(); } catch { /* ignore */ }
+      relayout();
       termRef.current?.focus();
     }, 50);
     return () => window.clearTimeout(id);
-  }, [active]);
+  }, [active, relayout]);
 
   // Ctrl + wheel zooms; a plain wheel goes to tmux (mouse mode) as scrollback.
   useEffect(() => {
@@ -345,14 +370,14 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
     return attachWheelZoom(
       el,
       () => termRef.current,
-      () => { try { fitRef.current?.fit(); } catch { /* ignore */ } },
+      relayout,
       (size) => { manualZoomRef.current = true; writeFontSize(storageKey, size); },
     );
-  }, [storageKey]);
+  }, [relayout, storageKey]);
 
   useImperativeHandle(ref, () => ({
     focus: () => termRef.current?.focus(),
-    fit: () => { try { fitRef.current?.fit(); } catch { /* ignore */ } },
+    fit: relayout,
     clear: () => {
       termRef.current?.clear();
       clearBuffer();
@@ -369,8 +394,18 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
       attemptsRef.current = 0;
       connect();
     },
+    resetZoom: () => {
+      manualZoomRef.current = false;
+      forgetFontSize(storageKey);
+      const term = termRef.current;
+      if (term) {
+        term.options.fontSize = settingsRef.current.font_size;
+        term.options.lineHeight = 1.15;
+      }
+      relayout();
+    },
     sessionId: () => sessionIdRef.current,
-  }), [clearBuffer, connect, storageKey]);
+  }), [clearBuffer, connect, relayout, storageKey]);
 
   const retry = () => {
     attemptsRef.current = 0;

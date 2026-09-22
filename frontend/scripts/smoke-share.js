@@ -6,8 +6,9 @@
 // and `npx playwright install chromium`. It walks the whole flow the way a
 // person would: create a link, open it in a browser with no session, get in
 // with the password, type into the shared shell, then check that a read-only
-// link cannot type, that a viewer never reshapes the owner's pane, and that a
-// revoked link stops working.
+// link cannot type, that a viewer never reshapes the owner's pane, that one
+// viewer's zoom stays in that viewer's window, and that a revoked link stops
+// working.
 const { chromium } = require('playwright');
 const { execSync } = require('child_process');
 
@@ -18,6 +19,11 @@ const pane = () => {
     return execSync("tmux list-panes -a -F '#{pane_width}x#{pane_height}' 2>/dev/null | head -1", { encoding: 'utf8' }).trim();
   } catch { return '?'; }
 };
+
+/** The text size a page is drawing its terminal at. */
+const fontSize = (p) => p.$eval('.xterm-rows', (el) => getComputedStyle(el).fontSize);
+/** How many rows the grid has, which every viewer takes from the owner. */
+const rowCount = (p) => p.$eval('.xterm-rows', (el) => el.children.length);
 
 const results = [];
 const check = (name, ok) => { results.push([name, ok]); console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}`); };
@@ -99,6 +105,40 @@ async function createLink(page, { password, readOnly }) {
   }
   await guest.waitForTimeout(1000);
   check('zooming a viewer leaves the pane alone', paneBefore === pane());
+
+  // Zoom belongs to the window it was made in: a second viewer on the same
+  // link, and the owner, must keep the text size they had.
+  const guest2Ctx = await browser.newContext({ viewport: { width: 1200, height: 800 } });
+  const guest2 = await guest2Ctx.newPage();
+  await guest2.goto(url, { waitUntil: 'networkidle' });
+  await guest2.waitForSelector('.share-gate');
+  await guest2.fill('.share-gate input', 'sharepw');
+  await guest2.click('.share-gate button');
+  await guest2.waitForSelector('.xterm-screen', { timeout: 20000 });
+  await guest2.waitForTimeout(2500);
+  const guest2Font = await fontSize(guest2);
+  const ownerFont = await fontSize(owner);
+  const guestZoomed = await fontSize(guest);
+
+  await guest.mouse.move(box.x, box.y);
+  for (let i = 0; i < 3; i++) {
+    await guest.keyboard.down('Control');
+    await guest.mouse.wheel(0, -120);
+    await guest.keyboard.up('Control');
+    await guest.waitForTimeout(200);
+  }
+  await guest.waitForTimeout(1200);
+  check('one viewer zooming leaves the other alone', (await fontSize(guest2)) === guest2Font);
+  check('one viewer zooming leaves the owner alone', (await fontSize(owner)) === ownerFont);
+  check('a zoomed viewer still follows the owner grid',
+    (await rowCount(guest)) === (await rowCount(owner)));
+  check('zoom changed the text in that window', (await fontSize(guest)) !== guestZoomed);
+
+  const beforeFit = await fontSize(guest);
+  await guest.click('button:has-text("화면 맞춤")');
+  await guest.waitForTimeout(1500);
+  check('fit window scales the text back', (await fontSize(guest)) !== beforeFit);
+  check('fit window keeps the owner grid', (await rowCount(guest)) === (await rowCount(owner)));
 
   const roUrl = await createLink(owner, { password: '', readOnly: true });
   const roCtx = await browser.newContext({ viewport: { width: 1000, height: 700 } });

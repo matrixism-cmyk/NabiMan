@@ -267,12 +267,17 @@
 .share-left-critical { border-left: 2px solid var(--danger); color: var(--danger); }
 .status-badge.warn { background: rgba(243, 156, 18, 0.16); color: var(--warning); }
 
-/* A mirrored pane keeps the owner's grid, so centre whatever space is left
-   over instead of hugging the top-left corner. */
+/* A watched pane keeps the owner's grid, so centre whatever space is left
+   over instead of hugging the top-left corner. Zooming in past the window is
+   the viewer's own business, so let them scroll to the rest of it — `safe`
+   keeps the top-left reachable once the grid is larger than the window. */
 .share-page .terminal-view-screen {
   display: flex;
   align-items: center;
   justify-content: center;
+  align-items: safe center;
+  justify-content: safe center;
+  overflow: auto;
   padding: 0;
 }
 

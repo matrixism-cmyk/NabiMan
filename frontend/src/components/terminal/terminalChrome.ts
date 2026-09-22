@@ -236,12 +236,27 @@ export function fitFontToPane(
 }
 
 /**
- * Take on another terminal's grid and scale the text to the window. A mirrored
- * pane may grow past the normal zoom cap: filling the window is the point.
+ * Take on another terminal's grid, leaving the text size alone.
+ *
+ * A watched pane has to keep the owner's grid — tmux paints one screen for it,
+ * so a different number of columns would simply be wrong — but how big that
+ * grid is drawn is the viewer's own business.
+ */
+export function adoptGrid(term: Terminal, cols: number, rows: number): void {
+  if (cols <= 0 || rows <= 0) return;
+  if (term.cols === cols && term.rows === rows) return;
+  term.resize(cols, rows);
+}
+
+/**
+ * Take on another terminal's grid and scale the text to fill the window. Used
+ * until the viewer zooms by hand, after which the text size is theirs to keep.
+ * A mirrored pane may grow past the normal zoom cap: filling the window is the
+ * point.
  */
 export function mirrorGrid(term: Terminal, fit: FitAddon, cols: number, rows: number): void {
   if (cols <= 0 || rows <= 0) return;
-  term.resize(cols, rows);
+  adoptGrid(term, cols, rows);
   fitFontToPane(term, fit, cols, rows, 44);
 }
 

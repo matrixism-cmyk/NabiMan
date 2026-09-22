@@ -93,6 +93,13 @@ export default function SharePage({ token }: { token: string }) {
         {info.read_only && <span className="status-badge">{t('share.readOnly')}</span>}
         {!info.alive && <span className="status-badge down">{t('share.ended')}</span>}
         <span className="share-head-spacer" />
+        <button
+          className="btn btn-secondary btn-sm"
+          title={t('share.fitWindowHint')}
+          onClick={() => viewRef.current?.resetZoom()}
+        >
+          {t('share.fitWindow')}
+        </button>
         <button className="btn btn-secondary btn-sm" onClick={() => viewRef.current?.reconnect()}>
           {t('terminal.reconnect')}
         </button>

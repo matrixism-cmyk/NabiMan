@@ -205,6 +205,12 @@ const t: T = {
   'share.revoked': { ko: '링크를 취소했습니다.', en: 'Link revoked.', ja: 'リンクを取り消しました。' },
   'share.headTitle': { ko: '공유된 터미널', en: 'Shared terminal', ja: '共有ターミナル' },
   'share.ended': { ko: '세션 종료됨', en: 'session ended', ja: 'セッション終了' },
+  'share.fitWindow': { ko: '화면 맞춤', en: 'Fit window', ja: '画面に合わせる' },
+  'share.fitWindowHint': {
+    ko: '확대·축소는 이 창에만 적용됩니다. 창 크기에 맞게 되돌립니다.',
+    en: 'Zoom applies to this window only. Scales the text back to fit it.',
+    ja: '拡大・縮小はこのウィンドウだけに適用されます。ウィンドウに合わせて戻します。',
+  },
   // --- Remote workspace (server list + terminal in one place) ---
   'tab.remoteWorkspace': { ko: '원격 접속', en: 'Remote Access', ja: 'リモート接続' },
   'remote.overview': { ko: '전체 현황', en: 'Fleet overview', ja: '全体状況' },
