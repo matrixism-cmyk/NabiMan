@@ -5,6 +5,7 @@ import { useT } from '../../i18n';
 import TerminalView, { TerminalStatus, TerminalTarget, TerminalViewHandle } from '../terminal/TerminalView';
 import { useTerminalSettings } from '../terminal/settings';
 import { useTerminalWindows } from '../terminal/TerminalWindows';
+import { pruneSessionZooms } from '../terminal/terminalStorage';
 import TerminalSettingsModal from '../terminal/TerminalSettingsModal';
 import ShareDialog from '../terminal/ShareDialog';
 import ShareLinksPanel from '../terminal/ShareLinksPanel';
@@ -55,6 +56,12 @@ export default function RemoteWorkspace() {
   const [adhocTarget, setAdhocTarget] = useState<{ host: string; port: number; user: string } | null>(null);
 
   useEffect(() => { rememberSelection(selection); }, [selection]);
+
+  // Each session remembers the size it was zoomed to; drop the sizes of
+  // sessions that have since ended.
+  useEffect(() => {
+    if (sessionData) pruneSessionZooms(sessions.filter(s => s.alive).map(s => s.id));
+  }, [sessionData, sessions]);
 
   // Opening the session list, or starting a new shell, should show the current
   // state rather than whatever the last poll happened to catch.

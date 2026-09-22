@@ -17,6 +17,7 @@ as static files — see the repository `Makefile`.
 | `npm run smoke` | Loads the built app in Chromium, signs in, opens the remote workspace |
 | `npm run smoke:share` | Share links end to end: password gate, read-only, revoke |
 | `npm run smoke:paste` | Every paste route in a terminal pane, images included |
+| `npm run smoke:zoom` | Zoom is remembered per session and survives a reload |
 
 ## Configuration
 

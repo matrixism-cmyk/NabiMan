@@ -14,6 +14,8 @@ export const MAX_BUFFER_CHARS = 512 * 1024;
 export const bufKey = (key: string) => `nabiman_term_buf_${key}`;
 export const sidKey = (key: string) => `nabiman_term_sid_${key}`;
 const fontKey = (key: string) => `nabiman_term_font_${key}`;
+/** The zoom's storage key, for tests that check what survives a prune. */
+export const fontKeyForTest = fontKey;
 
 export function readStored(key: string): string {
   try { return localStorage.getItem(key) || ''; } catch { return ''; }
@@ -47,8 +49,10 @@ export function forgetTerminalStorage(storageKey: string) {
 }
 
 /**
- * The zoom level a pane was left at. Ctrl+wheel is a per-pane adjustment, so
- * it outlives switching to another session and coming back — and a reload.
+ * The zoom level a terminal was left at, kept under the session's key once one
+ * is known (see sessionZoomKey). Ctrl+wheel therefore outlives switching to
+ * another session and coming back, a reload, and reopening the same session
+ * somewhere else.
  */
 export function readFontSize(storageKey: string): number | null {
   const raw = readStored(fontKey(storageKey));
@@ -65,7 +69,27 @@ export function forgetFontSize(storageKey: string) {
   try { localStorage.removeItem(fontKey(storageKey)); } catch { /* ignore */ }
 }
 
-/** Drop stored screens/session ids for panes that no longer exist. */
+/** The prefix every floating window's id carries (see TerminalWindows). */
+const WINDOW_PREFIX = 'tw_';
+
+/** Everything stored about one pane, whatever kind of entry it is. */
+function suffixOf(key: string): string | null {
+  for (const prefix of [bufKey(''), sidKey(''), fontKey('')]) {
+    if (key.startsWith(prefix)) return key.slice(prefix.length);
+  }
+  return null;
+}
+
+/**
+ * Drop stored screens, session ids and zooms left behind by floating windows
+ * that are gone — one closed in another tab, say.
+ *
+ * Only window panes are pruned. The workspace panes (`ws_*`), the docked
+ * panel (`dock_*`) and share viewers (`share_*`) have no window row to match
+ * against, and used to be wiped on every page load: a reload lost the zoom,
+ * the restored screen and the session id, so the pane started a fresh shell
+ * instead of re-attaching to the one still running.
+ */
 export function pruneTerminalStorage(liveKeys: string[]) {
   try {
     const keep = new Set(liveKeys);
@@ -73,12 +97,31 @@ export function pruneTerminalStorage(liveKeys: string[]) {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (!key) continue;
-      const suffix = key.startsWith(bufKey('')) ? key.slice(bufKey('').length)
-        : key.startsWith(sidKey('')) ? key.slice(sidKey('').length)
-        : key.startsWith(fontKey('')) ? key.slice(fontKey('').length)
-        : null;
-      // `dock_*` belongs to the docked terminal panel, which has no window row.
-      if (suffix === null || suffix.startsWith('dock_') || keep.has(suffix)) continue;
+      const suffix = suffixOf(key);
+      if (suffix === null || !suffix.startsWith(WINDOW_PREFIX) || keep.has(suffix)) continue;
+      stale.push(key);
+    }
+    stale.forEach((key) => localStorage.removeItem(key));
+  } catch { /* ignore */ }
+}
+
+/**
+ * Where a session's zoom is kept. Zoom follows the shell rather than the pane
+ * showing it, so a session looks the same whether it is joined in the
+ * workspace or opened in a window of its own.
+ */
+export const sessionZoomKey = (sessionId: string) => `sess_${sessionId}`;
+
+/** Forget the zoom of sessions that are no longer running. */
+export function pruneSessionZooms(liveSessionIds: string[]) {
+  try {
+    const keep = new Set(liveSessionIds.map(sessionZoomKey));
+    const stale: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith(fontKey(''))) continue;
+      const suffix = key.slice(fontKey('').length);
+      if (!suffix.startsWith('sess_') || keep.has(suffix)) continue;
       stale.push(key);
     }
     stale.forEach((key) => localStorage.removeItem(key));
