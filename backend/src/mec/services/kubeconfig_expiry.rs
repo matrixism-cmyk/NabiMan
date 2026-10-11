@@ -77,11 +77,19 @@ mod tests {
         const T: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
         let mut out = String::new();
         for chunk in bytes.chunks(3) {
-            let b = [chunk[0], *chunk.get(1).unwrap_or(&0), *chunk.get(2).unwrap_or(&0)];
+            let b = [
+                chunk[0],
+                *chunk.get(1).unwrap_or(&0),
+                *chunk.get(2).unwrap_or(&0),
+            ];
             out.push(T[(b[0] >> 2) as usize] as char);
             out.push(T[(((b[0] & 3) << 4) | (b[1] >> 4)) as usize] as char);
-            if chunk.len() > 1 { out.push(T[(((b[1] & 15) << 2) | (b[2] >> 6)) as usize] as char); }
-            if chunk.len() > 2 { out.push(T[(b[2] & 63) as usize] as char); }
+            if chunk.len() > 1 {
+                out.push(T[(((b[1] & 15) << 2) | (b[2] >> 6)) as usize] as char);
+            }
+            if chunk.len() > 2 {
+                out.push(T[(b[2] & 63) as usize] as char);
+            }
         }
         out
     }

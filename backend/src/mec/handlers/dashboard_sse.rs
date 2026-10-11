@@ -8,7 +8,7 @@
 use super::dashboard::build_live;
 use crate::mec::services::ServiceBundle;
 use crate::mec::MecState;
-use actix_web::{web, HttpResponse};
+use actix_web::{web, HttpRequest, HttpResponse};
 use futures::stream::{self, Stream, StreamExt};
 use std::convert::Infallible;
 use std::pin::Pin;
@@ -45,7 +45,20 @@ pub fn start_poller(state: &web::Data<MecState>) {
 }
 
 /// GET /dashboard/live/stream — snapshot-then-stream over Server-Sent Events.
-pub async fn stream(state: web::Data<MecState>) -> HttpResponse {
+pub async fn stream(
+    req: HttpRequest,
+    state: web::Data<MecState>,
+    sessions: web::Data<crate::jwt_sessions::SessionStore>,
+    users: web::Data<crate::users::UserStore>,
+) -> HttpResponse {
+    let Some(grant) = crate::terminal_tickets::ConnectionGrant::from_request(
+        &req,
+        sessions.get_ref().clone(),
+        users.get_ref().clone(),
+    )
+    .filter(|g| g.valid()) else {
+        return HttpResponse::Unauthorized().finish();
+    };
     let rx = state.live_tx.subscribe();
     // WatchStream yields the current value first, then every subsequent change.
     let snapshots = WatchStream::new(rx).filter_map(|maybe| async move {
@@ -58,10 +71,10 @@ pub async fn stream(state: web::Data<MecState>) -> HttpResponse {
 
     HttpResponse::Ok()
         .content_type("text/event-stream")
-        .insert_header(("Cache-Control", "no-cache"))
+        .insert_header(("Cache-Control", "no-store"))
         .insert_header(("Connection", "keep-alive"))
         .insert_header(("X-Accel-Buffering", "no"))
-        .streaming(stream)
+        .streaming(crate::stream_access::guard(stream, grant))
 }
 
 fn sse_event(name: &str, data: &str) -> String {

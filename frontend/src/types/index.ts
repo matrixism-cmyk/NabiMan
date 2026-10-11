@@ -31,7 +31,8 @@ export interface UserAccount {
   gid: number;
   home: string;
   shell: string;
-  is_logged_in: boolean;
+  is_logged_in: boolean | null;
+  can_manage: boolean;
 }
 
 export interface ServiceConfig {
@@ -118,6 +119,8 @@ export interface LogEntry {
 
 // --- Cron types ---
 export interface CronJob {
+  revision: string;
+  can_manage: boolean;
   id: number;
   user: string;
   schedule: string;
@@ -138,6 +141,8 @@ export interface ServiceDefinition {
 
 // --- Process types ---
 export interface ProcessInfo {
+  identity: string;
+  can_signal: boolean;
   pid: number;
   user: string;
   cpu: number;
@@ -187,6 +192,8 @@ export interface RemoteServer {
   status: string;
   /** True when an SSH password is stored (encrypted) for this server. */
   has_password?: boolean;
+  host_trust_version?: string;
+  host_trust?: { public_key: string; fingerprint: string; verified_by: string; verified_at: string; reason: string } | null;
 }
 
 export interface RemoteServerStatus {
@@ -242,6 +249,7 @@ export interface SslCertificate {
 }
 
 export interface ApiResponse<T> {
+  code?: string;
   success: boolean;
   data: T | null;
   message: string;

@@ -1,5 +1,5 @@
+use crate::models::{ApiResponse, Container, ContainerActionRequest, ContainerImage};
 use actix_web::{web, HttpResponse};
-use crate::models::{ApiResponse, Container, ContainerImage, ContainerActionRequest};
 
 fn run_docker(args: &[&str]) -> Result<String, String> {
     let output = std::process::Command::new("docker")
@@ -27,7 +27,9 @@ async fn docker_available() -> HttpResponse {
 
 async fn list_containers() -> HttpResponse {
     if !check_docker() {
-        return HttpResponse::Ok().json(ApiResponse::<Vec<Container>>::error("Docker is not available"));
+        return HttpResponse::Ok().json(ApiResponse::<Vec<Container>>::error(
+            "Docker is not available",
+        ));
     }
 
     match run_docker(&[
@@ -59,11 +61,15 @@ async fn list_containers() -> HttpResponse {
 
 async fn list_images() -> HttpResponse {
     if !check_docker() {
-        return HttpResponse::Ok().json(ApiResponse::<Vec<ContainerImage>>::error("Docker is not available"));
+        return HttpResponse::Ok().json(ApiResponse::<Vec<ContainerImage>>::error(
+            "Docker is not available",
+        ));
     }
 
     match run_docker(&[
-        "images", "--format", "{{.ID}}\\t{{.Repository}}\\t{{.Tag}}\\t{{.Size}}\\t{{.CreatedAt}}",
+        "images",
+        "--format",
+        "{{.ID}}\\t{{.Repository}}\\t{{.Tag}}\\t{{.Size}}\\t{{.CreatedAt}}",
     ]) {
         Ok(output) => {
             let images: Vec<ContainerImage> = output
@@ -143,7 +149,9 @@ async fn container_logs(body: web::Json<ContainerActionRequest>) -> HttpResponse
 
 async fn remove_image(body: web::Json<ContainerActionRequest>) -> HttpResponse {
     let id = &body.id;
-    if id.contains(|c: char| !c.is_alphanumeric() && c != '_' && c != '-' && c != '.' && c != ':' && c != '/') {
+    if id.contains(|c: char| {
+        !c.is_alphanumeric() && c != '_' && c != '-' && c != '.' && c != ':' && c != '/'
+    }) {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid image ID"));
     }
     match run_docker(&["rmi", id]) {

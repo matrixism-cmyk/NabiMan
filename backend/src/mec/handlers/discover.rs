@@ -1,8 +1,6 @@
 use super::util::{created, current_user, from_service_error, list_response};
 use crate::mec::MecState;
-use crate::models::mec::{
-    AllocationType, NodeAllocation, ResourceQuota, Tenant, TenantStatus,
-};
+use crate::models::mec::{AllocationType, NodeAllocation, ResourceQuota, Tenant, TenantStatus};
 use actix_web::{web, HttpRequest, HttpResponse};
 use chrono::Utc;
 use serde::Serialize;
@@ -76,7 +74,10 @@ const SYSTEM_NAMESPACES: &[&str] = &[
 ];
 
 fn is_suspected_tenant(name: &str, labels: &std::collections::HashMap<String, String>) -> bool {
-    labels.get("managed-by").map(|v| v == "nabiman").unwrap_or(false)
+    labels
+        .get("managed-by")
+        .map(|v| v == "nabiman")
+        .unwrap_or(false)
         || labels.contains_key("tenant")
         || name.ends_with("-poc")
         || name.ends_with("-prod")
@@ -88,16 +89,17 @@ pub async fn import_tenant(
     path: web::Path<String>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let user = current_user(&req);
+    let user = match current_user(&req) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
     let id = path.into_inner();
 
     if state.tenants.get(&id).ok().flatten().is_some() {
-        return from_service_error(
-            crate::mec::services::ServiceError::Conflict(format!(
-                "tenant {} already imported",
-                id
-            )),
-        );
+        return from_service_error(crate::mec::services::ServiceError::Conflict(format!(
+            "tenant {} already imported",
+            id
+        )));
     }
 
     // Verify namespace exists.
@@ -108,9 +110,10 @@ pub async fn import_tenant(
     let ns = match namespaces.iter().find(|n| n.name == id) {
         Some(n) => n,
         None => {
-            return from_service_error(
-                crate::mec::services::ServiceError::NotFound(format!("namespace {}", id)),
-            );
+            return from_service_error(crate::mec::services::ServiceError::NotFound(format!(
+                "namespace {}",
+                id
+            )));
         }
     };
 
@@ -148,10 +151,7 @@ pub async fn import_tenant(
         updated_at: now,
         status: TenantStatus::Active,
     };
-    state
-        .tenants
-        .upsert(&tenant, &user)
-        .ok();
+    state.tenants.upsert(&tenant, &user).ok();
     let audit = state.audit.begin(&user, "tenant_import", "tenant", &id);
     audit.success(Some(serde_json::json!({ "imported_namespace": id })));
     created(tenant)

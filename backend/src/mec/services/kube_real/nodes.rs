@@ -44,9 +44,7 @@ pub async fn patch_labels(
     remove: &[String],
 ) -> ServiceResult<()> {
     let mut patch = json!({ "metadata": { "labels": {} } });
-    let labels = patch["metadata"]["labels"]
-        .as_object_mut()
-        .expect("object");
+    let labels = patch["metadata"]["labels"].as_object_mut().expect("object");
     for (k, v) in add {
         labels.insert(k.clone(), json!(v));
     }
@@ -72,9 +70,9 @@ pub async fn patch_taints(
     let mut next: Vec<K8sTaint> = current
         .into_iter()
         .filter(|t| {
-            !remove
-                .iter()
-                .any(|(k, eff)| &t.key == k && eff.as_ref().map(|e| e.as_str() == t.effect).unwrap_or(true))
+            !remove.iter().any(|(k, eff)| {
+                &t.key == k && eff.as_ref().map(|e| e.as_str() == t.effect).unwrap_or(true)
+            })
         })
         .collect();
     for t in add {
@@ -101,7 +99,10 @@ pub async fn switch_gpu_mode(
     replicas: Option<u32>,
 ) -> ServiceResult<()> {
     let mut labels = HashMap::new();
-    labels.insert("nvidia.com/gpu.deploy.gpu-feature-discovery".to_string(), "true".to_string());
+    labels.insert(
+        "nvidia.com/gpu.deploy.gpu-feature-discovery".to_string(),
+        "true".to_string(),
+    );
     labels.insert("gpu-mode".to_string(), mode.as_label().to_string());
     if let Some(r) = replicas {
         labels.insert("nvidia.com/gpu.replicas".to_string(), r.to_string());
@@ -129,8 +130,12 @@ pub(super) fn map_not_found(e: kube::Error, what: &str) -> ServiceError {
 fn convert(n: &K8sNode) -> MecNode {
     let meta = n.metadata.clone();
     let name = meta.name.clone().unwrap_or_default();
-    let labels: HashMap<String, String> =
-        meta.labels.clone().unwrap_or_default().into_iter().collect();
+    let labels: HashMap<String, String> = meta
+        .labels
+        .clone()
+        .unwrap_or_default()
+        .into_iter()
+        .collect();
     let spec = n.spec.clone().unwrap_or_default();
     let status = n.status.clone().unwrap_or_default();
 
@@ -217,15 +222,15 @@ fn convert(n: &K8sNode) -> MecNode {
 }
 
 fn to_capacity(
-    map: &std::collections::BTreeMap<String, k8s_openapi::apimachinery::pkg::api::resource::Quantity>,
+    map: &std::collections::BTreeMap<
+        String,
+        k8s_openapi::apimachinery::pkg::api::resource::Quantity,
+    >,
 ) -> NodeCapacity {
     NodeCapacity {
         cpu: map.get("cpu").map(|q| q.0.clone()).unwrap_or_default(),
         memory: map.get("memory").map(|q| q.0.clone()).unwrap_or_default(),
-        pods: map
-            .get("pods")
-            .and_then(|q| q.0.parse().ok())
-            .unwrap_or(0),
+        pods: map.get("pods").and_then(|q| q.0.parse().ok()).unwrap_or(0),
         gpu: map.get("nvidia.com/gpu").and_then(|q| q.0.parse().ok()),
         storage: map.get("ephemeral-storage").map(|q| q.0.clone()),
     }

@@ -1,5 +1,5 @@
-use actix_web::{web, HttpResponse};
 use crate::models::{ApiResponse, LogEntry, LogQueryRequest};
+use actix_web::{web, HttpResponse};
 
 fn run_cmd(cmd: &str, args: &[&str]) -> Result<String, String> {
     let output = std::process::Command::new(cmd)
@@ -16,12 +16,31 @@ fn run_cmd(cmd: &str, args: &[&str]) -> Result<String, String> {
 fn validate_unit(unit: &str) -> bool {
     !unit.is_empty()
         && unit.len() < 256
-        && unit.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.' || c == '@')
+        && unit
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.' || c == '@')
 }
 
 fn validate_priority(p: &str) -> bool {
-    matches!(p, "emerg" | "alert" | "crit" | "err" | "warning" | "notice" | "info" | "debug"
-        | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7")
+    matches!(
+        p,
+        "emerg"
+            | "alert"
+            | "crit"
+            | "err"
+            | "warning"
+            | "notice"
+            | "info"
+            | "debug"
+            | "0"
+            | "1"
+            | "2"
+            | "3"
+            | "4"
+            | "5"
+            | "6"
+            | "7"
+    )
 }
 
 async fn get_logs(body: web::Json<LogQueryRequest>) -> HttpResponse {
@@ -36,7 +55,8 @@ async fn get_logs(body: web::Json<LogQueryRequest>) -> HttpResponse {
 
     if let Some(ref unit) = body.unit {
         if !validate_unit(unit) {
-            return HttpResponse::Ok().json(ApiResponse::<Vec<LogEntry>>::error("Invalid unit name"));
+            return HttpResponse::Ok()
+                .json(ApiResponse::<Vec<LogEntry>>::error("Invalid unit name"));
         }
         args.push("-u".to_string());
         args.push(unit.clone());
@@ -44,7 +64,8 @@ async fn get_logs(body: web::Json<LogQueryRequest>) -> HttpResponse {
 
     if let Some(ref priority) = body.priority {
         if !validate_priority(priority) {
-            return HttpResponse::Ok().json(ApiResponse::<Vec<LogEntry>>::error("Invalid priority"));
+            return HttpResponse::Ok()
+                .json(ApiResponse::<Vec<LogEntry>>::error("Invalid priority"));
         }
         args.push("-p".to_string());
         args.push(priority.clone());
@@ -52,8 +73,13 @@ async fn get_logs(body: web::Json<LogQueryRequest>) -> HttpResponse {
 
     if let Some(ref since) = body.since {
         // Validate basic date format (YYYY-MM-DD or similar)
-        if since.len() > 30 || since.contains(|c: char| !c.is_alphanumeric() && c != '-' && c != ':' && c != ' ' && c != 'T') {
-            return HttpResponse::Ok().json(ApiResponse::<Vec<LogEntry>>::error("Invalid since format"));
+        if since.len() > 30
+            || since.contains(|c: char| {
+                !c.is_alphanumeric() && c != '-' && c != ':' && c != ' ' && c != 'T'
+            })
+        {
+            return HttpResponse::Ok()
+                .json(ApiResponse::<Vec<LogEntry>>::error("Invalid since format"));
         }
         args.push("--since".to_string());
         args.push(since.clone());

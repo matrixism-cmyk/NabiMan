@@ -29,7 +29,8 @@
     "smoke": "node scripts/smoke-browser.js",
     "smoke:share": "node scripts/smoke-share.js",
     "smoke:paste": "node scripts/smoke-paste.js",
-    "smoke:zoom": "node scripts/smoke-zoom.js"
+    "smoke:zoom": "node scripts/smoke-zoom.js",
+    "smoke:rail": "node scripts/smoke-rail.js"
   },
   "browserslist": {
     "production": [

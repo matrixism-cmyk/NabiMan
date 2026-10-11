@@ -85,7 +85,8 @@ where
         let user_key = user_key(&req);
         let now = Instant::now();
         let is_delete = method == Method::DELETE;
-        let (mutation_count, delete_count) = tally_and_record(&self.bucket, &user_key, now, is_delete);
+        let (mutation_count, delete_count) =
+            tally_and_record(&self.bucket, &user_key, now, is_delete);
 
         if mutation_count > MAX_MUTATIONS_PER_WINDOW
             || (is_delete && delete_count > MAX_DELETES_PER_WINDOW)
@@ -113,7 +114,10 @@ where
 }
 
 fn is_mutation(method: &Method) -> bool {
-    matches!(*method, Method::POST | Method::PUT | Method::PATCH | Method::DELETE)
+    matches!(
+        *method,
+        Method::POST | Method::PUT | Method::PATCH | Method::DELETE
+    )
 }
 
 fn user_key(req: &ServiceRequest) -> String {
@@ -130,12 +134,7 @@ fn user_key(req: &ServiceRequest) -> String {
     format!("{}|{}", user, ip)
 }
 
-fn tally_and_record(
-    bucket: &Bucket,
-    key: &str,
-    now: Instant,
-    is_delete: bool,
-) -> (usize, usize) {
+fn tally_and_record(bucket: &Bucket, key: &str, now: Instant, is_delete: bool) -> (usize, usize) {
     let mut map = bucket.lock().unwrap();
     let entries = map.entry(key.to_string()).or_default();
     entries.retain(|(t, _)| now.duration_since(*t) < WINDOW);

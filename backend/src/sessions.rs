@@ -1,5 +1,5 @@
-use actix_web::{web, HttpResponse};
 use crate::models::ApiResponse;
+use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Clone)]
@@ -13,11 +13,14 @@ pub struct LoginSession {
 }
 
 async fn list_sessions() -> HttpResponse {
-    let output = std::process::Command::new("w").arg("-h").output()
+    let output = std::process::Command::new("w")
+        .arg("-h")
+        .output()
         .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
         .unwrap_or_default();
 
-    let sessions: Vec<LoginSession> = output.lines()
+    let sessions: Vec<LoginSession> = output
+        .lines()
         .filter(|l| !l.trim().is_empty())
         .map(|line| {
             let parts: Vec<&str> = line.split_whitespace().collect();
@@ -48,7 +51,8 @@ async fn kill_session(body: web::Json<KillSessionRequest>) -> HttpResponse {
 
     // Find PIDs for this TTY
     let output = std::process::Command::new("fuser")
-        .arg(format!("/dev/{}", tty)).output();
+        .arg(format!("/dev/{}", tty))
+        .output();
 
     match output {
         Ok(o) => {
@@ -58,8 +62,10 @@ async fn kill_session(body: web::Json<KillSessionRequest>) -> HttpResponse {
             }
             for pid in pids.split_whitespace() {
                 if let Ok(p) = pid.trim().parse::<u32>() {
-                    let _ = std::process::Command::new("kill").arg("-9")
-                        .arg(p.to_string()).output();
+                    let _ = std::process::Command::new("kill")
+                        .arg("-9")
+                        .arg(p.to_string())
+                        .output();
                 }
             }
             HttpResponse::Ok().json(ApiResponse::ok(format!("Session {} terminated", tty)))
@@ -70,7 +76,8 @@ async fn kill_session(body: web::Json<KillSessionRequest>) -> HttpResponse {
 
 async fn last_logins() -> HttpResponse {
     let output = std::process::Command::new("last")
-        .args(["-n", "20", "-w"]).output()
+        .args(["-n", "20", "-w"])
+        .output()
         .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
         .unwrap_or_default();
 
@@ -82,6 +89,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         web::scope("/api/sessions")
             .route("", web::get().to(list_sessions))
             .route("/kill", web::post().to(kill_session))
-            .route("/last", web::get().to(last_logins))
+            .route("/last", web::get().to(last_logins)),
     );
 }

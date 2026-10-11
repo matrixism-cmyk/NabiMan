@@ -137,11 +137,7 @@ fn record_view(req: &ServiceRequest, audit: &AuditLogger, throttle: &ViewThrottl
 }
 
 fn extract_user(req: &ServiceRequest) -> Option<String> {
-    let auth = req.headers().get("Authorization")?.to_str().ok()?;
-    let token = auth.strip_prefix("Bearer ")?;
-    crate::auth::decode_claims_unverified(token)
-        .ok()
-        .map(|d| d.claims.sub)
+    crate::auth::extract_username(req.request())
 }
 
 #[cfg(test)]

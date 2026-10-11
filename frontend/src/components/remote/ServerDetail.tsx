@@ -4,6 +4,7 @@ import { RemoteServer, RemoteServerStatus } from '../../types';
 import { useT } from '../../i18n';
 import { DeployKeyDialog } from '../SshKeyComponents';
 import ServerForm from './ServerForm';
+import HostTrustForm from './HostTrustForm';
 
 /** Live facts about one server: probe it and show what came back. */
 export function ServerStatusView({ server }: { server: RemoteServer }) {
@@ -90,10 +91,15 @@ interface SettingsProps {
 export function ServerSettingsView({ server, onChanged, onDeleted }: SettingsProps) {
   const { t } = useT();
   const [showDeploy, setShowDeploy] = useState(false);
+  const [error, setError] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   const remove = async () => {
     if (!window.confirm(t('remote.deleteConfirm', { name: server.name }))) return;
-    await apiRequest(`/api/remote-servers/${server.id}`, { method: 'DELETE' });
+    setDeleting(true);
+    const res = await apiRequest(`/api/remote-servers/${server.id}`, { method: 'DELETE' });
+    setDeleting(false);
+    if (!res.success) { setError(res.message || t('common.error')); return; }
     onDeleted();
   };
 
@@ -105,10 +111,12 @@ export function ServerSettingsView({ server, onChanged, onDeleted }: SettingsPro
           <button className="btn btn-secondary btn-sm" onClick={() => setShowDeploy(v => !v)}>
             {showDeploy ? t('remote.hideKey') : t('remote.deployKey')}
           </button>
-          <button className="btn btn-danger btn-sm" onClick={remove}>{t('common.delete')}</button>
+          <button className="btn btn-danger btn-sm" disabled={deleting} onClick={remove}>{t('common.delete')}</button>
         </div>
       </div>
+      {error && <div role="alert" className="message">{error}</div>}
       {showDeploy && <DeployKeyDialog server={server} onClose={() => setShowDeploy(false)} />}
+      <HostTrustForm key={`${server.id}:${server.host}:${server.port}:${server.host_trust?.fingerprint || ""}`} server={server} onSaved={onChanged} />
       <ServerForm key={server.id} server={server} onSaved={onChanged} />
     </div>
   );

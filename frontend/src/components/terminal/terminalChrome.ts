@@ -2,6 +2,7 @@ import { Terminal } from 'xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import 'xterm/css/xterm.css';
+import './terminal-symbols.css';
 import { TerminalSettings } from './settings';
 import { blobsFromClipboardItems, pathsForClipboardFiles } from './pasteFile';
 
@@ -18,10 +19,12 @@ const THEME = {
 export function createTerminal(settings: TerminalSettings): { term: Terminal; fit: FitAddon } {
   const term = new Terminal({
     cursorBlink: true, cursorStyle: 'block', fontSize: settings.font_size,
-    fontFamily: "'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Menlo', monospace",
+    fontFamily: "'NabiMan Circled Digits', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Menlo', monospace",
     fontWeight: '400', fontWeightBold: '700', lineHeight: 1.15, theme: THEME,
     allowProposedApi: true, scrollback: settings.scrollback_lines,
-    rightClickSelectsWord: true, convertEol: true,
+    // A real PTY supplies CR/LF itself. Converting LF to CRLF corrupts
+    // tmux's cursor-relative redraws (notably while scrolling copy-mode).
+    rightClickSelectsWord: true, convertEol: false,
   });
   const fit = new FitAddon();
   term.loadAddon(fit);

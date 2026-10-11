@@ -17,6 +17,13 @@ export default function ProcessesPanel() {
   const { data, loading, error, refetch } = useApi<ProcessInfo[]>('/api/processes', 5000);
   const [filter, setFilter] = useState('');
   const [message, setMessage] = useState('');
+  const capability = useApi<{ can_signal: boolean }>('/api/processes/options');
+  const [selected, setSelected] = useState<{ process: ProcessInfo; signal: string } | null>(null);
+  const [confirmation, setConfirmation] = useState('');
+  const [busy, setBusy] = useState(false);
+  const canSignal = capability.data?.can_signal === true && !capability.error;
+  const stale = selected && !data?.some(p => p.pid === selected.process.pid && p.identity === selected.process.identity);
+
 
   const filtered = (data || []).filter(p =>
     !filter || p.command.toLowerCase().includes(filter.toLowerCase())
@@ -26,12 +33,17 @@ export default function ProcessesPanel() {
 
   const { sorted, toggle, indicator } = useSortable(filtered, 'cpu', 'desc');
 
-  const handleKill = async (pid: number, signal: string) => {
-    const label = signal === 'KILL' ? 'Force kill' : 'Terminate';
-    if (!window.confirm(`${label} PID ${pid}?`)) return;
-    const res = await apiPost<string>('/api/processes/kill', { pid, signal });
-    setMessage(res.success ? res.data || 'OK' : res.message);
-    setTimeout(refetch, 1000);
+  const handleKill = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selected || stale || error || busy || !canSignal || confirmation !== String(selected.process.pid)) return;
+    setBusy(true); setMessage('');
+    try {
+      const res = await apiPost<{ accepted: boolean; observation: string }>('/api/processes/kill', {
+        pid: selected.process.pid, signal: selected.signal, expected_identity: selected.process.identity,
+      });
+      setMessage(res.success && res.data?.accepted ? t(res.data.observation === 'exited' ? 'processes.exited' : res.data.observation === 'still_present' ? 'processes.present' : 'processes.unknownObservation') : res.message || t('processes.unknownResult'));
+    } catch { setMessage(t('processes.unknownResult')); }
+    finally { setBusy(false); setSelected(null); setConfirmation(''); refetch(); }
   };
 
   if (loading) return <div className="panel loading">{t('processes.loading')}</div>;
@@ -44,7 +56,18 @@ export default function ProcessesPanel() {
   return (
     <div className="panel">
       <h2>{t('processes.title')}</h2>
-      {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
+      <p>{t('processes.scopeHelp')}</p>
+      {!canSignal && <p>{t('processes.readOnly')}</p>}
+      {message && <div role="status" className="message">{message}</div>}
+      {selected && <form className="inline-form" onSubmit={handleKill}>
+        <p>PID {selected.process.pid} · UID {selected.process.user} · {selected.process.started}</p>
+        <pre>{selected.process.command}</pre><p>{selected.signal === 'KILL' ? t('processes.killHelp') : t('processes.termHelp')}</p>
+        {stale && <div role="alert">{t('processes.stale')}</div>}
+        <label htmlFor="process-confirm">{t('processes.confirmPid')}</label>
+        <input id="process-confirm" value={confirmation} onChange={e => setConfirmation(e.target.value)} disabled={busy} autoComplete="off" />
+        <button className="btn btn-danger" type="submit" disabled={busy || !!stale || confirmation !== String(selected.process.pid) || !canSignal}>{t('processes.send')}</button>
+        <button type="button" disabled={busy} onClick={() => { setSelected(null); setConfirmation(''); }}>{t('common.cancel')}</button>
+      </form>}
       <div className="filter-row">
         <input placeholder={t('processes.filterPlaceholder')} value={filter}
           onChange={e => setFilter(e.target.value)} className="filter-input" />
@@ -54,7 +77,7 @@ export default function ProcessesPanel() {
         <thead>
           <tr>
             {S('pid', t('processes.pid'))}
-            {S('user', t('processes.user'))}
+            {S('user', 'UID')}
             {S('cpu', t('processes.cpuPercent'))}
             {S('memory', t('processes.memPercent'))}
             {S('rss', t('processes.rss'))}
@@ -75,8 +98,8 @@ export default function ProcessesPanel() {
               <td className="process-cmd"><code>{proc.command}</code></td>
               <td>
                 <div className="btn-group">
-                  <button className="btn btn-warning btn-sm" onClick={() => handleKill(proc.pid, 'TERM')}>{t('processes.term')}</button>
-                  <button className="btn btn-danger btn-sm" onClick={() => handleKill(proc.pid, 'KILL')}>{t('processes.kill')}</button>
+                  {canSignal && proc.can_signal && <><button className="btn btn-warning btn-sm" disabled={busy} onClick={() => { setSelected({ process: { ...proc }, signal: 'TERM' }); setConfirmation(''); }}>{t('processes.term')}</button>
+                  <button className="btn btn-danger btn-sm" disabled={busy} onClick={() => { setSelected({ process: { ...proc }, signal: 'KILL' }); setConfirmation(''); }}>{t('processes.kill')}</button></>}
                 </div>
               </td>
             </tr>

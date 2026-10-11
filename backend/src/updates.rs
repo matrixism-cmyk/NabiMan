@@ -1,5 +1,5 @@
-use actix_web::{web, HttpResponse};
 use crate::models::ApiResponse;
+use actix_web::{web, HttpResponse};
 use serde::Serialize;
 
 #[derive(Serialize, Clone)]
@@ -17,8 +17,12 @@ pub struct UpdateCheckResult {
 
 fn detect_pkg_manager() -> Option<&'static str> {
     for cmd in &["apt", "dnf", "yum"] {
-        if std::process::Command::new("which").arg(cmd)
-            .output().map(|o| o.status.success()).unwrap_or(false) {
+        if std::process::Command::new("which")
+            .arg(cmd)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+        {
             return Some(cmd);
         }
     }
@@ -28,23 +32,33 @@ fn detect_pkg_manager() -> Option<&'static str> {
 async fn check_updates() -> HttpResponse {
     let mgr = match detect_pkg_manager() {
         Some(m) => m,
-        None => return HttpResponse::Ok().json(ApiResponse::<UpdateCheckResult>::error("No supported package manager found")),
+        None => {
+            return HttpResponse::Ok().json(ApiResponse::<UpdateCheckResult>::error(
+                "No supported package manager found",
+            ))
+        }
     };
 
     let output = match mgr {
         "apt" => {
             let _ = std::process::Command::new("apt").args(["update"]).output();
-            std::process::Command::new("apt").args(["list", "--upgradable"]).output()
+            std::process::Command::new("apt")
+                .args(["list", "--upgradable"])
+                .output()
         }
-        "dnf" | "yum" => {
-            std::process::Command::new(mgr).args(["check-update", "-q"]).output()
+        "dnf" | "yum" => std::process::Command::new(mgr)
+            .args(["check-update", "-q"])
+            .output(),
+        _ => {
+            return HttpResponse::Ok().json(ApiResponse::<UpdateCheckResult>::error("Unsupported"))
         }
-        _ => return HttpResponse::Ok().json(ApiResponse::<UpdateCheckResult>::error("Unsupported")),
     };
 
     let output = match output {
         Ok(o) => String::from_utf8_lossy(&o.stdout).to_string(),
-        Err(e) => return HttpResponse::Ok().json(ApiResponse::<UpdateCheckResult>::error(&e.to_string())),
+        Err(e) => {
+            return HttpResponse::Ok().json(ApiResponse::<UpdateCheckResult>::error(&e.to_string()))
+        }
     };
 
     let packages: Vec<UpdatablePackage> = match mgr {
@@ -57,24 +71,31 @@ async fn check_updates() -> HttpResponse {
 }
 
 fn parse_apt_upgradable(output: &str) -> Vec<UpdatablePackage> {
-    output.lines()
+    output
+        .lines()
         .filter(|l| l.contains("[upgradable"))
         .filter_map(|line| {
             let name = line.split('/').next()?.to_string();
             let rest = line.split_whitespace().collect::<Vec<_>>();
             let new_ver = rest.get(1).unwrap_or(&"").to_string();
-            let cur_ver = rest.iter()
+            let cur_ver = rest
+                .iter()
                 .position(|&w| w == "[upgradable")
                 .and_then(|i| rest.get(i + 2))
                 .map(|s| s.trim_end_matches(']').to_string())
                 .unwrap_or_default();
-            Some(UpdatablePackage { name, current_version: cur_ver, new_version: new_ver })
+            Some(UpdatablePackage {
+                name,
+                current_version: cur_ver,
+                new_version: new_ver,
+            })
         })
         .collect()
 }
 
 fn parse_dnf_updates(output: &str) -> Vec<UpdatablePackage> {
-    output.lines()
+    output
+        .lines()
         .filter(|l| !l.is_empty() && !l.starts_with("Last metadata"))
         .filter_map(|line| {
             let parts: Vec<&str> = line.split_whitespace().collect();
@@ -84,7 +105,9 @@ fn parse_dnf_updates(output: &str) -> Vec<UpdatablePackage> {
                     current_version: String::new(),
                     new_version: parts[1].to_string(),
                 })
-            } else { None }
+            } else {
+                None
+            }
         })
         .collect()
 }
@@ -97,9 +120,15 @@ async fn run_upgrade() -> HttpResponse {
 
     let result = match mgr {
         "apt" => std::process::Command::new("apt")
-            .args(["upgrade", "-y"]).env("DEBIAN_FRONTEND", "noninteractive").output(),
-        "dnf" => std::process::Command::new("dnf").args(["upgrade", "-y"]).output(),
-        "yum" => std::process::Command::new("yum").args(["update", "-y"]).output(),
+            .args(["upgrade", "-y"])
+            .env("DEBIAN_FRONTEND", "noninteractive")
+            .output(),
+        "dnf" => std::process::Command::new("dnf")
+            .args(["upgrade", "-y"])
+            .output(),
+        "yum" => std::process::Command::new("yum")
+            .args(["update", "-y"])
+            .output(),
         _ => return HttpResponse::Ok().json(ApiResponse::<String>::error("Unsupported")),
     };
 
@@ -125,8 +154,12 @@ struct UpgradePackageRequest {
 
 async fn upgrade_package(body: web::Json<UpgradePackageRequest>) -> HttpResponse {
     let name = &body.name;
-    if name.is_empty() || name.len() > 128
-        || !name.chars().all(|c| c.is_alphanumeric() || "-_.+:".contains(c)) {
+    if name.is_empty()
+        || name.len() > 128
+        || !name
+            .chars()
+            .all(|c| c.is_alphanumeric() || "-_.+:".contains(c))
+    {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid package name"));
     }
     let mgr = match detect_pkg_manager() {
@@ -136,16 +169,25 @@ async fn upgrade_package(body: web::Json<UpgradePackageRequest>) -> HttpResponse
     let result = match mgr {
         "apt" => std::process::Command::new("apt")
             .args(["install", "--only-upgrade", "-y", name])
-            .env("DEBIAN_FRONTEND", "noninteractive").output(),
-        "dnf" => std::process::Command::new("dnf").args(["upgrade", "-y", name]).output(),
-        "yum" => std::process::Command::new("yum").args(["update", "-y", name]).output(),
+            .env("DEBIAN_FRONTEND", "noninteractive")
+            .output(),
+        "dnf" => std::process::Command::new("dnf")
+            .args(["upgrade", "-y", name])
+            .output(),
+        "yum" => std::process::Command::new("yum")
+            .args(["update", "-y", name])
+            .output(),
         _ => return HttpResponse::Ok().json(ApiResponse::<String>::error("Unsupported")),
     };
     match result {
         Ok(o) => {
-            let combined = format!("{}\n{}",
+            let combined = format!(
+                "{}\n{}",
                 String::from_utf8_lossy(&o.stdout),
-                String::from_utf8_lossy(&o.stderr)).trim().to_string();
+                String::from_utf8_lossy(&o.stderr)
+            )
+            .trim()
+            .to_string();
             if o.status.success() {
                 HttpResponse::Ok().json(ApiResponse::ok(combined))
             } else {
@@ -161,6 +203,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         web::scope("/api/updates")
             .route("/check", web::get().to(check_updates))
             .route("/upgrade", web::post().to(run_upgrade))
-            .route("/upgrade-package", web::post().to(upgrade_package))
+            .route("/upgrade-package", web::post().to(upgrade_package)),
     );
 }

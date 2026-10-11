@@ -1,26 +1,32 @@
-use actix_web::{dev::{ServiceRequest, ServiceResponse, Transform, Service}, Error, HttpResponse};
-use actix_web::body::EitherBody;
-use std::collections::HashMap;
-use std::future::{Ready, ready, Future};
-use std::pin::Pin;
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
-use std::time::Instant;
+//! Process-wide bounded admission for password, MFA and registration entry points.
+mod state;
+#[cfg(test)]
+mod tests;
 use crate::models::ApiResponse;
-
-const MAX_ATTEMPTS: usize = 5;
-const WINDOW_SECS: u64 = 300; // 5 minutes
-
-type AttemptMap = Arc<Mutex<HashMap<String, Vec<Instant>>>>;
-
-pub struct RateLimiter { attempts: AttemptMap }
-
+use actix_web::{
+    body::EitherBody,
+    dev::{Service, ServiceRequest, ServiceResponse, Transform},
+    web, Error, HttpMessage, HttpResponse,
+};
+use futures::StreamExt;
+use state::{Permit, Shared};
+use std::{
+    future::{ready, Future, Ready},
+    pin::Pin,
+    rc::Rc,
+    time::{Duration, Instant},
+};
+#[derive(Clone)]
+pub struct RateLimiter {
+    state: Shared,
+}
 impl RateLimiter {
     pub fn new() -> Self {
-        Self { attempts: Arc::new(Mutex::new(HashMap::new())) }
+        Self {
+            state: Shared::default(),
+        }
     }
 }
-
 impl<S, B> Transform<S, ServiceRequest> for RateLimiter
 where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
@@ -28,24 +34,44 @@ where
 {
     type Response = ServiceResponse<EitherBody<B>>;
     type Error = Error;
-    type Transform = RateLimiterMiddleware<S>;
+    type Transform = Middleware<S>;
     type InitError = ();
-    type Future = Ready<Result<Self::Transform, Self::InitError>>;
-
+    type Future = Ready<Result<Self::Transform, ()>>;
     fn new_transform(&self, service: S) -> Self::Future {
-        ready(Ok(RateLimiterMiddleware {
+        ready(Ok(Middleware {
             service: Rc::new(service),
-            attempts: self.attempts.clone(),
+            state: self.state.clone(),
         }))
     }
 }
-
-pub struct RateLimiterMiddleware<S> {
+pub struct Middleware<S> {
     service: Rc<S>,
-    attempts: AttemptMap,
+    state: Shared,
 }
-
-impl<S, B> Service<ServiceRequest> for RateLimiterMiddleware<S>
+fn limited(seconds: u64) -> HttpResponse {
+    let seconds = seconds.max(1);
+    HttpResponse::TooManyRequests()
+        .insert_header(("Retry-After", seconds.to_string()))
+        .insert_header(("Cache-Control", "no-store"))
+        .json(ApiResponse::<()>::error(&format!(
+            "Too many authentication attempts. Retry after {seconds} seconds."
+        )))
+}
+fn protected(path: &str) -> bool {
+    matches!(
+        path,
+        "/api/auth/register"
+            | "/api/auth/login"
+            | "/api/auth/ldap/login"
+            | "/api/auth/change-password"
+            | "/api/auth/2fa/verify"
+            | "/api/auth/2fa/setup"
+            | "/api/auth/2fa/verify-setup"
+            | "/api/auth/2fa/disable"
+            | "/api/auth/2fa/recovery-codes"
+    )
+}
+impl<S, B> Service<ServiceRequest> for Middleware<S>
 where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     B: 'static,
@@ -53,51 +79,108 @@ where
     type Response = ServiceResponse<EitherBody<B>>;
     type Error = Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
-
-    fn poll_ready(&self, cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), Self::Error>> {
+    fn poll_ready(
+        &self,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
         self.service.poll_ready(cx)
     }
-
-    fn call(&self, req: ServiceRequest) -> Self::Future {
-        // Only rate-limit POST /api/auth/login
-        if req.path() != "/api/auth/login" || req.method() != "POST" {
-            let svc = self.service.clone();
-            return Box::pin(async move {
-                svc.call(req).await.map(|r| r.map_into_left_body())
-            });
+    fn call(&self, mut req: ServiceRequest) -> Self::Future {
+        let service = self.service.clone();
+        if !protected(req.path()) || req.method() != "POST" {
+            return Box::pin(
+                async move { service.call(req).await.map(|r| r.map_into_left_body()) },
+            );
         }
-
-        let ip = req.peer_addr()
+        // Never trust client-controlled Forwarded / X-Forwarded-For headers.
+        let peer = req
+            .peer_addr()
             .map(|a| a.ip().to_string())
             .unwrap_or_else(|| "unknown".into());
-
-        let now = Instant::now();
-        let cutoff = now - std::time::Duration::from_secs(WINDOW_SECS);
-        let mut map = self.attempts.lock().unwrap();
-
-        let entry = map.entry(ip.clone()).or_default();
-        entry.retain(|t| *t > cutoff);
-
-        if entry.len() >= MAX_ATTEMPTS {
-            let remaining = entry.first()
-                .map(|t| WINDOW_SECS.saturating_sub(t.elapsed().as_secs()))
-                .unwrap_or(WINDOW_SECS);
-            drop(map);
-            return Box::pin(async move {
-                let resp = HttpResponse::TooManyRequests()
-                    .json(ApiResponse::<()>::error(
-                        &format!("Too many login attempts. Try again in {} seconds", remaining)
-                    ));
-                Ok(req.into_response(resp).map_into_right_body())
-            });
-        }
-
-        entry.push(now);
-        drop(map);
-
-        let svc = self.service.clone();
+        let permit = Permit::begin(&self.state, &peer, Instant::now());
         Box::pin(async move {
-            svc.call(req).await.map(|r| r.map_into_left_body())
+            let mut permit = match permit {
+                Ok(p) => p,
+                Err(seconds) => {
+                    return Ok(req.into_response(limited(seconds)).map_into_right_body())
+                }
+            };
+            let mut payload = req.take_payload();
+            let read = tokio::time::timeout(Duration::from_secs(3), async {
+                let mut body = web::BytesMut::new();
+                while let Some(chunk) = payload.next().await {
+                    let chunk = chunk.map_err(|_| ())?;
+                    if body.len() + chunk.len() > 32768 {
+                        return Err(());
+                    }
+                    body.extend_from_slice(&chunk);
+                }
+                Ok::<_, ()>(body.freeze())
+            })
+            .await;
+            let bytes =
+                match read {
+                    Ok(Ok(b)) => b,
+                    _ => return Ok(req
+                        .into_response(
+                            HttpResponse::BadRequest()
+                                .insert_header(("Cache-Control", "no-store"))
+                                .json(ApiResponse::<()>::error(
+                                    "Authentication request is too large, incomplete or unreadable",
+                                )),
+                        )
+                        .map_into_right_body()),
+                };
+            let signup = req.path() == "/api/auth/register";
+            let category;
+            let identity;
+            if signup {
+                category = "registration-source";
+                identity = peer;
+            } else if let Some(id) = crate::auth::verified_user_id(req.request()) {
+                category = "settings-user";
+                identity = id;
+            } else {
+                category = "login-account";
+                // Ambiguous duplicate fields are rejected by the same typed deserializer as handlers.
+                #[derive(serde::Deserialize)]
+                struct Identity {
+                    username: Option<String>,
+                }
+                let parsed = serde_json::from_slice::<Identity>(&bytes);
+                let name =
+                    match parsed {
+                        Ok(v) => v.username.unwrap_or_else(|| {
+                            if req.path() == "/api/auth/login" {
+                                "admin".into()
+                            } else {
+                                String::new()
+                            }
+                        }),
+                        Err(_) => {
+                            return Ok(req
+                                .into_response(HttpResponse::BadRequest().json(
+                                    ApiResponse::<()>::error("Invalid authentication request"),
+                                ))
+                                .map_into_right_body())
+                        }
+                    };
+                if name.len() > 256 {
+                    return Ok(req
+                        .into_response(HttpResponse::BadRequest().finish())
+                        .map_into_right_body());
+                }
+                identity = name.to_lowercase();
+            }
+            if let Err(seconds) = permit.account(category, &identity, Instant::now()) {
+                return Ok(req.into_response(limited(seconds)).map_into_right_body());
+            }
+            req.set_payload(bytes.into());
+            let result = service.call(req).await;
+            if !signup && result.as_ref().is_ok_and(|r| r.status().is_success()) {
+                permit.success();
+            }
+            result.map(|r| r.map_into_left_body())
         })
     }
 }

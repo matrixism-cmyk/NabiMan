@@ -43,14 +43,9 @@ pub async fn list(client: &Client) -> ServiceResult<Vec<NamespaceInfo>> {
         .collect())
 }
 
-pub async fn create(
-    client: &Client,
-    name: &str,
-    labels: &[(String, String)],
-) -> ServiceResult<()> {
+pub async fn create(client: &Client, name: &str, labels: &[(String, String)]) -> ServiceResult<()> {
     let api: Api<Namespace> = Api::all(client.clone());
-    let label_map: BTreeMap<String, String> =
-        labels.iter().cloned().collect::<BTreeMap<_, _>>();
+    let label_map: BTreeMap<String, String> = labels.iter().cloned().collect::<BTreeMap<_, _>>();
     let ns = Namespace {
         metadata: kube::core::ObjectMeta {
             name: Some(name.to_string()),

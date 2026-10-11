@@ -1,5 +1,5 @@
-use actix_web::{web, HttpResponse};
 use crate::models::ApiResponse;
+use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Clone)]
@@ -18,17 +18,30 @@ fn parse_certbot_output(output: &str) -> Vec<SslCertificate> {
     let mut expiry = String::new();
     let mut path = String::new();
 
-    let flush = |certs: &mut Vec<SslCertificate>, d: &mut String, e: &mut String, p: &mut String| {
-        if !d.is_empty() && !e.is_empty() {
-            let (exp_str, days) = parse_expiry(e);
-            let status = if days < 0 { "expired" } else if days < 14 { "warning" } else { "valid" };
-            certs.push(SslCertificate {
-                domain: d.clone(), issuer: "Let's Encrypt".into(),
-                expiry: exp_str, days_left: days, path: p.clone(), status: status.into(),
-            });
-        }
-        d.clear(); e.clear(); p.clear();
-    };
+    let flush =
+        |certs: &mut Vec<SslCertificate>, d: &mut String, e: &mut String, p: &mut String| {
+            if !d.is_empty() && !e.is_empty() {
+                let (exp_str, days) = parse_expiry(e);
+                let status = if days < 0 {
+                    "expired"
+                } else if days < 14 {
+                    "warning"
+                } else {
+                    "valid"
+                };
+                certs.push(SslCertificate {
+                    domain: d.clone(),
+                    issuer: "Let's Encrypt".into(),
+                    expiry: exp_str,
+                    days_left: days,
+                    path: p.clone(),
+                    status: status.into(),
+                });
+            }
+            d.clear();
+            e.clear();
+            p.clear();
+        };
 
     for line in output.lines() {
         let t = line.trim();
@@ -48,37 +61,60 @@ fn parse_certbot_output(output: &str) -> Vec<SslCertificate> {
 fn parse_expiry(raw: &str) -> (String, i64) {
     let date_part = raw.split('(').next().unwrap_or(raw).trim().to_string();
     let days = if let Some(start) = raw.find("VALID:") {
-        raw[start+6..].split_whitespace().next()
-            .and_then(|d| d.parse::<i64>().ok()).unwrap_or(0)
-    } else if raw.contains("EXPIRED") { -1 } else { 0 };
+        raw[start + 6..]
+            .split_whitespace()
+            .next()
+            .and_then(|d| d.parse::<i64>().ok())
+            .unwrap_or(0)
+    } else if raw.contains("EXPIRED") {
+        -1
+    } else {
+        0
+    };
     (date_part, days)
 }
 
 /// Fallback: read cert expiry directly from filesystem when certbot is locked
 fn list_from_filesystem() -> Vec<SslCertificate> {
     let live_dir = std::path::Path::new("/etc/letsencrypt/live");
-    if !live_dir.exists() { return Vec::new(); }
+    if !live_dir.exists() {
+        return Vec::new();
+    }
     let mut certs = Vec::new();
     if let Ok(entries) = std::fs::read_dir(live_dir) {
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
-            if name == "README" { continue; }
+            if name == "README" {
+                continue;
+            }
             let cert_path = entry.path().join("fullchain.pem");
-            if !cert_path.exists() { continue; }
+            if !cert_path.exists() {
+                continue;
+            }
             // Use openssl to read expiry
             let expiry_info = std::process::Command::new("openssl")
                 .args(["x509", "-enddate", "-noout", "-in"])
-                .arg(&cert_path).output()
+                .arg(&cert_path)
+                .output()
                 .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
                 .unwrap_or_default();
             // Format: notAfter=Jun 21 01:53:31 2026 GMT
             let expiry_str = expiry_info.trim_start_matches("notAfter=").to_string();
             let days = calc_days_left(&expiry_str);
-            let status = if days < 0 { "expired" } else if days < 14 { "warning" } else { "valid" };
+            let status = if days < 0 {
+                "expired"
+            } else if days < 14 {
+                "warning"
+            } else {
+                "valid"
+            };
             certs.push(SslCertificate {
-                domain: name, issuer: "Let's Encrypt".into(),
-                expiry: expiry_str, days_left: days,
-                path: cert_path.to_string_lossy().to_string(), status: status.into(),
+                domain: name,
+                issuer: "Let's Encrypt".into(),
+                expiry: expiry_str,
+                days_left: days,
+                path: cert_path.to_string_lossy().to_string(),
+                status: status.into(),
             });
         }
     }
@@ -88,12 +124,12 @@ fn list_from_filesystem() -> Vec<SslCertificate> {
 
 fn calc_days_left(expiry: &str) -> i64 {
     // Parse "Jun 21 01:53:31 2026 GMT"
-    chrono::NaiveDateTime::parse_from_str(
-        expiry.trim_end_matches(" GMT"), "%b %d %H:%M:%S %Y"
-    ).map(|dt| {
-        let exp = dt.and_utc();
-        (exp - chrono::Utc::now()).num_days()
-    }).unwrap_or(0)
+    chrono::NaiveDateTime::parse_from_str(expiry.trim_end_matches(" GMT"), "%b %d %H:%M:%S %Y")
+        .map(|dt| {
+            let exp = dt.and_utc();
+            (exp - chrono::Utc::now()).num_days()
+        })
+        .unwrap_or(0)
 }
 
 fn list_vhost_domains() -> Vec<String> {
@@ -102,40 +138,64 @@ fn list_vhost_domains() -> Vec<String> {
         .output()
         .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
         .unwrap_or_default();
-    output.lines()
+    output
+        .lines()
         .filter_map(|l| {
-            let name = l.split_whitespace().nth(1).unwrap_or("").trim_end_matches(';').to_string();
-            if name.is_empty() || name.contains('*') || name == "_"
-                || name.contains("example") || name == "redirection" || name == "The" {
+            let name = l
+                .split_whitespace()
+                .nth(1)
+                .unwrap_or("")
+                .trim_end_matches(';')
+                .to_string();
+            if name.is_empty()
+                || name.contains('*')
+                || name == "_"
+                || name.contains("example")
+                || name == "redirection"
+                || name == "The"
+            {
                 None
-            } else { Some(name) }
+            } else {
+                Some(name)
+            }
         })
         .collect::<std::collections::HashSet<_>>()
-        .into_iter().collect()
+        .into_iter()
+        .collect()
 }
 
 async fn list_certificates() -> HttpResponse {
     // Try certbot first, fall back to filesystem if locked/fails
     let output = std::process::Command::new("certbot")
-        .args(["certificates", "--non-interactive"]).output();
+        .args(["certificates", "--non-interactive"])
+        .output();
 
     let mut certs = match output {
         Ok(o) if o.status.success() => {
             let text = String::from_utf8_lossy(&o.stdout).to_string()
                 + &String::from_utf8_lossy(&o.stderr);
             let parsed = parse_certbot_output(&text);
-            if parsed.is_empty() { list_from_filesystem() } else { parsed }
+            if parsed.is_empty() {
+                list_from_filesystem()
+            } else {
+                parsed
+            }
         }
         _ => list_from_filesystem(),
     };
     // Add uncertified vhost domains
     let vhosts = list_vhost_domains();
-    let certified: std::collections::HashSet<String> = certs.iter().map(|c| c.domain.clone()).collect();
+    let certified: std::collections::HashSet<String> =
+        certs.iter().map(|c| c.domain.clone()).collect();
     for domain in vhosts {
         if !certified.contains(&domain) {
             certs.push(SslCertificate {
-                domain, issuer: "-".into(), expiry: "-".into(),
-                days_left: 0, path: String::new(), status: "none".into(),
+                domain,
+                issuer: "-".into(),
+                expiry: "-".into(),
+                days_left: 0,
+                path: String::new(),
+                status: "none".into(),
             });
         }
     }
@@ -143,8 +203,8 @@ async fn list_certificates() -> HttpResponse {
     HttpResponse::Ok().json(ApiResponse::ok(certs))
 }
 
-use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 #[derive(Serialize, Clone)]
 pub struct RenewStatus {
@@ -163,12 +223,18 @@ fn renew_jobs() -> &'static RenewJobs {
 }
 
 #[derive(Deserialize)]
-pub struct RenewRequest { pub domain: String }
+pub struct RenewRequest {
+    pub domain: String,
+}
 
 async fn renew_certificate(body: web::Json<RenewRequest>) -> HttpResponse {
     let domain = body.domain.clone();
-    if domain.is_empty() || domain.len() > 253
-        || !domain.chars().all(|c| c.is_alphanumeric() || c == '.' || c == '-') {
+    if domain.is_empty()
+        || domain.len() > 253
+        || !domain
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '.' || c == '-')
+    {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid domain"));
     }
     let jobs = renew_jobs();
@@ -179,24 +245,44 @@ async fn renew_certificate(body: web::Json<RenewRequest>) -> HttpResponse {
         }
     }
     // Start background renewal
-    jobs.lock().unwrap().insert(domain.clone(), RenewStatus {
-        domain: domain.clone(), status: "running".into(), message: "Renewing...".into(),
-        started_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-    });
+    jobs.lock().unwrap().insert(
+        domain.clone(),
+        RenewStatus {
+            domain: domain.clone(),
+            status: "running".into(),
+            message: "Renewing...".into(),
+            started_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+        },
+    );
     let jobs2 = jobs.clone();
     let d = domain.clone();
     std::thread::spawn(move || {
         let output = std::process::Command::new("timeout")
-            .args(["120", "certbot", "renew", "--cert-name", &d,
-                   "--force-renewal", "--non-interactive", "--no-random-sleep-on-renew"])
+            .args([
+                "120",
+                "certbot",
+                "renew",
+                "--cert-name",
+                &d,
+                "--force-renewal",
+                "--non-interactive",
+                "--no-random-sleep-on-renew",
+            ])
             .output();
         let (status, message) = match output {
             Ok(o) => {
-                let msg = format!("{}\n{}",
+                let msg = format!(
+                    "{}\n{}",
                     String::from_utf8_lossy(&o.stdout),
-                    String::from_utf8_lossy(&o.stderr)).trim().to_string();
-                if o.status.success() { ("success".into(), msg) }
-                else { ("error".into(), msg) }
+                    String::from_utf8_lossy(&o.stderr)
+                )
+                .trim()
+                .to_string();
+                if o.status.success() {
+                    ("success".into(), msg)
+                } else {
+                    ("error".into(), msg)
+                }
             }
             Err(e) => ("error".into(), e.to_string()),
         };
@@ -208,7 +294,9 @@ async fn renew_certificate(body: web::Json<RenewRequest>) -> HttpResponse {
         }
     });
     HttpResponse::Ok().json(ApiResponse::ok(RenewStatus {
-        domain, status: "running".into(), message: "Renewal started in background".into(),
+        domain,
+        status: "running".into(),
+        message: "Renewal started in background".into(),
         started_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
     }))
 }
@@ -223,12 +311,18 @@ async fn renew_status(path: web::Path<String>) -> HttpResponse {
 }
 
 #[derive(Deserialize)]
-pub struct IssueRequest { pub domain: String }
+pub struct IssueRequest {
+    pub domain: String,
+}
 
 async fn issue_certificate(body: web::Json<IssueRequest>) -> HttpResponse {
     let domain = body.domain.clone();
-    if domain.is_empty() || domain.len() > 253
-        || !domain.chars().all(|c| c.is_alphanumeric() || c == '.' || c == '-') {
+    if domain.is_empty()
+        || domain.len() > 253
+        || !domain
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '.' || c == '-')
+    {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid domain"));
     }
     let jobs = renew_jobs();
@@ -237,24 +331,46 @@ async fn issue_certificate(body: web::Json<IssueRequest>) -> HttpResponse {
             return HttpResponse::Ok().json(ApiResponse::ok(job.clone()));
         }
     }
-    jobs.lock().unwrap().insert(domain.clone(), RenewStatus {
-        domain: domain.clone(), status: "running".into(), message: "Issuing...".into(),
-        started_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-    });
+    jobs.lock().unwrap().insert(
+        domain.clone(),
+        RenewStatus {
+            domain: domain.clone(),
+            status: "running".into(),
+            message: "Issuing...".into(),
+            started_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+        },
+    );
     let jobs2 = jobs.clone();
     let d = domain.clone();
     std::thread::spawn(move || {
         let output = std::process::Command::new("timeout")
-            .args(["120", "certbot", "--apache", "-d", &d,
-                   "--non-interactive", "--agree-tos", "--no-eff-email",
-                   "--email", "webmaster@xos.kr"])
+            .args([
+                "120",
+                "certbot",
+                "--apache",
+                "-d",
+                &d,
+                "--non-interactive",
+                "--agree-tos",
+                "--no-eff-email",
+                "--email",
+                "webmaster@xos.kr",
+            ])
             .output();
         let (status, message) = match output {
             Ok(o) => {
-                let msg = format!("{}\n{}",
+                let msg = format!(
+                    "{}\n{}",
                     String::from_utf8_lossy(&o.stdout),
-                    String::from_utf8_lossy(&o.stderr)).trim().to_string();
-                if o.status.success() { ("success".into(), msg) } else { ("error".into(), msg) }
+                    String::from_utf8_lossy(&o.stderr)
+                )
+                .trim()
+                .to_string();
+                if o.status.success() {
+                    ("success".into(), msg)
+                } else {
+                    ("error".into(), msg)
+                }
             }
             Err(e) => ("error".into(), e.to_string()),
         };
@@ -266,7 +382,9 @@ async fn issue_certificate(body: web::Json<IssueRequest>) -> HttpResponse {
         }
     });
     HttpResponse::Ok().json(ApiResponse::ok(RenewStatus {
-        domain, status: "running".into(), message: "Certificate issuance started".into(),
+        domain,
+        status: "running".into(),
+        message: "Certificate issuance started".into(),
         started_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
     }))
 }
@@ -277,6 +395,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("/certificates", web::get().to(list_certificates))
             .route("/renew", web::post().to(renew_certificate))
             .route("/renew/{domain}", web::get().to(renew_status))
-            .route("/issue", web::post().to(issue_certificate))
+            .route("/issue", web::post().to(issue_certificate)),
     );
 }

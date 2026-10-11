@@ -73,18 +73,32 @@ pub async fn node_metrics(client: &Client) -> ServiceResult<Vec<NodeMetrics>> {
     for n in &nodes {
         cap.insert(
             n.name.clone(),
-            (cpu_millicores(&n.capacity.cpu), mem_bytes(&n.capacity.memory)),
+            (
+                cpu_millicores(&n.capacity.cpu),
+                mem_bytes(&n.capacity.memory),
+            ),
         );
     }
 
-    let api: Api<DynamicObject> = Api::all_with(client.clone(), &metrics_resource("NodeMetrics", "nodes"));
+    let api: Api<DynamicObject> =
+        Api::all_with(client.clone(), &metrics_resource("NodeMetrics", "nodes"));
     let list = api.list(&capped()).await.map_err(upstream_err)?;
     let mut out = Vec::new();
     for item in list {
         let name = item.metadata.name.clone().unwrap_or_default();
         let usage = item.data.get("usage");
-        let cpu = cpu_millicores(usage.and_then(|u| u.get("cpu")).and_then(|v| v.as_str()).unwrap_or(""));
-        let mem = mem_bytes(usage.and_then(|u| u.get("memory")).and_then(|v| v.as_str()).unwrap_or(""));
+        let cpu = cpu_millicores(
+            usage
+                .and_then(|u| u.get("cpu"))
+                .and_then(|v| v.as_str())
+                .unwrap_or(""),
+        );
+        let mem = mem_bytes(
+            usage
+                .and_then(|u| u.get("memory"))
+                .and_then(|v| v.as_str())
+                .unwrap_or(""),
+        );
         let (cpu_cap, mem_cap) = cap.get(&name).copied().unwrap_or((0, 0));
         out.push(NodeMetrics {
             name,
@@ -103,7 +117,8 @@ pub async fn node_metrics(client: &Client) -> ServiceResult<Vec<NodeMetrics>> {
 }
 
 pub async fn tenant_usage(client: &Client) -> ServiceResult<Vec<TenantUsage>> {
-    let api: Api<DynamicObject> = Api::all_with(client.clone(), &metrics_resource("PodMetrics", "pods"));
+    let api: Api<DynamicObject> =
+        Api::all_with(client.clone(), &metrics_resource("PodMetrics", "pods"));
     let list = api.list(&capped()).await.map_err(upstream_err)?;
     let mut agg: BTreeMap<String, (u64, u64, u32)> = BTreeMap::new();
     for item in list {
@@ -112,8 +127,16 @@ pub async fn tenant_usage(client: &Client) -> ServiceResult<Vec<TenantUsage>> {
         if let Some(conts) = item.data.get("containers").and_then(|c| c.as_array()) {
             for c in conts {
                 let u = c.get("usage");
-                cpu += cpu_millicores(u.and_then(|x| x.get("cpu")).and_then(|v| v.as_str()).unwrap_or(""));
-                mem += mem_bytes(u.and_then(|x| x.get("memory")).and_then(|v| v.as_str()).unwrap_or(""));
+                cpu += cpu_millicores(
+                    u.and_then(|x| x.get("cpu"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or(""),
+                );
+                mem += mem_bytes(
+                    u.and_then(|x| x.get("memory"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or(""),
+                );
             }
         }
         let e = agg.entry(ns).or_insert((0, 0, 0));
@@ -123,12 +146,14 @@ pub async fn tenant_usage(client: &Client) -> ServiceResult<Vec<TenantUsage>> {
     }
     let mut out: Vec<TenantUsage> = agg
         .into_iter()
-        .map(|(namespace, (cpu_millicores, memory_bytes, pods))| TenantUsage {
-            namespace,
-            cpu_millicores,
-            memory_bytes,
-            pods,
-        })
+        .map(
+            |(namespace, (cpu_millicores, memory_bytes, pods))| TenantUsage {
+                namespace,
+                cpu_millicores,
+                memory_bytes,
+                pods,
+            },
+        )
         .collect();
     out.sort_by(|a, b| b.cpu_millicores.cmp(&a.cpu_millicores));
     Ok(out)
@@ -177,5 +202,9 @@ pub async fn list_events(client: &Client, limit: u32) -> ServiceResult<Vec<Clust
         })
         .collect();
     events.sort_by(|a, b| b.0.cmp(&a.0));
-    Ok(events.into_iter().take(limit as usize).map(|(_, e)| e).collect())
+    Ok(events
+        .into_iter()
+        .take(limit as usize)
+        .map(|(_, e)| e)
+        .collect())
 }

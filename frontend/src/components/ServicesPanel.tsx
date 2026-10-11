@@ -1,26 +1,17 @@
 import React, { useState } from 'react';
-import { useApi, apiPost } from '../hooks/useApi';
+import { useApi } from '../hooks/useApi';
 import { SystemService } from '../types';
 import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';
+import { useServiceControl } from '../hooks/useServiceControl';
+import ServiceControlResult from './ServiceControlResult';
 
 export default function ServicesPanel() {
   const { t } = useT();
   const { data, loading, error, refetch } = useApi<SystemService[]>('/api/services', 10000);
   const [filter, setFilter] = useState('');
   const [stateFilter, setStateFilter] = useState<'all' | 'active' | 'inactive' | 'failed'>('all');
-  const [message, setMessage] = useState('');
-  const [actionLoading, setActionLoading] = useState('');
-
-  const handleAction = async (name: string, action: string) => {
-    if ((action === 'stop' || action === 'disable') && !window.confirm(`${action} "${name}"?`)) return;
-    setActionLoading(name);
-    setMessage('');
-    const res = await apiPost<string>('/api/services/action', { name, action });
-    setMessage(res.success ? res.data || `${action} OK` : res.message);
-    setActionLoading('');
-    refetch();
-  };
+  const control = useServiceControl(refetch);
 
   const filtered = (data || []).filter(s => {
     const matchName = s.name.toLowerCase().includes(filter.toLowerCase())
@@ -37,8 +28,6 @@ export default function ServicesPanel() {
     <th className="sortable" onClick={() => toggle(key)}>{label}{indicator(key)}</th>
   );
 
-  if (loading) return <div className="panel loading">{t('services.loading')}</div>;
-  if (error) return <div className="panel error">{t('common.error')}: {error}</div>;
 
   const stateButtons: { key: typeof stateFilter; labelKey: string }[] = [
     { key: 'all', labelKey: 'common.all' },
@@ -51,7 +40,11 @@ export default function ServicesPanel() {
     <div className="panel">
       <h2>{t('services.title')}</h2>
 
-      {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
+      {loading && <p>{t('services.loading')}</p>}
+      {error && <div className="panel error" role="alert">{t('common.error')}: {error}</div>}
+      {control.message && <div className="message" role="status">{control.message}</div>}
+      <ServiceControlResult operationId={control.operationId} setOperationId={control.setOperationId}
+        result={control.result} busy={control.busy} inspect={control.inspect} />
 
       <div className="filter-row">
         <input
@@ -70,9 +63,9 @@ export default function ServicesPanel() {
         </div>
       </div>
 
-      <p className="text-secondary">{filtered.length} {t('services.services')}</p>
+      {!loading && !error && <p className="text-secondary">{filtered.length} {t('services.services')}</p>}
 
-      <table className="data-table">
+      {!loading && !error && <table className="data-table">
         <thead>
           <tr>
             {S('name', t('services.service'))}
@@ -104,33 +97,33 @@ export default function ServicesPanel() {
                 <div className="btn-group">
                   {svc.active_state !== 'active' && (
                     <button className="btn btn-primary btn-sm"
-                      disabled={actionLoading === svc.name}
-                      onClick={() => handleAction(svc.name, 'start')}>{t('common.start')}</button>
+                      disabled={control.busy || !control.ready}
+                      onClick={() => control.act(svc.name, 'start')}>{t('common.start')}</button>
                   )}
                   {svc.active_state === 'active' && (
                     <button className="btn btn-warning btn-sm"
-                      disabled={actionLoading === svc.name}
-                      onClick={() => handleAction(svc.name, 'stop')}>{t('common.stop')}</button>
+                      disabled={control.busy || !control.ready}
+                      onClick={() => control.act(svc.name, 'stop')}>{t('common.stop')}</button>
                   )}
                   <button className="btn btn-secondary btn-sm"
-                    disabled={actionLoading === svc.name}
-                    onClick={() => handleAction(svc.name, 'restart')}>{t('common.restart')}</button>
+                    disabled={control.busy || !control.ready}
+                    onClick={() => control.act(svc.name, 'restart')}>{t('common.restart')}</button>
                   {!svc.enabled ? (
                     <button className="btn btn-secondary btn-sm"
-                      disabled={actionLoading === svc.name}
-                      onClick={() => handleAction(svc.name, 'enable')}>{t('services.enable')}</button>
+                      disabled={control.busy || !control.ready}
+                      onClick={() => control.act(svc.name, 'enable')}>{t('services.enable')}</button>
                   ) : (
                     <button className="btn btn-secondary btn-sm"
-                      disabled={actionLoading === svc.name}
-                      onClick={() => handleAction(svc.name, 'disable')}>{t('services.disable')}</button>
+                      disabled={control.busy || !control.ready}
+                      onClick={() => control.act(svc.name, 'disable')}>{t('services.disable')}</button>
                   )}
                 </div>
               </td>
             </tr>
           ))}
         </tbody>
-      </table>
-      {filtered.length > 100 && (
+      </table>}
+      {!loading && !error && filtered.length > 100 && (
         <p className="text-secondary">{t('common.showingFirst', { count: filtered.length })}</p>
       )}
     </div>

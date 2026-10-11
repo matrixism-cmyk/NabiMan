@@ -6,13 +6,13 @@ export type Tab =
   | 'containers' | 'services' | 'firewall' | 'logs' | 'cron' | 'processes' | 'disks'
   | 'remote' | 'updates' | 'diagnostics' | 'ssl'
   | 'files' | 'backup' | 'audit' | 'database' | 'mail' | 'swap' | 'sessions' | 'dns' | 'usermgmt'
-  | 'notifications' | 'alertrules' | 'vhost' | 'ipblock' | 'license' | 'enterpriseauth'
+  | 'mfa' | 'loginSessions' | 'scopeSettings' | 'notifications' | 'alertrules' | 'vhost' | 'ipblock' | 'license' | 'enterpriseauth'
   | 'mecDashboard' | 'mecNoc' | 'mecLive' | 'mecTenants' | 'mecNodes' | 'mecGpu' | 'mecFirewall'
   | 'mecStorage' | 'mecIngress' | 'mecJobs' | 'mecAudit' | 'mecHealth'
   | 'mecSettings' | 'mecDiscovery' | 'mecUsers';
 
 export type Category =
-  | 'dashboard' | 'monitoring' | 'management' | 'security' | 'system' | 'remote' | 'mec';
+  | 'administration' | 'dashboard' | 'monitoring' | 'management' | 'security' | 'system' | 'remote' | 'mec';
 
 export interface CatDef {
   key: Category;
@@ -21,6 +21,12 @@ export interface CatDef {
 }
 
 export const categories: CatDef[] = [
+  { key: 'administration', labelKey: 'cat.administration', tabs: [
+    { key: 'usermgmt', labelKey: 'tab.userMgmt' },
+    { key: 'scopeSettings', labelKey: 'tab.scopeSettings' },
+    { key: 'loginSessions', labelKey: 'loginSessions.title' },
+    { key: 'mfa', labelKey: 'mfa.title' },
+  ]},
   { key: 'dashboard', labelKey: 'cat.dashboard', tabs: [
     { key: 'server', labelKey: 'tab.serverStatus' },
     { key: 'charts', labelKey: 'tab.charts' },
@@ -52,7 +58,6 @@ export const categories: CatDef[] = [
     { key: 'ipblock', labelKey: 'tab.ipBlock' },
     { key: 'accounts', labelKey: 'tab.accounts' },
     { key: 'ssl', labelKey: 'tab.ssl' },
-    { key: 'usermgmt', labelKey: 'tab.userMgmt' },
     { key: 'sessions', labelKey: 'tab.sessions' },
     { key: 'audit', labelKey: 'tab.audit' },
     { key: 'enterpriseauth', labelKey: 'tab.enterpriseAuth' },

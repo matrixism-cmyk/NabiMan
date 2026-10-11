@@ -2,6 +2,18 @@ type Lang = 'ko' | 'en' | 'ja';
 type T = Record<string, Record<Lang, string>>;
 
 const t: T = {
+  'support.title': { ko: '지원용 진단 보고서', en: 'Support diagnostic report', ja: 'サポート診断レポート' },
+  'support.description': { ko: '실행 버전, 자원 사용량, 저장소 상태와 회원·접속·최근 작업의 집계만 수집합니다. 원본 로그, 터미널 내용, 계정 이름, 서버 주소, 비밀번호와 키는 포함하지 않습니다.', en: 'Collect runtime identity, resource usage, storage status and aggregate account, connection and recent job counts. Raw logs, terminal contents, account names, server addresses, passwords and keys are excluded.', ja: '実行バージョン、リソース使用量、ストレージ状態とアカウント・接続・最近のジョブ件数を収集します。生ログ、ターミナル内容、アカウント名、サーバーアドレス、パスワード、鍵は含みません。' },
+  'support.collect': { ko: '진단 보고서 생성', en: 'Generate diagnostic report', ja: '診断レポートを生成' },
+  'support.collecting': { ko: '진단 정보를 수집하는 중…', en: 'Collecting diagnostics…', ja: '診断情報を収集中…' },
+  'support.preview': { ko: '다운로드할 진단 자료 미리보기', en: 'Diagnostic download preview', ja: '診断データのプレビュー' },
+  'support.reviewed': { ko: '내용을 검토했으며 이 자료를 다운로드하겠습니다', en: 'I have reviewed the contents and want to download this report', ja: '内容を確認し、このレポートをダウンロードします' },
+  'support.download': { ko: '검토한 JSON 다운로드', en: 'Download reviewed JSON', ja: '確認したJSONをダウンロード' },
+  'support.localOnly': { ko: '자료는 외부로 자동 전송되지 않습니다. 다운로드 후 공유할 대상을 직접 선택하세요.', en: 'No report is automatically sent to an external service. Choose who to share the downloaded file with.', ja: '外部サービスへ自動送信されません。ダウンロード後の共有先はご自身で選択してください。' },
+  'support.limits': { ko: '각 항목은 수집 시점이 다를 수 있습니다. 서버 연결·DB 무결성·보안 인증 결과가 아니며, 작업은 최근 저장된 1,000건까지만 집계합니다.', en: 'Sections may reflect different instants. This is not a connectivity, database integrity or security attestation. Job counts cover at most the latest 1,000 stored jobs.', ja: '各項目の収集時刻は異なる場合があります。接続・DB整合性・セキュリティ認証の証明ではなく、ジョブは直近の保存済み1,000件までです。' },
+  'support.root': { ko: '현재 API 프로세스는 root 권한으로 실행 중입니다. 비특권 API 분리는 아직 완료되지 않았습니다.', en: 'The API process currently runs as root. Separation into an unprivileged API is not complete.', ja: 'APIプロセスはroot権限で実行中です。非特権APIへの分離は未完了です。' },
+  'support.partial': { ko: '일부 항목을 수집하지 못했습니다. busy·unavailable·too_large 항목은 정상이나 0건을 뜻하지 않습니다.', en: 'Some sections could not be collected. Busy, unavailable or too_large sections do not mean healthy or empty.', ja: '収集できない項目があります。busy・unavailable・too_largeは正常や0件を意味しません。' },
+
   // --- Server Status ---
   'serverStatus.title': { ko: '서버 상태', en: 'Server Status', ja: 'サーバー状態' },
   'serverStatus.hostname': { ko: '호스트명', en: 'Hostname', ja: 'ホスト名' },
@@ -77,6 +89,12 @@ const t: T = {
   'diagnostics.hostPlaceholder': { ko: '호스트명 또는 IP', en: 'Hostname or IP', ja: 'ホスト名またはIP' },
   'diagnostics.portCheck': { ko: '포트 체크', en: 'Port Check', ja: 'ポートチェック' },
   'diagnostics.port': { ko: '포트', en: 'Port', ja: 'ポート' },
+  'diagnostics.runtime': { ko: '실행 중인 서버 버전', en: 'Running Server Version', ja: '実行中のサーバーバージョン' },
+  'diagnostics.runtimeHint': { ko: '배포 기록과 실행 파일 지문을 비교해 업데이트 반영 여부를 확인할 수 있습니다. 지원 요청 시 이 정보를 함께 전달하세요.', en: 'Compare the executable fingerprint with your deployment record to confirm the update. Include this information in support requests.', ja: '実行ファイルの指紋をデプロイ記録と比較して更新を確認できます。サポートへのお問い合わせにもこの情報をご利用ください。' },
+  'diagnostics.packageVersion': { ko: '패키지 버전', en: 'Package version', ja: 'パッケージバージョン' },
+  'diagnostics.startedAt': { ko: '서버 시작 시각', en: 'Server started at', ja: 'サーバー起動時刻' },
+  'diagnostics.instanceId': { ko: '실행 인스턴스 ID', en: 'Instance ID', ja: 'インスタンスID' },
+  'diagnostics.executableHash': { ko: '실행 파일 SHA-256', en: 'Executable SHA-256', ja: '実行ファイルSHA-256' },
 
   // --- Charts ---
   'charts.title': { ko: '리소스 모니터링', en: 'Resource Monitoring', ja: 'リソースモニタリング' },

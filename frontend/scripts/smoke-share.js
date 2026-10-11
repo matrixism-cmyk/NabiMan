@@ -39,6 +39,8 @@ async function signIn(browser) {
   await page.waitForSelector('.app-header');
   await page.click('.cat-btn:has-text("원격")');
   await page.click('.rw-item:has-text("로컬 셸")');
+  // A target opens on its session list; the terminal is one tab over.
+  await page.click('.rw-tabs button:has-text("터미널")');
   await page.waitForTimeout(700);
   const connect = await page.$('.rw-connect-card button.btn-primary');
   if (connect) await connect.click();
@@ -52,7 +54,7 @@ async function createLink(page, { password, readOnly }) {
   await page.waitForSelector('.share-dialog');
   await page.click('.share-dialog button:has-text("24시간")');
   if (password) await page.fill('.share-dialog input[type="password"]', password);
-  if (readOnly) await page.check('.share-dialog input[type="checkbox"]');
+  await page.locator('.share-dialog input[type="checkbox"]').setChecked(Boolean(readOnly));
   await page.click('.share-dialog button:has-text("링크 만들기")');
   await page.waitForSelector('.share-created input');
   const url = await page.$eval('.share-created input', (el) => el.value);
@@ -70,7 +72,7 @@ async function createLink(page, { password, readOnly }) {
   await owner.waitForTimeout(1200);
 
   const url = await createLink(owner, { password: 'sharepw', readOnly: false });
-  check('link looks like a share URL', /\/share\/[0-9a-f]{32}$/.test(url));
+  check('link looks like a share URL', /\/share\/[0-9a-f]{64}$/.test(url));
 
   const guestCtx = await browser.newContext({ viewport: { width: 900, height: 600 } });
   const guest = await guestCtx.newPage();

@@ -10,7 +10,10 @@ pub fn parse_ldap_host_port(server_url: &str) -> Option<(String, u16)> {
 
     let (host, port) = if let Some(idx) = stripped.rfind(':') {
         let h = &stripped[..idx];
-        let p = stripped[idx + 1..].trim_end_matches('/').parse::<u16>().unwrap_or(default_port);
+        let p = stripped[idx + 1..]
+            .trim_end_matches('/')
+            .parse::<u16>()
+            .unwrap_or(default_port);
         (h.to_string(), p)
     } else {
         (stripped.trim_end_matches('/').to_string(), default_port)
@@ -101,7 +104,10 @@ mod tests {
     #[test]
     fn test_parse_dn_from_ldif() {
         let ldif = "dn: uid=john,ou=users,dc=example,dc=com\nuid: john\nmemberOf: cn=admins,ou=groups,dc=example,dc=com\n";
-        assert_eq!(parse_dn_from_ldif(ldif), Some("uid=john,ou=users,dc=example,dc=com".into()));
+        assert_eq!(
+            parse_dn_from_ldif(ldif),
+            Some("uid=john,ou=users,dc=example,dc=com".into())
+        );
     }
 
     #[test]

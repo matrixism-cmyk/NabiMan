@@ -105,7 +105,8 @@ fn is_prompt(t: &str) -> bool {
     }
     let body = &t[..t.len() - 1];
     let body = body.trim_end_matches(')');
-    let body = body.trim_end_matches(|c: char| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '(');
+    let body = body
+        .trim_end_matches(|c: char| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '(');
     body.is_empty()
 }
 

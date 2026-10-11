@@ -1,8 +1,8 @@
 use super::axgate_service::{AxgateHealth, AxgateService, SyncResult};
 use super::{ServiceError, ServiceResult};
 use crate::models::mec::{
-    AnyMarker, CreateNatRuleRequest, NatRule, NatSource, NatType, PolicyAction, Protocol,
-    PublicIp, PublicIpStatus, SecurityPolicy,
+    AnyMarker, CreateNatRuleRequest, NatRule, NatSource, NatType, PolicyAction, Protocol, PublicIp,
+    PublicIpStatus, SecurityPolicy,
 };
 use async_trait::async_trait;
 use chrono::Utc;

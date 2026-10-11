@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { useApi, apiPost } from '../hooks/useApi';
+import AuditIntegrityPanel from './AuditIntegrityPanel';
+import AuditForwardingPanel from './AuditForwardingPanel';
+import { useApi } from '../hooks/useApi';
 import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';
 
@@ -24,12 +26,6 @@ export default function AuditPanel() {
     <th className="sortable" onClick={() => toggle(key)}>{label}{indicator(key)}</th>
   );
 
-  const handleClear = async () => {
-    if (!window.confirm(t('audit.confirmClear'))) return;
-    await apiPost<string>('/api/audit/clear', {});
-    refetch();
-  };
-
   if (loading && !data) return <div className="panel loading">{t('common.loading')}</div>;
   if (error) return <div className="panel error">{t('common.error')}: {error}</div>;
 
@@ -39,9 +35,10 @@ export default function AuditPanel() {
         <h2>{t('audit.title')}</h2>
         <div className="btn-group">
           <button className="btn btn-secondary btn-sm" onClick={refetch}>{t('ssl.refresh')}</button>
-          <button className="btn btn-danger btn-sm" onClick={handleClear}>{t('audit.clear')}</button>
         </div>
       </div>
+      <AuditIntegrityPanel />
+      <AuditForwardingPanel />
       <div className="filter-row">
         <input className="filter-input" placeholder={t('audit.filterUser')} value={userFilter}
           onChange={e => setUserFilter(e.target.value)} style={{ maxWidth: 150 }} />

@@ -7,8 +7,8 @@ use std::rc::Rc;
 
 const PREFIX: &str = "/api/mec/";
 const READ_ONLY_ALLOW_PATH_SUFFIXES: &[&str] = &[
-    "/firewall/sync",         // 읽기 전용이지만 POST (running-config 재동기화)
-    "/jobs/",                 // SSE stream은 GET이므로 자동 통과
+    "/firewall/sync", // 읽기 전용이지만 POST (running-config 재동기화)
+    "/jobs/",         // SSE stream은 GET이므로 자동 통과
 ];
 
 pub fn is_read_only() -> bool {

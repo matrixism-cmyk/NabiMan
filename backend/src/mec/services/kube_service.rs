@@ -34,11 +34,7 @@ pub trait KubeService: Send + Sync {
     ) -> ServiceResult<()>;
 
     async fn list_namespaces(&self) -> ServiceResult<Vec<NamespaceInfo>>;
-    async fn create_namespace(
-        &self,
-        name: &str,
-        labels: &[(String, String)],
-    ) -> ServiceResult<()>;
+    async fn create_namespace(&self, name: &str, labels: &[(String, String)]) -> ServiceResult<()>;
     async fn delete_namespace(&self, name: &str) -> ServiceResult<()>;
     async fn apply_resource_quota(
         &self,
@@ -46,8 +42,12 @@ pub trait KubeService: Send + Sync {
         quota: &ResourceQuota,
     ) -> ServiceResult<()>;
     async fn get_quota_usage(&self, namespace: &str) -> ServiceResult<QuotaUsage>;
-    async fn apply_network_policy(&self, namespace: &str, name: &str, spec: &str)
-        -> ServiceResult<()>;
+    async fn apply_network_policy(
+        &self,
+        namespace: &str,
+        name: &str,
+        spec: &str,
+    ) -> ServiceResult<()>;
     async fn apply_limit_range(&self, namespace: &str, spec: &str) -> ServiceResult<()>;
     async fn apply_rbac(&self, namespace: &str, user: &str) -> ServiceResult<()>;
     async fn apply_deployment(&self, namespace: &str, spec: &str) -> ServiceResult<()>;
@@ -55,8 +55,10 @@ pub trait KubeService: Send + Sync {
     async fn apply_service(&self, namespace: &str, spec: &str) -> ServiceResult<()>;
     async fn delete_service(&self, namespace: &str, name: &str) -> ServiceResult<()>;
 
-    async fn list_lb_services(&self, namespace: Option<&str>)
-        -> ServiceResult<Vec<LoadBalancerService>>;
+    async fn list_lb_services(
+        &self,
+        namespace: Option<&str>,
+    ) -> ServiceResult<Vec<LoadBalancerService>>;
 
     async fn list_pods(&self, namespace: &str) -> ServiceResult<Vec<PodInfo>>;
     async fn count_pods(&self, namespace: &str) -> ServiceResult<u32>;

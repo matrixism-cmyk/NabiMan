@@ -2,6 +2,7 @@ type Lang = 'ko' | 'en' | 'ja';
 type T = Record<string, Record<Lang, string>>;
 
 const t: T = {
+  'login.sessionEnded': { ko: '로그인 유지 정보를 갱신할 수 없습니다. 다시 로그인해 주세요.', en: 'Your login could not be renewed. Please sign in again.', ja: 'ログインを更新できませんでした。もう一度ログインしてください。' },
   // --- Common ---
   'common.loading': { ko: '로딩 중...', en: 'Loading...', ja: '読み込み中...' },
   'common.error': { ko: '오류', en: 'Error', ja: 'エラー' },
@@ -59,6 +60,9 @@ const t: T = {
   'cat.dashboard': { ko: '대시보드', en: 'Dashboard', ja: 'ダッシュボード' },
   'cat.monitoring': { ko: '모니터링', en: 'Monitoring', ja: 'モニタリング' },
   'cat.management': { ko: '관리', en: 'Management', ja: '管理' },
+  'cat.administration': { ko: '최고관리자', en: 'Administration', ja: '最高管理者' },
+  'cat.scopeAdministration': { ko: '소속 관리', en: 'Membership', ja: '所属管理' },
+  'tab.scopeSettings': { ko: 'tenant·서버 운영 설정', en: 'Tenant & Server Settings', ja: 'tenant・サーバー運用設定' },
   'cat.security': { ko: '보안', en: 'Security', ja: 'セキュリティ' },
   'cat.system': { ko: '시스템', en: 'System', ja: 'システム' },
   'cat.remote': { ko: '원격', en: 'Remote', ja: 'リモート' },
@@ -98,24 +102,25 @@ const t: T = {
   // --- Login ---
   'login.password': { ko: '관리자 비밀번호', en: 'Admin Password', ja: '管理者パスワード' },
   'login.button': { ko: '로그인', en: 'Login', ja: 'ログイン' },
+  'login.retryAfter': { ko: '요청이 많습니다. {seconds}초 후 다시 시도하세요.', en: 'Too many attempts. Try again in {seconds} seconds.', ja: '試行回数が多すぎます。{seconds}秒後に再試行してください。' },
   'login.loggingIn': { ko: '로그인 중...', en: 'Logging in...', ja: 'ログイン中...' },
   'login.failed': { ko: '로그인 실패', en: 'Login failed', ja: 'ログイン失敗' },
   'login.connectionFailed': { ko: '연결 실패', en: 'Connection failed', ja: '接続失敗' },
   'login.username': { ko: '사용자명', en: 'Username', ja: 'ユーザー名' },
-  'login.totpCode': { ko: '인증 코드 (6자리)', en: 'Auth Code (6 digits)', ja: '認証コード (6桁)' },
+  'login.totpCode': { ko: '인증 번호 또는 복구 코드', en: 'Authenticator or recovery code', ja: '認証コードまたはリカバリーコード' },
   'login.local': { ko: '로컬', en: 'Local', ja: 'ローカル' },
   'login.ldap': { ko: 'LDAP', en: 'LDAP', ja: 'LDAP' },
   'login.ldapUsername': { ko: 'LDAP 사용자명', en: 'LDAP Username', ja: 'LDAPユーザー名' },
   'login.oauthLogin': { ko: '로그인', en: 'Login', ja: 'ログイン' },
 
   // --- Tabs (new) ---
-  'tab.userMgmt': { ko: '사용자 관리', en: 'User Management', ja: 'ユーザー管理' },
+  'tab.userMgmt': { ko: '회원 승인·관리', en: 'Member Approval & Management', ja: '会員承認・管理' },
 
   // --- User Management ---
   'userMgmt.title': { ko: '사용자 관리', en: 'User Management', ja: 'ユーザー管理' },
   'userMgmt.addUser': { ko: '사용자 추가', en: 'Add User', ja: 'ユーザー追加' },
   'userMgmt.role': { ko: '역할', en: 'Role', ja: '権限' },
-  'userMgmt.admin': { ko: '관리자', en: 'Admin', ja: '管理者' },
+  'userMgmt.admin': { ko: '최고관리자', en: 'Super Administrator', ja: '最高管理者' },
   'userMgmt.operator': { ko: '운영자', en: 'Operator', ja: 'オペレーター' },
   'userMgmt.viewer': { ko: '뷰어', en: 'Viewer', ja: 'ビューア' },
   'userMgmt.created': { ko: '생성일', en: 'Created', ja: '作成日' },
@@ -141,6 +146,22 @@ const t: T = {
   'license.maxServers': { ko: '최대 서버 수', en: 'Max Servers', ja: '最大サーバー数' },
   'license.unlimited': { ko: '무제한', en: 'Unlimited', ja: '無制限' },
   'license.noLicense': { ko: '라이선스가 없습니다', en: 'No license', ja: 'ライセンスなし' },
+  'license.refresh': { ko: "새로고침", en: "Refresh", ja: "更新" },
+  'license.active': { ko: "활성", en: "Active", ja: "有効" },
+  'license.inactive': { ko: "비활성", en: "Inactive", ja: "無効" },
+  'license.noExpiry': { ko: "무기한", en: "No expiry", ja: "無期限" },
+  'license.enabled': { ko: "허용", en: "Enabled", ja: "許可" },
+  'license.disabled': { ko: "미허용", en: "Disabled", ja: "不許可" },
+  'license.key': { ko: "라이선스 키", en: "License key", ja: "ライセンスキー" },
+  'license.trialRemaining': { ko: "체험 기간 {days}일 남음", en: "Trial: {days} days remaining", ja: "試用期間：残り{days}日" },
+  'license.state.licensed': { ko: "서명된 라이선스가 확인되었습니다.", en: "Signed license verified.", ja: "署名済みライセンスを確認しました。" },
+  'license.state.invalid_license': { ko: "라이선스 서명 또는 저장 정보가 올바르지 않습니다. 서명된 라이선스를 다시 등록해 주세요.", en: "Invalid license signature or stored data. Register a signed replacement.", ja: "署名または保存情報が無効です。署名済みライセンスを再登録してください。" },
+  'license.state.verification_unavailable': { ko: "신뢰할 발급자 공개키를 읽을 수 없어 라이선스를 확인할 수 없습니다.", en: "License cannot be verified: trusted issuer public keys unavailable.", ja: "発行者の公開鍵が利用できないため検証できません。" },
+  'license.state.license_expired': { ko: "라이선스가 만료되었습니다.", en: "License has expired.", ja: "ライセンスの期限が切れています。" },
+  'license.state.storage_error': { ko: "라이선스 저장소를 읽거나 쓸 수 없습니다.", en: "License storage is unavailable.", ja: "ライセンス保存先が利用できません。" },
+  'license.state.invalid_trial_timestamp': { ko: "체험 시작 기록이 올바르지 않습니다.", en: "Invalid trial start record.", ja: "試用開始記録が無効です。" },
+  'license.state.trial': { ko: "체험 기간입니다.", en: "Trial period.", ja: "試用期間中です。" },
+  'license.state.trial_expired': { ko: "체험 기간이 종료되었습니다.", en: "Trial period ended.", ja: "試用期間が終了しました。" },
   'license.activated': { ko: '라이선스가 활성화되었습니다', en: 'License activated', ja: 'ライセンスを有効化しました' },
   'license.invalidKey': { ko: '유효하지 않은 라이선스 키', en: 'Invalid license key', ja: '無効なライセンスキー' },
 };

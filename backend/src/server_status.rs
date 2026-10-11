@@ -1,6 +1,6 @@
+use crate::models::{ApiResponse, ServerStatus};
 use actix_web::{get, web, HttpResponse};
 use sysinfo::System;
-use crate::models::{ApiResponse, ServerStatus};
 
 #[get("/api/server/status")]
 async fn get_status() -> HttpResponse {

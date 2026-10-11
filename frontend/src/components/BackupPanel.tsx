@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useApi, apiPost, apiRequest } from '../hooks/useApi';
+import { useApi, apiPost, apiRequest, fetchWithRefresh } from '../hooks/useApi';
 import { useT } from '../i18n';
+import EncryptedBackupPanel from './EncryptedBackupPanel';
 import { useSortable } from '../hooks/useSortable';
 
 interface BackupEntry { id: string; source: string; filename: string; size: number; created: string; }
-interface BackupSchedule { id: string; name: string; paths: string[]; cron_expr: string; compression: boolean; enabled: boolean; last_run: string | null; next_run: string | null; }
+interface BackupSchedule { id: string; name: string; paths: string[]; cron_expr: string; compression: boolean; enabled: boolean; last_run: string | null; next_run: string | null; last_result?: { state: string; started_at: string; finished_at: string | null; filename: string | null; error: string | null } | null; }
 
 export default function BackupPanel() {
   const { t } = useT();
@@ -16,6 +17,8 @@ export default function BackupPanel() {
   // Schedule state
   const [schedules, setSchedules] = useState<BackupSchedule[]>([]);
   const [schedulesLoading, setSchedulesLoading] = useState(false);
+  const [scheduleError, setScheduleError] = useState('');
+  const [acting, setActing] = useState(false);
   const [showAddSchedule, setShowAddSchedule] = useState(false);
   const [schedName, setSchedName] = useState('');
   const [schedPaths, setSchedPaths] = useState('');
@@ -28,18 +31,19 @@ export default function BackupPanel() {
   const fetchSchedules = useCallback(async () => {
     setSchedulesLoading(true);
     try {
-      const token = sessionStorage.getItem('nabiman_token') || '';
-      const res = await fetch('/api/backup/schedules', {
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
+      const res = await fetchWithRefresh('/api/backup/schedules');
       const json = await res.json();
-      if (json.success && json.data) setSchedules(json.data);
-    } catch { /* ignore */ }
+      if (!res.ok || !json.success) throw new Error(json.message || 'Backup schedules unavailable');
+      setSchedules(json.data); setScheduleError('');
+    } catch (cause) { setScheduleError(cause instanceof Error ? cause.message : 'Backup schedules unavailable'); }
     setSchedulesLoading(false);
   }, []);
 
   useEffect(() => {
-    if (tab === 'schedules') fetchSchedules();
+    if (tab !== 'schedules') return;
+    fetchSchedules();
+    const timer = window.setInterval(fetchSchedules, 5000);
+    return () => window.clearInterval(timer);
   }, [tab, fetchSchedules]);
 
   const createBackup = async () => {
@@ -66,24 +70,29 @@ export default function BackupPanel() {
   const addSchedule = async () => {
     if (!schedName.trim() || !schedPaths.trim() || !schedCron.trim()) return;
     const paths = schedPaths.split(',').map(p => p.trim()).filter(Boolean);
-    const res = await apiPost<string>('/api/backup/schedules', {
-      name: schedName, paths, cron_expr: schedCron, compression: schedCompression,
-    });
-    setMsg(res.data || res.message);
-    if (res.success) {
-      setShowAddSchedule(false);
-      setSchedName('');
-      setSchedPaths('');
-      setSchedCron('0 2 * * *');
-      setSchedCompression(true);
-      fetchSchedules();
-    }
+    setActing(true);
+    try {
+      const res = await apiPost<BackupSchedule>('/api/backup/schedules', {
+        name: schedName, paths, cron_expr: schedCron, compression: schedCompression,
+      });
+      if (!res.success) throw new Error(res.message);
+      setMsg(t('backup.scheduleSaved')); setShowAddSchedule(false);
+      setSchedName(''); setSchedPaths(''); setSchedCron('0 2 * * *'); setSchedCompression(true);
+      await fetchSchedules();
+    } catch (cause) { setMsg(cause instanceof Error ? cause.message : t('common.error')); }
+    finally { setActing(false); }
   };
 
-  const deleteSchedule = async (id: string) => {
-    if (!window.confirm(t('backup.confirmDelete'))) return;
-    await apiRequest<string>(`/api/backup/schedules/${id}`, { method: 'DELETE' });
-    fetchSchedules();
+  const scheduleAction = async (id: string, action: 'delete' | 'run') => {
+    if (action === 'delete' && !window.confirm(t('backup.confirmDelete'))) return;
+    setActing(true);
+    try {
+      const res = await apiRequest(`/api/backup/schedules/${id}${action === 'run' ? '/run' : ''}`, { method: action === 'run' ? 'POST' : 'DELETE' });
+      if (!res.success) throw new Error(res.message);
+      setMsg(t(action === 'run' ? 'backup.accepted' : 'backup.scheduleDeleted'));
+      await fetchSchedules();
+    } catch (cause) { setMsg(cause instanceof Error ? cause.message : t('common.error')); }
+    finally { setActing(false); }
   };
 
   const createCompressed = async () => {
@@ -100,12 +109,15 @@ export default function BackupPanel() {
     <th className="sortable" onClick={() => toggle(key)}>{label}{indicator(key)}</th>
   );
 
-  if (loading) return <div className="panel loading">{t('common.loading')}</div>;
-  if (error) return <div className="panel error">{t('common.error')}: {error}</div>;
+  if (loading && !data) return <div className="panel loading">{t('common.loading')}</div>;
+  if (error && !data) return <div className="panel error">{t('common.error')}: {error}</div>;
 
   return (
-    <div className="panel">
+    <div className="panel backup-panel">
       <h2>{t('backup.title')}</h2>
+      {error && <p role="alert">{error}</p>}
+      <p>{t('backup.scopeNotice')}</p>
+      <details><summary>{t('recovery.title')}</summary><p>{t('recovery.description')}</p><a href="/management-recovery.html" target="_blank" rel="noopener noreferrer">{t('recovery.guide')}</a></details>
       <div className="tab-row" style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <button
           className={`btn btn-sm ${tab === 'backups' ? 'btn-primary' : 'btn-secondary'}`}
@@ -120,10 +132,11 @@ export default function BackupPanel() {
           {t('backup.schedules')}
         </button>
       </div>
-      {msg && <div className="message" onClick={() => setMsg('')}>{msg}</div>}
+      {msg && <div role="status" className="message" onClick={() => setMsg('')}>{msg}</div>}
 
       {tab === 'backups' && (
         <>
+          <EncryptedBackupPanel files={(data || []).map(file => file.filename)} refresh={refetch} />
           <div className="filter-row">
             <input className="filter-input" placeholder={t('backup.pathPlaceholder')} value={path}
               onChange={e => setPath(e.target.value)} onKeyDown={e => e.key === 'Enter' && createBackup()} />
@@ -135,12 +148,12 @@ export default function BackupPanel() {
               <tbody>
                 {sorted.map((b, i) => (
                   <tr key={i}>
-                    <td><code>{b.source}</code></td>
+                    <td><code>{b.filename.endsWith('.bak') ? b.source : '—'}</code></td>
                     <td>{b.filename}</td>
                     <td>{b.size}</td>
                     <td>{b.created}</td>
                     <td className="btn-group">
-                      <button className="btn btn-sm btn-primary" onClick={() => restoreBackup(b.filename, b.source)}>{t('backup.restore')}</button>
+                      <button className="btn btn-sm btn-primary" disabled={!b.filename.endsWith('.bak')} title={t('backup.archiveRestore')} onClick={() => restoreBackup(b.filename, b.source)}>{t('backup.restore')}</button>
                       <button className="btn btn-sm btn-danger" onClick={() => deleteBackup(b.filename)}>{t('common.delete')}</button>
                     </td>
                   </tr>
@@ -153,6 +166,8 @@ export default function BackupPanel() {
 
       {tab === 'schedules' && (
         <>
+          <p>{t('backup.cronHelp')}</p>
+          {scheduleError && <p role="alert">{scheduleError}</p>}
           <div className="filter-row" style={{ marginBottom: 12 }}>
             <button className="btn btn-primary btn-sm" onClick={() => setShowAddSchedule(!showAddSchedule)}>
               {showAddSchedule ? t('common.cancel') : t('backup.addSchedule')}
@@ -163,21 +178,21 @@ export default function BackupPanel() {
             <div className="inline-form" style={{ marginBottom: 16 }}>
               <div className="form-row">
                 <label>{t('backup.scheduleName')}</label>
-                <input value={schedName} onChange={e => setSchedName(e.target.value)} placeholder="Daily /var backup" />
+                <input aria-label={t('backup.scheduleName')} value={schedName} onChange={e => setSchedName(e.target.value)} placeholder="Daily /var backup" />
               </div>
               <div className="form-row">
                 <label>{t('backup.paths')}</label>
-                <input value={schedPaths} onChange={e => setSchedPaths(e.target.value)} placeholder="/var/www, /etc/nginx" />
+                <input aria-label={t('backup.paths')} value={schedPaths} onChange={e => setSchedPaths(e.target.value)} placeholder="/var/www, /etc/nginx" />
               </div>
               <div className="form-row">
                 <label>{t('backup.cronExpr')}</label>
-                <input value={schedCron} onChange={e => setSchedCron(e.target.value)} placeholder="0 2 * * *" />
+                <input aria-label={t('backup.cronExpr')} value={schedCron} onChange={e => setSchedCron(e.target.value)} placeholder="0 2 * * *" />
               </div>
               <div className="form-row">
                 <label>{t('backup.compression')}</label>
                 <input type="checkbox" checked={schedCompression} onChange={e => setSchedCompression(e.target.checked)} />
               </div>
-              <button className="btn btn-primary" onClick={addSchedule}>{t('common.add')}</button>
+              <button className="btn btn-primary" disabled={acting || Boolean(scheduleError)} onClick={addSchedule}>{t('common.add')}</button>
             </div>
           )}
 
@@ -189,7 +204,7 @@ export default function BackupPanel() {
             <button className="btn btn-primary btn-sm" onClick={createCompressed}>{t('backup.createCompressed')}</button>
           </div>
 
-          {schedulesLoading ? (
+          {schedulesLoading && !schedules.length ? (
             <p className="loading">{t('common.loading')}</p>
           ) : schedules.length > 0 ? (
             <table className="data-table">
@@ -212,10 +227,13 @@ export default function BackupPanel() {
                     <td>{s.compression ? t('backup.compressed') : '-'}</td>
                     <td>
                       {s.enabled ? '✓' : '✗'}
-                      {s.last_run && <span style={{ marginLeft: 8, fontSize: '0.85em' }}>{s.last_run}</span>}
+                      <div>{t('backup.' + (s.last_result?.state || 'unverified'))}</div>
+                      {s.last_result && <><div>{s.last_result.started_at}</div><div>{s.last_result.finished_at}</div><code>{s.last_result.filename}</code><p>{s.last_result.error}</p></>}
+                      {s.last_run && <div>{t('backup.lastRecorded')}: {s.last_run}</div>}
                     </td>
                     <td>
-                      <button className="btn btn-sm btn-danger" onClick={() => deleteSchedule(s.id)}>
+                      <button className="btn btn-sm btn-primary" disabled={acting || Boolean(scheduleError) || schedules.some(row => row.last_result?.state === 'running')} onClick={() => scheduleAction(s.id, 'run')}>{t('backup.runNow')}</button>
+                      <button className="btn btn-sm btn-danger" disabled={acting || Boolean(scheduleError) || s.last_result?.state === 'running'} onClick={() => scheduleAction(s.id, 'delete')}>
                         {t('common.delete')}
                       </button>
                     </td>

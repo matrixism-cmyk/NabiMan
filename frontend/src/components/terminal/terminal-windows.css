@@ -107,7 +107,7 @@
 .terminal-view-screen {
   width: 100%;
   height: 100%;
-  padding: 4px 6px;
+  padding: 0;
   box-sizing: border-box;
 }
 
@@ -330,3 +330,29 @@
   color: var(--text-secondary);
 }
 .session-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* FitAddon subtracts padding on xterm itself, not its parent. */
+.terminal-view-screen > .xterm { padding: 4px 6px; box-sizing: border-box; }
+.terminal-view-screen { overflow: hidden; min-width: 0; }
+.term-window-body { min-width: 0; overflow: hidden; padding-right: 7px; padding-bottom: 6px; }
+.terminal-view-with-history { display: flex; }
+.terminal-view-with-history .terminal-view-screen { flex: 1; width: 0; }
+.terminal-view-with-history .xterm-viewport { scrollbar-width: none; }
+.terminal-view-with-history .xterm-viewport::-webkit-scrollbar { width: 0; }
+.terminal-history-controls {
+  flex: 0 0 24px; display: flex; flex-direction: column;
+  background: #152330; border-left: 1px solid #293c4d; overscroll-behavior: contain;
+}
+.terminal-history-track { flex: 1; min-height: 0; position: relative; touch-action: none; cursor: pointer; }
+.terminal-history-track:focus-visible { outline: 2px solid #7eb8ed; outline-offset: -2px; }
+.terminal-history-thumb { position: absolute; top: 0; left: 5px; right: 5px; border-radius: 7px; background: #65839d; cursor: grab; }
+.terminal-history-track:active .terminal-history-thumb { background: #a1c5e3; cursor: grabbing; }
+.terminal-history-track[aria-disabled="true"] { cursor: default; }
+.terminal-history-track[aria-disabled="true"] .terminal-history-thumb { opacity: .25; cursor: default; }
+.terminal-history-controls button {
+  border: 0; background: transparent; color: #b9c8d7;
+  min-height: 30px; padding: 0; cursor: pointer;
+}
+.terminal-history-controls button:hover { background: #2b4052; }
+.terminal-history-controls button:disabled { opacity: .4; cursor: default; }
+.terminal-view-with-history .terminal-view-status { right: 32px; }

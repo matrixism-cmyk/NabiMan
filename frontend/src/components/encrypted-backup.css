@@ -1,0 +1,14 @@
+.encrypted-backup { text-align: left; margin-bottom: 24px; }
+.encrypted-backup > p { line-height: 1.6; }
+.encrypted-backup fieldset { display: grid; gap: 12px; margin: 16px 0; padding: 16px; min-width: 0; border: 1px solid var(--border); border-radius: 8px; }
+.encrypted-backup label { display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.encrypted-backup label input, .encrypted-backup label select { box-sizing: border-box; width: 100%; text-align: left; padding: 8px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; }
+.encrypted-backup label:has(input[type=checkbox]) { flex-direction: row; align-items: flex-start; }
+.encrypted-backup input[type=checkbox] { width: auto; }
+.encrypted-backup button { justify-self: start; }
+@media (min-width: 1000px) { .encrypted-backup fieldset { grid-template-columns: 1fr 1fr; } .encrypted-backup fieldset > :first-of-type, .encrypted-backup fieldset > :last-child { grid-column: 1 / -1; } }
+
+.encrypted-backup input:focus-visible, .encrypted-backup select:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.backup-panel .data-table { table-layout: fixed; width: 100%; }
+.backup-panel .data-table td { overflow-wrap: anywhere; white-space: normal; }
+.backup-panel .data-table .btn-group { flex-wrap: wrap; }

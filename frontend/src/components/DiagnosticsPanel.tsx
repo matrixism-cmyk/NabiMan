@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { apiPost } from '../hooks/useApi';
 import { PortCheckResult } from '../types';
 import { useT } from '../i18n';
+import SupportReportPanel from './SupportReportPanel';
+import RuntimeIdentityPanel from './RuntimeIdentityPanel';
 
 type Tool = 'ping' | 'traceroute' | 'nslookup' | 'port-check';
 
@@ -61,6 +63,8 @@ export default function DiagnosticsPanel() {
         </button>
       </div>
       {output && <pre className="log-output">{output}</pre>}
+      <RuntimeIdentityPanel />
+      <SupportReportPanel />
     </div>
   );
 }

@@ -12,18 +12,20 @@ use std::collections::BTreeMap;
 
 const QUOTA_NAME: &str = "tenant-quota";
 
-pub async fn apply(
-    client: &Client,
-    namespace: &str,
-    quota: &ResourceQuota,
-) -> ServiceResult<()> {
+pub async fn apply(client: &Client, namespace: &str, quota: &ResourceQuota) -> ServiceResult<()> {
     let api: Api<K8sQuota> = Api::namespaced(client.clone(), namespace);
 
     let mut hard: BTreeMap<String, Quantity> = BTreeMap::new();
     hard.insert("requests.cpu".into(), Quantity(quota.cpu_requests.clone()));
     hard.insert("limits.cpu".into(), Quantity(quota.cpu_limits.clone()));
-    hard.insert("requests.memory".into(), Quantity(quota.memory_requests.clone()));
-    hard.insert("limits.memory".into(), Quantity(quota.memory_limits.clone()));
+    hard.insert(
+        "requests.memory".into(),
+        Quantity(quota.memory_requests.clone()),
+    );
+    hard.insert(
+        "limits.memory".into(),
+        Quantity(quota.memory_limits.clone()),
+    );
     hard.insert(
         "requests.nvidia.com/gpu".into(),
         Quantity(quota.gpu.to_string()),
@@ -32,12 +34,12 @@ pub async fn apply(
         "limits.nvidia.com/gpu".into(),
         Quantity(quota.gpu.to_string()),
     );
-    hard.insert(
-        "requests.storage".into(),
-        Quantity(quota.storage.clone()),
-    );
+    hard.insert("requests.storage".into(), Quantity(quota.storage.clone()));
     hard.insert("pods".into(), Quantity(quota.pods.to_string()));
-    hard.insert("persistentvolumeclaims".into(), Quantity(quota.pvcs.to_string()));
+    hard.insert(
+        "persistentvolumeclaims".into(),
+        Quantity(quota.pvcs.to_string()),
+    );
     hard.insert(
         "services.loadbalancers".into(),
         Quantity(quota.lb_services.to_string()),
@@ -107,11 +109,11 @@ pub async fn usage(client: &Client, namespace: &str) -> ServiceResult<QuotaUsage
 }
 
 fn q_val(map: &BTreeMap<String, Quantity>, k: &str) -> String {
-    map.get(k).map(|v| v.0.clone()).unwrap_or_else(|| "0".into())
+    map.get(k)
+        .map(|v| v.0.clone())
+        .unwrap_or_else(|| "0".into())
 }
 
 fn q_u32(map: &BTreeMap<String, Quantity>, k: &str) -> u32 {
-    map.get(k)
-        .and_then(|v| v.0.parse().ok())
-        .unwrap_or(0)
+    map.get(k).and_then(|v| v.0.parse().ok()).unwrap_or(0)
 }

@@ -1,5 +1,7 @@
 use super::audit_helper::begin_audit;
-use super::util::{created, current_user, from_service_error, list_response, no_content, ok_response};
+use super::util::{
+    created, current_user, from_service_error, list_response, no_content, ok_response,
+};
 use crate::mec::MecState;
 use actix_web::{web, HttpRequest, HttpResponse};
 use serde::Deserialize;
@@ -32,7 +34,13 @@ pub async fn create(
     body: web::Json<CreateUserRequest>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let user = current_user(&req);
+    let user = match current_user(&req) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    if let Err(e) = super::super::credentials::validate_password(&body.password) {
+        return from_service_error(e);
+    }
     let audit = begin_audit(&req, &state, &user, "user_create", "user", &body.username)
         .with_input(serde_json::json!({ "username": &body.username }));
     match state
@@ -46,6 +54,7 @@ pub async fn create(
             created(u)
         }
         Err(e) => {
+            let e = super::super::credentials::safe_error(e);
             audit.failure(e.to_string());
             from_service_error(e)
         }
@@ -57,7 +66,10 @@ pub async fn delete(
     path: web::Path<String>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let user = current_user(&req);
+    let user = match current_user(&req) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
     let id = path.into_inner();
     if let Err(e) = crate::mec::safety::require_confirm_header(&req, &id) {
         return from_service_error(e);
@@ -69,6 +81,7 @@ pub async fn delete(
             no_content()
         }
         Err(e) => {
+            let e = super::super::credentials::safe_error(e);
             audit.failure(e.to_string());
             from_service_error(e)
         }
@@ -86,9 +99,15 @@ pub async fn reset_password(
     body: web::Json<ResetPasswordRequest>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let user = current_user(&req);
+    let user = match current_user(&req) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
     let id = path.into_inner();
     if let Err(e) = crate::mec::safety::require_confirm_header(&req, &id) {
+        return from_service_error(e);
+    }
+    if let Err(e) = super::super::credentials::validate_password(&body.new_password) {
         return from_service_error(e);
     }
     let audit = begin_audit(&req, &state, &user, "user_reset_password", "user", &id);
@@ -103,6 +122,7 @@ pub async fn reset_password(
             ok_response(serde_json::json!({"status": "reset"}))
         }
         Err(e) => {
+            let e = super::super::credentials::safe_error(e);
             audit.failure(e.to_string());
             from_service_error(e)
         }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { apiPost } from '../hooks/useApi';
+import { apiPost, fetchWithRefresh } from '../hooks/useApi';
 import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';
 
@@ -100,10 +100,20 @@ export default function FileManagerPanel() {
     if (res.success) browse(pathInput);
   };
 
-  const handleDownload = (path: string) => {
-    const token = sessionStorage.getItem('nabiman_token') || '';
-    const url = `/api/files/download?path=${encodeURIComponent(path)}&token=${encodeURIComponent(token)}`;
-    window.open(url, '_blank');
+  const handleDownload = async (path: string) => {
+    try {
+      const response = await fetchWithRefresh(`/api/files/download?path=${encodeURIComponent(path)}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = path.split('/').pop() || 'download';
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (cause) {
+      setMsg(cause instanceof Error ? cause.message : t('common.error'));
+    }
   };
 
   const handleChmod = async (path: string) => {

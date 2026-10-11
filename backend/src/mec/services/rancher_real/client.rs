@@ -17,8 +17,8 @@ impl RancherRealConfig {
     pub fn from_env() -> Option<Self> {
         let base_url = std::env::var("NABIMAN_MEC_RANCHER_URL").ok()?;
         let token = std::env::var("NABIMAN_MEC_RANCHER_TOKEN").ok()?;
-        let cluster_id = std::env::var("NABIMAN_MEC_RANCHER_CLUSTER")
-            .unwrap_or_else(|_| "local".into());
+        let cluster_id =
+            std::env::var("NABIMAN_MEC_RANCHER_CLUSTER").unwrap_or_else(|_| "local".into());
         let insecure_tls = std::env::var("NABIMAN_MEC_RANCHER_INSECURE")
             .map(|v| v == "1" || v == "true")
             .unwrap_or(false);
@@ -42,6 +42,7 @@ pub struct RancherReal {
 impl RancherReal {
     pub fn new(cfg: RancherRealConfig) -> ServiceResult<Self> {
         let http = Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
             .danger_accept_invalid_certs(cfg.insecure_tls)
             .timeout(Duration::from_secs(15))
             .build()
@@ -65,11 +66,23 @@ impl RancherReal {
 
 #[async_trait]
 impl RancherService for RancherReal {
-    async fn create_project(
-        &self,
-        cluster_id: &str,
-        name: &str,
-    ) -> ServiceResult<RancherProject> {
+    fn identity_realm(&self) -> ServiceResult<String> {
+        let url = reqwest::Url::parse(&self.base_url)
+            .map_err(|_| ServiceError::Unavailable("Invalid Rancher identity realm".into()))?;
+        if !matches!(url.scheme(), "http" | "https")
+            || url.host_str().is_none()
+            || !url.username().is_empty()
+            || url.password().is_some()
+            || url.query().is_some()
+            || url.fragment().is_some()
+        {
+            return Err(ServiceError::Unavailable(
+                "Invalid Rancher identity realm".into(),
+            ));
+        }
+        Ok(url.as_str().trim_end_matches('/').into())
+    }
+    async fn create_project(&self, cluster_id: &str, name: &str) -> ServiceResult<RancherProject> {
         super::projects::create(self, cluster_id, name).await
     }
 
@@ -86,7 +99,10 @@ impl RancherService for RancherReal {
     }
 
     async fn create_user(&self, username: &str, password: &str) -> ServiceResult<RancherUser> {
-        super::users::create(self, username, password).await
+        crate::mec::credentials::validate_password(password)?;
+        super::users::create(self, username, password)
+            .await
+            .map_err(crate::mec::credentials::safe_error)
     }
 
     async fn delete_user(&self, id: &str) -> ServiceResult<()> {
@@ -102,7 +118,10 @@ impl RancherService for RancherReal {
     }
 
     async fn reset_password(&self, id: &str, new_password: &str) -> ServiceResult<()> {
-        super::users::reset_password(self, id, new_password).await
+        crate::mec::credentials::validate_password(new_password)?;
+        super::users::reset_password(self, id, new_password)
+            .await
+            .map_err(crate::mec::credentials::safe_error)
     }
 
     async fn create_prtb(
@@ -177,4 +196,42 @@ pub(super) async fn handle_response<T: serde::de::DeserializeOwned>(
         });
     }
     res.json::<T>().await.map_err(upstream_err)
+}
+
+#[cfg(test)]
+mod identity_realm_tests {
+    use super::*;
+    #[test]
+    fn realm_is_canonical_and_never_contains_endpoint_credentials() {
+        let make = |base: &str| {
+            RancherReal::new(RancherRealConfig {
+                base_url: base.into(),
+                token: "fixture-only".into(),
+                cluster_id: "c".into(),
+                insecure_tls: false,
+            })
+            .unwrap()
+        };
+        assert_eq!(
+            make("https://RANCHER.example:443/")
+                .identity_realm()
+                .unwrap(),
+            "https://rancher.example"
+        );
+        assert_eq!(
+            make("https://rancher.example/proxy/")
+                .identity_realm()
+                .unwrap(),
+            "https://rancher.example/proxy"
+        );
+        for base in [
+            "invalid",
+            "file:///tmp/rancher",
+            "https://user:password@rancher.example",
+            "https://rancher.example?token=fixture",
+            "https://rancher.example#fragment",
+        ] {
+            assert!(make(base).identity_realm().is_err());
+        }
+    }
 }

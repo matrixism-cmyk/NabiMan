@@ -1,12 +1,12 @@
 mod client;
-mod nodes;
-mod namespaces;
-mod quota;
-mod services_ops;
-mod rbac;
-mod workloads;
 mod ingress_ops;
-mod pvcs;
 mod live;
+mod namespaces;
+mod nodes;
+mod pvcs;
+mod quota;
+mod rbac;
+mod services_ops;
+mod workloads;
 
 pub use client::{KubeReal, KubeRealConfig};

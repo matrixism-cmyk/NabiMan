@@ -37,10 +37,12 @@ pub struct UserAccount {
     pub gid: u32,
     pub home: String,
     pub shell: String,
-    pub is_logged_in: bool,
+    pub is_logged_in: Option<bool>,
+    pub can_manage: bool,
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CreateAccountRequest {
     pub username: String,
     pub password: String,
@@ -48,12 +50,19 @@ pub struct CreateAccountRequest {
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ChangePasswordRequest {
     pub username: String,
     pub new_password: String,
+    pub expected_uid: u32,
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DeleteAccountRequest {
     pub username: String,
+    pub expected_uid: u32,
+    #[serde(default)]
+    pub remove_home: bool,
+    pub confirm_home: Option<String>,
 }

@@ -1,5 +1,5 @@
-use actix_web::{web, HttpRequest, HttpResponse};
 use crate::models::ApiResponse;
+use actix_web::{web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -67,9 +67,11 @@ async fn browse(query: web::Query<BrowseRequest>) -> HttpResponse {
     let dir_path = query.path.as_deref().unwrap_or("/");
     let dir = match sanitize_path(dir_path) {
         Some(p) if p.is_dir() => p,
-        _ => return HttpResponse::Ok().json(
-            ApiResponse::<Vec<FileEntry>>::error("Invalid or inaccessible directory")
-        ),
+        _ => {
+            return HttpResponse::Ok().json(ApiResponse::<Vec<FileEntry>>::error(
+                "Invalid or inaccessible directory",
+            ))
+        }
     };
 
     let mut entries = Vec::new();
@@ -77,36 +79,46 @@ async fn browse(query: web::Query<BrowseRequest>) -> HttpResponse {
         entries.push(FileEntry {
             name: "..".into(),
             path: parent.to_string_lossy().to_string(),
-            is_dir: true, size: 0, modified: String::new(), permissions: String::new(),
+            is_dir: true,
+            size: 0,
+            modified: String::new(),
+            permissions: String::new(),
         });
     }
 
     match std::fs::read_dir(&dir) {
         Ok(rd) => {
-            let mut items: Vec<FileEntry> = rd.filter_map(|e| {
-                let e = e.ok()?;
-                let meta = e.metadata().ok()?;
-                let modified = meta.modified().ok()
-                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                    .map(|d| chrono::DateTime::from_timestamp(d.as_secs() as i64, 0)
-                        .map(|dt| dt.format("%Y-%m-%d %H:%M").to_string())
-                        .unwrap_or_default())
-                    .unwrap_or_default();
-                let perms = format_permissions(&meta);
-                Some(FileEntry {
-                    name: e.file_name().to_string_lossy().to_string(),
-                    path: e.path().to_string_lossy().to_string(),
-                    is_dir: meta.is_dir(),
-                    size: meta.len(),
-                    modified, permissions: perms,
+            let mut items: Vec<FileEntry> = rd
+                .filter_map(|e| {
+                    let e = e.ok()?;
+                    let meta = e.metadata().ok()?;
+                    let modified = meta
+                        .modified()
+                        .ok()
+                        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                        .map(|d| {
+                            chrono::DateTime::from_timestamp(d.as_secs() as i64, 0)
+                                .map(|dt| dt.format("%Y-%m-%d %H:%M").to_string())
+                                .unwrap_or_default()
+                        })
+                        .unwrap_or_default();
+                    let perms = format_permissions(&meta);
+                    Some(FileEntry {
+                        name: e.file_name().to_string_lossy().to_string(),
+                        path: e.path().to_string_lossy().to_string(),
+                        is_dir: meta.is_dir(),
+                        size: meta.len(),
+                        modified,
+                        permissions: perms,
+                    })
                 })
-            }).collect();
+                .collect();
             items.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then(a.name.cmp(&b.name)));
             entries.extend(items);
         }
-        Err(e) => return HttpResponse::Ok().json(
-            ApiResponse::<Vec<FileEntry>>::error(&e.to_string())
-        ),
+        Err(e) => {
+            return HttpResponse::Ok().json(ApiResponse::<Vec<FileEntry>>::error(&e.to_string()))
+        }
     }
     HttpResponse::Ok().json(ApiResponse::ok(entries))
 }
@@ -123,15 +135,19 @@ async fn read_file(body: web::Json<ReadFileRequest>) -> HttpResponse {
         _ => return HttpResponse::Ok().json(ApiResponse::<FileContent>::error("Invalid file")),
     };
     let meta = match std::fs::metadata(&path) {
-        Ok(m) => m, Err(e) => return HttpResponse::Ok().json(
-            ApiResponse::<FileContent>::error(&e.to_string())),
+        Ok(m) => m,
+        Err(e) => {
+            return HttpResponse::Ok().json(ApiResponse::<FileContent>::error(&e.to_string()))
+        }
     };
     if meta.len() > 2 * 1024 * 1024 {
         return HttpResponse::Ok().json(ApiResponse::<FileContent>::error("File too large (>2MB)"));
     }
     match std::fs::read_to_string(&path) {
         Ok(content) => HttpResponse::Ok().json(ApiResponse::ok(FileContent {
-            path: path.to_string_lossy().to_string(), content, size: meta.len(),
+            path: path.to_string_lossy().to_string(),
+            content,
+            size: meta.len(),
         })),
         Err(e) => HttpResponse::Ok().json(ApiResponse::<FileContent>::error(&e.to_string())),
     }
@@ -163,11 +179,16 @@ async fn chmod_file(body: web::Json<ChmodRequest>) -> HttpResponse {
     };
     // Validate mode is octal (3-4 digits)
     if !body.mode.chars().all(|c| c.is_ascii_digit() && c < '8')
-        || body.mode.len() < 3 || body.mode.len() > 4
+        || body.mode.len() < 3
+        || body.mode.len() > 4
     {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid octal mode"));
     }
-    match std::process::Command::new("chmod").arg(&body.mode).arg(&path).output() {
+    match std::process::Command::new("chmod")
+        .arg(&body.mode)
+        .arg(&path)
+        .output()
+    {
         Ok(o) if o.status.success() => {
             HttpResponse::Ok().json(ApiResponse::ok("Permissions changed".to_string()))
         }
@@ -228,25 +249,31 @@ async fn download_file(query: web::Query<DownloadQuery>) -> HttpResponse {
     };
     let meta = match std::fs::metadata(&path) {
         Ok(m) => m,
-        Err(e) => return HttpResponse::BadRequest().json(
-            ApiResponse::<String>::error(&e.to_string())
-        ),
+        Err(e) => {
+            return HttpResponse::BadRequest().json(ApiResponse::<String>::error(&e.to_string()))
+        }
     };
     if meta.len() > MAX_UPLOAD_SIZE {
-        return HttpResponse::BadRequest().json(
-            ApiResponse::<String>::error("File too large (>50MB)")
-        );
+        return HttpResponse::BadRequest()
+            .json(ApiResponse::<String>::error("File too large (>50MB)"));
     }
     let bytes = match std::fs::read(&path) {
         Ok(b) => b,
-        Err(e) => return HttpResponse::InternalServerError().json(
-            ApiResponse::<String>::error(&e.to_string())
-        ),
+        Err(e) => {
+            return HttpResponse::InternalServerError()
+                .json(ApiResponse::<String>::error(&e.to_string()))
+        }
     };
-    let fname = path.file_name().map(|n| n.to_string_lossy().to_string())
+    let fname = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| "download".into());
     HttpResponse::Ok()
-        .insert_header(("Content-Disposition", format!("attachment; filename=\"{}\"", fname)))
+        .insert_header(("Cache-Control", "no-store"))
+        .insert_header((
+            "Content-Disposition",
+            format!("attachment; filename=\"{}\"", fname),
+        ))
         .insert_header(("Content-Type", "application/octet-stream"))
         .body(bytes)
 }
@@ -254,14 +281,14 @@ async fn download_file(query: web::Query<DownloadQuery>) -> HttpResponse {
 async fn upload_file(req: HttpRequest, body: web::Bytes) -> HttpResponse {
     let target_path = match req.headers().get("X-File-Path") {
         Some(v) => v.to_str().unwrap_or("").to_string(),
-        None => return HttpResponse::BadRequest().json(
-            ApiResponse::<String>::error("Missing X-File-Path header")
-        ),
+        None => {
+            return HttpResponse::BadRequest()
+                .json(ApiResponse::<String>::error("Missing X-File-Path header"))
+        }
     };
     if body.len() as u64 > MAX_UPLOAD_SIZE {
-        return HttpResponse::BadRequest().json(
-            ApiResponse::<String>::error("File too large (>50MB)")
-        );
+        return HttpResponse::BadRequest()
+            .json(ApiResponse::<String>::error("File too large (>50MB)"));
     }
     let path = match sanitize_parent_path(&target_path) {
         Some(p) => p,
@@ -286,6 +313,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("/mkdir", web::post().to(mkdir))
             .route("/delete", web::post().to(delete_file))
             .route("/download", web::get().to(download_file))
-            .route("/upload", web::post().to(upload_file))
+            .route("/upload", web::post().to(upload_file)),
     );
 }

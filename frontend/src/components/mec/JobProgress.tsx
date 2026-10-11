@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { useT } from '../../i18n';
-import { useJobStream, JobStreamEvent } from '../../hooks/mec/useJobStream';
+import { useJobStream, JobStreamEvent, JobSnapshotStatus } from '../../hooks/mec/useJobStream';
 
 interface StepState {
   name: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  duration_ms?: number;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+  duration_ms?: number | null;
   message?: string | null;
   reason?: string;
 }
@@ -18,7 +18,7 @@ export default function JobProgress({ jobId }: Props) {
   const { t } = useT();
   const [steps, setSteps] = useState<Record<string, StepState>>({});
   const [order, setOrder] = useState<string[]>([]);
-  const [finalStatus, setFinalStatus] = useState<'running' | 'completed' | 'failed'>(
+  const [finalStatus, setFinalStatus] = useState<JobSnapshotStatus['state']>(
     'running',
   );
   const [terminalError, setTerminalError] = useState<string | null>(null);
@@ -27,6 +27,12 @@ export default function JobProgress({ jobId }: Props) {
     jobId,
     onEvent: (ev: JobStreamEvent) => {
       switch (ev.event) {
+        case 'snapshot':
+          setFinalStatus(ev.status.state);
+          setTerminalError(ev.status.reason || ev.status.error || ev.error || null);
+          setSteps(Object.fromEntries((ev.steps || []).map((step) => [step.name, step])));
+          setOrder((ev.steps || []).map((step) => step.name));
+          break;
         case 'step_started':
           setOrder((prev) =>
             prev.includes(ev.step) ? prev : [...prev, ev.step],
@@ -73,7 +79,7 @@ export default function JobProgress({ jobId }: Props) {
   const progress = useMemo(() => {
     const total = order.length || 1;
     const done = Object.values(steps).filter(
-      (s) => s.status === 'completed' || s.status === 'failed',
+      (s) => s.status === 'completed' || s.status === 'skipped',
     ).length;
     return Math.min(100, Math.round((done / total) * 100));
   }, [order, steps]);
@@ -104,7 +110,7 @@ export default function JobProgress({ jobId }: Props) {
         <strong style={{ color: barColor(finalStatus) }}>
           {finalStatus === 'running'
             ? (isOpen ? t('mec.jobs.stateRunning') : t('mec.jobs.stateConnecting'))
-            : finalStatus}
+            : finalStatus === 'unknown_result' ? t('mec.jobs.stateUnknownResult') : finalStatus}
         </strong>
         {error && <span style={{ color: '#ef4444' }}> — {error}</span>}
         {terminalError && (
@@ -119,6 +125,12 @@ export default function JobProgress({ jobId }: Props) {
           </div>
         )}
       </div>
+
+      {finalStatus === 'unknown_result' && (
+        <div role="alert" style={{ color: '#92400e', background: '#fffbeb', padding: '10px', marginBottom: '12px' }}>
+          {t('mec.jobs.verifyBeforeRetry')}
+        </div>
+      )}
 
       <ul
         style={{
@@ -135,20 +147,20 @@ export default function JobProgress({ jobId }: Props) {
             s.status === 'completed'
               ? '✓'
               : s.status === 'running'
-              ? '⟳'
+              ? (finalStatus === 'unknown_result' ? '?' : '⟳')
               : s.status === 'failed'
               ? '✗'
               : '·';
           return (
             <li
               key={name}
-              style={{ padding: '3px 0', color: stepColor(s.status) }}
+              style={{ padding: '3px 0', color: finalStatus === 'unknown_result' && s.status === 'running' ? '#d97706' : stepColor(s.status) }}
             >
               <span style={{ display: 'inline-block', width: '18px' }}>
                 {icon}
               </span>
               {s.name}
-              {s.duration_ms !== undefined && (
+              {s.duration_ms != null && (
                 <span style={{ color: '#9ca3af', marginLeft: '8px' }}>
                   ({s.duration_ms}ms)
                 </span>
@@ -169,6 +181,7 @@ export default function JobProgress({ jobId }: Props) {
 function barColor(state: string): string {
   if (state === 'completed') return '#10b981';
   if (state === 'failed') return '#ef4444';
+  if (state === 'unknown_result') return '#d97706';
   return '#3b82f6';
 }
 

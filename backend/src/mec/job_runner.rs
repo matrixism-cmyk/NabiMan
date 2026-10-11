@@ -1,4 +1,5 @@
 use super::db::job_store::JobStore;
+use super::services::{ServiceError, ServiceResult};
 use crate::models::mec::{Job, JobKind, JobStatus, JobStep};
 use chrono::Utc;
 use std::collections::HashMap;
@@ -55,9 +56,14 @@ impl JobRunner {
         }
     }
 
-    pub fn create(&self, kind: JobKind, created_by: &str, steps: Vec<String>) -> Job {
+    pub fn create(
+        &self,
+        kind: JobKind,
+        created_by: &str,
+        steps: Vec<String>,
+    ) -> ServiceResult<Job> {
         let job = Job {
-            id: format!("job-{}", &uuid::Uuid::new_v4().to_string()[..8]),
+            id: format!("job-{}", uuid::Uuid::new_v4().simple()),
             kind,
             status: JobStatus::Pending,
             started_at: Utc::now(),
@@ -67,26 +73,46 @@ impl JobRunner {
             result: None,
             error: None,
         };
-        let _ = self.store.insert(&job);
+        self.store.insert(&job)?;
         let (tx, _rx) = broadcast::channel(STREAM_CAPACITY);
         self.channels.lock().unwrap().insert(job.id.clone(), tx);
-        job
+        Ok(job)
     }
 
     pub fn subscribe(&self, job_id: &str) -> Option<ProgressRx> {
-        self.channels.lock().unwrap().get(job_id).map(|tx| tx.subscribe())
+        self.channels
+            .lock()
+            .unwrap()
+            .get(job_id)
+            .map(|tx| tx.subscribe())
     }
 
-    pub fn mark_started(&self, job_id: &str) {
-        let _ = self.store.update_status(job_id, &JobStatus::Running);
-        self.emit(job_id, JobEvent::Started { job_id: job_id.into() });
+    pub fn mark_started(&self, job_id: &str) -> ServiceResult<()> {
+        self.store.start(job_id)?;
+        self.emit(
+            job_id,
+            JobEvent::Started {
+                job_id: job_id.into(),
+            },
+        );
+        Ok(())
     }
 
-    pub fn mark_step_started(&self, job_id: &str, steps: &mut [JobStep], name: &str) {
-        if let Some(s) = steps.iter_mut().find(|s| s.name == name) {
+    pub fn mark_step_started(
+        &self,
+        job_id: &str,
+        steps: &mut [JobStep],
+        name: &str,
+    ) -> ServiceResult<()> {
+        let mut next = steps.to_vec();
+        if let Some(s) = next.iter_mut().find(|s| s.name == name) {
             s.mark_started();
         }
-        let _ = self.store.update_steps(job_id, steps);
+        if !next.iter().any(|s| s.name == name) {
+            return Err(ServiceError::InvalidInput("Unknown job step".into()));
+        }
+        self.store.update_steps(job_id, &next)?;
+        steps.clone_from_slice(&next);
         self.emit(
             job_id,
             JobEvent::StepStarted {
@@ -94,16 +120,28 @@ impl JobRunner {
                 step: name.into(),
             },
         );
+        Ok(())
     }
 
-    pub fn mark_step_done(&self, job_id: &str, steps: &mut [JobStep], name: &str, message: Option<String>) {
-        let dur = if let Some(s) = steps.iter_mut().find(|s| s.name == name) {
+    pub fn mark_step_done(
+        &self,
+        job_id: &str,
+        steps: &mut [JobStep],
+        name: &str,
+        message: Option<String>,
+    ) -> ServiceResult<()> {
+        let mut next = steps.to_vec();
+        let dur = if let Some(s) = next.iter_mut().find(|s| s.name == name) {
             s.mark_completed(message.clone());
             s.duration_ms.unwrap_or(0)
         } else {
             0
         };
-        let _ = self.store.update_steps(job_id, steps);
+        if !next.iter().any(|s| s.name == name) {
+            return Err(ServiceError::InvalidInput("Unknown job step".into()));
+        }
+        self.store.update_steps(job_id, &next)?;
+        steps.clone_from_slice(&next);
         self.emit(
             job_id,
             JobEvent::StepCompleted {
@@ -113,14 +151,26 @@ impl JobRunner {
                 message,
             },
         );
+        Ok(())
     }
 
     #[allow(dead_code)]
-    pub fn mark_step_failed(&self, job_id: &str, steps: &mut [JobStep], name: &str, reason: String) {
-        if let Some(s) = steps.iter_mut().find(|s| s.name == name) {
+    pub fn mark_step_failed(
+        &self,
+        job_id: &str,
+        steps: &mut [JobStep],
+        name: &str,
+        reason: String,
+    ) -> ServiceResult<()> {
+        let mut next = steps.to_vec();
+        if let Some(s) = next.iter_mut().find(|s| s.name == name) {
             s.mark_failed(reason.clone());
         }
-        let _ = self.store.update_steps(job_id, steps);
+        if !next.iter().any(|s| s.name == name) {
+            return Err(ServiceError::InvalidInput("Unknown job step".into()));
+        }
+        self.store.update_steps(job_id, &next)?;
+        steps.clone_from_slice(&next);
         self.emit(
             job_id,
             JobEvent::StepFailed {
@@ -129,13 +179,30 @@ impl JobRunner {
                 reason,
             },
         );
+        Ok(())
     }
 
-    pub fn complete(&self, job_id: &str, result: Option<serde_json::Value>) {
-        if let Some(v) = &result {
-            let _ = self.store.set_result(job_id, v);
-        }
-        let _ = self.store.update_status(job_id, &JobStatus::Completed);
+    #[allow(dead_code)]
+    pub fn complete(&self, job_id: &str, result: Option<serde_json::Value>) -> ServiceResult<()> {
+        self.store
+            .finish(job_id, &JobStatus::Completed, result.as_ref(), None)?;
+        self.emit_completed(job_id, result);
+        Ok(())
+    }
+
+    pub fn complete_tenant(
+        &self,
+        job_id: &str,
+        change: super::db::job_store::TenantCompletion<'_>,
+        result: Option<serde_json::Value>,
+    ) -> ServiceResult<()> {
+        self.store
+            .complete_tenant(job_id, change, result.as_ref())?;
+        self.emit_completed(job_id, result);
+        Ok(())
+    }
+
+    fn emit_completed(&self, job_id: &str, result: Option<serde_json::Value>) {
         self.emit(
             job_id,
             JobEvent::Completed {
@@ -146,14 +213,24 @@ impl JobRunner {
         self.channels.lock().unwrap().remove(job_id);
     }
 
-    pub fn fail(&self, job_id: &str, error: String) {
-        let _ = self.store.set_error(job_id, &error);
-        let _ = self.store.update_status(
+    pub fn fail(&self, job_id: &str, error: String) -> ServiceResult<()> {
+        self.fail_with_result(job_id, error, None)
+    }
+
+    pub fn fail_with_result(
+        &self,
+        job_id: &str,
+        error: String,
+        result: Option<serde_json::Value>,
+    ) -> ServiceResult<()> {
+        self.store.finish(
             job_id,
             &JobStatus::Failed {
                 error: error.clone(),
             },
-        );
+            result.as_ref(),
+            Some(&error),
+        )?;
         self.emit(
             job_id,
             JobEvent::Failed {
@@ -162,6 +239,7 @@ impl JobRunner {
             },
         );
         self.channels.lock().unwrap().remove(job_id);
+        Ok(())
     }
 
     fn emit(&self, job_id: &str, event: JobEvent) {
@@ -186,19 +264,27 @@ mod tests {
         let db = db::open_in_memory().unwrap();
         let store = Arc::new(JobStore::new(db));
         let runner = JobRunner::new(store.clone());
-        let job = runner.create(
-            JobKind::TenantDelete {
-                tenant_id: "x".into(),
-            },
-            "admin",
-            vec!["cleanup".into()],
-        );
+        let job = runner
+            .create(
+                JobKind::TenantDelete {
+                    tenant_id: "x".into(),
+                },
+                "admin",
+                vec!["cleanup".into()],
+            )
+            .unwrap();
         let mut rx = runner.subscribe(&job.id).unwrap();
-        runner.mark_started(&job.id);
+        runner.mark_started(&job.id).unwrap();
         let mut steps = job.steps.clone();
-        runner.mark_step_started(&job.id, &mut steps, "cleanup");
-        runner.mark_step_done(&job.id, &mut steps, "cleanup", None);
-        runner.complete(&job.id, Some(serde_json::json!({"ok": true})));
+        runner
+            .mark_step_started(&job.id, &mut steps, "cleanup")
+            .unwrap();
+        runner
+            .mark_step_done(&job.id, &mut steps, "cleanup", None)
+            .unwrap();
+        runner
+            .complete(&job.id, Some(serde_json::json!({"ok": true})))
+            .unwrap();
 
         let mut events = Vec::new();
         while let Ok(e) = rx.try_recv() {
@@ -209,3 +295,7 @@ mod tests {
         assert_eq!(stored.status, JobStatus::Completed);
     }
 }
+
+#[cfg(test)]
+#[path = "job_runner_failure_tests.rs"]
+mod failure_tests;

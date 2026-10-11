@@ -1,14 +1,21 @@
-use actix_web::{web, HttpResponse};
+//! Offline public-key verification. Issuing keys never belong on this server.
 use crate::models::ApiResponse;
+use actix_web::{web, HttpRequest, HttpResponse};
+use chrono::{NaiveDate, Utc};
+use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
-use sha2::{Sha256, Digest};
-use std::path::PathBuf;
+use std::{
+    collections::{BTreeMap, HashSet},
+    io::{Read, Write},
+    path::{Path, PathBuf},
+    sync::Mutex,
+};
 
-const HMAC_SECRET: &[u8] = b"nabiman-license-hmac-secret-key-2026";
-const TRIAL_DAYS: i64 = 30;
-const HMAC_BLOCK_SIZE: usize = 64;
-
+const MAX_FILE: u64 = 65536;
+const TRIAL_SECONDS: i64 = 30 * 86400;
+static WRITES: Mutex<()> = Mutex::new(());
 #[derive(Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct LicenseInfo {
     pub tier: String,
     pub holder: String,
@@ -17,7 +24,37 @@ pub struct LicenseInfo {
     pub max_servers: Option<u32>,
     pub features: Vec<String>,
 }
-
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+struct Claims {
+    license_id: String,
+    product: String,
+    info: LicenseInfo,
+}
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Envelope {
+    version: u32,
+    key_id: String,
+    payload: String,
+    signature: String,
+}
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Stored {
+    signed_key: String,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct KeyFile {
+    keys: Vec<KeySpec>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct KeySpec {
+    key_id: String,
+    public_key: String,
+}
 #[derive(Serialize, Clone)]
 pub struct LicenseStatus {
     pub active: bool,
@@ -29,195 +66,318 @@ pub struct LicenseStatus {
     pub trial_days_remaining: Option<i64>,
     pub features: Vec<String>,
     pub max_servers: Option<u32>,
+    pub validation_state: String,
+    pub license_id: Option<String>,
 }
-
 #[derive(Deserialize)]
-pub struct ActivateRequest { pub key: String }
-
+#[serde(deny_unknown_fields)]
+pub struct ActivateRequest {
+    pub key: String,
+}
 fn data_dir() -> PathBuf {
     PathBuf::from(std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into()))
 }
-
-fn load_license() -> Option<LicenseInfo> {
-    std::fs::read_to_string(data_dir().join("license.json"))
-        .ok().and_then(|s| serde_json::from_str(&s).ok())
+fn key_path() -> PathBuf {
+    PathBuf::from(
+        std::env::var("NABIMAN_LICENSE_PUBLIC_KEYS_FILE")
+            .unwrap_or_else(|_| "/etc/nabiman/license-public-keys.json".into()),
+    )
 }
-
-fn save_license(info: &LicenseInfo) -> Result<(), String> {
-    let dir = data_dir();
-    std::fs::create_dir_all(&dir).map_err(|e| format!("Cannot create data dir: {}", e))?;
-    let json = serde_json::to_string_pretty(info).map_err(|e| e.to_string())?;
-    std::fs::write(dir.join("license.json"), json)
-        .map_err(|e| format!("Cannot write license: {}", e))
+fn read_limited(path: &Path, max: u64) -> std::io::Result<String> {
+    let file = std::fs::File::open(path)?;
+    let mut text = String::new();
+    file.take(max + 1).read_to_string(&mut text)?;
+    if text.len() as u64 > max {
+        return Err(std::io::Error::other("File exceeds size limit"));
+    }
+    Ok(text)
 }
-
-fn get_trial_info() -> (bool, Option<i64>) {
-    let ts_path = data_dir().join("install_timestamp");
-    let install_ts = if ts_path.exists() {
-        std::fs::read_to_string(&ts_path).ok().and_then(|s| s.trim().parse::<i64>().ok())
-    } else {
-        let now = chrono::Utc::now().timestamp();
-        let _ = std::fs::create_dir_all(data_dir());
-        let _ = std::fs::write(&ts_path, now.to_string());
-        Some(now)
-    };
-    match install_ts {
-        Some(ts) => {
-            let remaining = TRIAL_DAYS - (chrono::Utc::now().timestamp() - ts) / 86400;
-            if remaining > 0 { (true, Some(remaining)) } else { (false, Some(0)) }
+fn key_id_valid(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 64
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"-_".contains(&b))
+}
+fn keys_from(text: &str) -> Result<BTreeMap<String, VerifyingKey>, String> {
+    let file: KeyFile =
+        serde_json::from_str(text).map_err(|_| "Invalid license verification key file")?;
+    if file.keys.is_empty() || file.keys.len() > 64 {
+        return Err("Invalid key count".into());
+    }
+    let mut keys = BTreeMap::new();
+    for item in file.keys {
+        if !key_id_valid(&item.key_id) {
+            return Err("Invalid key ID".into());
         }
-        None => (false, None),
+        let bytes: [u8; 32] = hex::decode(&item.public_key)
+            .map_err(|_| "Invalid public key")?
+            .try_into()
+            .map_err(|_| "Public key must be 32 bytes")?;
+        let key = VerifyingKey::from_bytes(&bytes).map_err(|_| "Invalid Ed25519 public key")?;
+        if key.is_weak() || keys.insert(item.key_id, key).is_some() {
+            return Err("Weak or duplicate verification key".into());
+        }
     }
+    Ok(keys)
 }
-
+fn load_keys(path: &Path) -> Result<BTreeMap<String, VerifyingKey>, String> {
+    keys_from(&read_limited(path, MAX_FILE).map_err(|_| "License verification keys unavailable")?)
+}
+fn signed_message(key_id: &str, payload: &[u8]) -> Vec<u8> {
+    let mut msg = b"NabiMan license v1\0".to_vec();
+    msg.extend_from_slice(key_id.as_bytes());
+    msg.push(0);
+    msg.extend_from_slice(payload);
+    msg
+}
 fn features_for_tier(tier: &str) -> Vec<String> {
-    match tier {
-        "enterprise" => vec![
-            "basic_monitoring", "management", "alerts", "backups",
-            "ldap", "oauth", "api_keys", "unlimited_servers",
-        ].into_iter().map(String::from).collect(),
-        "pro" => vec!["basic_monitoring", "management", "alerts", "backups"]
-            .into_iter().map(String::from).collect(),
-        _ => vec!["basic_monitoring".into()],
+    let values: &[&str] = match tier {
+        "enterprise" => &[
+            "basic_monitoring",
+            "management",
+            "alerts",
+            "backups",
+            "ldap",
+            "oauth",
+            "api_keys",
+            "unlimited_servers",
+        ],
+        "pro" => &["basic_monitoring", "management", "alerts", "backups"],
+        _ => &["basic_monitoring"],
+    };
+    values.iter().map(|s| s.to_string()).collect()
+}
+fn date(value: &str) -> Result<NaiveDate, String> {
+    let date = NaiveDate::parse_from_str(value, "%Y-%m-%d").map_err(|_| "Invalid license date")?;
+    if date.format("%Y-%m-%d").to_string() != value {
+        return Err("License dates must use YYYY-MM-DD".into());
+    }
+    Ok(date)
+}
+fn validate_claims(claims: &Claims, today: NaiveDate) -> Result<(), String> {
+    let info = &claims.info;
+    if claims.product != "nabiman"
+        || !key_id_valid(&claims.license_id)
+        || !matches!(info.tier.as_str(), "free" | "pro" | "enterprise")
+    {
+        return Err("Invalid license product, ID or tier".into());
+    }
+    if info.holder.trim().is_empty()
+        || info.holder.len() > 256
+        || info.holder.chars().any(char::is_control)
+    {
+        return Err("Invalid license holder".into());
+    }
+    let issued = date(&info.issued_at)?;
+    if issued > today {
+        return Err("License is not yet valid".into());
+    }
+    if let Some(exp) = &info.expires_at {
+        let exp = date(exp)?;
+        if exp < issued {
+            return Err("Expiry precedes issue date".into());
+        }
+        if exp < today {
+            return Err("License has expired".into());
+        }
+    }
+    let allowed = features_for_tier(&info.tier);
+    let mut unique = HashSet::new();
+    if info.features.is_empty()
+        || info
+            .features
+            .iter()
+            .any(|f| !allowed.contains(f) || !unique.insert(f))
+    {
+        return Err("Invalid license features".into());
+    }
+    match info.tier.as_str() {
+        "free" if info.max_servers != Some(1) => {
+            return Err("Free license server limit must be 1".into())
+        }
+        "pro" if !matches!(info.max_servers, Some(1..=10)) => {
+            return Err("Pro license server limit must be between 1 and 10".into())
+        }
+        "enterprise" if info.max_servers == Some(0) => return Err("Invalid server limit".into()),
+        _ => {}
+    }
+    Ok(())
+}
+fn verify(
+    key: &str,
+    keys: &BTreeMap<String, VerifyingKey>,
+    today: NaiveDate,
+) -> Result<Claims, String> {
+    if key.len() > MAX_FILE as usize {
+        return Err("License key exceeds size limit".into());
+    }
+    let encoded = key
+        .strip_prefix("NBL1.")
+        .ok_or("Unsupported license format; obtain a signed replacement")?;
+    let bytes = hex::decode(encoded).map_err(|_| "Invalid license envelope")?;
+    let envelope: Envelope =
+        serde_json::from_slice(&bytes).map_err(|_| "Invalid license envelope")?;
+    if envelope.version != 1 || !key_id_valid(&envelope.key_id) {
+        return Err("Unsupported license version or key ID".into());
+    }
+    let public = keys
+        .get(&envelope.key_id)
+        .ok_or("Unknown license issuer key")?;
+    let payload = hex::decode(&envelope.payload).map_err(|_| "Invalid license payload")?;
+    if payload.len() > 8192 {
+        return Err("License payload exceeds size limit".into());
+    }
+    let bytes = hex::decode(&envelope.signature).map_err(|_| "Invalid license signature")?;
+    let signature = Signature::from_slice(&bytes).map_err(|_| "Invalid license signature")?;
+    public
+        .verify_strict(&signed_message(&envelope.key_id, &payload), &signature)
+        .map_err(|_| "Invalid license signature")?;
+    let claims: Claims =
+        serde_json::from_slice(&payload).map_err(|_| "Invalid signed license data")?;
+    validate_claims(&claims, today)?;
+    Ok(claims)
+}
+fn inactive(state: &str) -> LicenseStatus {
+    LicenseStatus {
+        active: false,
+        tier: "free".into(),
+        holder: String::new(),
+        expires_at: None,
+        days_remaining: None,
+        is_trial: false,
+        trial_days_remaining: None,
+        features: features_for_tier("free"),
+        max_servers: Some(1),
+        validation_state: state.into(),
+        license_id: None,
     }
 }
-
-fn max_servers_for_tier(tier: &str) -> Option<u32> {
-    match tier { "enterprise" => None, "pro" => Some(10), _ => Some(1) }
-}
-
-fn license_days_remaining(expires_at: &Option<String>) -> Option<i64> {
-    expires_at.as_ref().and_then(|exp| {
-        chrono::NaiveDate::parse_from_str(exp, "%Y-%m-%d").ok().map(|d| {
-            (d - chrono::Utc::now().date_naive()).num_days()
-        })
-    })
-}
-
-fn get_license_status() -> LicenseStatus {
-    let (trial_active, trial_remaining) = get_trial_info();
-    match load_license() {
-        Some(lic) => {
-            let days_rem = license_days_remaining(&lic.expires_at);
-            let expired = days_rem.map(|d| d < 0).unwrap_or(false);
-            LicenseStatus {
-                active: !expired, tier: lic.tier, holder: lic.holder,
-                expires_at: lic.expires_at, days_remaining: days_rem,
-                is_trial: false, trial_days_remaining: None,
-                features: lic.features, max_servers: lic.max_servers,
+fn trial(dir: &Path, now: i64) -> LicenseStatus {
+    use std::os::unix::fs::OpenOptionsExt;
+    let path = dir.join("install_timestamp");
+    if !path.exists() {
+        let result = (|| -> std::io::Result<()> {
+            std::fs::create_dir_all(dir)?;
+            let mut f = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&path)?;
+            write!(f, "{now}")?;
+            f.sync_all()
+        })();
+        if let Err(e) = result {
+            if e.kind() != std::io::ErrorKind::AlreadyExists {
+                return inactive("storage_error");
             }
         }
-        None => LicenseStatus {
-            active: trial_active, tier: "free".into(), holder: String::new(),
-            expires_at: None, days_remaining: None,
-            is_trial: true, trial_days_remaining: trial_remaining,
-            features: features_for_tier("free"), max_servers: max_servers_for_tier("free"),
-        },
     }
-}
-
-// HMAC-SHA256 (RFC 2104) implemented with sha2
-fn hmac_sha256(key: &[u8], message: &[u8]) -> Vec<u8> {
-    let mut padded_key = vec![0u8; HMAC_BLOCK_SIZE];
-    if key.len() > HMAC_BLOCK_SIZE {
-        let hash = Sha256::digest(key);
-        padded_key[..hash.len()].copy_from_slice(&hash);
+    let ts = match read_limited(&path, 64)
+        .ok()
+        .and_then(|s| s.trim().parse::<i64>().ok())
+    {
+        Some(ts) if ts > 0 && ts <= now => ts,
+        _ => return inactive("invalid_trial_timestamp"),
+    };
+    let seconds = (TRIAL_SECONDS - (now - ts)).max(0);
+    let remaining = (seconds + 86399) / 86400;
+    let mut status = inactive(if seconds > 0 {
+        "trial"
     } else {
-        padded_key[..key.len()].copy_from_slice(key);
-    }
-    let mut ipad = vec![0x36u8; HMAC_BLOCK_SIZE];
-    let mut opad = vec![0x5cu8; HMAC_BLOCK_SIZE];
-    for i in 0..HMAC_BLOCK_SIZE {
-        ipad[i] ^= padded_key[i];
-        opad[i] ^= padded_key[i];
-    }
-    let mut inner = Sha256::new();
-    inner.update(&ipad);
-    inner.update(message);
-    let inner_hash = inner.finalize();
-    let mut outer = Sha256::new();
-    outer.update(&opad);
-    outer.update(&inner_hash);
-    outer.finalize().to_vec()
+        "trial_expired"
+    });
+    status.active = seconds > 0;
+    status.is_trial = true;
+    status.trial_days_remaining = Some(remaining);
+    status
 }
-
-fn base64_decode(input: &str) -> Result<Vec<u8>, String> {
-    let table = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut lookup = [255u8; 256];
-    for (i, &ch) in table.iter().enumerate() { lookup[ch as usize] = i as u8; }
-    let clean: Vec<u8> = input.bytes()
-        .filter(|&b| b != b'\n' && b != b'\r' && b != b' ').collect();
-    let stripped: &[u8] = clean.strip_suffix(b"==")
-        .or_else(|| clean.strip_suffix(b"=")).unwrap_or(&clean);
-    let mut out = Vec::with_capacity(stripped.len() * 3 / 4);
-    for chunk in stripped.chunks(4) {
-        let mut accum: u32 = 0;
-        for (j, &byte) in chunk.iter().enumerate() {
-            let val = lookup[byte as usize];
-            if val == 255 { return Err(format!("Invalid base64 character: {}", byte as char)); }
-            accum |= (val as u32) << (6 * (3 - j));
+fn status_at(dir: &Path, key_file: &Path, now: chrono::DateTime<Utc>) -> LicenseStatus {
+    let file = match read_limited(&dir.join("license.json"), MAX_FILE) {
+        Ok(file) => file,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return trial(dir, now.timestamp()),
+        Err(_) => return inactive("storage_error"),
+    };
+    let stored: Stored = match serde_json::from_str(&file) {
+        Ok(s) => s,
+        Err(_) => return inactive("invalid_license"),
+    };
+    let keys = match load_keys(key_file) {
+        Ok(keys) => keys,
+        Err(_) => return inactive("verification_unavailable"),
+    };
+    let claims = match verify(&stored.signed_key, &keys, now.date_naive()) {
+        Ok(c) => c,
+        Err(e) => {
+            return inactive(if e == "License has expired" {
+                "license_expired"
+            } else {
+                "invalid_license"
+            })
         }
-        let n = match chunk.len() { 4 => 3, 3 => 2, 2 => 1, _ => return Err("Bad base64".into()) };
-        if n >= 1 { out.push((accum >> 16) as u8); }
-        if n >= 2 { out.push((accum >> 8) as u8); }
-        if n >= 3 { out.push(accum as u8); }
+    };
+    let info = claims.info;
+    LicenseStatus {
+        active: true,
+        tier: info.tier,
+        holder: info.holder,
+        days_remaining: info
+            .expires_at
+            .as_ref()
+            .and_then(|d| date(d).ok())
+            .map(|d| (d - now.date_naive()).num_days()),
+        expires_at: info.expires_at,
+        is_trial: false,
+        trial_days_remaining: None,
+        features: info.features,
+        max_servers: info.max_servers,
+        validation_state: "licensed".into(),
+        license_id: Some(claims.license_id),
     }
-    Ok(out)
 }
-
-// Key format: base64( json_payload + "." + hex(hmac_sha256(secret, json_payload)) )
-fn validate_license_key(key: &str) -> Result<LicenseInfo, String> {
-    let decoded = base64_decode(key)?;
-    let decoded_str = String::from_utf8(decoded).map_err(|_| "Invalid UTF-8 in key")?;
-    let dot_pos = decoded_str.rfind('.').ok_or("Invalid key format: no separator")?;
-    let json_part = &decoded_str[..dot_pos];
-    let sig_hex = &decoded_str[dot_pos + 1..];
-    let expected_hex = hex::encode(hmac_sha256(HMAC_SECRET, json_part.as_bytes()));
-    if !constant_time_eq(sig_hex.as_bytes(), expected_hex.as_bytes()) {
-        return Err("Invalid license signature".into());
-    }
-    let info: LicenseInfo = serde_json::from_str(json_part)
-        .map_err(|e| format!("Invalid license data: {}", e))?;
-    if !["free", "pro", "enterprise"].contains(&info.tier.as_str()) {
-        return Err("Unknown license tier".into());
-    }
-    if let Some(ref exp) = info.expires_at {
-        if let Ok(d) = chrono::NaiveDate::parse_from_str(exp, "%Y-%m-%d") {
-            if d < chrono::Utc::now().date_naive() { return Err("License has expired".into()); }
-        }
-    }
-    Ok(info)
-}
-
-fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() { return false; }
-    a.iter().zip(b.iter()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
-}
-
-// --- Route handlers ---
-
 async fn get_status() -> HttpResponse {
-    HttpResponse::Ok().json(ApiResponse::ok(get_license_status()))
+    HttpResponse::Ok().json(ApiResponse::ok(status_at(
+        &data_dir(),
+        &key_path(),
+        Utc::now(),
+    )))
 }
-
-async fn activate(body: web::Json<ActivateRequest>) -> HttpResponse {
-    let key = body.key.trim();
-    if key.is_empty() {
-        return HttpResponse::Ok().json(ApiResponse::<LicenseStatus>::error("License key is empty"));
-    }
-    match validate_license_key(key) {
-        Ok(info) => match save_license(&info) {
-            Ok(()) => HttpResponse::Ok().json(ApiResponse::ok(get_license_status())),
-            Err(e) => HttpResponse::Ok().json(ApiResponse::<LicenseStatus>::error(&e)),
-        },
-        Err(e) => HttpResponse::Ok().json(ApiResponse::<LicenseStatus>::error(&e)),
-    }
-}
-
 async fn get_features() -> HttpResponse {
-    HttpResponse::Ok().json(ApiResponse::ok(get_license_status().features))
+    HttpResponse::Ok().json(ApiResponse::ok(
+        status_at(&data_dir(), &key_path(), Utc::now()).features,
+    ))
 }
-
+async fn activate(
+    req: HttpRequest,
+    users: web::Data<crate::users::UserStore>,
+    body: web::Json<ActivateRequest>,
+) -> HttpResponse {
+    if let Err(r) = crate::membership::require_super(&req, &users) {
+        return r;
+    }
+    let keys = match load_keys(&key_path()) {
+        Ok(keys) => keys,
+        Err(e) => return HttpResponse::ServiceUnavailable().json(ApiResponse::<()>::error(&e)),
+    };
+    let key = body.key.trim();
+    if let Err(e) = verify(key, &keys, Utc::now().date_naive()) {
+        return HttpResponse::BadRequest().json(ApiResponse::<()>::error(&e));
+    }
+    let _guard = WRITES.lock().unwrap();
+    let stored = serde_json::to_vec(&Stored {
+        signed_key: key.into(),
+    })
+    .expect("Stored license serialization");
+    if crate::private_storage::write(&data_dir().join("license.json"), &stored).is_err() {
+        return HttpResponse::InternalServerError()
+            .json(ApiResponse::<()>::error("Cannot persist signed license"));
+    }
+    HttpResponse::Ok().json(ApiResponse::ok(status_at(
+        &data_dir(),
+        &key_path(),
+        Utc::now(),
+    )))
+}
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/license")
@@ -226,103 +386,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("/features", web::get().to(get_features)),
     );
 }
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn base64_encode_test(input: &str) -> String {
-        let table = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-        let bytes = input.as_bytes();
-        let mut result = String::new();
-        for chunk in bytes.chunks(3) {
-            let (b0, b1, b2) = (chunk[0] as u32,
-                chunk.get(1).copied().unwrap_or(0) as u32,
-                chunk.get(2).copied().unwrap_or(0) as u32);
-            let triple = (b0 << 16) | (b1 << 8) | b2;
-            result.push(table[((triple >> 18) & 0x3F) as usize] as char);
-            result.push(table[((triple >> 12) & 0x3F) as usize] as char);
-            result.push(if chunk.len() > 1 { table[((triple >> 6) & 0x3F) as usize] as char } else { '=' });
-            result.push(if chunk.len() > 2 { table[(triple & 0x3F) as usize] as char } else { '=' });
-        }
-        result
-    }
-
-    fn make_key(info: &LicenseInfo, secret: &[u8]) -> String {
-        let json = serde_json::to_string(info).unwrap();
-        let mac = hmac_sha256(secret, json.as_bytes());
-        base64_encode_test(&format!("{}.{}", json, hex::encode(&mac)))
-    }
-
-    #[test]
-    fn test_features_for_tier() {
-        assert_eq!(features_for_tier("free"), vec!["basic_monitoring"]);
-        assert!(features_for_tier("pro").contains(&"alerts".to_string()));
-        assert!(features_for_tier("enterprise").contains(&"ldap".to_string()));
-    }
-
-    #[test]
-    fn test_max_servers_for_tier() {
-        assert_eq!(max_servers_for_tier("free"), Some(1));
-        assert_eq!(max_servers_for_tier("pro"), Some(10));
-        assert_eq!(max_servers_for_tier("enterprise"), None);
-    }
-
-    #[test]
-    fn test_hmac_sha256_consistency() {
-        let mac1 = hmac_sha256(b"key", b"message");
-        let mac2 = hmac_sha256(b"key", b"message");
-        assert_eq!(mac1, mac2);
-        assert_ne!(mac1, hmac_sha256(b"key", b"different"));
-    }
-
-    #[test]
-    fn test_constant_time_eq() {
-        assert!(constant_time_eq(b"hello", b"hello"));
-        assert!(!constant_time_eq(b"hello", b"world"));
-        assert!(!constant_time_eq(b"short", b"longer"));
-    }
-
-    #[test]
-    fn test_base64_decode() {
-        assert_eq!(base64_decode("aGVsbG8=").unwrap(), b"hello");
-        assert!(base64_decode("").unwrap().is_empty());
-    }
-
-    #[test]
-    fn test_validate_bad_key() {
-        assert!(validate_license_key("not-valid-base64!!!").is_err());
-        assert!(validate_license_key("aGVsbG8=").is_err());
-    }
-
-    #[test]
-    fn test_roundtrip_license_key() {
-        let info = LicenseInfo {
-            tier: "pro".into(), holder: "Test User".into(),
-            issued_at: "2026-01-01".into(), expires_at: Some("2027-01-01".into()),
-            max_servers: Some(10), features: features_for_tier("pro"),
-        };
-        let key = make_key(&info, HMAC_SECRET);
-        let result = validate_license_key(&key).unwrap();
-        assert_eq!(result.tier, "pro");
-        assert_eq!(result.holder, "Test User");
-    }
-
-    #[test]
-    fn test_tampered_key_rejected() {
-        let info = LicenseInfo {
-            tier: "enterprise".into(), holder: "Legit User".into(),
-            issued_at: "2026-01-01".into(), expires_at: Some("2027-01-01".into()),
-            max_servers: None, features: features_for_tier("enterprise"),
-        };
-        let key = make_key(&info, b"wrong-secret");
-        assert!(validate_license_key(&key).is_err());
-    }
-
-    #[test]
-    fn test_license_days_remaining() {
-        let future = chrono::Utc::now().date_naive() + chrono::Duration::days(30);
-        let exp = Some(future.format("%Y-%m-%d").to_string());
-        assert_eq!(license_days_remaining(&exp), Some(30));
-    }
-}
+#[path = "license_tests.rs"]
+mod tests;

@@ -1,5 +1,8 @@
-use actix_web::{dev::{ServiceRequest, ServiceResponse, Transform, Service}, Error};
-use std::future::{Ready, ready, Future};
+use actix_web::{
+    dev::{Service, ServiceRequest, ServiceResponse, Transform},
+    Error,
+};
+use std::future::{ready, Future, Ready};
 use std::pin::Pin;
 use std::rc::Rc;
 
@@ -17,11 +20,15 @@ where
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ready(Ok(SecurityHeadersMiddleware { service: Rc::new(service) }))
+        ready(Ok(SecurityHeadersMiddleware {
+            service: Rc::new(service),
+        }))
     }
 }
 
-pub struct SecurityHeadersMiddleware<S> { service: Rc<S> }
+pub struct SecurityHeadersMiddleware<S> {
+    service: Rc<S>,
+}
 
 impl<S, B> Service<ServiceRequest> for SecurityHeadersMiddleware<S>
 where
@@ -32,7 +39,10 @@ where
     type Error = Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
-    fn poll_ready(&self, cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), Self::Error>> {
+    fn poll_ready(
+        &self,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
         self.service.poll_ready(cx)
     }
 

@@ -7,6 +7,13 @@ pub type RancherServiceArc = Arc<dyn RancherService + Send + Sync>;
 
 #[async_trait]
 pub trait RancherService: Send + Sync {
+    /// Stable provider namespace for durable account links. Unavailable adapters
+    /// must not invent a realm that could be confused with a real installation.
+    fn identity_realm(&self) -> ServiceResult<String> {
+        Err(super::ServiceError::Unavailable(
+            "Rancher identity realm unavailable".into(),
+        ))
+    }
     async fn create_project(&self, cluster_id: &str, name: &str) -> ServiceResult<RancherProject>;
     async fn delete_project(&self, id: &str) -> ServiceResult<()>;
     async fn get_project(&self, id: &str) -> ServiceResult<RancherProject>;

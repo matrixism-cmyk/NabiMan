@@ -12,6 +12,7 @@ interface LicenseStatus {
   trial_days_remaining: number | null;
   features: string[];
   max_servers: number | null;
+  validation_state: string;
 }
 
 export default function LicensePanel() {
@@ -26,10 +27,15 @@ export default function LicensePanel() {
     if (!key.trim()) return;
     setActivating(true);
     setMsg('');
-    const res = await apiPost<string>('/api/license/activate', { key: key.trim() });
-    setMsg(res.data || res.message);
-    setActivating(false);
-    if (res.success) { setKey(''); refetch(); }
+    try {
+      const res = await apiPost<LicenseStatus>('/api/license/activate', { key: key.trim() });
+      setMsg(res.success ? t('license.activated') : res.message || t('common.error'));
+      if (res.success) { setKey(''); refetch(); }
+    } catch (cause) {
+      setMsg(cause instanceof Error ? cause.message : t('common.error'));
+    } finally {
+      setActivating(false);
+    }
   };
 
   const tierBadgeClass = (tier: string) => {
@@ -67,6 +73,8 @@ export default function LicensePanel() {
       </div>
       {msg && <div className="message" onClick={() => setMsg('')}>{msg}</div>}
 
+      {data.validation_state && <p role={data.active ? 'status' : 'alert'}>{t(`license.state.${data.validation_state}`)}</p>}
+
       {/* Status Card */}
       <div className="info-grid">
         <div className="info-item">
@@ -90,14 +98,14 @@ export default function LicensePanel() {
           <span className="info-value">{data.holder || '-'}</span>
         </div>
         <div className="info-item">
-          <span className="info-label">{t('license.expires')}</span>
+          <span className="info-label">{t('license.expiresAt')}</span>
           <span className="info-value">
             {data.expires_at ? (
               <span className={data.days_remaining != null && data.days_remaining < 30 ? 'text-danger' : ''}>
                 {data.expires_at}
-                {data.days_remaining != null && ` (${data.days_remaining}${t('license.daysLeft')})`}
+                {data.days_remaining != null && ` (${data.days_remaining} ${t('license.daysRemaining')})`}
               </span>
-            ) : t('license.noExpiry')}
+            ) : data.active && !data.is_trial ? t('license.noExpiry') : '-'}
           </span>
         </div>
         {data.max_servers != null && (
@@ -166,8 +174,9 @@ export default function LicensePanel() {
       <h3>{t('license.activate')}</h3>
       <div className="inline-form">
         <div className="form-row">
-          <label>{t('license.key')}</label>
+          <label htmlFor="license-key">{t('license.key')}</label>
           <textarea
+            id="license-key"
             className="filter-input"
             rows={3}
             value={key}
@@ -181,7 +190,7 @@ export default function LicensePanel() {
           onClick={handleActivate}
           disabled={activating || !key.trim()}
         >
-          {activating ? t('common.working') : t('license.activateBtn')}
+          {activating ? t('common.working') : t('license.activateKey')}
         </button>
       </div>
     </div>

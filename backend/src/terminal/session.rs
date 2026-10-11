@@ -1,6 +1,15 @@
 //! The tmux-backed session registry: what is running, for whom, and for how
 //! long — plus the tmux commands that create and inspect those sessions.
 
+#[path = "tmux_operations.rs"]
+mod tmux_operations;
+use tmux_operations::write_tmux_conf;
+pub(crate) use tmux_operations::{
+    capture_scrollback, client_size, close_tmux_session, create_tmux_session, exact_session,
+    pane_preview, paste_into_pane, rename_tmux_window, tmux, tmux_session_exists,
+    tmux_session_state,
+};
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -12,7 +21,10 @@ pub(crate) const CLEANUP_INTERVAL: Duration = Duration::from_secs(60);
 pub(crate) const MAX_SCROLLBACK: u32 = 200_000;
 
 pub(crate) fn now_unix() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 pub(crate) fn data_dir() -> String {
@@ -23,10 +35,15 @@ pub(crate) fn data_dir() -> String {
 pub struct TmuxSession {
     pub(crate) tmux_name: String,
     pub(crate) owner: String,
+    /// Display names are historical metadata, never proof of ownership.
+    #[serde(default)]
+    pub(crate) owner_id: String,
     pub(crate) label: String,
     #[serde(default)]
     #[allow(dead_code)]
     pub(crate) ssh_cmd: Option<String>,
+    #[serde(default)]
+    pub(crate) remote_binding: Option<super::remote_access::RemoteBinding>,
     #[serde(default = "now_unix")]
     pub(crate) created_unix: u64,
     #[serde(default = "now_unix")]
@@ -49,35 +66,55 @@ pub struct TmuxSession {
 }
 
 pub type PtyStore = Arc<Mutex<HashMap<String, TmuxSession>>>;
-pub fn new_pty_store() -> PtyStore { Arc::new(Mutex::new(HashMap::new())) }
+impl TmuxSession {
+    pub(crate) fn owned_by(&self, user_id: &str) -> bool {
+        !self.owner_id.is_empty() && !user_id.is_empty() && self.owner_id == user_id
+    }
+}
+pub(crate) fn visible_to(
+    session: &TmuxSession,
+    user_id: &str,
+    users: &crate::users::UserStore,
+) -> bool {
+    !user_id.is_empty()
+        && !session.owner_id.is_empty()
+        && (session.owned_by(user_id) || session.shared)
+        && users.lock().ok().is_some_and(|m| {
+            m.iter().any(|u| {
+                u.id == session.owner_id
+                    && crate::scope_access::permission(u, "GET", "/api/terminal")
+            })
+        })
+}
 
-fn sessions_file() -> String { format!("{}/terminal_sessions.json", data_dir()) }
+#[cfg(test)]
+#[path = "session_ownership_tests.rs"]
+mod ownership_tests;
+
+fn sessions_file() -> String {
+    format!("{}/terminal_sessions.json", data_dir())
+}
 
 /// Write the session registry to disk so a server restart does not orphan the
 /// tmux sessions the browser still knows about.
 pub(crate) fn persist(map: &HashMap<String, TmuxSession>) {
-    if let Ok(json) = serde_json::to_string_pretty(map) {
-        let _ = std::fs::create_dir_all(data_dir());
-        let _ = std::fs::write(sessions_file(), json);
-    }
+    super::registry::persist(std::path::Path::new(&sessions_file()), map);
 }
 
 /// Re-adopt sessions that survived a restart; drop the ones whose tmux session
 /// is gone. Called once at startup.
 pub fn restore_sessions(store: &PtyStore) {
-    let saved: HashMap<String, TmuxSession> = std::fs::read_to_string(sessions_file())
-        .ok()
-        .and_then(|c| serde_json::from_str(&c).ok())
-        .unwrap_or_default();
     let mut map = store.lock().unwrap();
-    for (id, mut session) in saved {
-        if tmux_session_exists(&session.tmux_name) {
-            session.ws_count = 0;
-            map.insert(id, session);
-        }
-    }
+    map.retain(|_, session| {
+        session.ws_count = 0;
+        // An unavailable tmux command is not proof that the session vanished.
+        tmux_session_state(&session.tmux_name).unwrap_or(true)
+    });
     if !map.is_empty() {
-        println!("Terminal: restored {} live tmux session(s)", map.len());
+        println!(
+            "Terminal: retained {} registered tmux session(s)",
+            map.len()
+        );
         // Mouse and clipboard bindings live on the tmux server, so sessions
         // started by an older build pick up the current ones here.
         if let Some(path) = write_tmux_conf(default_scrollback()) {
@@ -93,254 +130,63 @@ pub fn start_pty_cleanup(store: PtyStore) {
         std::thread::sleep(CLEANUP_INTERVAL);
         let mut map = store.lock().unwrap();
         let now = now_unix();
-        let expired: Vec<String> = map.iter()
+        let expired: Vec<String> = map
+            .iter()
             .filter(|(_, s)| {
-                s.ws_count == 0 && s.timeout_secs > 0
+                s.ws_count == 0
+                    && s.timeout_secs > 0
                     && now.saturating_sub(s.last_active_unix) > s.timeout_secs
             })
-            .map(|(id, _)| id.clone()).collect();
+            .map(|(id, _)| id.clone())
+            .collect();
         // A session whose tmux process died (host rebooted, user typed exit)
         // is dropped too, so the session list never shows ghosts.
-        let dead: Vec<String> = map.iter()
-            .filter(|(_, s)| s.ws_count == 0 && !tmux_session_exists(&s.tmux_name))
-            .map(|(id, _)| id.clone()).collect();
+        let dead: Vec<String> = map
+            .iter()
+            .filter(|(_, s)| {
+                s.ws_count == 0 && matches!(tmux_session_state(&s.tmux_name), Ok(false))
+            })
+            .map(|(id, _)| id.clone())
+            .collect();
         let mut changed = false;
         for id in expired {
-            if let Some(s) = map.remove(&id) {
-                let _ = tmux().args(["kill-session", "-t", &s.tmux_name]).output();
-                changed = true;
+            if let Some(s) = map.get(&id) {
+                if close_tmux_session(&s.tmux_name).is_ok() {
+                    map.remove(&id);
+                    changed = true;
+                }
             }
         }
         for id in dead {
             map.remove(&id);
             changed = true;
         }
-        if changed { persist(&map); }
+        if changed {
+            persist(&map);
+        }
     });
 }
 
 #[allow(dead_code)]
-pub fn kill_user_sessions(store: &PtyStore, username: &str) {
+pub fn kill_user_sessions(store: &PtyStore, user_id: &str) {
     let mut map = store.lock().unwrap();
-    let ids: Vec<String> = map.iter().filter(|(_, s)| s.owner == username).map(|(id, _)| id.clone()).collect();
+    let ids: Vec<String> = map
+        .iter()
+        .filter(|(_, s)| s.owned_by(user_id))
+        .map(|(id, _)| id.clone())
+        .collect();
     for id in ids {
-        if let Some(s) = map.remove(&id) {
-            let _ = tmux().args(["kill-session", "-t", &s.tmux_name]).output();
+        if let Some(s) = map.get(&id) {
+            if close_tmux_session(&s.tmux_name).is_ok() {
+                map.remove(&id);
+            }
         }
     }
+
     persist(&map);
 }
 
 pub(crate) fn generate_session_id() -> String {
     use rand::Rng;
     format!("pty_{:016x}", rand::thread_rng().gen::<u64>())
-}
-
-pub(crate) fn tmux_session_exists(name: &str) -> bool {
-    tmux().args(["has-session", "-t", name])
-        .output().map(|o| o.status.success()).unwrap_or(false)
-}
-
-/// Options and mouse bindings every NabiMan tmux session runs with.
-///
-/// The mouse bindings differ from tmux's defaults in one way: a selection is
-/// copied *without* leaving copy-mode, so the highlight stays on screen instead
-/// of blinking out the moment the button is released. `set-clipboard on` makes
-/// tmux hand that copied text to the browser as an OSC 52 sequence.
-fn tmux_conf_body(scrollback: u32) -> String {
-    // window-size latest keeps a watching share viewer from shrinking the pane
-    // for whoever is actually working in it.
-    //
-    // Keeping the highlight means staying in copy-mode, where keystrokes go to
-    // copy-mode instead of the shell — so a click of either button leaves it
-    // again, which is also what makes a right-click paste land.
-    //
-    // `copy-pipe-no-clear "tmux load-buffer -w -"` is what actually reaches the
-    // browser: it keeps the highlight on screen after the button comes up, and
-    // -w makes tmux hand the text over as an OSC 52 sequence, which the
-    // frontend turns into a clipboard write. set-clipboard alone does not do
-    // it for tmux's own copy commands.
-    let copy = r#"send -X copy-pipe-no-clear "tmux load-buffer -w -""#;
-    format!(
-        "set -g history-limit {scrollback}\n\
-         set -g mouse on\n\
-         set -g set-clipboard on\n\
-         set -g window-size latest\n\
-         set -as terminal-features ',xterm*:clipboard'\n\
-         bind -T copy-mode    MouseDragEnd1Pane {copy}\n\
-         bind -T copy-mode-vi MouseDragEnd1Pane {copy}\n\
-         bind -T copy-mode    DoubleClick1Pane send -X select-word \\; {copy}\n\
-         bind -T copy-mode-vi DoubleClick1Pane send -X select-word \\; {copy}\n\
-         bind -T copy-mode    TripleClick1Pane send -X select-line \\; {copy}\n\
-         bind -T copy-mode-vi TripleClick1Pane send -X select-line \\; {copy}\n\
-         bind -T root DoubleClick1Pane select-pane \\; copy-mode -H \\; send -X select-word \\; {copy}\n\
-         bind -T root TripleClick1Pane select-pane \\; copy-mode -H \\; send -X select-line \\; {copy}\n\
-         bind -T copy-mode    MouseDown1Pane send -X cancel\n\
-         bind -T copy-mode-vi MouseDown1Pane send -X cancel\n\
-         bind -T copy-mode    MouseDown3Pane send -X cancel\n\
-         bind -T copy-mode-vi MouseDown3Pane send -X cancel\n",
-        scrollback = scrollback,
-        copy = copy,
-    )
-}
-
-/// Seed options for a tmux server this process may be about to start.
-fn write_tmux_conf(scrollback: u32) -> Option<String> {
-    let path = format!("{}/tmux.conf", data_dir());
-    std::fs::create_dir_all(data_dir()).ok()?;
-    std::fs::write(&path, tmux_conf_body(scrollback)).ok()?;
-    Some(path)
-}
-
-pub(crate) fn create_tmux_session(name: &str, command: Option<&str>, scrollback: u32, size: (u16, u16)) -> Result<(), String> {
-    // history-limit only applies to panes created when they are made, so the
-    // value has to be in place *before* the session is spawned. Two paths cover
-    // both cases: -f seeds the options when this command starts the tmux server
-    // (the first session after a reboot), and set-option -g covers every later
-    // session on an already running server.
-    let conf = write_tmux_conf(scrollback);
-    // -f only applies when this command starts the server, so a server that is
-    // already up gets the same file sourced explicitly.
-    if let Some(ref path) = conf {
-        let _ = tmux().args(["source-file", path]).output();
-    }
-    let _ = tmux()
-        .args(["set-option", "-g", "history-limit", &scrollback.to_string()])
-        .output();
-
-    // Create the pane at the size the browser already has: attaching a smaller
-    // client would otherwise shrink the pane and push the first lines (an ssh
-    // error, for instance) straight out of view.
-    let cols = size.0.to_string();
-    let rows = size.1.to_string();
-    let mut args: Vec<&str> = Vec::new();
-    if let Some(ref path) = conf {
-        args.push("-f");
-        args.push(path);
-    }
-    args.extend(["new-session", "-d", "-s", name, "-x", &cols, "-y", &rows]);
-    if let Some(cmd) = command {
-        args.push(cmd);
-    }
-    let out = tmux().args(&args).output()
-        .map_err(|e| format!("tmux: {}", e))?;
-    if !out.status.success() {
-        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
-    }
-    // Enable mouse so the wheel scrolls tmux's own history (copy-mode) like a
-    // native terminal — otherwise, in tmux's alternate screen, xterm.js turns
-    // the wheel into arrow keys, which bash treats as command-history nav.
-    let _ = tmux()
-        .args(["set-option", "-t", name, "mouse", "on"])
-        .output();
-    let _ = tmux()
-        .args(["set-option", "-t", name, "history-limit", &scrollback.to_string()])
-        .output();
-    // Detaching a browser must never tear the session down.
-    let _ = tmux()
-        .args(["set-option", "-t", name, "destroy-unattached", "off"])
-        .output();
-    Ok(())
-}
-
-/// `tmux` with the inherited session variables cleared. Without this, a server
-/// started from inside a tmux pane would talk to that pane's socket instead of
-/// its own.
-pub(crate) fn tmux() -> std::process::Command {
-    let mut cmd = std::process::Command::new("tmux");
-    cmd.env_remove("TMUX").env_remove("TMUX_PANE");
-    cmd
-}
-
-fn tmux_size(args: &[&str]) -> Option<(u16, u16)> {
-    let out = tmux().args(args).output().ok()?;
-    let text = String::from_utf8_lossy(&out.stdout);
-    let mut parts = text.split_whitespace();
-    let cols = parts.next()?.parse().ok()?;
-    let rows = parts.next()?.parse().ok()?;
-    Some((cols, rows))
-}
-
-/// The terminal size a share viewer should open with: whatever the person
-/// already attached is using, status line included. Matching the pane instead
-/// would cost a row to the status bar and quietly shrink the session.
-pub(crate) fn client_size(name: &str) -> Option<(u16, u16)> {
-    tmux_size(&["list-clients", "-t", name, "-F", "#{client_width} #{client_height}"])
-        .or_else(|| {
-            // Nobody is watching: the pane plus the status line it draws under it.
-            tmux_size(&["display-message", "-p", "-t", name, "#{pane_width} #{pane_height}"])
-                .map(|(c, r)| (c, r + 1))
-        })
-}
-
-/// The last few lines on screen, as plain text — enough for a thumbnail in the
-/// session list without shipping a whole screen of escape codes.
-pub(crate) fn pane_preview(name: &str, lines: usize) -> String {
-    let out = match tmux().args(["capture-pane", "-p", "-J", "-t", name]).output() {
-        Ok(o) if o.status.success() => o.stdout,
-        _ => return String::new(),
-    };
-    let text = String::from_utf8_lossy(&out);
-    let kept: Vec<&str> = text
-        .lines()
-        .filter(|l| !l.trim().is_empty())
-        .rev()
-        .take(lines)
-        .collect();
-    kept.into_iter()
-        .rev()
-        .map(|l| l.chars().take(200).collect::<String>())
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-/// Show the operator's name for a session in tmux's own status line too.
-pub(crate) fn rename_tmux_window(name: &str, title: &str) {
-    let _ = tmux().args(["rename-window", "-t", name, title]).output();
-}
-
-/// Hand text to a pane through tmux's own paste buffer.
-///
-/// Writing the bytes straight into the pseudo-terminal works until the pane is
-/// in copy-mode, where they are swallowed, and it loses the bracketed-paste
-/// markers that let an editor tell a paste from typing. tmux does both
-/// properly, so the paste goes through tmux.
-pub(crate) fn paste_into_pane(name: &str, text: &str) {
-    use std::io::Write;
-
-    // A selection left the pane in copy-mode; leave it before pasting.
-    if tmux_size(&["display-message", "-p", "-t", name, "#{pane_in_mode} 0"])
-        .map(|(mode, _)| mode == 1)
-        .unwrap_or(false)
-    {
-        let _ = tmux().args(["send-keys", "-X", "-t", name, "cancel"]).output();
-    }
-
-    let buffer = format!("nabiman-paste-{}", name);
-    let mut child = match tmux()
-        .args(["load-buffer", "-b", &buffer, "-"])
-        .stdin(std::process::Stdio::piped())
-        .spawn()
-    {
-        Ok(c) => c,
-        Err(_) => return,
-    };
-    if let Some(stdin) = child.stdin.as_mut() {
-        let _ = stdin.write_all(text.as_bytes());
-    }
-    let _ = child.wait();
-    let _ = tmux().args(["paste-buffer", "-d", "-b", &buffer, "-t", name]).output();
-}
-
-/// Read back the pane history (ANSI colours included) so a reopened window can
-/// show what scrolled past while it was closed.
-pub(crate) fn capture_scrollback(name: &str, lines: u32) -> Result<String, String> {
-    let start = format!("-{}", lines.min(MAX_SCROLLBACK));
-    let out = tmux()
-        .args(["capture-pane", "-p", "-e", "-J", "-S", &start, "-t", name])
-        .output().map_err(|e| format!("tmux: {}", e))?;
-    if !out.status.success() {
-        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
-    }
-    Ok(String::from_utf8_lossy(&out.stdout).to_string())
 }

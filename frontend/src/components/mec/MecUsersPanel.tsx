@@ -1,3 +1,5 @@
+import InitialCredentials, { BootstrapCredentials, randomPassword } from './InitialCredentials';
+import { fetchWithRefresh } from '../../hooks/useApi';
 import React, { useState } from 'react';
 import { useT } from '../../i18n';
 import {
@@ -21,16 +23,6 @@ interface RancherUser {
   must_change_password: boolean;
 }
 
-function randomPassword(len = 16): string {
-  const chars =
-    'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$';
-  let out = '';
-  for (let i = 0; i < len; i++) {
-    out += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return out;
-}
-
 export default function MecUsersPanel() {
   const { t } = useT();
   const { data, loading, error, refetch } = useMecList<RancherUser>(
@@ -41,7 +33,7 @@ export default function MecUsersPanel() {
   const [form, setForm] = useState({ username: '', password: randomPassword() });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [credentials, setCredentials] = useState<BootstrapCredentials | null>(null);
   const [filter, setFilter] = useState('');
 
   const create = async (e: React.FormEvent) => {
@@ -52,9 +44,7 @@ export default function MecUsersPanel() {
       const res = await mecPost('/api/mec/v1/users', form);
       if (res.error) setErr(res.error.message);
       else {
-        setToast(
-          t('mec.users.createdToast', { username: form.username, password: form.password }),
-        );
+        setCredentials({ username: form.username, password: form.password });
         setShowAdd(false);
         setForm({ username: '', password: randomPassword() });
         await refetch();
@@ -91,19 +81,21 @@ export default function MecUsersPanel() {
     if (newPw === null) return;
     const final = newPw || randomPassword();
     try {
-      await fetch(
+      const response = await fetchWithRefresh(
         `/api/mec/v1/users/${encodeURIComponent(u.id)}/reset-password`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${sessionStorage.getItem('nabiman_token') || ''}`,
             'X-Confirm-Name': u.id,
           },
           body: JSON.stringify({ new_password: final }),
         },
       );
-      setToast(t('mec.users.resetToast', { username: u.username, password: final }));
+      const body = await response.json();
+      if (!response.ok || body.error) throw new Error(body.error?.message || `HTTP ${response.status}`);
+      setCredentials({ username: u.username, password: final });
+      await refetch();
     } catch (e) {
       setErr(String(e));
     }
@@ -129,34 +121,14 @@ export default function MecUsersPanel() {
     >
       <ErrorBanner error={error || err || undefined} />
 
-      {toast && (
-        <div
-          style={{
-            background: '#fef3c7',
-            borderLeft: '3px solid #f59e0b',
-            padding: '10px 14px',
-            borderRadius: '6px',
-            fontSize: '13px',
-            marginBottom: '12px',
-          }}
-        >
-          <strong>🔐 </strong>{toast}
-          <button
-            style={{ float: 'right' }}
-            className="btn btn-secondary btn-small"
-            onClick={() => setToast(null)}
-          >
-            {t('mec.users.close')}
-          </button>
-        </div>
-      )}
+      {credentials && <InitialCredentials credentials={credentials} onDone={() => setCredentials(null)} />}
 
       {showAdd && (
         <form
           onSubmit={create}
           style={{
-            background: 'white',
-            border: '1px solid #e5e7eb',
+            background: 'var(--surface-alt)',
+            border: '1px solid var(--border)',
             padding: '14px',
             borderRadius: '8px',
             marginBottom: '12px',
@@ -186,7 +158,7 @@ export default function MecUsersPanel() {
                 {t('mec.users.initialPassword')}
               </div>
               <input
-                required
+                required type="password" autoComplete="new-password" minLength={15}
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 style={{ width: '100%' }}

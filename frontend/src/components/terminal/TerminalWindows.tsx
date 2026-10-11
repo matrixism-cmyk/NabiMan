@@ -31,9 +31,10 @@ const TerminalWindowsContext = createContext<Ctx | null>(null);
 
 const LAYOUT_KEY = 'nabiman_term_windows';
 
-function loadLayout(): TermWindow[] {
+function loadLayout(key = LAYOUT_KEY): TermWindow[] {
   try {
-    const raw = localStorage.getItem(LAYOUT_KEY);
+    const raw = localStorage.getItem(key)
+      || (key === `${LAYOUT_KEY}:admin` ? localStorage.getItem(LAYOUT_KEY) : null);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -43,8 +44,9 @@ function loadLayout(): TermWindow[] {
   }
 }
 
-function saveLayout(windows: TermWindow[]) {
-  try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(windows)); } catch { /* ignore */ }
+function saveLayout(windows: TermWindow[], key = LAYOUT_KEY) {
+  try { localStorage.setItem(key, JSON.stringify(windows));
+    if (key === `${LAYOUT_KEY}:admin`) localStorage.removeItem(LAYOUT_KEY); } catch { /* ignore */ }
 }
 
 function describe(target: TerminalTarget): string {
@@ -61,17 +63,19 @@ function describe(target: TerminalTarget): string {
  * tabs, dragging or losing the network never clears a screen. Positions are
  * remembered across reloads and each window re-attaches to its session.
  */
-export function TerminalWindowsProvider({ children }: { children: React.ReactNode }) {
-  const [windows, setWindows] = useState<TermWindow[]>(loadLayout);
+export function TerminalWindowsProvider({ children, owner, active = true }: { children: React.ReactNode; owner?: string; active?: boolean }) {
+  const { t } = useT();
+  const layoutKey = owner ? `${LAYOUT_KEY}:${owner}` : LAYOUT_KEY;
+  const [windows, setWindows] = useState<TermWindow[]>(() => active ? loadLayout(layoutKey) : []);
   const [showSettings, setShowSettings] = useState(false);
   const topZ = useRef(windows.reduce((m, w) => Math.max(m, w.z), 10));
 
-  useEffect(() => { saveLayout(windows); }, [windows]);
+  useEffect(() => { if (active) saveLayout(windows, layoutKey); }, [windows, active, layoutKey]);
 
   // Clear screens left behind by windows that are gone (e.g. closed in another tab).
   useEffect(() => {
-    pruneTerminalStorage(loadLayout().map((w) => w.id));
-  }, []);
+    if (active && !owner) pruneTerminalStorage(loadLayout(layoutKey).map((w) => w.id));
+  }, [active, owner, layoutKey]);
 
   const update = useCallback((id: string, patch: Partial<TermWindow>) => {
     setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, ...patch } : w)));
@@ -92,6 +96,11 @@ export function TerminalWindowsProvider({ children }: { children: React.ReactNod
   }, []);
 
   const openTerminal = useCallback((target: TerminalTarget, options?: OpenOptions): string => {
+    if (!active) return '';
+    if (options?.joinSessionId) {
+      const existing = windows.find(w => storedSessionId(w.id) === options.joinSessionId);
+      if (existing) { focusWindow(existing.id); return existing.id; }
+    }
     const id = `tw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
     topZ.current += 1;
     // The pane picks its session up from storage when it mounts.
@@ -118,7 +127,7 @@ export function TerminalWindowsProvider({ children }: { children: React.ReactNod
       return [...prev, win];
     });
     return id;
-  }, []);
+  }, [windows, focusWindow, active]);
 
   /**
    * Close the window but leave the session running server-side — it stays in
@@ -131,15 +140,15 @@ export function TerminalWindowsProvider({ children }: { children: React.ReactNod
   }, []);
 
   /** Close the window and kill its tmux session for good. */
-  const endSession = useCallback((id: string) => {
+  const endSession = useCallback(async (id: string) => {
     const sid = storedSessionId(id);
     if (sid) {
-      apiRequest(`/api/terminal/sessions/${encodeURIComponent(sid)}`, { method: 'DELETE' })
-        .catch(() => { /* already gone */ });
+      const res = await apiRequest(`/api/terminal/sessions/${encodeURIComponent(sid)}`, { method: 'DELETE' });
+      if (!res.success) { window.alert(res.message || t('common.error')); return; }
     }
     forgetTerminalStorage(id);
     setWindows((prev) => prev.filter((w) => w.id !== id));
-  }, []);
+  }, [t]);
 
   /** Lay every open window out in a grid that fills the screen. */
   const tile = useCallback(() => {
@@ -205,7 +214,7 @@ export function TerminalWindowsProvider({ children }: { children: React.ReactNod
   return (
     <TerminalWindowsContext.Provider value={value}>
       {children}
-      <TerminalWindowLayer
+      {active && <TerminalWindowLayer
         windows={windows}
         onUpdate={update}
         onFocus={focusWindow}
@@ -214,8 +223,8 @@ export function TerminalWindowsProvider({ children }: { children: React.ReactNod
         onTile={tile}
         onCascade={cascade}
         onOpenSettings={() => setShowSettings(true)}
-      />
-      {showSettings && <TerminalSettingsModal onClose={() => setShowSettings(false)} />}
+      />}
+      {active && showSettings && <TerminalSettingsModal onClose={() => setShowSettings(false)} />}
     </TerminalWindowsContext.Provider>
   );
 }

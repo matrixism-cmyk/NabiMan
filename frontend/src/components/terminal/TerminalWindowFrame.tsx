@@ -114,6 +114,15 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
         <span className="term-window-title">{win.title}</span>
         <span className="term-window-sub">{win.subtitle}</span>
         <span className="term-window-actions">
+          <button
+            title={t('terminal.redraw')}
+            aria-label={t('terminal.redraw')}
+            disabled={status !== 'connected'}
+            onClick={(e) => { e.stopPropagation(); onFocus(win.id); viewRef.current?.redraw(); }}
+          ><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <path d="M8 21h8M12 17v4M15 7a4 4 0 1 0 1 5M15 5v4h-4" />
+          </svg></button>
           <button title={t('terminal.reconnect')} onClick={(e) => { e.stopPropagation(); viewRef.current?.reconnect(); }}>↻</button>
           <button title={t('terminal.newSession')} onClick={(e) => { e.stopPropagation(); viewRef.current?.newSession(); }}>+</button>
           {sessionId && (

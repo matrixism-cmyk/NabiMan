@@ -1,7 +1,7 @@
-use actix_web::{get, web, HttpResponse};
-use sysinfo::Networks;
-use std::fs;
 use crate::models::{ApiResponse, TrafficSnapshot};
+use actix_web::{get, web, HttpResponse};
+use std::fs;
+use sysinfo::Networks;
 
 #[get("/api/traffic/current")]
 async fn get_current_traffic() -> HttpResponse {

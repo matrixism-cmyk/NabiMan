@@ -3,8 +3,12 @@ use std::fmt;
 #[derive(Debug, Clone)]
 pub enum ServiceError {
     NotFound(String),
+    Forbidden(String),
     Conflict(String),
-    Upstream { source: String, message: String },
+    Upstream {
+        source: String,
+        message: String,
+    },
     #[allow(dead_code)]
     Unauthorized(String),
     InvalidInput(String),
@@ -17,6 +21,7 @@ pub type ServiceResult<T> = Result<T, ServiceError>;
 impl fmt::Display for ServiceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Forbidden(s) => write!(f, "forbidden: {}", s),
             Self::NotFound(s) => write!(f, "not found: {}", s),
             Self::Conflict(s) => write!(f, "conflict: {}", s),
             Self::Upstream { source, message } => {
@@ -35,6 +40,7 @@ impl std::error::Error for ServiceError {}
 impl ServiceError {
     pub fn http_status(&self) -> u16 {
         match self {
+            Self::Forbidden(_) => 403,
             Self::NotFound(_) => 404,
             Self::Conflict(_) => 409,
             Self::Unauthorized(_) => 401,
@@ -47,6 +53,7 @@ impl ServiceError {
 
     pub fn code(&self) -> &'static str {
         match self {
+            Self::Forbidden(_) => "FORBIDDEN",
             Self::NotFound(_) => "NOT_FOUND",
             Self::Conflict(_) => "CONFLICT",
             Self::Upstream { .. } => "UPSTREAM_ERROR",
@@ -88,7 +95,11 @@ mod tests {
         assert_eq!(ServiceError::Conflict("x".into()).http_status(), 409);
         assert_eq!(ServiceError::Internal("x".into()).http_status(), 500);
         assert_eq!(
-            ServiceError::Upstream { source: "k8s".into(), message: "m".into() }.http_status(),
+            ServiceError::Upstream {
+                source: "k8s".into(),
+                message: "m".into()
+            }
+            .http_status(),
             502
         );
     }

@@ -27,7 +27,9 @@ pub async fn live(state: web::Data<MecState>) -> HttpResponse {
     }
 }
 
-pub async fn build_live(services: &ServiceBundle) -> crate::mec::services::ServiceResult<LiveSnapshot> {
+pub async fn build_live(
+    services: &ServiceBundle,
+) -> crate::mec::services::ServiceResult<LiveSnapshot> {
     // Node inventory (authoritative status + GPU slots) merged with metrics-server
     // usage, so NotReady/DOWN nodes — which metrics-server omits — still appear.
     let inventory = services.kube.list_nodes().await?;
@@ -89,7 +91,9 @@ pub async fn build_live(services: &ServiceBundle) -> crate::mec::services::Servi
         kubeconfig_days: crate::mec::services::kubeconfig_expiry::days_until_expiry_from_env(),
     };
     let health = ClusterHealth {
-        gpu_available_slots: health.gpu_total_slots.saturating_sub(health.gpu_allocated_slots),
+        gpu_available_slots: health
+            .gpu_total_slots
+            .saturating_sub(health.gpu_allocated_slots),
         ..health
     };
 
@@ -103,15 +107,33 @@ pub async fn build_live(services: &ServiceBundle) -> crate::mec::services::Servi
         cluster.memory_used_bytes += n.memory_usage_bytes;
         cluster.memory_capacity_bytes += n.memory_capacity_bytes;
     }
-    let pct = |u: u64, c: u64| if c == 0 { 0.0 } else { (u as f64 / c as f64 * 100.0) as f32 };
+    let pct = |u: u64, c: u64| {
+        if c == 0 {
+            0.0
+        } else {
+            (u as f64 / c as f64 * 100.0) as f32
+        }
+    };
     cluster.cpu_percent = pct(cluster.cpu_used_millicores, cluster.cpu_capacity_millicores);
     cluster.memory_percent = pct(cluster.memory_used_bytes, cluster.memory_capacity_bytes);
 
     // VPN sessions are best-effort: an AXGATE outage must not sink the whole
     // wall, so a failure degrades to an empty list (honest placeholder).
-    let vpn_sessions = services.axgate.list_vpn_sessions().await.unwrap_or_default();
+    let vpn_sessions = services
+        .axgate
+        .list_vpn_sessions()
+        .await
+        .unwrap_or_default();
 
-    Ok(LiveSnapshot { cluster, health, nodes, pods, tenants, events, vpn_sessions })
+    Ok(LiveSnapshot {
+        cluster,
+        health,
+        nodes,
+        pods,
+        tenants,
+        events,
+        vpn_sessions,
+    })
 }
 
 #[derive(Serialize)]
@@ -154,9 +176,7 @@ pub struct FirewallStats {
     pub security_policies: u32,
 }
 
-async fn build_summary(
-    state: &MecState,
-) -> crate::mec::services::ServiceResult<DashboardSummary> {
+async fn build_summary(state: &MecState) -> crate::mec::services::ServiceResult<DashboardSummary> {
     let nodes = state.services.kube.list_nodes().await?;
     let total_nodes = nodes.len() as u32;
     let ready = nodes

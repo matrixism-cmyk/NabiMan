@@ -7,7 +7,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build backend
-FROM rust:1.77-bookworm AS backend
+FROM rust:1.88-bookworm AS backend
 WORKDIR /app/backend
 COPY backend/Cargo.toml backend/Cargo.lock ./
 RUN mkdir src && echo 'fn main(){}' > src/main.rs && cargo build --release && rm -rf src

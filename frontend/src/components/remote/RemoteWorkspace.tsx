@@ -14,12 +14,15 @@ import MultiServerDashboard from '../MultiServerDashboard';
 import ServerForm from './ServerForm';
 import { ServerStatusView, ServerExecView, ServerSettingsView } from './ServerDetail';
 import SessionsView, { SessionInfo } from './SessionsView';
+import TargetSessionsView from './TargetSessionsView';
 import TargetRail from './TargetRail';
+import AdhocConnect from './AdhocConnect';
+import { useTargetActions } from './useTargetActions';
 import {
-  OverviewView, readSelection, rememberSelection, Selection, ServerView, sessionLabel,
+  OverviewView, readPaneState, readSelection, rememberPaneState, rememberSelection, Selection, ServerView,
+  sessionLabel,
 } from './workspaceState';
 import './remote-workspace.css';
-
 
 /**
  * One place for everything remote: the list of things you can connect to on
@@ -39,12 +42,13 @@ export default function RemoteWorkspace() {
   const servers = useMemo(() => serverData || [], [serverData]);
   const sessions = useMemo(() => sessionData || [], [sessionData]);
 
+  const [restored] = useState(readPaneState);
   const [selection, setSelection] = useState<Selection>(readSelection);
-  const [serverView, setServerView] = useState<ServerView>('terminal');
+  const [serverView, setServerView] = useState<ServerView>(restored.view);
   const [overviewView, setOverviewView] = useState<OverviewView>('summary');
   const [manualPassword, setManualPassword] = useState(false);
-  const [joinSessionId, setJoinSessionId] = useState<string | undefined>();
-  const [connected, setConnected] = useState<Set<string>>(new Set());
+  const [joinSessionId, setJoinSessionId] = useState<string | undefined>(restored.join);
+  const [connected, setConnected] = useState<Set<string>>(() => new Set(restored.connected));
   const [currentSessionId, setCurrentSessionId] = useState('');
   const [termStatus, setTermStatus] = useState<TerminalStatus>('connecting');
   const [showSettings, setShowSettings] = useState(false);
@@ -52,10 +56,13 @@ export default function RemoteWorkspace() {
   const [shareTarget, setShareTarget] = useState('');
   const [filter, setFilter] = useState('');
   const [checkingAll, setCheckingAll] = useState(false);
-  const [adhocForm, setAdhocForm] = useState({ host: '', port: '22', user: 'root' });
+  const [checkError, setCheckError] = useState('');
   const [adhocTarget, setAdhocTarget] = useState<{ host: string; port: number; user: string } | null>(null);
 
-  useEffect(() => { rememberSelection(selection); }, [selection]);
+  useEffect(() => {
+    rememberSelection(selection);
+    rememberPaneState({ view: serverView, connected: Array.from(connected), join: joinSessionId });
+  }, [selection, serverView, connected, joinSessionId]);
 
   // Each session remembers the size it was zoomed to; drop the sizes of
   // sessions that have since ended.
@@ -63,11 +70,12 @@ export default function RemoteWorkspace() {
     if (sessionData) pruneSessionZooms(sessions.filter(s => s.alive).map(s => s.id));
   }, [sessionData, sessions]);
 
-  // Opening the session list, or starting a new shell, should show the current
-  // state rather than whatever the last poll happened to catch.
+  // Opening a session list (the fleet's or a target's), or starting a new
+  // shell, should show the current state, not whatever the last poll caught.
   useEffect(() => {
-    if (selection.kind === 'overview' && overviewView === 'sessions') refetchSessions();
-  }, [selection.kind, overviewView, refetchSessions]);
+    if (selection.kind === 'overview' ? overviewView === 'sessions'
+      : (selection.kind === 'server' || selection.kind === 'local') && serverView === 'sessions') refetchSessions();
+  }, [selection, overviewView, serverView, refetchSessions]);
   useEffect(() => { if (currentSessionId) refetchSessions(); }, [currentSessionId, refetchSessions]);
 
   const selectedServer = selection.kind === 'server'
@@ -81,7 +89,8 @@ export default function RemoteWorkspace() {
     }
   }, [selection, servers, selectedServer]);
 
-  const select = useCallback((next: Selection, view: ServerView = 'terminal') => {
+  // A target opens on the sessions already running there, not on a terminal.
+  const select = useCallback((next: Selection, view: ServerView = 'sessions') => {
     setSelection(next);
     setServerView(view);
     setManualPassword(false);
@@ -94,10 +103,11 @@ export default function RemoteWorkspace() {
     : selection.kind === 'adhoc' && adhocTarget ? `ssh:${adhocTarget.user}@${adhocTarget.host}:${adhocTarget.port}`
     : null;
 
-  const liveSessions = useMemo(
-    () => (label ? sessions.filter(s => s.label === label && s.alive) : []),
+  const targetSessions = useMemo(
+    () => (label ? sessions.filter(s => s.label === label) : []),
     [sessions, label],
   );
+  const liveCount = targetSessions.filter(s => s.alive).length;
 
   const terminalTarget: TerminalTarget | null =
     selection.kind === 'local' ? { kind: 'local' }
@@ -114,10 +124,10 @@ export default function RemoteWorkspace() {
     : selection.kind === 'adhoc' && adhocTarget ? `ws_adhoc_${adhocTarget.user}@${adhocTarget.host}:${adhocTarget.port}`
     : '';
 
-  // Selecting a target never dials on its own: it attaches when a session is
-  // already running, and otherwise waits for an explicit "접속".
+  // Selecting a target never dials on its own, not even into a running
+  // session: it shows the sessions, and waits for "참여" or "접속".
   const attached = Boolean(terminalTarget)
-    && (Boolean(joinSessionId) || liveSessions.length > 0 || connected.has(storageKey));
+    && (Boolean(joinSessionId) || connected.has(storageKey));
 
   const connect = (skipSaved = false) => {
     setManualPassword(skipSaved);
@@ -125,6 +135,11 @@ export default function RemoteWorkspace() {
     setConnected(prev => new Set(prev).add(key));
     setServerView('terminal');
   };
+
+  const { connectTo, runRailAction } = useTargetActions({
+    servers, selection, select, joinSessionId, manualPassword, connected, setConnected,
+    setServerView, viewRef, openTerminal, refetchSessions, refetchServers, setError: setCheckError,
+  });
 
   const detach = () => {
     if (!terminalTarget) return;
@@ -158,7 +173,9 @@ export default function RemoteWorkspace() {
 
   const checkAll = async () => {
     setCheckingAll(true);
-    await apiPost<RemoteServerStatus[]>('/api/remote-servers/check-all', {});
+    setCheckError('');
+    const result = await apiPost<RemoteServerStatus[]>('/api/remote-servers/check-all', {});
+    if (!result.success) setCheckError(result.message || t('common.error'));
     setCheckingAll(false);
     refetchServers();
   };
@@ -170,9 +187,10 @@ export default function RemoteWorkspace() {
   const localCount = sessions.filter(s => s.label === 'local' && s.alive).length;
 
   const isServerTarget = selection.kind === 'server' && Boolean(selectedServer);
+  /** Targets that open on their session list: a saved server or the local shell. */
+  const hasSessionsView = isServerTarget || selection.kind === 'local';
   const showTerminalPane = attached && Boolean(terminalTarget);
-  const terminalVisible = (isServerTarget && serverView === 'terminal')
-    || selection.kind === 'local'
+  const terminalVisible = (hasSessionsView && serverView === 'terminal')
     || (selection.kind === 'adhoc' && Boolean(adhocTarget));
 
   const headTitle = selection.kind === 'overview' ? t('remote.title')
@@ -199,6 +217,7 @@ export default function RemoteWorkspace() {
         localSessions={localCount}
         sessionsFor={countFor}
         onSelect={select}
+        onAction={runRailAction}
         onFilter={setFilter}
         onCheckAll={checkAll}
       />
@@ -223,9 +242,14 @@ export default function RemoteWorkspace() {
                 <button className={overviewView === 'keys' ? 'is-active' : ''} onClick={() => setOverviewView('keys')}>{t('remote.sshKey')}</button>
               </>
             )}
+            {hasSessionsView && (
+              <>
+                <button className={serverView === 'sessions' ? 'is-active' : ''} onClick={() => setServerView('sessions')}>{t('remote.sessionsTab')} {liveCount > 0 && <em>{liveCount}</em>}</button>
+                <button className={serverView === 'terminal' ? 'is-active' : ''} onClick={() => setServerView('terminal')}>{t('tab.terminal')}</button>
+              </>
+            )}
             {isServerTarget && (
               <>
-                <button className={serverView === 'terminal' ? 'is-active' : ''} onClick={() => setServerView('terminal')}>{t('tab.terminal')}</button>
                 <button className={serverView === 'status' ? 'is-active' : ''} onClick={() => setServerView('status')}>{t('remote.statusView')}</button>
                 <button className={serverView === 'exec' ? 'is-active' : ''} onClick={() => setServerView('exec')}>{t('remote.exec')}</button>
                 <button className={serverView === 'settings' ? 'is-active' : ''} onClick={() => setServerView('settings')}>{t('common.settings')}</button>
@@ -256,6 +280,7 @@ export default function RemoteWorkspace() {
           </div>
         </header>
 
+        {checkError && <div role="alert" className="message">{checkError}</div>}
         <div className="rw-body">
           {/* The terminal stays mounted while other views are open, so switching
               to 상태 and back does not drop the shell. */}
@@ -283,6 +308,11 @@ export default function RemoteWorkspace() {
                 <p className="text-secondary">{t('remote.connectHint')}</p>
                 <div className="btn-group">
                   <button className="btn btn-primary" onClick={() => connect(false)}>{t('remote.connect')}</button>
+                  {liveCount > 0 && (
+                    <button className="btn btn-secondary" onClick={() => setServerView('sessions')}>
+                      {t('remote.showRunning', { count: liveCount })}
+                    </button>
+                  )}
                   {selectedServer?.has_password && (
                     <button className="btn btn-secondary" onClick={() => connect(true)} title={t('remote.manualPasswordHint')}>
                       ⌨ {t('remote.manualPassword')}
@@ -306,12 +336,20 @@ export default function RemoteWorkspace() {
             </div>
           )}
 
+          {hasSessionsView && serverView === 'sessions' && (
+            <TargetSessionsView name={headTitle} sessions={targetSessions} currentSessionId={currentSessionId}
+              onRefresh={refetchSessions} onAttach={attachSession} onPopOut={popOutSession}
+              onShare={(session) => { setShareTarget(session.id); setShowShare(true); }}
+              onNewSession={() => connectTo(selection, true)}
+              onOpenWindow={() => runRailAction(selection, 'window')} />
+          )}
+
           {selection.kind === 'new' && (
             <div className="rw-view rw-view-scroll">
               <div className="rw-section">
                 <div className="rw-section-head"><h3>{t('remote.addRemoteServer')}</h3></div>
                 <ServerForm
-                  onSaved={(server) => { refetchServers(); select({ kind: 'server', id: server.id }); }}
+                  onSaved={async (server) => { await refetchServers(); select({ kind: 'server', id: server.id }, 'settings'); }}
                   onCancel={() => select({ kind: 'overview' })}
                 />
                 <p className="text-secondary">{t('remote.noServersKeyHint')}</p>
@@ -320,27 +358,10 @@ export default function RemoteWorkspace() {
           )}
 
           {selection.kind === 'adhoc' && !adhocTarget && (
-            <div className="rw-view rw-view-scroll">
-              <div className="rw-section">
-                <div className="rw-section-head"><h3>{t('remote.adhoc')}</h3></div>
-                <p className="text-secondary">{t('remote.adhocHint')}</p>
-                <form className="filter-row" onSubmit={(e) => {
-                  e.preventDefault();
-                  if (!adhocForm.host.trim()) return;
-                  const target = { host: adhocForm.host.trim(), port: parseInt(adhocForm.port, 10) || 22, user: adhocForm.user.trim() || 'root' };
-                  setAdhocTarget(target);
-                  setConnected(prev => new Set(prev).add(`ws_adhoc_${target.user}@${target.host}:${target.port}`));
-                }}>
-                  <input className="filter-input" placeholder={t('terminal.hostPlaceholder')} value={adhocForm.host}
-                    onChange={e => setAdhocForm({ ...adhocForm, host: e.target.value })} required />
-                  <input className="filter-input" style={{ maxWidth: 90 }} placeholder={t('terminal.portPlaceholder')}
-                    value={adhocForm.port} onChange={e => setAdhocForm({ ...adhocForm, port: e.target.value })} />
-                  <input className="filter-input" style={{ maxWidth: 140 }} placeholder={t('terminal.userPlaceholder')}
-                    value={adhocForm.user} onChange={e => setAdhocForm({ ...adhocForm, user: e.target.value })} />
-                  <button type="submit" className="btn btn-primary btn-sm">{t('common.connect')}</button>
-                </form>
-              </div>
-            </div>
+            <AdhocConnect onConnect={(target) => {
+              setAdhocTarget(target);
+              setConnected(prev => new Set(prev).add(`ws_adhoc_${target.user}@${target.host}:${target.port}`));
+            }} />
           )}
 
           {isServerTarget && selectedServer && serverView === 'status' && (

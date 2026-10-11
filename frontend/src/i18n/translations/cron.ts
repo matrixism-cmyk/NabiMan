@@ -1,0 +1,17 @@
+export default {
+  'cron.editJob': { ko: '예약 작업 수정', en: 'Edit scheduled job', ja: '予約ジョブの編集' },
+  'cron.editHelp': { ko: '선택한 행의 시간과 명령만 수정합니다. 실행 계정·행 위치·주변 환경설정은 유지하며, 이미 실행 중인 작업에는 적용되지 않습니다.', en: 'Change the schedule and command of this line. Keep its account, position and surrounding environment. Already running jobs are unaffected.', ja: '選択行の時刻とコマンドを変更します。アカウント・行位置・周囲の設定は維持します。実行中のジョブには影響しません。' },
+  'cron.before': { ko: '수정 전 작업', en: 'Job before change', ja: '変更前のジョブ' },
+  'cron.after': { ko: '저장할 작업', en: 'Job to save', ja: '保存するジョブ' },
+  'cron.reload': { ko: '다시 조회', en: 'Reload', ja: '再読込' },
+  'cron.scopeHelp': { ko: '본 서버의 사용자 crontab입니다. 나비맨 회원·tenant 작업, /etc/cron.d, systemd timer는 포함하지 않습니다. 변경은 최고관리자만 가능합니다.', en: 'Local user crontabs only. NabiMan member/tenant jobs, /etc/cron.d and systemd timers are separate. Only the highest administrator can change these commands.', ja: '本サーバーのユーザーcrontabです。会員・tenantジョブ、/etc/cron.d、systemd timerは対象外です。変更は最高管理者のみ可能です。' },
+  'cron.executionHelp': { ko: '명령은 해당 OS 계정 권한과 cron의 시간대·환경·셸 설정으로 실행됩니다. % 문자는 cron에서 특별한 의미가 있습니다. 저장 성공은 향후 실행 성공을 보장하지 않습니다.', en: 'Commands run with the OS account privileges and cron timezone, environment and shell settings. % has special cron semantics. Saving does not prove future execution success.', ja: '指定OSアカウント権限とcronの時間帯・環境・シェルで実行されます。%には特別な意味があります。保存成功は実行成功を保証しません。' },
+  'cron.review': { ko: '현재 설정 읽고 검토', en: 'Read current crontab for review', ja: '現在の設定を読み込んで確認' },
+  'cron.existing': { ko: '검토한 기존 crontab (읽기 전용)', en: 'Reviewed existing crontab (read only)', ja: '確認した既存crontab（読み取り専用）' },
+  'cron.reviewFailed': { ko: '기존 설정을 확인하지 못했습니다. 변경할 수 없습니다.', en: 'Could not read existing settings. Changes are unavailable.', ja: '既存設定を確認できないため変更できません。' },
+  'cron.confirmExecution': { ko: '실행 계정·명령·기존 환경을 확인했습니다.', en: 'I reviewed the execution account, command and existing environment.', ja: '実行アカウント・コマンド・既存環境を確認しました。' },
+  'cron.deleteHelp': { ko: '선택한 작업 행만 삭제합니다. 환경변수·주석·다른 작업의 순서는 유지합니다. 이미 실행 중인 작업은 중단하지 않습니다.', en: 'Remove only this job line; keep environment, comments and other entries in order. Already running jobs are not stopped.', ja: '選択した行のみ削除し、環境変数・コメント・他の行順は維持します。実行中のジョブは停止しません。' },
+  'cron.confirmDelete': { ko: '표시된 예약 작업의 삭제를 확인합니다.', en: 'Confirm removal of the displayed scheduled job.', ja: '表示した予約ジョブの削除を確認します。' },
+  'cron.stale': { ko: '검토 이후 설정이 변경되었습니다. 다시 조회해 선택하세요.', en: 'Settings changed after review. Reload and select again.', ja: '確認後に設定が変更されました。再読込して選択してください。' },
+  'cron.unknownResult': { ko: '변경 결과를 확인하지 못했습니다. 자동 재시도하지 않습니다. 현재 설정을 다시 확인하세요.', en: 'Change outcome was not confirmed. No automatic retry. Review current settings before submitting again.', ja: '変更結果を確認できません。自動再試行は行いません。現在の設定を確認してください。' },
+};

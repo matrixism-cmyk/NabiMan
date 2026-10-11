@@ -24,25 +24,20 @@ impl StarterKitOrchestrator {
     }
 
     pub async fn deploy(&self, tenant_id: &str, user: &str) -> ServiceResult<DeployResult> {
-        let mut tenant = self
-            .tenants
-            .get(tenant_id)?
-            .ok_or_else(|| {
-                crate::mec::services::ServiceError::NotFound(format!("tenant {}", tenant_id))
-            })?;
+        let mut tenant = self.tenants.get(tenant_id)?.ok_or_else(|| {
+            crate::mec::services::ServiceError::NotFound(format!("tenant {}", tenant_id))
+        })?;
 
         let ssh_user = format!("{}-dev", tenant_id);
         let ssh_password = random_password(16);
         let vscode_password = random_password(16);
-        let ssh_hash = bcrypt::hash(&ssh_password, 10).map_err(|e| {
-            crate::mec::services::ServiceError::Internal(format!("bcrypt: {}", e))
-        })?;
+        let ssh_hash = bcrypt::hash(&ssh_password, 10)
+            .map_err(|e| crate::mec::services::ServiceError::Internal(format!("bcrypt: {}", e)))?;
 
         let kube = &self.services.kube;
         let (deploy_ssh, svc_ssh) =
             ubuntu_ssh_manifests(&tenant.namespace, tenant_id, &ssh_user, &ssh_hash);
-        let (deploy_vs, svc_vs) =
-            vscode_manifests(&tenant.namespace, tenant_id, &vscode_password);
+        let (deploy_vs, svc_vs) = vscode_manifests(&tenant.namespace, tenant_id, &vscode_password);
 
         kube.apply_deployment(&tenant.namespace, &deploy_ssh.to_string())
             .await?;
@@ -81,16 +76,17 @@ impl StarterKitOrchestrator {
     }
 
     pub async fn remove(&self, tenant_id: &str, user: &str) -> ServiceResult<()> {
-        let mut tenant = self
-            .tenants
-            .get(tenant_id)?
-            .ok_or_else(|| {
-                crate::mec::services::ServiceError::NotFound(format!("tenant {}", tenant_id))
-            })?;
+        let mut tenant = self.tenants.get(tenant_id)?.ok_or_else(|| {
+            crate::mec::services::ServiceError::NotFound(format!("tenant {}", tenant_id))
+        })?;
         let kube = &self.services.kube;
-        let _ = kube.delete_service(&tenant.namespace, "ubuntu-ssh-svc").await;
+        let _ = kube
+            .delete_service(&tenant.namespace, "ubuntu-ssh-svc")
+            .await;
         let _ = kube.delete_service(&tenant.namespace, "vscode-svc").await;
-        let _ = kube.delete_deployment(&tenant.namespace, "ubuntu-ssh").await;
+        let _ = kube
+            .delete_deployment(&tenant.namespace, "ubuntu-ssh")
+            .await;
         let _ = kube.delete_deployment(&tenant.namespace, "vscode").await;
         tenant.starter_kit = None;
         tenant.updated_at = Utc::now();
@@ -100,8 +96,7 @@ impl StarterKitOrchestrator {
 }
 
 fn random_password(len: usize) -> String {
-    const CHARSET: &[u8] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     let mut rng = rand::thread_rng();
     (0..len)
         .map(|_| {
@@ -143,10 +138,7 @@ mod tests {
     #[tokio::test]
     async fn deploy_and_remove() {
         let state = MecState::mocks();
-        state
-            .tenants
-            .upsert(&sample_tenant("x"), "admin")
-            .unwrap();
+        state.tenants.upsert(&sample_tenant("x"), "admin").unwrap();
         let orch = StarterKitOrchestrator::new(state.services.clone(), state.tenants.clone());
         let res = orch.deploy("x", "admin").await.unwrap();
         assert_eq!(res.ssh_user, "x-dev");

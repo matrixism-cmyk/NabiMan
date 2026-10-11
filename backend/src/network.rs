@@ -1,7 +1,7 @@
-use actix_web::{get, web, HttpResponse};
-use sysinfo::Networks;
-use std::fs;
 use crate::models::{ApiResponse, NetworkInterface, NetworkStatus};
+use actix_web::{get, web, HttpResponse};
+use std::fs;
+use sysinfo::Networks;
 
 #[get("/api/network/status")]
 async fn get_network_status() -> HttpResponse {

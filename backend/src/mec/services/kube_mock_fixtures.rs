@@ -43,7 +43,14 @@ pub fn sample_tenant_usage() -> Vec<TenantUsage> {
 }
 
 pub fn sample_pod_phases() -> PodPhaseSummary {
-    PodPhaseSummary { running: 279, pending: 0, failed: 7, succeeded: 27, unknown: 0, total: 313 }
+    PodPhaseSummary {
+        running: 279,
+        pending: 0,
+        failed: 7,
+        succeeded: 27,
+        unknown: 0,
+        total: 313,
+    }
 }
 
 pub fn sample_events(limit: u32) -> Vec<ClusterEvent> {
@@ -61,12 +68,60 @@ pub fn sample_events(limit: u32) -> Vec<ClusterEvent> {
         }
     };
     let all = vec![
-        mk(8, "Warning", "BackOff", "Pod", "loki-0", "monitoring", "Back-off restarting failed container"),
-        mk(35, "Normal", "Pulled", "Pod", "triton-a40-xyz", "maninblock-poc", "Container image already present"),
-        mk(60, "Warning", "Unhealthy", "Pod", "istio-cni-node-7npdd", "istio-system", "Readiness probe failed"),
-        mk(95, "Normal", "Scheduled", "Pod", "gpu-job-12", "witches-poc", "Successfully assigned to mec-wn01"),
-        mk(140, "Normal", "Started", "Pod", "api-gw-5f9", "funit-poc", "Started container api"),
-        mk(210, "Warning", "FailedMount", "Pod", "triton-a40-dwwfh", "maninblock-poc", "MountVolume.SetUp failed for pvc"),
+        mk(
+            8,
+            "Warning",
+            "BackOff",
+            "Pod",
+            "loki-0",
+            "monitoring",
+            "Back-off restarting failed container",
+        ),
+        mk(
+            35,
+            "Normal",
+            "Pulled",
+            "Pod",
+            "triton-a40-xyz",
+            "maninblock-poc",
+            "Container image already present",
+        ),
+        mk(
+            60,
+            "Warning",
+            "Unhealthy",
+            "Pod",
+            "istio-cni-node-7npdd",
+            "istio-system",
+            "Readiness probe failed",
+        ),
+        mk(
+            95,
+            "Normal",
+            "Scheduled",
+            "Pod",
+            "gpu-job-12",
+            "witches-poc",
+            "Successfully assigned to mec-wn01",
+        ),
+        mk(
+            140,
+            "Normal",
+            "Started",
+            "Pod",
+            "api-gw-5f9",
+            "funit-poc",
+            "Started container api",
+        ),
+        mk(
+            210,
+            "Warning",
+            "FailedMount",
+            "Pod",
+            "triton-a40-dwwfh",
+            "maninblock-poc",
+            "MountVolume.SetUp failed for pvc",
+        ),
     ];
     all.into_iter().take(limit as usize).collect()
 }
@@ -74,10 +129,38 @@ pub fn sample_events(limit: u32) -> Vec<ClusterEvent> {
 pub fn sample_nodes() -> Vec<Node> {
     vec![
         make_node("mec-cp01", "control-plane", 32, "125Gi", None, None),
-        make_node("mec-cp02", "worker", 32, "125Gi", Some(("T4", 4, 12)), Some("funit-poc")),
-        make_node("mec-wn01", "worker", 32, "125Gi", Some(("T4", 4, 12)), Some("maninblock-poc")),
-        make_node("mec-wn02", "worker", 64, "503Gi", Some(("A40", 4, 16)), Some("witches-poc")),
-        make_node("mec-wn04", "worker", 72, "555Gi", Some(("GH200", 7, 7)), Some("ygram-poc")),
+        make_node(
+            "mec-cp02",
+            "worker",
+            32,
+            "125Gi",
+            Some(("T4", 4, 12)),
+            Some("funit-poc"),
+        ),
+        make_node(
+            "mec-wn01",
+            "worker",
+            32,
+            "125Gi",
+            Some(("T4", 4, 12)),
+            Some("maninblock-poc"),
+        ),
+        make_node(
+            "mec-wn02",
+            "worker",
+            64,
+            "503Gi",
+            Some(("A40", 4, 16)),
+            Some("witches-poc"),
+        ),
+        make_node(
+            "mec-wn04",
+            "worker",
+            72,
+            "555Gi",
+            Some(("GH200", 7, 7)),
+            Some("ygram-poc"),
+        ),
     ]
 }
 
@@ -97,11 +180,13 @@ fn make_node(
         labels.insert("tenant".into(), t.into());
     }
     let taints = tenant
-        .map(|t| vec![Taint {
-            key: "tenant".into(),
-            value: Some(t.into()),
-            effect: TaintEffect::NoSchedule,
-        }])
+        .map(|t| {
+            vec![Taint {
+                key: "tenant".into(),
+                value: Some(t.into()),
+                effect: TaintEffect::NoSchedule,
+            }]
+        })
         .unwrap_or_default();
     let gpu_info = gpu.map(|(model, count, slots)| GpuInfo {
         model: model.into(),

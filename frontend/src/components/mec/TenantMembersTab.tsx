@@ -1,3 +1,8 @@
+import DelegatedManagedGrant from './DelegatedManagedGrant';
+import MembershipOperations from './MembershipOperations';
+import ManagedMembershipPolicies from './ManagedMembershipPolicies';
+import { useApi } from '../../hooks/useApi';
+import InitialCredentials, { BootstrapCredentials } from './InitialCredentials';
 import React, { useState } from 'react';
 import { useT } from '../../i18n';
 import { useMecList, mecPost, mecDelete } from '../../hooks/mec/useMecApi';
@@ -29,14 +34,19 @@ const ROLES = [
 
 export default function TenantMembersTab({ tenantId }: Props) {
   const { t } = useT();
+  const { data: me } = useApi<{ role: string; status: string; memberships: { kind: string; scope_id: string; role: string; enabled: boolean }[] }>('/api/users/me');
+  const canManage = me?.role === 'admin' && me.status === 'active';
+  const isTenantManager = me?.status === 'active' && me.memberships?.some(m => m.kind === 'tenant' && m.scope_id === tenantId && m.role === 'admin' && m.enabled);
+  const [operationRevision, setOperationRevision] = useState(0);
   const { data, loading, error, refetch } = useMecList<Member>(
-    `/api/mec/v1/tenants/${encodeURIComponent(tenantId)}/members`,
+    canManage ? `/api/mec/v1/tenants/${encodeURIComponent(tenantId)}/members` : '',
     60_000,
   );
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('project-owner');
+  const [role, setRole] = useState('project-member');
   const [createIfMissing, setCreateIfMissing] = useState(false);
+  const [credentials, setCredentials] = useState<BootstrapCredentials | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
@@ -46,17 +56,18 @@ export default function TenantMembersTab({ tenantId }: Props) {
     setBusy(true);
     setErr(null);
     try {
-      const res = await mecPost(
+      const res = await mecPost<{ initial_credentials?: BootstrapCredentials | null }>(
         `/api/mec/v1/tenants/${encodeURIComponent(tenantId)}/members`,
         {
           username,
-          password: password || 'changeme!',
+          password: password || undefined,
           role,
           create_if_missing: createIfMissing,
         },
       );
       if (res.error) setErr(res.error.message);
       else {
+        setCredentials(res.data?.initial_credentials || null);
         setUsername('');
         setPassword('');
         await refetch();
@@ -64,6 +75,7 @@ export default function TenantMembersTab({ tenantId }: Props) {
     } catch (e) {
       setErr(String(e));
     } finally {
+      setOperationRevision(value => value + 1);
       setBusy(false);
     }
   };
@@ -77,7 +89,7 @@ export default function TenantMembersTab({ tenantId }: Props) {
       await refetch();
     } catch (e) {
       setErr(String(e));
-    }
+    } finally { setOperationRevision(value => value + 1); }
   };
 
   return (
@@ -95,7 +107,9 @@ export default function TenantMembersTab({ tenantId }: Props) {
       </div>
       <ErrorBanner error={error || err || undefined} />
 
-      <Section title={t('mec.tenant.members.add')}>
+      {credentials && <InitialCredentials credentials={credentials} onDone={() => setCredentials(null)} />}
+
+      {canManage && <details><summary>{t('mec.managed.legacyAdd')}</summary><p>{t('mec.managed.legacyWarning')}</p><Section title={t('mec.tenant.members.add')}>
         <form
           onSubmit={add}
           style={{
@@ -125,7 +139,9 @@ export default function TenantMembersTab({ tenantId }: Props) {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="changeme!"
+              placeholder={t('mec.credentials.generatedIfBlank')}
+              minLength={15}
+              disabled={!createIfMissing}
               style={{ width: '100%' }}
             />
           </label>
@@ -157,7 +173,7 @@ export default function TenantMembersTab({ tenantId }: Props) {
             {busy ? t('mec.tenant.members.adding') : t('mec.tenant.members.addBtn')}
           </button>
         </form>
-      </Section>
+      </Section></details>}
 
       <Section title={t('mec.tenant.members.list')} marginTop="20px">
         <Toolbar>
@@ -219,18 +235,20 @@ export default function TenantMembersTab({ tenantId }: Props) {
               accessor: () => '',
               sortable: false,
               width: '80px',
-              render: (m) => (
+              render: (m) => canManage ? (
                 <button
                   className="btn btn-danger btn-small"
                   onClick={() => remove(m.id, m.username || m.user_id)}
                 >
                   {t('mec.tenant.members.remove')}
                 </button>
-              ),
+              ) : null,
             },
           ]}
         />
       </Section>
+      {!canManage && isTenantManager && <DelegatedManagedGrant tenantId={tenantId} />}
+      {canManage && <><MembershipOperations tenantId={tenantId} revision={operationRevision} /><ManagedMembershipPolicies tenantId={tenantId} onChanged={async () => { setOperationRevision(value => value + 1); await refetch(); }} /></>}
     </div>
   );
 }

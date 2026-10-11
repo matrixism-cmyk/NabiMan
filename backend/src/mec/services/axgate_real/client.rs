@@ -1,9 +1,7 @@
 use super::session::AxgateSession;
 use crate::mec::services::axgate_service::{AxgateHealth, AxgateService, SyncResult};
 use crate::mec::services::{ServiceError, ServiceResult};
-use crate::models::mec::{
-    CreateNatRuleRequest, NatRule, PublicIp, SecurityPolicy,
-};
+use crate::models::mec::{CreateNatRuleRequest, NatRule, PublicIp, SecurityPolicy};
 use async_trait::async_trait;
 use chrono::Utc;
 use std::sync::Mutex;
@@ -15,6 +13,8 @@ pub struct AxgateRealConfig {
     pub username: String,
     pub password: String,
     pub timeout_secs: u64,
+    pub host_key_sha256: String,
+    pub legacy_until: Option<String>,
 }
 
 impl AxgateRealConfig {
@@ -36,6 +36,9 @@ impl AxgateRealConfig {
             username,
             password,
             timeout_secs,
+            host_key_sha256: std::env::var("NABIMAN_MEC_AXGATE_HOST_KEY_SHA256")
+                .unwrap_or_default(),
+            legacy_until: std::env::var("NABIMAN_MEC_AXGATE_LEGACY_UNTIL").ok(),
         })
     }
 }
@@ -62,20 +65,19 @@ impl AxgateReal {
     }
 
     pub(super) async fn fetch_config(&self) -> ServiceResult<String> {
+        super::host_trust::HostTrust::parse(
+            &self.config.host_key_sha256,
+            self.config.legacy_until.as_deref(),
+            Utc::now(),
+        )?;
         let now = std::time::Instant::now();
         if let Some(config) = self.cached_config(now) {
             return Ok(config);
         }
-        let cfg = AxgateSession::connect(
-            &self.config.host,
-            self.config.port,
-            &self.config.username,
-            &self.config.password,
-            Duration::from_secs(self.config.timeout_secs),
-        )
-        .await?
-        .fetch_running_config()
-        .await?;
+        let cfg = AxgateSession::connect(&self.config)
+            .await?
+            .fetch_running_config()
+            .await?;
         self.cache.lock().unwrap().running_config = Some(cfg.clone());
         self.cache.lock().unwrap().cached_at = Some(now);
         Ok(cfg)
@@ -166,15 +168,7 @@ impl AxgateService for AxgateReal {
 
     async fn health_check(&self) -> ServiceResult<AxgateHealth> {
         let start = std::time::Instant::now();
-        match AxgateSession::connect(
-            &self.config.host,
-            self.config.port,
-            &self.config.username,
-            &self.config.password,
-            Duration::from_secs(self.config.timeout_secs),
-        )
-        .await
-        {
+        match AxgateSession::connect(&self.config).await {
             Ok(_) => Ok(AxgateHealth {
                 connected: true,
                 endpoint: format!("{}:{}", self.config.host, self.config.port),
@@ -198,16 +192,10 @@ impl AxgateService for AxgateReal {
         if std::env::var("NABIMAN_MEC_AXGATE_VPN").is_err() {
             return Ok(vec![]);
         }
-        let output = AxgateSession::connect(
-            &self.config.host,
-            self.config.port,
-            &self.config.username,
-            &self.config.password,
-            Duration::from_secs(self.config.timeout_secs),
-        )
-        .await?
-        .run_commands(&["show sslvpn tunnel"])
-        .await?;
+        let output = AxgateSession::connect(&self.config)
+            .await?
+            .run_commands(&["show sslvpn tunnel"])
+            .await?;
         Ok(super::parser::parse_vpn_sessions(&output))
     }
 }
@@ -216,5 +204,30 @@ pub(super) fn upstream<E: std::fmt::Display>(e: E) -> ServiceError {
     ServiceError::Upstream {
         source: "axgate".into(),
         message: e.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod trust_cache_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn expired_legacy_exception_cannot_serve_cached_configuration() {
+        let key = russh::keys::PrivateKey::random(&mut rand10::rng(), russh::keys::Algorithm::Ed25519).unwrap();
+        let service = AxgateReal::new(AxgateRealConfig {
+            host: "127.0.0.1".into(),
+            port: 1,
+            username: "test".into(),
+            password: "test".into(),
+            timeout_secs: 1,
+            host_key_sha256: key.public_key().fingerprint(russh::keys::HashAlg::Sha256).to_string(),
+            legacy_until: Some((Utc::now() - chrono::Duration::seconds(1)).to_rfc3339()),
+        });
+        *service.cache.lock().unwrap() = AxgateCache {
+            running_config: Some("previous configuration".into()),
+            cached_at: Some(std::time::Instant::now()),
+        };
+        let err = service.fetch_config().await.unwrap_err();
+        assert!(err.to_string().contains("expired"));
     }
 }

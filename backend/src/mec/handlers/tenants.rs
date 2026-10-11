@@ -1,22 +1,51 @@
-use super::util::{accepted, created, current_user, from_service_error, list_response, no_content, ok_response};
+use super::util::{
+    accepted, created, current_user, from_service_error, list_response, no_content, ok_response,
+};
 use crate::mec::tenant_orchestrator::TenantOrchestrator;
 use crate::mec::MecState;
 use crate::models::mec::CreateTenantRequest;
 use actix_web::{web, HttpRequest, HttpResponse};
 
-pub async fn list(state: web::Data<MecState>) -> HttpResponse {
+fn public_tenant(mut tenant: crate::models::mec::Tenant) -> crate::models::mec::Tenant {
+    if let Some(kit) = tenant.starter_kit.as_mut() {
+        kit.ssh_password_hash = None;
+    }
+    tenant
+}
+
+pub async fn list(
+    req: HttpRequest,
+    users: web::Data<crate::users::UserStore>,
+    state: web::Data<MecState>,
+) -> HttpResponse {
+    let actor = match crate::membership::actor(&req, &users) {
+        Ok(u) => u,
+        Err(r) => return r,
+    };
     match state.tenants.list() {
-        Ok(ts) => list_response(ts),
+        Ok(ts) => list_response(
+            ts.into_iter()
+                .filter(|t| {
+                    actor.super_admin()
+                        || !actor.restricted()
+                        || actor
+                            .scope_role(&crate::models::ScopeKind::Tenant, &t.id)
+                            .is_some()
+                })
+                .map(public_tenant)
+                .collect::<Vec<_>>(),
+        ),
         Err(e) => from_service_error(e.into()),
     }
 }
 
 pub async fn get(path: web::Path<String>, state: web::Data<MecState>) -> HttpResponse {
     match state.tenants.get(&path) {
-        Ok(Some(t)) => ok_response(t),
-        Ok(None) => from_service_error(
-            crate::mec::services::ServiceError::NotFound(format!("tenant {}", &path)),
-        ),
+        Ok(Some(t)) => ok_response(public_tenant(t)),
+        Ok(None) => from_service_error(crate::mec::services::ServiceError::NotFound(format!(
+            "tenant {}",
+            &path
+        ))),
         Err(e) => from_service_error(e.into()),
     }
 }
@@ -26,7 +55,10 @@ pub async fn create(
     body: web::Json<CreateTenantRequest>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let user = current_user(&req);
+    let user = match current_user(&req) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
     let orch = TenantOrchestrator::new(
         state.services.clone(),
         state.audit.clone(),
@@ -35,8 +67,9 @@ pub async fn create(
     );
     let spec = body.into_inner();
     let tenant_id_copy = spec.tenant_id.clone();
-    match orch.create(spec, &user).await {
-        Ok(t) => {
+    match orch.create_with_credentials(spec, &user).await {
+        Ok(created_tenant) => {
+            let t = created_tenant.tenant;
             if let Some(ch) = state.channels.as_ref() {
                 crate::mec::notify::MecNotify::TenantCreated {
                     tenant_id: &t.id,
@@ -45,7 +78,16 @@ pub async fn create(
                 }
                 .dispatch(ch);
             }
-            created(t)
+            let mut payload = serde_json::to_value(public_tenant(t)).expect("Tenant serialization");
+            payload["initial_credentials"] =
+                serde_json::to_value(created_tenant.initial_credentials)
+                    .expect("Credential serialization");
+            let mut response = created(payload);
+            response.headers_mut().insert(
+                actix_web::http::header::CACHE_CONTROL,
+                actix_web::http::header::HeaderValue::from_static("no-store"),
+            );
+            response
         }
         Err(e) => {
             if let Some(ch) = state.channels.as_ref() {
@@ -66,7 +108,10 @@ pub async fn delete(
     path: web::Path<String>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let user = current_user(&req);
+    let user = match current_user(&req) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
     let id = path.into_inner();
     if let Err(e) = crate::mec::safety::require_confirm_header(&req, &id) {
         return from_service_error(e);
@@ -92,10 +137,7 @@ pub async fn delete(
     }
 }
 
-pub async fn quota_usage(
-    path: web::Path<String>,
-    state: web::Data<MecState>,
-) -> HttpResponse {
+pub async fn quota_usage(path: web::Path<String>, state: web::Data<MecState>) -> HttpResponse {
     match state.services.kube.get_quota_usage(&path).await {
         Ok(q) => ok_response(q),
         Err(e) => from_service_error(e),
@@ -123,13 +165,17 @@ pub async fn guide_download(
     path: web::Path<String>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let user = current_user(&req);
+    let user = match current_user(&req) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
     let tenant = match state.tenants.get(&path) {
         Ok(Some(t)) => t,
         Ok(None) => {
-            return from_service_error(
-                crate::mec::services::ServiceError::NotFound(format!("tenant {}", &path)),
-            );
+            return from_service_error(crate::mec::services::ServiceError::NotFound(format!(
+                "tenant {}",
+                &path
+            )));
         }
         Err(e) => return from_service_error(e.into()),
     };
@@ -146,9 +192,7 @@ pub async fn guide_download(
             ))
             .content_type("text/plain; charset=utf-8")
             .body(text),
-        Err(e) => from_service_error(
-            crate::mec::services::ServiceError::Internal(e.to_string()),
-        ),
+        Err(e) => from_service_error(crate::mec::services::ServiceError::Internal(e.to_string())),
     }
 }
 
@@ -157,13 +201,17 @@ pub async fn guide_download_docx(
     path: web::Path<String>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let user = current_user(&req);
+    let user = match current_user(&req) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
     let tenant = match state.tenants.get(&path) {
         Ok(Some(t)) => t,
         Ok(None) => {
-            return from_service_error(
-                crate::mec::services::ServiceError::NotFound(format!("tenant {}", &path)),
-            );
+            return from_service_error(crate::mec::services::ServiceError::NotFound(format!(
+                "tenant {}",
+                &path
+            )));
         }
         Err(e) => return from_service_error(e.into()),
     };
@@ -174,9 +222,7 @@ pub async fn guide_download_docx(
     let doc = match gen.generate_tenant_guide(&tenant, &user) {
         Ok(d) => d,
         Err(e) => {
-            return from_service_error(
-                crate::mec::services::ServiceError::Internal(e.to_string()),
-            );
+            return from_service_error(crate::mec::services::ServiceError::Internal(e.to_string()));
         }
     };
     match std::fs::read(&doc.file_path) {
@@ -187,9 +233,7 @@ pub async fn guide_download_docx(
             ))
             .content_type("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
             .body(bytes),
-        Err(e) => from_service_error(
-            crate::mec::services::ServiceError::Internal(e.to_string()),
-        ),
+        Err(e) => from_service_error(crate::mec::services::ServiceError::Internal(e.to_string())),
     }
 }
 
@@ -205,15 +249,17 @@ pub async fn deploy_starter_kit(
     path: web::Path<String>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let user = current_user(&req);
+    let user = match current_user(&req) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
     let orch = crate::mec::starter_kit::StarterKitOrchestrator::new(
         state.services.clone(),
         state.tenants.clone(),
     );
     let id = path.into_inner();
-    let audit = super::audit_helper::begin_audit(
-        &req, &state, &user, "starter_kit_deploy", "tenant", &id,
-    );
+    let audit =
+        super::audit_helper::begin_audit(&req, &state, &user, "starter_kit_deploy", "tenant", &id);
     match orch.deploy(&id, &user).await {
         Ok(r) => {
             audit.success(Some(serde_json::json!({"ssh_user": &r.ssh_user})));
@@ -244,14 +290,16 @@ pub async fn delete_starter_kit(
     path: web::Path<String>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let user = current_user(&req);
+    let user = match current_user(&req) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
     let id = path.into_inner();
     if let Err(e) = crate::mec::safety::require_confirm_header(&req, &id) {
         return from_service_error(e);
     }
-    let audit = super::audit_helper::begin_audit(
-        &req, &state, &user, "starter_kit_delete", "tenant", &id,
-    );
+    let audit =
+        super::audit_helper::begin_audit(&req, &state, &user, "starter_kit_delete", "tenant", &id);
     let orch = crate::mec::starter_kit::StarterKitOrchestrator::new(
         state.services.clone(),
         state.tenants.clone(),

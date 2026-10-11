@@ -20,17 +20,11 @@ pub async fn apply_network_policy(
     // Parse provided spec, or fall back to a minimal "allow all egress" policy.
     let policy: NetworkPolicy = if spec_json.trim().is_empty() || spec_json == "{}" {
         serde_json::from_value(default_egress_policy(name)).map_err(|e| {
-            crate::mec::services::ServiceError::Internal(format!(
-                "build network policy: {}",
-                e
-            ))
+            crate::mec::services::ServiceError::Internal(format!("build network policy: {}", e))
         })?
     } else {
         serde_json::from_str(spec_json).map_err(|e| {
-            crate::mec::services::ServiceError::InvalidInput(format!(
-                "network policy json: {}",
-                e
-            ))
+            crate::mec::services::ServiceError::InvalidInput(format!("network policy json: {}", e))
         })?
     };
 
@@ -103,17 +97,17 @@ pub async fn apply_rbac(client: &Client, namespace: &str, user: &str) -> Service
             namespace: Some(namespace.into()),
             ..Default::default()
         },
-        rules: Some(vec![
-            PolicyRule {
-                api_groups: Some(vec!["".into(), "apps".into(), "batch".into()]),
-                resources: Some(vec!["*".into()]),
-                verbs: vec!["get", "list", "watch", "create", "update", "patch", "delete"]
-                    .into_iter()
-                    .map(String::from)
-                    .collect(),
-                ..Default::default()
-            },
-        ]),
+        rules: Some(vec![PolicyRule {
+            api_groups: Some(vec!["".into(), "apps".into(), "batch".into()]),
+            resources: Some(vec!["*".into()]),
+            verbs: vec![
+                "get", "list", "watch", "create", "update", "patch", "delete",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+            ..Default::default()
+        }]),
     };
 
     let binding = RoleBinding {

@@ -2,9 +2,11 @@
 name = "nabiman-server"
 version = "0.1.0"
 edition = "2021"
+default-run = "nabiman-server"
 
 [dependencies]
-actix-web = "4"
+# TLS/HTTP2 terminates at the deployment proxy; the backend uses HTTP/1 + WebSocket.
+actix-web = { version = "4", default-features = false, features = ["macros", "ws", "cookies", "compress-brotli", "compress-gzip", "compress-zstd", "unicode", "compat"] }
 actix-cors = "0.7"
 actix-files = "0.6"
 serde = { version = "1", features = ["derive"] }
@@ -14,6 +16,7 @@ sysinfo = "0.30"
 chrono = { version = "0.4", features = ["serde"] }
 sha2 = "0.10"
 hex = "0.4"
+ed25519-dalek = "=2.2.0"
 actix-web-actors = "4"
 actix = "0.13"
 nix = { version = "0.29", features = ["term", "process", "fs", "signal", "ioctl"] }
@@ -24,14 +27,18 @@ rand = "0.8"
 totp-rs = { version = "5", features = ["qr"] }
 base32 = "0.5"
 aes-gcm = "0.10"
+# Passphrase-only age v1 backup format. 0.12.x ML-KEM conflicts with current SSH crypto;
+# use the upstream 0.11.5 fix release and verify cross-version/Go interoperability.
+age = { version = "=0.11.5", default-features = false }
+tar = { version = "=0.4.46", default-features = false }
+flate2 = "1"
 
 # MEC Management 모듈
 kube = { version = "0.95", features = ["runtime", "derive", "rustls-tls"], default-features = false }
 k8s-openapi = { version = "0.23", features = ["latest"] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 rusqlite = { version = "0.31", features = ["bundled"] }
-russh = "0.44"
-russh-keys = "0.44"
+russh = "=0.64.1"
 uuid = { version = "1", features = ["v4", "serde"] }
 async-trait = "0.1"
 futures = "0.3"
@@ -39,5 +46,18 @@ tokio-stream = { version = "0.1", features = ["sync"] }
 docx-rs = "0.4"
 
 [dev-dependencies]
+rand10 = { package = "rand", version = "0.10", features = ["thread_rng"] }
 actix-rt = "2"
 actix-test = "0.1"
+
+# Runtime identity hashes the executing inode, which is much larger with debug symbols.
+# Keep SHA-256 compression optimized so debug smoke servers retain normal startup latency.
+[profile.dev.package.sha2]
+opt-level = 3
+
+[profile.dev.package.scrypt]
+opt-level = 3
+[profile.dev.package.salsa20]
+opt-level = 3
+[profile.dev.package.pbkdf2]
+opt-level = 3

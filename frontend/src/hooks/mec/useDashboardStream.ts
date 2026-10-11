@@ -1,3 +1,4 @@
+import { fetchWithRefresh } from '../useApi';
 import { useEffect, useState } from 'react';
 
 interface DashboardStreamResult<T> {
@@ -37,11 +38,9 @@ export function useDashboardStream<T>(path: string, enabled = true): DashboardSt
 
     const connect = async () => {
       if (stopped) return;
-      const token = sessionStorage.getItem('nabiman_token');
       controller = new AbortController();
       try {
-        const res = await fetch(`${path}${token ? `?token=${encodeURIComponent(token)}` : ''}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        const res = await fetchWithRefresh(path, {
           signal: controller.signal,
         });
         if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);

@@ -1,6 +1,6 @@
 use super::handlers::{
-    audit, dashboard, dashboard_sse, discover, docs, firewall, gpu, health, jobs, jobs_sse, members,
-    network, nodes, preflight, settings, storage, tenants, users,
+    audit, dashboard, dashboard_sse, discover, docs, firewall, gpu, health, jobs, jobs_sse,
+    members, network, nodes, preflight, settings, storage, tenants, users,
 };
 use actix_web::web;
 
@@ -35,27 +35,93 @@ fn user_scope() -> actix_web::Scope {
         .route("", web::post().to(users::create))
         .route("/{id}", web::get().to(users::get))
         .route("/{id}", web::delete().to(users::delete))
-        .route("/{id}/reset-password", web::post().to(users::reset_password))
+        .route(
+            "/{id}/reset-password",
+            web::post().to(users::reset_password),
+        )
 }
 
 fn tenant_scope() -> actix_web::Scope {
     web::scope("/tenants")
+        .route(
+            "/{id}/members/{user_id}/access-plan",
+            web::get().to(super::handlers::access_plan::inspect),
+        )
         .route("", web::get().to(tenants::list))
         .route("", web::post().to(tenants::create))
         .route("/discover", web::get().to(discover::discover))
         .route("/{id}", web::get().to(tenants::get))
         .route("/{id}", web::delete().to(tenants::delete))
         .route("/{id}/import", web::post().to(discover::import_tenant))
-        .route("/{id}/delete-preflight", web::get().to(preflight::tenant_delete))
+        .route(
+            "/{id}/delete-preflight",
+            web::get().to(preflight::tenant_delete),
+        )
         .route("/{id}/quota-usage", web::get().to(tenants::quota_usage))
         .route("/{id}/resources", web::get().to(tenants::resources))
         .route("/{id}/guide.txt", web::get().to(tenants::guide_download))
-        .route("/{id}/guide.docx", web::get().to(tenants::guide_download_docx))
-        .route("/{id}/starter-kit", web::post().to(tenants::deploy_starter_kit))
-        .route("/{id}/starter-kit", web::delete().to(tenants::delete_starter_kit))
+        .route(
+            "/{id}/guide.docx",
+            web::get().to(tenants::guide_download_docx),
+        )
+        .route(
+            "/{id}/starter-kit",
+            web::post().to(tenants::deploy_starter_kit),
+        )
+        .route(
+            "/{id}/starter-kit",
+            web::delete().to(tenants::delete_starter_kit),
+        )
+        .route(
+            "/{id}/access-delegation",
+            web::get().to(super::access_delegation::get),
+        )
+        .route(
+            "/{id}/access-delegation",
+            web::put().to(super::access_delegation::put),
+        )
+        .route(
+            "/{id}/delegated-access-context",
+            web::get().to(super::access_delegation::context),
+        )
+        .route(
+            "/{id}/scoped-managed-memberships",
+            web::get().to(super::managed_revocation::inventory),
+        )
+        .route(
+            "/{id}/managed-memberships/{operation_id}/revoke",
+            web::post().to(super::managed_revocation::revoke),
+        )
+        .route(
+            "/{id}/managed-memberships",
+            web::get().to(super::managed_memberships::inventory),
+        )
+        .route(
+            "/{id}/pending-managed-grants",
+            web::get().to(super::managed_memberships::pending_inventory),
+        )
+        .route(
+            "/{id}/managed-memberships",
+            web::post().to(super::managed_memberships::grant),
+        )
+        .route(
+            "/{id}/membership-operations/{operation_id}/associate",
+            web::post().to(super::managed_memberships::attach),
+        )
         .route("/{id}/members", web::get().to(members::list))
+        .route(
+            "/{id}/membership-operations",
+            web::get().to(members::operations),
+        )
+        .route(
+            "/{id}/membership-operations/{operation_id}/reconcile",
+            web::post().to(members::reconcile),
+        )
         .route("/{id}/members", web::post().to(members::add))
-        .route("/{id}/members/{binding_id}", web::delete().to(members::remove))
+        .route(
+            "/{id}/members/{binding_id}",
+            web::delete().to(members::remove),
+        )
 }
 
 fn node_scope() -> actix_web::Scope {
@@ -96,7 +162,10 @@ fn firewall_scope() -> actix_web::Scope {
         .route("/nat-rules", web::post().to(firewall::add_nat))
         .route("/nat-rules/{id}", web::delete().to(firewall::delete_nat))
         .route("/nat-rules/{id}", web::patch().to(firewall::patch_nat))
-        .route("/security-policies", web::get().to(firewall::security_policies))
+        .route(
+            "/security-policies",
+            web::get().to(firewall::security_policies),
+        )
         .route("/sync", web::post().to(firewall::sync))
 }
 
@@ -105,7 +174,10 @@ fn storage_scope() -> actix_web::Scope {
         .route("/overview", web::get().to(storage::overview))
         .route("/pvcs", web::get().to(storage::pvcs))
         .route("/harbor/projects", web::get().to(storage::harbor_projects))
-        .route("/harbor/projects", web::post().to(storage::create_harbor_project))
+        .route(
+            "/harbor/projects",
+            web::post().to(storage::create_harbor_project),
+        )
         .route(
             "/harbor/projects/{project}/images",
             web::get().to(storage::harbor_repositories),
@@ -123,6 +195,7 @@ fn job_scope() -> actix_web::Scope {
         .route("", web::get().to(jobs::list))
         .route("/{id}", web::get().to(jobs::get))
         .route("/{id}/stream", web::get().to(jobs_sse::stream))
+        .route("/{id}/recovery", web::get().to(jobs::recovery))
 }
 
 fn doc_scope() -> actix_web::Scope {

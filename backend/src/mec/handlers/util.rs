@@ -1,6 +1,6 @@
 use crate::mec::services::ServiceError;
 use crate::models::mec::{MecError, MecListResponse, MecResponse};
-use actix_web::{HttpResponse, HttpRequest};
+use actix_web::{HttpRequest, HttpResponse};
 use serde::Serialize;
 
 pub fn ok_response<T: Serialize>(data: T) -> HttpResponse {
@@ -25,9 +25,13 @@ pub fn no_content() -> HttpResponse {
 }
 
 pub fn from_service_error(err: ServiceError) -> HttpResponse {
-    let e = MecError::with_details(err.code(), &err.to_string(), serde_json::json!({
-        "kind": err.code()
-    }));
+    let e = MecError::with_details(
+        err.code(),
+        &err.to_string(),
+        serde_json::json!({
+            "kind": err.code()
+        }),
+    );
     let body = MecResponse::<serde_json::Value>::error(e);
     let status = err.http_status();
     let builder = match status {
@@ -45,12 +49,12 @@ pub fn from_service_error(err: ServiceError) -> HttpResponse {
     b.json(body)
 }
 
-pub fn current_user(req: &HttpRequest) -> String {
-    req.headers()
-        .get("X-User")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("admin")
-        .to_string()
+pub fn current_user(req: &HttpRequest) -> Result<String, HttpResponse> {
+    crate::auth::extract_username(req).ok_or_else(|| {
+        from_service_error(ServiceError::Unauthorized(
+            "Verified principal required".into(),
+        ))
+    })
 }
 
 pub fn source_ip(req: &HttpRequest) -> Option<String> {

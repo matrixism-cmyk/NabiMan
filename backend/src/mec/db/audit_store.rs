@@ -14,6 +14,13 @@ impl AuditStore {
 
     pub fn insert(&self, log: &MecAuditLog) -> rusqlite::Result<()> {
         let conn = self.db.lock().unwrap();
+        Self::insert_on(&conn, log)
+    }
+
+    pub(crate) fn insert_on(
+        conn: &rusqlite::Connection,
+        log: &MecAuditLog,
+    ) -> rusqlite::Result<()> {
         conn.execute(
             "INSERT INTO audit_logs
                 (id, timestamp, user, action, resource_type, resource_id,
@@ -180,17 +187,21 @@ mod tests {
         for i in 0..3 {
             store.insert(&sample_log(&format!("a{}", i))).unwrap();
         }
-        let results = store.query(&AuditQuery {
-            user: Some("admin".into()),
-            limit: Some(10),
-            ..Default::default()
-        }).unwrap();
+        let results = store
+            .query(&AuditQuery {
+                user: Some("admin".into()),
+                limit: Some(10),
+                ..Default::default()
+            })
+            .unwrap();
         assert_eq!(results.len(), 3);
 
-        let none = store.query(&AuditQuery {
-            user: Some("other".into()),
-            ..Default::default()
-        }).unwrap();
+        let none = store
+            .query(&AuditQuery {
+                user: Some("other".into()),
+                ..Default::default()
+            })
+            .unwrap();
         assert!(none.is_empty());
     }
 }

@@ -10,6 +10,8 @@ frontend/.env.local
 backend/static/
 backend/static.bak-*/
 dist/
+__pycache__/
+*.pyc
 
 # Runtime data
 backend/data/

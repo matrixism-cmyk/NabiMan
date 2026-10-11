@@ -9,10 +9,7 @@ use kube::{
     Client,
 };
 
-pub async fn list(
-    client: &Client,
-    namespace: Option<&str>,
-) -> ServiceResult<Vec<IngressRow>> {
+pub async fn list(client: &Client, namespace: Option<&str>) -> ServiceResult<Vec<IngressRow>> {
     let api: Api<Ingress> = match namespace {
         Some(ns) => Api::namespaced(client.clone(), ns),
         None => Api::all(client.clone()),
@@ -29,15 +26,9 @@ pub async fn apply(client: &Client, namespace: &str, spec_json: &str) -> Service
         crate::mec::services::ServiceError::InvalidInput(format!("ingress json: {}", e))
     })?;
     let api: Api<Ingress> = Api::namespaced(client.clone(), namespace);
-    let name = ing
-        .metadata
-        .name
-        .clone()
-        .ok_or_else(|| {
-            crate::mec::services::ServiceError::InvalidInput(
-                "ingress missing metadata.name".into(),
-            )
-        })?;
+    let name = ing.metadata.name.clone().ok_or_else(|| {
+        crate::mec::services::ServiceError::InvalidInput("ingress missing metadata.name".into())
+    })?;
     match api.create(&PostParams::default(), &ing).await {
         Ok(_) => Ok(()),
         Err(kube::Error::Api(ae)) if ae.code == 409 => {

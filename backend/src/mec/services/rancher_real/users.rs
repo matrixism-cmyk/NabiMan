@@ -29,7 +29,8 @@ impl From<UserWire> for RancherUser {
             id: w.id,
             username: w.username.unwrap_or_default(),
             display_name: w.display_name,
-            enabled: w.enabled.unwrap_or(true),
+            // A missing activation flag is not evidence of an active identity.
+            enabled: w.enabled.unwrap_or(false),
             must_change_password: w.must_change_password.unwrap_or(false),
         }
     }
@@ -42,7 +43,7 @@ pub async fn create(r: &RancherReal, username: &str, password: &str) -> ServiceR
         "username": username,
         "password": password,
         "enabled": true,
-        "mustChangePassword": false,
+        "mustChangePassword": true,
     });
     let res = r
         .auth(r.http.post(&url))
@@ -66,7 +67,10 @@ pub async fn delete(r: &RancherReal, id: &str) -> ServiceResult<()> {
     } else {
         let code = res.status();
         let body = res.text().await.unwrap_or_default();
-        Err(upstream_err(format!("delete user {}: {} {}", id, code, body)))
+        Err(upstream_err(format!(
+            "delete user {}: {} {}",
+            id, code, body
+        )))
     }
 }
 
@@ -92,11 +96,7 @@ pub async fn list(r: &RancherReal) -> ServiceResult<Vec<RancherUser>> {
     Ok(list.data.into_iter().map(Into::into).collect())
 }
 
-pub async fn reset_password(
-    r: &RancherReal,
-    id: &str,
-    new_password: &str,
-) -> ServiceResult<()> {
+pub async fn reset_password(r: &RancherReal, id: &str, new_password: &str) -> ServiceResult<()> {
     let url = r.url(&format!("/v3/users/{}?action=setpassword", id));
     let body = json!({ "newPassword": new_password });
     let res = r
@@ -119,5 +119,22 @@ pub async fn reset_password(
             "reset password {}: {} {}",
             id, code, body
         )))
+    }
+}
+
+#[cfg(test)]
+mod identity_activation_tests {
+    use super::*;
+    #[test]
+    fn only_explicit_enabled_state_proves_an_active_remote_identity() {
+        for (body, expected) in [
+            (r#"{"id":"u-1","username":"alice","enabled":true}"#, true),
+            (r#"{"id":"u-1","username":"alice","enabled":false}"#, false),
+            (r#"{"id":"u-1","username":"alice"}"#, false),
+        ] {
+            let wire: UserWire = serde_json::from_str(body).unwrap();
+            let user: RancherUser = wire.into();
+            assert_eq!(user.enabled, expected);
+        }
     }
 }

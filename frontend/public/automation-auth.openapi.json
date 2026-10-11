@@ -1,0 +1,333 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "NabiMan scoped automation token authentication",
+    "version": "1",
+    "description": "Authentication subset, not the full NabiMan API. Owner-bound read-only tokens, mandatory 1–90 day expiry. No service-account, write, terminal or token-management access using automation credentials. Use HTTPS and exactly one credential header. Legacy keys remain disabled."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "paths": {
+    "/api/server/status": {
+      "get": {
+        "summary": "status:read",
+        "security": [
+          {
+            "AutomationBearer": []
+          },
+          {
+            "AutomationHeader": []
+          }
+        ],
+        "x-required-token-scope": "status:read",
+        "responses": {
+          "200": {
+            "description": "Inspect success in the API envelope; HTTP success alone is not an operation-success receipt."
+          },
+          "401": {
+            "description": "Missing, invalid, expired, revoked, owner-changed or operator-disabled token; storage failure also denies authentication."
+          },
+          "403": {
+            "description": "Scope or current owner permissions deny the operation."
+          }
+        }
+      }
+    },
+    "/api/remote-servers": {
+      "get": {
+        "summary": "servers:read",
+        "security": [
+          {
+            "AutomationBearer": []
+          },
+          {
+            "AutomationHeader": []
+          }
+        ],
+        "x-required-token-scope": "servers:read",
+        "responses": {
+          "200": {
+            "description": "Inspect success in the API envelope; HTTP success alone is not an operation-success receipt."
+          },
+          "401": {
+            "description": "Missing, invalid, expired, revoked, owner-changed or operator-disabled token; storage failure also denies authentication."
+          },
+          "403": {
+            "description": "Scope or current owner permissions deny the operation."
+          }
+        }
+      }
+    },
+    "/api/mec/v1/tenants": {
+      "get": {
+        "summary": "tenants:read",
+        "security": [
+          {
+            "AutomationBearer": []
+          },
+          {
+            "AutomationHeader": []
+          }
+        ],
+        "x-required-token-scope": "tenants:read",
+        "responses": {
+          "200": {
+            "description": "Inspect success in the API envelope; HTTP success alone is not an operation-success receipt."
+          },
+          "401": {
+            "description": "Missing, invalid, expired, revoked, owner-changed or operator-disabled token; storage failure also denies authentication."
+          },
+          "403": {
+            "description": "Scope or current owner permissions deny the operation."
+          }
+        }
+      }
+    },
+    "/api/mec/v1/tenants/{id}": {
+      "get": {
+        "summary": "tenants:read",
+        "security": [
+          {
+            "AutomationBearer": []
+          },
+          {
+            "AutomationHeader": []
+          }
+        ],
+        "x-required-token-scope": "tenants:read",
+        "responses": {
+          "200": {
+            "description": "Inspect success in the API envelope; HTTP success alone is not an operation-success receipt."
+          },
+          "401": {
+            "description": "Missing, invalid, expired, revoked, owner-changed or operator-disabled token; storage failure also denies authentication."
+          },
+          "403": {
+            "description": "Scope or current owner permissions deny the operation."
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            }
+          }
+        ]
+      }
+    },
+    "/api/mec/v1/tenants/{id}/resources": {
+      "get": {
+        "summary": "tenants:read",
+        "security": [
+          {
+            "AutomationBearer": []
+          },
+          {
+            "AutomationHeader": []
+          }
+        ],
+        "x-required-token-scope": "tenants:read",
+        "responses": {
+          "200": {
+            "description": "Inspect success in the API envelope; HTTP success alone is not an operation-success receipt."
+          },
+          "401": {
+            "description": "Missing, invalid, expired, revoked, owner-changed or operator-disabled token; storage failure also denies authentication."
+          },
+          "403": {
+            "description": "Scope or current owner permissions deny the operation."
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            }
+          }
+        ]
+      }
+    },
+    "/api/mec/v1/tenants/{id}/quota-usage": {
+      "get": {
+        "summary": "tenants:read",
+        "security": [
+          {
+            "AutomationBearer": []
+          },
+          {
+            "AutomationHeader": []
+          }
+        ],
+        "x-required-token-scope": "tenants:read",
+        "responses": {
+          "200": {
+            "description": "Inspect success in the API envelope; HTTP success alone is not an operation-success receipt."
+          },
+          "401": {
+            "description": "Missing, invalid, expired, revoked, owner-changed or operator-disabled token; storage failure also denies authentication."
+          },
+          "403": {
+            "description": "Scope or current owner permissions deny the operation."
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            }
+          }
+        ]
+      }
+    },
+    "/api/apikeys": {
+      "get": {
+        "summary": "List token metadata; highest-administrator interactive JWT only",
+        "security": [
+          {
+            "InteractiveJWT": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Metadata only; no hash, stamp or secret"
+          },
+          "503": {
+            "description": "Token storage unavailable"
+          }
+        }
+      },
+      "post": {
+        "summary": "Issue one owner-bound token; highest-administrator interactive JWT only",
+        "security": [
+          {
+            "InteractiveJWT": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "scopes",
+                  "expires_in_days"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "scopes": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 3,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "status:read",
+                        "servers:read",
+                        "tenants:read"
+                      ]
+                    }
+                  },
+                  "expires_in_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 90
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "One-time plaintext key in data.key. Cache-Control: no-store. Store securely; never log this response."
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "403": {
+            "description": "Highest administrator required"
+          },
+          "409": {
+            "description": "Token limit reached"
+          },
+          "503": {
+            "description": "Storage unavailable; no successful issuance receipt"
+          }
+        }
+      }
+    },
+    "/api/apikeys/{id}": {
+      "delete": {
+        "summary": "Durably revoke token; already accepted requests may finish",
+        "security": [
+          {
+            "InteractiveJWT": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revoked"
+          },
+          "404": {
+            "description": "Unknown token"
+          },
+          "503": {
+            "description": "Uncertain storage publication; inspect before restart"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "AutomationBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "nbm_ followed by 64 hex characters"
+      },
+      "AutomationHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      },
+      "InteractiveJWT": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

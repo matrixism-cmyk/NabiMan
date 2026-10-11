@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { RemoteServer } from '../../types';
 import { useT } from '../../i18n';
-import { Selection } from './workspaceState';
+import RailContextMenu, { RailMenuItem } from './RailContextMenu';
+import { RailAction, Selection } from './workspaceState';
 
 interface Props {
   servers: RemoteServer[];
@@ -12,17 +13,66 @@ interface Props {
   localSessions: number;
   sessionsFor: (server: RemoteServer) => number;
   onSelect: (next: Selection) => void;
+  /** Something picked from an entry's right-click menu. */
+  onAction: (target: Selection, action: RailAction) => void;
   onFilter: (value: string) => void;
   onCheckAll: () => void;
 }
+
+type MenuTarget = { kind: 'server'; server: RemoteServer } | { kind: 'local' };
+
+interface OpenMenu { x: number; y: number; target: MenuTarget; opener: HTMLElement }
 
 /** Everything you can connect to, in one list: the fleet, the servers, the
  *  local shell, and a one-off target that is not worth saving. */
 export default function TargetRail({
   servers, selection, online, filter, checkingAll, localSessions,
-  sessionsFor, onSelect, onFilter, onCheckAll,
+  sessionsFor, onSelect, onAction, onFilter, onCheckAll,
 }: Props) {
   const { t } = useT();
+  const [menu, setMenu] = useState<OpenMenu | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
+
+  const openMenu = (e: React.MouseEvent<HTMLButtonElement>, target: MenuTarget) => {
+    e.preventDefault();
+    const opener = e.currentTarget;
+    // The menu key and Shift+F10 report no pointer position: open by the entry.
+    const box = opener.getBoundingClientRect();
+    const fromKeyboard = e.clientX === 0 && e.clientY === 0;
+    setMenu({
+      x: fromKeyboard ? box.left + 24 : e.clientX,
+      y: fromKeyboard ? box.bottom - 4 : e.clientY,
+      target,
+      opener,
+    });
+  };
+
+  const itemsFor = (target: MenuTarget): RailMenuItem[] => {
+    const selectionOf: Selection = target.kind === 'server'
+      ? { kind: 'server', id: target.server.id } : { kind: 'local' };
+    const run = (action: RailAction) => () => onAction(selectionOf, action);
+    const count = target.kind === 'server' ? sessionsFor(target.server) : localSessions;
+    const items: RailMenuItem[] = [
+      { key: 'connect', icon: '▶', label: t('remote.menuConnect'), onSelect: run('connect') },
+      { key: 'newSession', icon: '＋', label: t('remote.menuNewSession'), onSelect: run('newSession') },
+      {
+        key: 'sessions', icon: '☰',
+        label: count > 0 ? `${t('remote.menuSessions')} (${count})` : t('remote.menuSessions'),
+        onSelect: run('sessions'),
+      },
+      { key: 'window', icon: '⧉', label: t('remote.menuWindow'), onSelect: run('window') },
+    ];
+    if (target.kind === 'server') {
+      items.push(
+        { key: 'status', icon: '◔', label: t('remote.statusView'), separated: true, onSelect: run('status') },
+        { key: 'exec', icon: '›', label: t('remote.menuExec'), onSelect: run('exec') },
+        { key: 'check', icon: '↻', label: t('remote.menuCheck'), onSelect: run('check') },
+        { key: 'edit', icon: '✎', label: t('remote.menuEdit'), separated: true, onSelect: run('edit') },
+        { key: 'delete', icon: '✕', label: t('common.delete'), danger: true, onSelect: run('delete') },
+      );
+    }
+    return items;
+  };
   const query = filter.trim().toLowerCase();
   const visible = query
     ? servers.filter(s => s.name.toLowerCase().includes(query) || s.host.toLowerCase().includes(query)
@@ -59,7 +109,10 @@ export default function TargetRail({
             return (
               <button key={server.id}
                 className={`rw-item ${selection.kind === 'server' && selection.id === server.id ? 'is-active' : ''}`}
-                onClick={() => onSelect({ kind: 'server', id: server.id })}>
+                title={t('remote.railMenuHint')}
+                aria-haspopup="menu"
+                onClick={() => onSelect({ kind: 'server', id: server.id })}
+                onContextMenu={(e) => openMenu(e, { kind: 'server', server })}>
                 <span className={`rw-lamp rw-lamp-${state}`} />
                 <span className="rw-item-name">{server.name}</span>
                 {count > 0 && <span className="rw-item-count" title={t('remote.liveSessions')}>{count}</span>}
@@ -73,7 +126,10 @@ export default function TargetRail({
 
           <div className="rw-rail-label">{t('remote.otherGroup')}</div>
           <button className={`rw-item ${selection.kind === 'local' ? 'is-active' : ''}`}
-            onClick={() => onSelect({ kind: 'local' })}>
+            title={t('remote.railMenuHint')}
+            aria-haspopup="menu"
+            onClick={() => onSelect({ kind: 'local' })}
+            onContextMenu={(e) => openMenu(e, { kind: 'local' })}>
             <span className="rw-lamp rw-lamp-local" />
             <span className="rw-item-name">{t('remote.localShell')}</span>
             {localSessions > 0 && <span className="rw-item-count">{localSessions}</span>}
@@ -85,6 +141,17 @@ export default function TargetRail({
             <span className="rw-item-sub">{t('remote.adhocHint')}</span>
           </button>
         </div>
+
+        {menu && (
+          <RailContextMenu
+            x={menu.x}
+            y={menu.y}
+            title={menu.target.kind === 'server' ? menu.target.server.name : t('remote.localShell')}
+            items={itemsFor(menu.target)}
+            opener={menu.opener}
+            onClose={closeMenu}
+          />
+        )}
     </aside>
   );
 }

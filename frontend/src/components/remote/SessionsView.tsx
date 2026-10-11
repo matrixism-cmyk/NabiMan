@@ -5,6 +5,7 @@ import { useT } from '../../i18n';
 export interface SessionInfo {
   id: string; label: string; owner: string; ws_count: number; shared: boolean;
   age_secs: number; timeout_secs: number; scrollback: number; keepalive: boolean; alive: boolean;
+  state?: 'alive' | 'ended' | 'unknown' | 'blocked';
   /** A name the operator gave it; empty means it goes by its label. */
   title: string;
   /** The last lines on screen, for the thumbnail. */
@@ -24,15 +25,22 @@ interface Props {
   onAttach: (session: SessionInfo) => void;
   onPopOut: (session: SessionInfo) => void;
   onShare?: (session: SessionInfo) => void;
+  /** Heading for the list; the fleet-wide list keeps the default. */
+  title?: string;
+  /** Extra buttons next to the heading, such as starting a new session. */
+  actions?: React.ReactNode;
+  /** What to show when nothing is running, in place of the plain notice. */
+  empty?: React.ReactNode;
 }
 
 /** Every shell running on the server, with a look at what is on each screen. */
 export default function SessionsView({
-  sessions, currentSessionId, onRefresh, onAttach, onPopOut, onShare,
+  sessions, currentSessionId, onRefresh, onAttach, onPopOut, onShare, title, actions, empty,
 }: Props) {
   const { t } = useT();
   const [renaming, setRenaming] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+  const [message, setMessage] = useState('');
 
   const startRename = (session: SessionInfo) => {
     setRenaming(session.id);
@@ -40,28 +48,45 @@ export default function SessionsView({
   };
 
   const saveRename = async (session: SessionInfo) => {
-    await apiPost(`/api/terminal/sessions/${session.id}/name`, { name: draft });
-    setRenaming(null);
-    onRefresh();
+    try {
+      const res = await apiPost(`/api/terminal/sessions/${session.id}/name`, { name: draft });
+      if (!res.success) { setMessage(res.message || t('common.error')); return; }
+      setMessage('');
+      setRenaming(null);
+      onRefresh();
+    } catch { setMessage(t('terminal.actionUncertain')); }
   };
 
   const kill = async (session: SessionInfo) => {
     if (!window.confirm(t('terminal.endSessionConfirm', { name: session.title || session.label }))) return;
-    await apiRequest(`/api/terminal/sessions/${session.id}`, { method: 'DELETE' });
-    onRefresh();
+    try {
+      const res = await apiRequest(`/api/terminal/sessions/${session.id}`, { method: 'DELETE' });
+      if (!res.success) { setMessage(res.message || t('common.error')); return; }
+      setMessage('');
+      onRefresh();
+    } catch { setMessage(t('terminal.actionUncertain')); }
   };
 
   const toggle = async (session: SessionInfo, what: 'keepalive' | 'share') => {
-    const body = what === 'keepalive' ? { keepalive: !session.keepalive } : { shared: !session.shared };
-    await apiPost(`/api/terminal/sessions/${session.id}/${what}`, body);
-    onRefresh();
+    try {
+      const body = what === 'keepalive' ? { keepalive: !session.keepalive } : { shared: !session.shared };
+      const res = await apiPost(`/api/terminal/sessions/${session.id}/${what}`, body);
+      if (!res.success) { setMessage(res.message || t('common.error')); return; }
+      setMessage('');
+      onRefresh();
+    } catch { setMessage(t('terminal.actionUncertain')); }
   };
+
+  const heading = title || t('terminal.activeSessions');
 
   if (sessions.length === 0) {
     return (
       <div className="rw-section">
-        <div className="rw-section-head"><h3>{t('terminal.activeSessions')}</h3></div>
-        <p className="text-secondary">{t('terminal.noSessions')}</p>
+        <div className="rw-section-head">
+          <h3>{heading}</h3>
+          {actions && <div className="btn-group">{actions}</div>}
+        </div>
+        {empty || <p className="text-secondary">{t('terminal.noSessions')}</p>}
       </div>
     );
   }
@@ -69,12 +94,20 @@ export default function SessionsView({
   return (
     <div className="rw-section">
       <div className="rw-section-head">
-        <h3>{t('terminal.activeSessions')}</h3>
-        <button className="btn btn-secondary btn-sm" onClick={onRefresh}>{t('common.refresh')}</button>
+        <h3>{heading}</h3>
+        <div className="btn-group">
+          {actions}
+          <button className="btn btn-secondary btn-sm" onClick={onRefresh}>{t('common.refresh')}</button>
+        </div>
       </div>
 
+      {message && <div role="alert" className="message">{message}</div>}
       <div className="session-grid">
-        {sessions.map(session => (
+        {sessions.map(session => {
+          const state = session.state === undefined ? (session.alive ? 'alive' : 'ended') :
+            ['alive', 'ended', 'unknown', 'blocked'].includes(session.state) ? session.state : 'unknown';
+          const attachable = session.alive && state === 'alive';
+          return (
           <div key={session.id} className={`session-card ${session.id === currentSessionId ? 'is-current' : ''}`}>
             <div className="session-card-head">
               {renaming === session.id ? (
@@ -91,7 +124,7 @@ export default function SessionsView({
                 <>
                   <strong className="session-name">{session.title || session.label}</strong>
                   <button className="session-rename-btn" title={t('terminal.rename')} onClick={() => startRename(session)}>✎</button>
-                  {!session.alive && <span className="status-badge down">{t('share.ended')}</span>}
+                  {state !== 'alive' && <span className="status-badge down">{t(state === 'unknown' ? 'terminal.sessionUnknown' : state === 'blocked' ? 'terminal.sessionBlocked' : 'share.ended')}</span>}
                   {session.id === currentSessionId && <span className="status-badge up">{t('terminal.thisPane')}</span>}
                 </>
               )}
@@ -112,24 +145,24 @@ export default function SessionsView({
 
             <div className="session-actions">
               {session.id !== currentSessionId && (
-                <button className="btn btn-primary btn-sm" onClick={() => onAttach(session)}>{t('terminal.join')}</button>
+                <button className="btn btn-primary btn-sm" disabled={!attachable} onClick={() => onAttach(session)}>{t('terminal.join')}</button>
               )}
-              <button className="btn btn-secondary btn-sm" title={t('remote.detachHint')} onClick={() => onPopOut(session)}>⧉</button>
+              <button className="btn btn-secondary btn-sm" title={t('remote.detachHint')} disabled={!attachable} onClick={() => onPopOut(session)}>⧉</button>
               {onShare && (
-                <button className="btn btn-secondary btn-sm" title={t('share.hint')} onClick={() => onShare(session)}>🔗</button>
+                <button className="btn btn-secondary btn-sm" title={t('share.hint')} disabled={!attachable} onClick={() => onShare(session)}>🔗</button>
               )}
               <button className={`btn btn-sm ${session.keepalive ? 'btn-primary' : 'btn-secondary'}`}
                 title={t('terminal.keepaliveHint')} onClick={() => toggle(session, 'keepalive')}>
                 {t('terminal.keepaliveShort')} {session.keepalive ? 'ON' : 'OFF'}
               </button>
               <button className={`btn btn-sm ${session.shared ? 'btn-warning' : 'btn-secondary'}`}
-                onClick={() => toggle(session, 'share')}>
+                disabled={!attachable && !session.shared} onClick={() => toggle(session, 'share')}>
                 {session.shared ? t('terminal.shared') : t('terminal.share')}
               </button>
-              <button className="btn btn-danger btn-sm" onClick={() => kill(session)}>✕</button>
+              <button className="btn btn-danger btn-sm" onClick={() => kill(session)}>{t('terminal.endSession')}</button>
             </div>
           </div>
-        ))}
+        );})}
       </div>
     </div>
   );

@@ -1,4 +1,6 @@
 import common from './common';
+import cron from './cron';
+import processes from './processes';
 import monitoring from './monitoring';
 import management from './management';
 import security from './security';
@@ -24,6 +26,8 @@ export const LANG_LABELS: Record<Lang, string> = {
 
 const translations: Record<string, Record<Lang, string>> = {
   ...common,
+  ...cron,
+  ...processes,
   ...monitoring,
   ...management,
   ...security,

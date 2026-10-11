@@ -70,7 +70,11 @@ impl From<&LdapConfig> for LdapConfigMasked {
             enabled: cfg.enabled,
             server_url: cfg.server_url.clone(),
             bind_dn: cfg.bind_dn.clone(),
-            bind_password: if cfg.bind_password.is_empty() { String::new() } else { "***".into() },
+            bind_password: if cfg.bind_password.is_empty() {
+                String::new()
+            } else {
+                "***".into()
+            },
             search_base: cfg.search_base.clone(),
             user_filter: cfg.user_filter.clone(),
             tls: cfg.tls,
@@ -80,24 +84,21 @@ impl From<&LdapConfig> for LdapConfigMasked {
     }
 }
 
-pub fn load_config() -> LdapConfig {
+pub fn load_config() -> Result<LdapConfig, String> {
     let path = ldap_config_path();
-    if path.exists() {
-        std::fs::read_to_string(&path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default()
-    } else {
-        LdapConfig::default()
+    match std::fs::read_to_string(&path) {
+        Ok(content) => {
+            serde_json::from_str(&content).map_err(|e| format!("LDAP config is invalid: {e}"))
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(LdapConfig::default()),
+        Err(error) => Err(format!("Cannot read LDAP config: {error}")),
     }
 }
 
-pub fn save_config(cfg: &LdapConfig) {
+pub fn save_config(cfg: &LdapConfig) -> Result<(), String> {
     let path = ldap_config_path();
-    if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    let _ = std::fs::write(&path, serde_json::to_string_pretty(cfg).unwrap_or_default());
+    let json = serde_json::to_vec_pretty(cfg).map_err(|e| e.to_string())?;
+    crate::private_storage::write(&path, &json).map_err(|e| format!("Cannot save LDAP config: {e}"))
 }
 
 #[cfg(test)]

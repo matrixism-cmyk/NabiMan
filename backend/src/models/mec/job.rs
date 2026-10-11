@@ -1,5 +1,5 @@
-use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Job {
@@ -17,13 +17,30 @@ pub struct Job {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum JobKind {
-    TenantCreate { spec: serde_json::Value },
-    TenantDelete { tenant_id: String },
-    StarterKitDeploy { tenant_id: String },
-    StarterKitDelete { tenant_id: String },
-    GpuModeSwitch { node: String, from_mode: String, to_mode: String },
-    DocGenerate { template: String, tenant_ids: Vec<String> },
-    FirewallNatAdd { spec: serde_json::Value },
+    TenantCreate {
+        spec: serde_json::Value,
+    },
+    TenantDelete {
+        tenant_id: String,
+    },
+    StarterKitDeploy {
+        tenant_id: String,
+    },
+    StarterKitDelete {
+        tenant_id: String,
+    },
+    GpuModeSwitch {
+        node: String,
+        from_mode: String,
+        to_mode: String,
+    },
+    DocGenerate {
+        template: String,
+        tenant_ids: Vec<String>,
+    },
+    FirewallNatAdd {
+        spec: serde_json::Value,
+    },
 }
 
 impl JobKind {
@@ -46,15 +63,22 @@ pub enum JobStatus {
     Pending,
     Running,
     Completed,
-    Failed { error: String },
+    Failed {
+        error: String,
+    },
     Cancelled,
+    #[serde(rename = "unknown_result")]
+    UnknownResult {
+        reason: String,
+        detected_at: DateTime<Utc>,
+    },
 }
 
 impl JobStatus {
     pub fn is_terminal(&self) -> bool {
         matches!(
             self,
-            Self::Completed | Self::Failed { .. } | Self::Cancelled
+            Self::Completed | Self::Failed { .. } | Self::Cancelled | Self::UnknownResult { .. }
         )
     }
 
@@ -66,6 +90,7 @@ impl JobStatus {
             Self::Completed => "completed",
             Self::Failed { .. } => "failed",
             Self::Cancelled => "cancelled",
+            Self::UnknownResult { .. } => "unknown_result",
         }
     }
 }
@@ -191,7 +216,9 @@ mod tests {
     fn progress_calculation() {
         let job = Job {
             id: "j1".into(),
-            kind: JobKind::TenantCreate { spec: serde_json::json!({}) },
+            kind: JobKind::TenantCreate {
+                spec: serde_json::json!({}),
+            },
             status: JobStatus::Running,
             started_at: Utc::now(),
             completed_at: None,

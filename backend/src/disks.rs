@@ -1,5 +1,5 @@
+use crate::models::{ApiResponse, DiskIo, DiskPartition, DiskStatus};
 use actix_web::{web, HttpResponse};
-use crate::models::{ApiResponse, DiskStatus, DiskPartition, DiskIo};
 
 async fn get_disk_status() -> HttpResponse {
     let partitions = get_partitions();
@@ -25,14 +25,16 @@ fn get_partitions() -> Vec<DiskPartition> {
             if parts.len() >= 7 {
                 let fs = parts[0];
                 // Skip pseudo filesystems
-                if fs.starts_with("tmpfs") || fs.starts_with("devtmpfs")
-                    || fs == "none" || fs == "udev" || fs == "overlay"
+                if fs.starts_with("tmpfs")
+                    || fs.starts_with("devtmpfs")
+                    || fs == "none"
+                    || fs == "udev"
+                    || fs == "overlay"
                 {
                     return None;
                 }
-                let parse_kb = |s: &str| -> u64 {
-                    s.trim_end_matches('K').parse::<u64>().unwrap_or(0) * 1024
-                };
+                let parse_kb =
+                    |s: &str| -> u64 { s.trim_end_matches('K').parse::<u64>().unwrap_or(0) * 1024 };
                 let use_pct = parts[6].trim_end_matches('%').parse::<f32>().unwrap_or(0.0);
                 Some(DiskPartition {
                     filesystem: fs.to_string(),
@@ -130,8 +132,5 @@ fn parse_proc_diskstats(content: &str) -> Vec<DiskIo> {
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.service(
-        web::scope("/api/disks")
-            .route("/status", web::get().to(get_disk_status)),
-    );
+    cfg.service(web::scope("/api/disks").route("/status", web::get().to(get_disk_status)));
 }

@@ -24,6 +24,11 @@ pub struct RemoteServer {
     /// whether a password is stored without ever receiving it.
     #[serde(default)]
     pub has_password: bool,
+    #[serde(default)]
+    pub host_trust: Option<HostKeyTrust>,
+    /// Approval generation survives revocation to prevent an ABA stale update.
+    #[serde(default)]
+    pub host_trust_version: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -85,4 +90,13 @@ pub struct SshKeyInfo {
 #[derive(Deserialize)]
 pub struct DeployKeyRequest {
     pub password: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct HostKeyTrust {
+    pub public_key: String,
+    pub fingerprint: String,
+    pub verified_by: String,
+    pub verified_at: String,
+    pub reason: String,
 }

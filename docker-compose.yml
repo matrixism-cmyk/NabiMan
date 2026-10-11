@@ -10,7 +10,7 @@ services:
       - nabiman-data:/var/lib/nabiman
     environment:
       - NABIMAN_PORT=8080
-      - NABIMAN_PASSWORD=changeme
+      - NABIMAN_PASSWORD=${NABIMAN_PASSWORD:?Set a strong NABIMAN_PASSWORD before starting}
     restart: unless-stopped
 
 volumes:

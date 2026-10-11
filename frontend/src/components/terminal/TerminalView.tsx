@@ -1,58 +1,20 @@
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Terminal } from 'xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { apiRequest } from '../../hooks/useApi';
 import { attachClipboard, attachTerminalIo, createTerminal } from './terminalChrome';
 import TerminalStatusPill from './TerminalStatusPill';
+import { HistoryPosition } from './TerminalHistoryBar';
+import TerminalHistoryControls from './TerminalHistoryControls';
 import { useScreenBuffer } from './useScreenBuffer';
-import { buildTerminalUrl } from './terminalUrl';
+import { buildTerminalUrl, ticketedTerminalUrl, ticketedShareUrl } from './terminalUrl';
 import { bufKey, readStored, sidKey, writeStored } from './terminalStorage';
 import { useTerminalZoom } from './useTerminalZoom';
+import { useTerminalHandle } from './useTerminalHandle';
 import { useT } from '../../i18n';
-import { TerminalSettings } from './settings';
 
-export interface TerminalTarget {
-  kind: 'local' | 'ssh';
-  host?: string;
-  port?: number;
-  user?: string;
-  /** Saved remote server id — lets the backend use its stored password. */
-  serverId?: string;
-  /** Connect as if no password were stored, so it can be typed in the pane. */
-  skipSavedPassword?: boolean;
-}
-
-export type TerminalStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'ended';
-
-export interface TerminalViewHandle {
-  focus: () => void;
-  fit: () => void;
-  clear: () => void;
-  reconnect: () => void;
-  /** Abandon the current tmux session and start a brand new one. */
-  newSession: () => void;
-  /** Drop a hand-made zoom and go back to filling the window. */
-  resetZoom: () => void;
-  sessionId: () => string;
-}
-
-interface Props {
-  target: TerminalTarget;
-  /** Stable identity of this pane: keys the stored session id and screen buffer. */
-  storageKey: string;
-  settings: TerminalSettings;
-  /** Attach to this existing session instead of the stored/new one. */
-  joinSessionId?: string;
-  active?: boolean;
-  /** Opened through a share link: no account, no session bookkeeping. */
-  share?: { token: string; ticket: string };
-  /** Mirror this grid instead of fitting the window (share viewers). */
-  grid?: { cols: number; rows: number };
-  onStatus?: (status: TerminalStatus) => void;
-  onSessionId?: (id: string) => void;
-}
-
-
+import type { TerminalStatus, TerminalViewHandle, TerminalViewProps } from './terminalTypes';
+export type { TerminalTarget, TerminalStatus, TerminalViewHandle } from './terminalTypes';
 
 /**
  * One terminal pane: an xterm.js screen wired to a tmux-backed PTY over a
@@ -75,13 +37,16 @@ const SIZE_MSG = '\x02SIZE:';
 /** Clipboard text on its way out, for the server to hand to tmux. */
 const PASTE_MSG = '\x01PASTE:';
 
-const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView(
+const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function TerminalView(
   { target, storageKey, settings, joinSessionId, active, share, grid, onStatus, onSessionId }, ref,
 ) {
+  const screenId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const connectGeneration = useRef(0);
+  const ticketController = useRef<AbortController | null>(null);
   const decoderRef = useRef(new TextDecoder());
   const closedRef = useRef(false);
   const endedRef = useRef(false);
@@ -95,6 +60,7 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
   const targetRef = useRef(target);
   const joinRef = useRef(joinSessionId);
   const shareRef = useRef(share);
+  const [historyPosition, setHistoryPosition] = useState<HistoryPosition | null>(null);
   const [status, setStatus] = useState<TerminalStatus>('connecting');
   const { t } = useT();
   const { chunksRef, record, saveBuffer, clearBuffer } = useScreenBuffer(storageKey, settingsRef);
@@ -106,12 +72,13 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
 
   // How big the text is drawn, and how a watched grid is followed: see
   // ./useTerminalZoom. Zoom belongs to the session, not to this pane.
+  const isShare = useCallback(() => Boolean(shareRef.current), []);
   const zoom = useTerminalZoom({
     storageKey,
     containerRef,
     termRef,
     fitRef,
-    isShare: () => Boolean(shareRef.current),
+    isShare,
     initialGrid: grid,
   });
   /** The pane is created once, so the mount effect reads the hook through a ref. */
@@ -136,6 +103,10 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
   const connect = useCallback(async () => {
     const term = termRef.current;
     if (!term || closedRef.current) return;
+    const generation = ++connectGeneration.current;
+    ticketController.current?.abort();
+    const controller = new AbortController();
+    ticketController.current = controller;
     if (retryTimerRef.current) { window.clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
     if (wsRef.current) {
       const stale = wsRef.current;
@@ -150,12 +121,6 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
     // A reconnect keeps the text size the viewer chose; only the grid is
     // taken from the owner again once the socket reports it.
     zoom.refresh();
-    if (attemptsRef.current > 0 && !shareRef.current) {
-      // A long-lived pane can outlive its access token. One authenticated REST
-      // call refreshes it (see fetchWithRefresh) before the socket carries it.
-      await apiRequest('/api/terminal/settings');
-      if (closedRef.current) return;
-    }
 
     const sessionId = shareRef.current
       ? ''
@@ -164,23 +129,47 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
     // Reopening a window with an empty screen: pull the history tmux kept
     // while nothing was attached, so the previous output is there again.
     if (sessionId && settingsRef.current.restore_scrollback && chunksRef.current.length === 0) {
-      const res = await apiRequest<string>(
-        `/api/terminal/sessions/${encodeURIComponent(sessionId)}/scrollback?lines=${settingsRef.current.scrollback_lines}`,
-      );
-      if (res.success && res.data) {
-        const text = res.data.replace(/\r?\n/g, '\r\n');
-        term.write(text);
-        record(text);
-      }
-      // The pane may have been closed while the history was in flight.
-      if (closedRef.current) return;
+      try {
+        const res = await apiRequest<string>(
+          `/api/terminal/sessions/${encodeURIComponent(sessionId)}/scrollback?lines=${settingsRef.current.scrollback_lines}`,
+          { signal: controller.signal },
+        );
+        if (closedRef.current || generation !== connectGeneration.current) return;
+        if (res.success && res.data) {
+          const text = res.data.replace(/\r?\n/g, '\r\n');
+          term.write(text);
+          record(text);
+        }
+      } catch { /* A missing history snapshot must not prevent a fresh authenticated connection. */ }
+      if (closedRef.current || generation !== connectGeneration.current || controller.signal.aborted) return;
     }
 
-    const ws = new WebSocket(buildUrl(sessionId));
+    setHistoryPosition(null);
+    const url = buildUrl(sessionId);
+    let connectionUrl: string;
+    try {
+      connectionUrl = shareRef.current ? await ticketedShareUrl(url, shareRef.current, controller.signal) : await ticketedTerminalUrl(`${url}&history=1`, controller.signal);
+    } catch (cause) {
+      if (controller.signal.aborted || closedRef.current || generation !== connectGeneration.current) return;
+      const attempt = attemptsRef.current++;
+      if (attempt === 0) {
+        const reason = cause instanceof Error ? cause.message : t('common.error');
+        term.write(`\r\n\x1b[31m[${reason}]\x1b[0m\r\n`);
+      }
+      // A share admission failure requires an explicit retry; never brute-force
+      // the password endpoint or retry a rejected/limited proof automatically.
+      if (shareRef.current || attempt >= MAX_COLD_ATTEMPTS) { report('disconnected'); return; }
+      report('reconnecting');
+      retryTimerRef.current = window.setTimeout(() => { connect(); }, Math.min(MAX_RECONNECT_DELAY_MS, 1000 * Math.pow(2, attempt)));
+      return;
+    }
+    if (closedRef.current || generation !== connectGeneration.current || controller.signal.aborted) return;
+    const ws = new WebSocket(connectionUrl);
     ws.binaryType = 'arraybuffer';
     wsRef.current = ws;
 
     ws.onopen = () => {
+      if (closedRef.current || generation !== connectGeneration.current || wsRef.current !== ws) { ws.close(); return; }
       attemptsRef.current = 0;
       everConnectedRef.current = true;
       report('connected');
@@ -190,7 +179,17 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
     };
 
     ws.onmessage = (event) => {
+      if (closedRef.current || generation !== connectGeneration.current || wsRef.current !== ws) return;
       if (typeof event.data === 'string') {
+        if (event.data.startsWith('\x02HISTORY:')) {
+          try {
+            const position: HistoryPosition = JSON.parse(event.data.slice(9));
+            if ([position.total, position.offset, position.rows].every(n => Number.isFinite(n) && n >= 0)) {
+              setHistoryPosition(position);
+            }
+          } catch { /* Ignore malformed metadata without printing it into the shell. */ }
+          return;
+        }
         if (event.data.startsWith(ENDED_MSG)) {
           // The shell exited or the session was killed: stop retrying and let
           // the operator start a new one deliberately.
@@ -228,11 +227,16 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
 
     ws.onerror = () => { /* onclose follows and drives the retry */ };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       if (wsRef.current === ws) wsRef.current = null;
       saveBuffer();
       if (closedRef.current) return;
       if (endedRef.current) { report('ended'); return; }
+      if (event.code === 1008) {
+        term.write(`\r\n\x1b[33m[${t('terminal.accessRevoked')}]\x1b[0m\r\n`);
+        report('disconnected');
+        return;
+      }
       // The tmux session keeps running server-side, so reconnecting simply
       // re-attaches to it — with keep-alive on we retry indefinitely. A socket
       // that never opened is a different story: stop after a few tries instead
@@ -264,6 +268,16 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
     if (containerRef.current) {
       term.open(containerRef.current);
       zoomRef.current.applyInitialLayout(term, fitAddon);
+      // Canvas may render before the bundled symbols font finishes loading.
+      // Refresh the atlas so early output uses the one-cell glyphs too.
+      if (document.fonts) {
+        void document.fonts.load(`${term.options.fontSize}px "NabiMan Circled Digits"`, '①').then(() => {
+          if (!closedRef.current && termRef.current === term) {
+            term.clearTextureAtlas();
+            term.refresh(0, term.rows - 1);
+          }
+        }).catch(() => {});
+      }
     }
 
     const saved = readStored(bufKey(storageKey));
@@ -293,11 +307,16 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
     const saveTimer = window.setInterval(saveBuffer, SAVE_INTERVAL_MS);
     return () => {
       closedRef.current = true;
+      ticketController.current?.abort();
       detachClipboard();
       window.clearInterval(saveTimer);
       if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
       saveBuffer();
-      wsRef.current?.close();
+      const socket = wsRef.current;
+      if (socket) {
+        socket.onopen = null; socket.onmessage = null; socket.onclose = null; socket.onerror = null;
+        socket.close();
+      }
       wsRef.current = null;
       term.dispose();
       termRef.current = null;
@@ -341,28 +360,10 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
     return () => window.clearTimeout(id);
   }, [active, zoom]);
 
-  useImperativeHandle(ref, () => ({
-    focus: () => termRef.current?.focus(),
-    fit: zoom.relayout,
-    clear: () => {
-      termRef.current?.clear();
-      clearBuffer();
-    },
-    reconnect: () => { attemptsRef.current = 0; endedRef.current = false; connect(); },
-    newSession: () => {
-      endedRef.current = false;
-      everConnectedRef.current = false;
-      sessionIdRef.current = '';
-      joinRef.current = undefined;
-      writeStored(sidKey(storageKey), '');
-      clearBuffer();
-      termRef.current?.reset();
-      attemptsRef.current = 0;
-      connect();
-    },
-    resetZoom: () => zoom.forget(settingsRef.current.font_size),
-    sessionId: () => sessionIdRef.current,
-  }), [clearBuffer, connect, storageKey, zoom]);
+  useTerminalHandle(ref, {
+    termRef, wsRef, endedRef, everConnectedRef, attemptsRef, sessionIdRef,
+    joinRef, settingsRef, zoom, storageKey, clearBuffer, connect,
+  });
 
   const retry = () => {
     attemptsRef.current = 0;
@@ -377,8 +378,10 @@ const TerminalView = forwardRef<TerminalViewHandle, Props>(function TerminalView
   };
 
   return (
-    <div className="terminal-view">
-      <div ref={containerRef} className="terminal-view-screen" />
+    <div className={`terminal-view ${share ? '' : 'terminal-view-with-history'}`}>
+      <div id={screenId} ref={containerRef} className="terminal-view-screen" />
+      {!share && <TerminalHistoryControls screenId={screenId} position={historyPosition}
+        connected={status === 'connected'} termRef={termRef} wsRef={wsRef} />}
       <TerminalStatusPill status={status} onRetry={retry} />
     </div>
   );

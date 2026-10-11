@@ -107,9 +107,9 @@ impl KubeService for KubeMock {
             .ok_or_else(|| ServiceError::NotFound(format!("node {}", node)))?;
         n.taints.extend(add.iter().cloned());
         n.taints.retain(|t| {
-            !remove.iter().any(|(k, eff)| {
-                &t.key == k && eff.as_ref().map(|e| e == &t.effect).unwrap_or(true)
-            })
+            !remove
+                .iter()
+                .any(|(k, eff)| &t.key == k && eff.as_ref().map(|e| e == &t.effect).unwrap_or(true))
         });
         Ok(())
     }
@@ -152,11 +152,7 @@ impl KubeService for KubeMock {
         Ok(self.state.lock().unwrap().namespaces.clone())
     }
 
-    async fn create_namespace(
-        &self,
-        name: &str,
-        labels: &[(String, String)],
-    ) -> ServiceResult<()> {
+    async fn create_namespace(&self, name: &str, labels: &[(String, String)]) -> ServiceResult<()> {
         let mut st = self.state.lock().unwrap();
         if st.namespaces.iter().any(|n| n.name == name) {
             return Err(ServiceError::Conflict(format!("namespace {} exists", name)));
@@ -219,11 +215,7 @@ impl KubeService for KubeMock {
         Ok(())
     }
 
-    async fn apply_limit_range(
-        &self,
-        _namespace: &str,
-        _spec: &str,
-    ) -> ServiceResult<()> {
+    async fn apply_limit_range(&self, _namespace: &str, _spec: &str) -> ServiceResult<()> {
         Ok(())
     }
 
@@ -244,12 +236,21 @@ impl KubeService for KubeMock {
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(spec) {
             let is_lb = v["spec"]["type"] == "LoadBalancer";
             if is_lb {
-                let name = v["metadata"]["name"].as_str().unwrap_or("unknown").to_string();
+                let name = v["metadata"]["name"]
+                    .as_str()
+                    .unwrap_or("unknown")
+                    .to_string();
                 let port = v["spec"]["ports"][0]["port"].as_u64().unwrap_or(0) as u16;
-                let target = v["spec"]["ports"][0]["targetPort"].as_u64().unwrap_or(port as u64) as u16;
-                let proto = v["spec"]["ports"][0]["protocol"].as_str().unwrap_or("TCP").to_string();
+                let target = v["spec"]["ports"][0]["targetPort"]
+                    .as_u64()
+                    .unwrap_or(port as u64) as u16;
+                let proto = v["spec"]["ports"][0]["protocol"]
+                    .as_str()
+                    .unwrap_or("TCP")
+                    .to_string();
                 let mut st = self.state.lock().unwrap();
-                st.services.retain(|s| !(s.namespace == namespace && s.name == name));
+                st.services
+                    .retain(|s| !(s.namespace == namespace && s.name == name));
                 let next_ip = format!("172.20.26.{}", 150 + (st.services.len() as u32 % 50));
                 st.services.push(crate::models::mec::LoadBalancerService {
                     namespace: namespace.into(),
@@ -356,40 +357,5 @@ impl KubeService for KubeMock {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn mock_list_nodes() {
-        let m = KubeMock::new();
-        let nodes = m.list_nodes().await.unwrap();
-        assert!(nodes.len() >= 4);
-    }
-
-    #[tokio::test]
-    async fn mock_create_delete_namespace() {
-        let m = KubeMock::new();
-        m.create_namespace("foo", &[]).await.unwrap();
-        assert!(m.list_namespaces().await.unwrap().iter().any(|n| n.name == "foo"));
-        m.delete_namespace("foo").await.unwrap();
-        assert!(!m.list_namespaces().await.unwrap().iter().any(|n| n.name == "foo"));
-    }
-
-    #[tokio::test]
-    async fn mock_taint_add_remove() {
-        let m = KubeMock::new();
-        m.patch_taints(
-            "mec-cp01",
-            &[Taint {
-                key: "dedicated".into(),
-                value: Some("test".into()),
-                effect: TaintEffect::NoSchedule,
-            }],
-            &[],
-        )
-        .await
-        .unwrap();
-        let n = m.get_node("mec-cp01").await.unwrap();
-        assert!(n.taints.iter().any(|t| t.key == "dedicated"));
-    }
-}
+#[path = "kube_mock_tests.rs"]
+mod tests;

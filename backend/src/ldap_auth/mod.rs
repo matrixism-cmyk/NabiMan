@@ -1,5 +1,5 @@
-use actix_web::{web, HttpResponse};
 use crate::models::ApiResponse;
+use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
 
 mod config;
@@ -15,7 +15,12 @@ struct TestResult {
 }
 
 async fn get_config() -> HttpResponse {
-    let cfg = load_config();
+    let cfg = match load_config() {
+        Ok(cfg) => cfg,
+        Err(error) => {
+            return HttpResponse::InternalServerError().json(ApiResponse::<()>::error(&error))
+        }
+    };
     let masked = LdapConfigMasked::from(&cfg);
     HttpResponse::Ok().json(ApiResponse::ok(masked))
 }
@@ -25,7 +30,12 @@ async fn save_ldap_config(body: web::Json<LdapConfig>) -> HttpResponse {
 
     // If password is masked, preserve existing password
     if cfg.bind_password == "***" {
-        let existing = load_config();
+        let existing = match load_config() {
+            Ok(existing) => existing,
+            Err(error) => {
+                return HttpResponse::InternalServerError().json(ApiResponse::<()>::error(&error))
+            }
+        };
         cfg.bind_password = existing.bind_password;
     }
 
@@ -33,13 +43,20 @@ async fn save_ldap_config(body: web::Json<LdapConfig>) -> HttpResponse {
         return HttpResponse::Ok().json(ApiResponse::<()>::error("Server URL is required"));
     }
 
-    save_config(&cfg);
+    if let Err(error) = save_config(&cfg) {
+        return HttpResponse::InternalServerError().json(ApiResponse::<()>::error(&error));
+    }
     let masked = LdapConfigMasked::from(&cfg);
     HttpResponse::Ok().json(ApiResponse::ok(masked))
 }
 
 async fn test_connection() -> HttpResponse {
-    let cfg = load_config();
+    let cfg = match load_config() {
+        Ok(cfg) => cfg,
+        Err(error) => {
+            return HttpResponse::InternalServerError().json(ApiResponse::<()>::error(&error))
+        }
+    };
 
     if cfg.server_url.is_empty() {
         return HttpResponse::Ok().json(ApiResponse::ok(TestResult {
@@ -65,7 +82,9 @@ async fn test_connection() -> HttpResponse {
     let result = std::net::ToSocketAddrs::to_socket_addrs(&addr.as_str())
         .map_err(|e| format!("DNS resolution failed for {}: {}", host, e))
         .and_then(|mut addrs| {
-            addrs.next().ok_or_else(|| format!("No addresses found for {}", host))
+            addrs
+                .next()
+                .ok_or_else(|| format!("No addresses found for {}", host))
         })
         .and_then(|socket_addr| {
             std::net::TcpStream::connect_timeout(&socket_addr, timeout)
@@ -101,20 +120,24 @@ pub struct LdapAuthResult {
 /// Authenticate user via LDAP bind using ldapsearch CLI
 pub fn ldap_authenticate(username: &str, password: &str) -> Result<LdapAuthResult, String> {
     // Validate inputs to prevent injection (before any config check)
-    if username.contains('\0') || username.contains('*') || username.contains('(') || username.contains(')') {
+    if username.contains('\0')
+        || username.contains('*')
+        || username.contains('(')
+        || username.contains(')')
+    {
         return Err("Invalid username characters".into());
     }
     if password.is_empty() {
         return Err("Password is required".into());
     }
 
-    let cfg = load_config();
+    let cfg = load_config()?;
     if !cfg.enabled {
         return Err("LDAP is not enabled".into());
     }
 
-    let (host, port) = parse_ldap_host_port(&cfg.server_url)
-        .ok_or("Cannot parse LDAP server URL")?;
+    let (host, port) =
+        parse_ldap_host_port(&cfg.server_url).ok_or("Cannot parse LDAP server URL")?;
 
     // Step 1: Search for user DN using service account
     let user_filter = cfg.user_filter.replace("{username}", username);
@@ -125,8 +148,11 @@ pub fn ldap_authenticate(username: &str, password: &str) -> Result<LdapAuthResul
     };
 
     let mut search_args = vec![
-        "-x".to_string(), "-H".to_string(), ldap_uri.clone(),
-        "-b".to_string(), cfg.search_base.clone(),
+        "-x".to_string(),
+        "-H".to_string(),
+        ldap_uri.clone(),
+        "-b".to_string(),
+        cfg.search_base.clone(),
         "-LLL".to_string(),
     ];
 
@@ -145,17 +171,23 @@ pub fn ldap_authenticate(username: &str, password: &str) -> Result<LdapAuthResul
         .map_err(|e| format!("ldapsearch not available: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&search_output.stdout);
-    let user_dn = parse_dn_from_ldif(&stdout)
-        .ok_or_else(|| "User not found in LDAP".to_string())?;
+    let user_dn =
+        parse_dn_from_ldif(&stdout).ok_or_else(|| "User not found in LDAP".to_string())?;
 
     // Step 2: Bind as the user to verify password
     let bind_output = std::process::Command::new("ldapsearch")
         .args([
-            "-x", "-H", &ldap_uri,
-            "-D", &user_dn,
-            "-w", password,
-            "-b", &user_dn,
-            "-s", "base",
+            "-x",
+            "-H",
+            &ldap_uri,
+            "-D",
+            &user_dn,
+            "-w",
+            password,
+            "-b",
+            &user_dn,
+            "-s",
+            "base",
             "-LLL",
             "(objectClass=*)",
             "dn",
@@ -173,9 +205,15 @@ pub fn ldap_authenticate(username: &str, password: &str) -> Result<LdapAuthResul
 
     // Step 3: Determine role from group membership
     let member_of_groups = parse_member_of(&stdout);
-    let role = if member_of_groups.iter().any(|g| g.contains(&cfg.admin_group) || cfg.admin_group.contains(g)) {
+    let role = if member_of_groups
+        .iter()
+        .any(|g| g.contains(&cfg.admin_group) || cfg.admin_group.contains(g))
+    {
         "admin"
-    } else if member_of_groups.iter().any(|g| g.contains(&cfg.operator_group) || cfg.operator_group.contains(g)) {
+    } else if member_of_groups
+        .iter()
+        .any(|g| g.contains(&cfg.operator_group) || cfg.operator_group.contains(g))
+    {
         "operator"
     } else {
         "viewer"
@@ -196,37 +234,75 @@ async fn ldap_login(
 ) -> HttpResponse {
     let result = match ldap_authenticate(&body.username, &body.password) {
         Ok(r) => r,
-        Err(e) => return HttpResponse::Ok().json(ApiResponse::<()>::error(&e)),
+        Err(_) => {
+            return HttpResponse::Unauthorized()
+                .json(ApiResponse::<()>::error("Invalid credentials"))
+        }
     };
 
     // Auto-provision user
-    crate::users::ensure_oauth_user(&user_store, &result.username, &result.role);
+    if let Err(error) = crate::users::ensure_oauth_user(&user_store, &result.username, &result.role)
+    {
+        return HttpResponse::InternalServerError().json(ApiResponse::<()>::error(&error));
+    }
 
+    let user = match crate::users::find_user_by_name(&user_store, &result.username) {
+        Some(user) if user.active() => user,
+        _ => {
+            return HttpResponse::Forbidden().json(ApiResponse::<()>::error(
+                "최고관리자의 가입 승인이 필요합니다",
+            ))
+        }
+    };
+    let role = user.role.as_str().to_string();
     let sid = crate::jwt_sessions::generate_session_id();
-    let ip = req.peer_addr().map(|a| a.ip().to_string()).unwrap_or_default();
-    crate::jwt_sessions::register_session(&sessions, &sid, &result.username, &ip);
+    let ip = req
+        .peer_addr()
+        .map(|a| a.ip().to_string())
+        .unwrap_or_default();
+    if !crate::jwt_sessions::register_authenticated_session(
+        &sessions,
+        &user_store,
+        &sid,
+        &user,
+        false,
+        &ip,
+    ) {
+        return HttpResponse::Unauthorized().json(ApiResponse::<()>::error(
+            "Account changed during authentication; sign in again",
+        ));
+    }
 
-    match crate::jwt_sessions::create_token_pair(&secret, &result.username, &result.role, &sid) {
-        Ok((access, refresh)) => HttpResponse::Ok().json(ApiResponse::ok(
-            serde_json::json!({
-                "token": access,
-                "refresh_token": refresh,
-                "username": result.username,
-                "role": result.role,
-                "auth_method": "ldap",
-            })
-        )),
+    match crate::jwt_sessions::create_token_pair(&secret, &result.username, &role, &sid) {
+        Ok((access, refresh)) => HttpResponse::Ok().json(ApiResponse::ok(serde_json::json!({
+            "token": access,
+            "refresh_token": refresh,
+            "username": result.username,
+            "role": role,
+            "auth_method": "ldap",
+        }))),
         Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<()>::error(&e)),
+    }
+}
+
+async fn provider() -> HttpResponse {
+    match load_config() {
+        Ok(cfg) => {
+            HttpResponse::Ok().json(ApiResponse::ok(serde_json::json!({"enabled": cfg.enabled})))
+        }
+        Err(_) => HttpResponse::ServiceUnavailable()
+            .json(ApiResponse::<()>::error("LDAP configuration unavailable")),
     }
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/auth/ldap")
+            .route("/provider", web::get().to(provider))
             .route("/config", web::get().to(get_config))
             .route("/config", web::post().to(save_ldap_config))
             .route("/test", web::post().to(test_connection))
-            .route("/login", web::post().to(ldap_login))
+            .route("/login", web::post().to(ldap_login)),
     );
 }
 

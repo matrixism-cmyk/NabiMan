@@ -1,7 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 
+export interface JobSnapshotStep {
+  name: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+  duration_ms?: number | null;
+  message?: string | null;
+}
+export interface JobSnapshotStatus {
+  state: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'unknown_result';
+  error?: string;
+  reason?: string;
+  detected_at?: string;
+}
+
 export type JobStreamEvent =
-  | { event: 'snapshot'; job_id: string; status?: unknown }
+  | { event: 'snapshot'; job_id: string; status: JobSnapshotStatus; steps?: JobSnapshotStep[]; error?: string | null }
   | { event: 'started'; job_id: string }
   | { event: 'step_started'; job_id: string; step: string }
   | {
@@ -29,13 +42,11 @@ export function useJobStream({ jobId, onEvent }: Options) {
 
   useEffect(() => {
     if (!jobId) return;
+    setEvents([]);
+    setError(null);
+    setIsOpen(false);
     const token = sessionStorage.getItem('nabiman_token');
-    // EventSource does not support custom headers; we embed token as query string
-    // and the backend middleware accepts it. If not supported, we fall back to
-    // authenticated fetch + manual parsing.
-    const url = `/api/mec/v1/jobs/${encodeURIComponent(jobId)}/stream${
-      token ? `?token=${encodeURIComponent(token)}` : ''
-    }`;
+    const url = `/api/mec/v1/jobs/${encodeURIComponent(jobId)}/stream`;
     const controller = new AbortController();
 
     (async () => {
@@ -63,7 +74,8 @@ export function useJobStream({ jobId, onEvent }: Options) {
             if (ev) {
               setEvents((prev) => [...prev, ev]);
               handlerRef.current?.(ev);
-              if (ev.event === 'completed' || ev.event === 'failed') {
+              if (ev.event === 'completed' || ev.event === 'failed' ||
+                  (ev.event === 'snapshot' && ['completed', 'failed', 'cancelled', 'unknown_result'].includes(ev.status.state))) {
                 controller.abort();
                 setIsOpen(false);
                 return;

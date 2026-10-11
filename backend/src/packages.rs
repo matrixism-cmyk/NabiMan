@@ -1,7 +1,7 @@
+use crate::models::ApiResponse;
 use actix_web::{get, post, web, HttpResponse};
 use serde::Deserialize;
 use std::process::Command;
-use crate::models::ApiResponse;
 
 #[derive(Deserialize)]
 pub struct PackageRequest {
@@ -16,8 +16,11 @@ pub struct SearchRequest {
 /// Detect package manager: apt, yum, or dnf
 fn detect_pkg_manager() -> Option<&'static str> {
     for cmd in &["apt-get", "dnf", "yum"] {
-        if Command::new("which").arg(cmd).output()
-            .map(|o| o.status.success()).unwrap_or(false)
+        if Command::new("which")
+            .arg(cmd)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
         {
             return Some(cmd);
         }
@@ -33,8 +36,9 @@ async fn list_installed() -> HttpResponse {
         Some("apt-get") => ("dpkg", &["--get-selections"]),
         Some("dnf") | Some("yum") => ("rpm", &["-qa", "--qf", "%{NAME}\t%{VERSION}-%{RELEASE}\n"]),
         _ => {
-            return HttpResponse::Ok()
-                .json(ApiResponse::<Vec<String>>::error("No supported package manager found"));
+            return HttpResponse::Ok().json(ApiResponse::<Vec<String>>::error(
+                "No supported package manager found",
+            ));
         }
     };
 
@@ -63,9 +67,12 @@ async fn list_installed() -> HttpResponse {
 #[post("/api/packages/search")]
 async fn search_package(body: web::Json<SearchRequest>) -> HttpResponse {
     // Validate query: alphanumeric, hyphen, underscore, dot only
-    if !body.query.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.') {
-        return HttpResponse::BadRequest()
-            .json(ApiResponse::<()>::error("Invalid search query"));
+    if !body
+        .query
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.')
+    {
+        return HttpResponse::BadRequest().json(ApiResponse::<()>::error("Invalid search query"));
     }
 
     let pm = detect_pkg_manager();
@@ -78,8 +85,9 @@ async fn search_package(body: web::Json<SearchRequest>) -> HttpResponse {
             .args(["search", &body.query])
             .output(),
         _ => {
-            return HttpResponse::Ok()
-                .json(ApiResponse::<()>::error("No supported package manager found"));
+            return HttpResponse::Ok().json(ApiResponse::<()>::error(
+                "No supported package manager found",
+            ));
         }
     };
 
@@ -108,14 +116,16 @@ async fn search_package(body: web::Json<SearchRequest>) -> HttpResponse {
 #[post("/api/packages/install")]
 async fn install_package(body: web::Json<PackageRequest>) -> HttpResponse {
     if !validate_package_name(&body.name) {
-        return HttpResponse::BadRequest()
-            .json(ApiResponse::<()>::error("Invalid package name"));
+        return HttpResponse::BadRequest().json(ApiResponse::<()>::error("Invalid package name"));
     }
 
     let pm = match detect_pkg_manager() {
         Some(pm) => pm,
-        None => return HttpResponse::Ok()
-            .json(ApiResponse::<()>::error("No supported package manager found")),
+        None => {
+            return HttpResponse::Ok().json(ApiResponse::<()>::error(
+                "No supported package manager found",
+            ))
+        }
     };
 
     let output = match pm {
@@ -134,8 +144,10 @@ async fn install_package(body: web::Json<PackageRequest>) -> HttpResponse {
         }
         Ok(result) => {
             let stderr = String::from_utf8_lossy(&result.stderr);
-            HttpResponse::InternalServerError()
-                .json(ApiResponse::<()>::error(&format!("Install failed: {}", stderr)))
+            HttpResponse::InternalServerError().json(ApiResponse::<()>::error(&format!(
+                "Install failed: {}",
+                stderr
+            )))
         }
         Err(e) => HttpResponse::InternalServerError()
             .json(ApiResponse::<()>::error(&format!("Failed: {}", e))),
@@ -145,14 +157,16 @@ async fn install_package(body: web::Json<PackageRequest>) -> HttpResponse {
 #[post("/api/packages/remove")]
 async fn remove_package(body: web::Json<PackageRequest>) -> HttpResponse {
     if !validate_package_name(&body.name) {
-        return HttpResponse::BadRequest()
-            .json(ApiResponse::<()>::error("Invalid package name"));
+        return HttpResponse::BadRequest().json(ApiResponse::<()>::error("Invalid package name"));
     }
 
     let pm = match detect_pkg_manager() {
         Some(pm) => pm,
-        None => return HttpResponse::Ok()
-            .json(ApiResponse::<()>::error("No supported package manager found")),
+        None => {
+            return HttpResponse::Ok().json(ApiResponse::<()>::error(
+                "No supported package manager found",
+            ))
+        }
     };
 
     let output = match pm {
@@ -171,8 +185,10 @@ async fn remove_package(body: web::Json<PackageRequest>) -> HttpResponse {
         }
         Ok(result) => {
             let stderr = String::from_utf8_lossy(&result.stderr);
-            HttpResponse::InternalServerError()
-                .json(ApiResponse::<()>::error(&format!("Remove failed: {}", stderr)))
+            HttpResponse::InternalServerError().json(ApiResponse::<()>::error(&format!(
+                "Remove failed: {}",
+                stderr
+            )))
         }
         Err(e) => HttpResponse::InternalServerError()
             .json(ApiResponse::<()>::error(&format!("Failed: {}", e))),
@@ -182,7 +198,9 @@ async fn remove_package(body: web::Json<PackageRequest>) -> HttpResponse {
 fn validate_package_name(name: &str) -> bool {
     !name.is_empty()
         && name.len() < 128
-        && name.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.' || c == '+')
+        && name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.' || c == '+')
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {

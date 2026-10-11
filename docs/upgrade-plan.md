@@ -1,5 +1,7 @@
 # nabiman 전체 솔루션 업그레이드 계획 (상세)
 
+> 최신 상용화 전략·제품 및 논문 비교·회원과 tenant 설계·실측 계획은 [나비맨 상용화 종합 계획](commercialization/README.md)을 참조한다. 아래 내용은 기존 점검과 구현 이력이다.
+
 > 작성 2026-06-29. 전체 솔루션 점검 결과를 토대로 수립한 제품 전반의 상세 업그레이드 로드맵.
 > MEC 관제(NOC) 단독 계획은 [`mec-management/09-noc-upgrade-plan.md`](mec-management/09-noc-upgrade-plan.md) 참조 — 본 문서는 이를 포함한 **제품 전체** 관점이며 중복은 참조로 갈음한다.
 

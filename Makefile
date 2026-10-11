@@ -25,15 +25,21 @@ docker-build:
 	docker build -t nabiman .
 
 docker-run:
+	@test -n "$$NABIMAN_PASSWORD" || (echo "Set NABIMAN_PASSWORD before docker-run" >&2; exit 1)
 	docker run -d --name nabiman -p 8080:8080 \
 		-v nabiman-data:/var/lib/nabiman \
-		-e NABIMAN_PASSWORD=changeme \
+		-e NABIMAN_PASSWORD \
 		nabiman
 
 install: build
 	@echo "Installing NabiMan..."
-	sudo cp backend/target/release/nabiman-server /usr/local/bin/
 	sudo mkdir -p /var/lib/nabiman
+	@if [ ! -e /var/lib/nabiman/users.json ] && [ ! -e /var/lib/nabiman/password ]; then \
+		test $${#NABIMAN_PASSWORD} -ge 12 || { echo "Set a 12+ character NABIMAN_PASSWORD before make install" >&2; exit 1; }; \
+		sudo install -m 600 /dev/null /var/lib/nabiman/password; \
+		printf '%s' "$$NABIMAN_PASSWORD" | sudo tee /var/lib/nabiman/password >/dev/null; \
+	fi
+	sudo cp backend/target/release/nabiman-server /usr/local/bin/
 	sudo cp nabiman.service /etc/systemd/system/
 	sudo systemctl daemon-reload
 	sudo systemctl enable nabiman

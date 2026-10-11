@@ -38,6 +38,7 @@ export function tone(value: string | boolean | undefined | null): StatusTone {
     case 'pending':
     case 'provisioning':
     case 'warning':
+    case 'unknown_result':
     case 'partial':
     case 'unmanaged':
       return 'warning';

@@ -21,7 +21,10 @@ export async function mecGet<T>(endpoint: string): Promise<MecResponse<T>> {
 }
 
 export async function mecList<T>(endpoint: string): Promise<MecListResponse<T>> {
-  return fetchMec<MecListResponse<T>>(endpoint);
+  const res = await fetchMec<MecListResponse<T> & Pick<MecResponse<T>, 'error'>>(endpoint);
+  if (res.error) throw new Error(res.error.message || res.error.code || 'MEC list request failed');
+  if (!Array.isArray(res.data)) throw new Error('Invalid MEC list response');
+  return res;
 }
 
 export async function mecPost<T>(endpoint: string, body: object): Promise<MecResponse<T>> {
@@ -100,9 +103,10 @@ export function useMecList<T>(endpoint: string, interval?: number): UseMecApiRes
     }
     try {
       const res = await mecList<T>(endpoint);
-      setData(res.data || []);
+      setData(res.data);
       setError(null);
     } catch (e) {
+      setData(null);
       setError(e instanceof Error ? e.message : 'Network error');
     } finally {
       setLoading(false);

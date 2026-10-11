@@ -14,7 +14,7 @@ const TIMEOUT_PRESETS: { label: string; value: number }[] = [
 /** Terminal preferences: history size, keep-alive, and text size. */
 export default function TerminalSettingsModal({ onClose }: { onClose: () => void }) {
   const { t } = useT();
-  const { settings, save } = useTerminalSettings();
+  const { settings, save, loadError } = useTerminalSettings();
   const [draft, setDraft] = useState<TerminalSettings>(settings);
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
@@ -39,7 +39,7 @@ export default function TerminalSettingsModal({ onClose }: { onClose: () => void
     <div className="modal-overlay term-settings-overlay" onClick={onClose}>
       <div className="modal-content term-settings" onClick={(e) => e.stopPropagation()}>
         <h3>{t('terminal.settings')}</h3>
-        {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
+        {(message || loadError) && <div role="alert" className="message" onClick={() => setMessage('')}>{message || loadError}</div>}
 
         <div className="form-group">
           <label>{t('terminal.scrollbackLines')}</label>

@@ -3,8 +3,6 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import { I18nProvider } from './i18n';
-import { TerminalSettingsProvider } from './components/terminal/settings';
-import { TerminalWindowsProvider } from './components/terminal/TerminalWindows';
 import SharePage from './components/terminal/SharePage';
 import reportWebVitals from './reportWebVitals';
 
@@ -22,11 +20,7 @@ root.render(
       {shareToken ? (
         <SharePage token={shareToken} />
       ) : (
-        <TerminalSettingsProvider>
-          <TerminalWindowsProvider>
-            <App />
-          </TerminalWindowsProvider>
-        </TerminalSettingsProvider>
+        <App />
       )}
     </I18nProvider>
   </React.StrictMode>

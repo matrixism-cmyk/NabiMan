@@ -68,11 +68,7 @@ pub fn ubuntu_ssh_manifests(
 }
 
 /// Returns (Deployment, Service) JSON for code-server (VS Code in browser).
-pub fn vscode_manifests(
-    namespace: &str,
-    tenant_id: &str,
-    password: &str,
-) -> (Value, Value) {
+pub fn vscode_manifests(namespace: &str, tenant_id: &str, password: &str) -> (Value, Value) {
     let deploy = json!({
         "apiVersion": "apps/v1",
         "kind": "Deployment",
@@ -136,7 +132,9 @@ mod tests {
     #[test]
     fn ubuntu_ssh_has_ssh_port() {
         let (d, s) = ubuntu_ssh_manifests("ns", "t", "user", "hash");
-        let ports = d["spec"]["template"]["spec"]["containers"][0]["ports"].as_array().unwrap();
+        let ports = d["spec"]["template"]["spec"]["containers"][0]["ports"]
+            .as_array()
+            .unwrap();
         assert_eq!(ports[0]["containerPort"], 2222);
         let svc_port = &s["spec"]["ports"][0];
         assert_eq!(svc_port["port"], 22);
@@ -145,7 +143,9 @@ mod tests {
     #[test]
     fn vscode_has_http_port() {
         let (d, s) = vscode_manifests("ns", "t", "pw");
-        let ports = d["spec"]["template"]["spec"]["containers"][0]["ports"].as_array().unwrap();
+        let ports = d["spec"]["template"]["spec"]["containers"][0]["ports"]
+            .as_array()
+            .unwrap();
         assert_eq!(ports[0]["containerPort"], 8080);
         let svc_port = &s["spec"]["ports"][0];
         assert_eq!(svc_port["port"], 8080);

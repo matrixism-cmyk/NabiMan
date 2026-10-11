@@ -1,7 +1,7 @@
 use super::util::{from_service_error, list_response};
 use crate::mec::MecState;
-use actix_web::{web, HttpResponse};
 use crate::models::mec::LbIpPool;
+use actix_web::{web, HttpResponse};
 
 pub async fn lb_pools(state: web::Data<MecState>) -> HttpResponse {
     // MetalLB IPAddressPool CRD 조회는 Phase 2 kube-rs 통합에서 구현.
@@ -90,7 +90,10 @@ pub async fn create_ingress(
     body: web::Json<CreateIngressRequest>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let user = super::util::current_user(&req);
+    let user = match super::util::current_user(&req) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
     let audit = super::audit_helper::begin_audit(
         &req,
         &state,
@@ -163,7 +166,10 @@ pub async fn delete_ingress(
     path: web::Path<(String, String)>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let user = super::util::current_user(&req);
+    let user = match super::util::current_user(&req) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
     let (namespace, name) = path.into_inner();
     if let Err(e) = crate::mec::safety::require_confirm_header(&req, &name) {
         return from_service_error(e);

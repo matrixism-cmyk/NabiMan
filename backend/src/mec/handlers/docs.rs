@@ -44,22 +44,15 @@ pub async fn generate(
     state: web::Data<MecState>,
 ) -> HttpResponse {
     if body.template != "tenant_access_guide" {
-        return from_service_error(
-            crate::mec::services::ServiceError::InvalidInput(format!(
-                "template {} not supported yet",
-                body.template
-            )),
-        );
+        return from_service_error(crate::mec::services::ServiceError::InvalidInput(format!(
+            "template {} not supported yet",
+            body.template
+        )));
     }
     let output_dir = crate::mec::docgen::DocGenerator::default_output_dir();
-    let text_gen = crate::mec::docgen::DocGenerator::new(
-        state.docs_store.clone(),
-        output_dir.clone(),
-    );
-    let docx_gen = crate::mec::docgen::DocxGenerator::new(
-        state.docs_store.clone(),
-        output_dir,
-    );
+    let text_gen =
+        crate::mec::docgen::DocGenerator::new(state.docs_store.clone(), output_dir.clone());
+    let docx_gen = crate::mec::docgen::DocxGenerator::new(state.docs_store.clone(), output_dir);
     let mut results: Vec<serde_json::Value> = Vec::new();
     for tid in &body.tenant_ids {
         let tenant = match state.tenants.get(tid) {
@@ -79,9 +72,9 @@ pub async fn generate(
         match doc_res {
             Ok(v) => results.push(v),
             Err(e) => {
-                return from_service_error(
-                    crate::mec::services::ServiceError::Internal(e.to_string()),
-                );
+                return from_service_error(crate::mec::services::ServiceError::Internal(
+                    e.to_string(),
+                ));
             }
         }
     }
@@ -91,16 +84,14 @@ pub async fn generate(
     }))
 }
 
-pub async fn download(
-    path: web::Path<String>,
-    state: web::Data<MecState>,
-) -> HttpResponse {
+pub async fn download(path: web::Path<String>, state: web::Data<MecState>) -> HttpResponse {
     let doc = match state.docs_store.get(&path) {
         Ok(Some(d)) => d,
         Ok(None) => {
-            return from_service_error(
-                crate::mec::services::ServiceError::NotFound(format!("doc {}", &path)),
-            );
+            return from_service_error(crate::mec::services::ServiceError::NotFound(format!(
+                "doc {}",
+                &path
+            )));
         }
         Err(e) => return from_service_error(e.into()),
     };
@@ -120,8 +111,6 @@ pub async fn download(
                 .content_type(mime)
                 .body(data)
         }
-        Err(e) => from_service_error(
-            crate::mec::services::ServiceError::Internal(e.to_string()),
-        ),
+        Err(e) => from_service_error(crate::mec::services::ServiceError::Internal(e.to_string())),
     }
 }

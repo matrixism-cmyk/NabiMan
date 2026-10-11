@@ -22,11 +22,14 @@ mod tests {
 
     #[test]
     fn test_jwt_roundtrip() {
-        use jsonwebtoken::{encode, decode, Header, EncodingKey, DecodingKey, Validation};
-        use serde::{Serialize, Deserialize};
+        use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+        use serde::{Deserialize, Serialize};
 
         #[derive(Serialize, Deserialize)]
-        struct Claims { sub: String, exp: usize }
+        struct Claims {
+            sub: String,
+            exp: usize,
+        }
 
         let secret = "test_secret";
         let claims = Claims {
@@ -34,18 +37,31 @@ mod tests {
             exp: (chrono::Utc::now().timestamp() + 3600) as usize,
         };
 
-        let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(secret.as_bytes())).unwrap();
-        let decoded = decode::<Claims>(&token, &DecodingKey::from_secret(secret.as_bytes()), &Validation::default()).unwrap();
+        let token = encode(
+            &Header::default(),
+            &claims,
+            &EncodingKey::from_secret(secret.as_bytes()),
+        )
+        .unwrap();
+        let decoded = decode::<Claims>(
+            &token,
+            &DecodingKey::from_secret(secret.as_bytes()),
+            &Validation::default(),
+        )
+        .unwrap();
         assert_eq!(decoded.claims.sub, "admin");
     }
 
     #[test]
     fn test_jwt_expiry_check() {
-        use jsonwebtoken::{encode, decode, Header, EncodingKey, DecodingKey, Validation};
-        use serde::{Serialize, Deserialize};
+        use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+        use serde::{Deserialize, Serialize};
 
         #[derive(Serialize, Deserialize)]
-        struct Claims { sub: String, exp: usize }
+        struct Claims {
+            sub: String,
+            exp: usize,
+        }
 
         let secret = "test_secret";
         let claims = Claims {
@@ -53,8 +69,17 @@ mod tests {
             exp: (chrono::Utc::now().timestamp() - 100) as usize, // expired
         };
 
-        let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(secret.as_bytes())).unwrap();
-        let result = decode::<Claims>(&token, &DecodingKey::from_secret(secret.as_bytes()), &Validation::default());
+        let token = encode(
+            &Header::default(),
+            &claims,
+            &EncodingKey::from_secret(secret.as_bytes()),
+        )
+        .unwrap();
+        let result = decode::<Claims>(
+            &token,
+            &DecodingKey::from_secret(secret.as_bytes()),
+            &Validation::default(),
+        );
         assert!(result.is_err()); // Should fail due to expiry
     }
 

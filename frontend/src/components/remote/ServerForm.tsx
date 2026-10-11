@@ -64,7 +64,8 @@ export default function ServerForm({ server, onSaved, onCancel }: Props) {
     if (!res.success || !res.data) { setMessage(res.message || t('common.error')); return; }
     setPassword('');
     onSaved(res.data);
-    if (password) verifyPassword(res.data.id);
+    if (password && res.data.host_trust) verifyPassword(res.data.id);
+    else if (!res.data.host_trust) setMessage(t('remote.trust.unverified'));
     else setMessage(server ? t('remote.serverSaved') : t('remote.serverAdded'));
   };
 

@@ -16,47 +16,48 @@ pub struct TenantDeletePreflight {
     pub confirm_token: String,
 }
 
-pub async fn tenant_delete(
-    path: web::Path<String>,
-    state: web::Data<MecState>,
-) -> HttpResponse {
+pub async fn tenant_delete(path: web::Path<String>, state: web::Data<MecState>) -> HttpResponse {
     let tenant_id = path.into_inner();
     let tenant = match state.tenants.get(&tenant_id) {
         Ok(Some(t)) => t,
         Ok(None) => {
-            return from_service_error(
-                crate::mec::services::ServiceError::NotFound(format!("tenant {}", tenant_id)),
-            );
+            return from_service_error(crate::mec::services::ServiceError::NotFound(format!(
+                "tenant {}",
+                tenant_id
+            )));
         }
         Err(e) => return from_service_error(e.into()),
     };
 
-    let namespaces = state
-        .services
-        .kube
-        .list_namespaces()
-        .await
-        .unwrap_or_default();
+    let namespaces = match state.services.kube.list_namespaces().await {
+        Ok(value) => value,
+        Err(e) => return from_service_error(e),
+    };
     let namespace_exists = namespaces.iter().any(|n| n.name == tenant.namespace);
 
-    let pods = state
-        .services
-        .kube
-        .count_pods(&tenant.namespace)
-        .await
-        .unwrap_or(0);
+    let pods = match state.services.kube.count_pods(&tenant.namespace).await {
+        Ok(value) => value,
+        Err(e) => return from_service_error(e),
+    };
 
-    let services = state
+    let services = match state
         .services
         .kube
         .list_lb_services(Some(&tenant.namespace))
         .await
-        .unwrap_or_default();
+    {
+        Ok(value) => value,
+        Err(e) => return from_service_error(e),
+    };
 
     let has_starter_kit = tenant.starter_kit.is_some();
 
     let rancher_project_exists = if let Some(pid) = &tenant.rancher_project_id {
-        state.services.rancher.get_project(pid).await.is_ok()
+        match state.services.rancher.get_project(pid).await {
+            Ok(_) => true,
+            Err(crate::mec::services::ServiceError::NotFound(_)) => false,
+            Err(e) => return from_service_error(e),
+        }
     } else {
         false
     };
@@ -84,10 +85,7 @@ pub async fn tenant_delete(
         ));
     }
     if !namespace_exists {
-        warnings.push(
-            "K8s에 네임스페이스가 존재하지 않습니다. DB 레코드만 제거됩니다."
-                .into(),
-        );
+        warnings.push("K8s에 네임스페이스가 존재하지 않습니다. DB 레코드만 제거됩니다.".into());
     }
 
     ok_response(TenantDeletePreflight {

@@ -72,15 +72,19 @@ impl<'a> MecNotify<'a> {
                 "테넌트 '{}' 이(가) '{}' 사용자에 의해 삭제되었습니다.",
                 tenant_id, user
             ),
-            Self::TenantCreateFailed { tenant_id, reason } => format!(
-                "테넌트 '{}' 생성 실패. 사유: {}",
-                tenant_id, reason
-            ),
+            Self::TenantCreateFailed { tenant_id, reason } => {
+                format!("테넌트 '{}' 생성 실패. 사유: {}", tenant_id, reason)
+            }
             Self::StarterKitDeployed { tenant_id, user } => format!(
                 "테넌트 '{}' 에 Starter Kit 이 '{}' 사용자에 의해 배포되었습니다.",
                 tenant_id, user
             ),
-            Self::GpuModeSwitched { node, from, to, user } => format!(
+            Self::GpuModeSwitched {
+                node,
+                from,
+                to,
+                user,
+            } => format!(
                 "노드 '{}' 의 GPU 모드가 {} → {} 로 전환되었습니다 (작업자: {}).",
                 node, from, to, user
             ),

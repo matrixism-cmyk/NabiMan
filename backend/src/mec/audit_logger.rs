@@ -13,7 +13,13 @@ impl AuditLogger {
         Self { store }
     }
 
-    pub fn begin(&self, user: &str, action: &str, resource_type: &str, resource_id: &str) -> AuditBuilder {
+    pub fn begin(
+        &self,
+        user: &str,
+        action: &str,
+        resource_type: &str,
+        resource_id: &str,
+    ) -> AuditBuilder {
         AuditBuilder::new(self.store.clone(), user, action, resource_type, resource_id)
     }
 }
@@ -86,7 +92,12 @@ impl AuditBuilder {
         &self.id
     }
 
-    pub fn complete(self, status: AuditStatus, output: Option<serde_json::Value>, error: Option<String>) {
+    pub fn complete(
+        self,
+        status: AuditStatus,
+        output: Option<serde_json::Value>,
+        error: Option<String>,
+    ) {
         let log = MecAuditLog {
             id: self.id,
             timestamp: Utc::now(),

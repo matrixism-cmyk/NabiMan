@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useT } from '../../../i18n';
 import { mecPost } from '../../../hooks/mec/useMecApi';
 import { Tenant } from '../../../types/mec';
+import InitialCredentials, { BootstrapCredentials } from '../InitialCredentials';
 import Step1Basic from './Step1Basic';
 import Step2Node from './Step2Node';
 import Step3Quota from './Step3Quota';
@@ -25,6 +26,7 @@ export default function TenantWizard({ onCreated, onCancel }: Props) {
   const [step, setStep] = useState(1);
   const [state, setState] = useState<WizardState>(initialState());
   const [err, setErr] = useState<string | null>(null);
+  const [credentials, setCredentials] = useState<BootstrapCredentials | null>(null);
   const [busy, setBusy] = useState(false);
 
   const next = () => {
@@ -55,7 +57,7 @@ export default function TenantWizard({ onCreated, onCancel }: Props) {
     setBusy(true);
     setErr(null);
     try {
-      const res = await mecPost<Tenant>(
+      const res = await mecPost<Tenant & { initial_credentials?: BootstrapCredentials }>(
         '/api/mec/v1/tenants',
         toRequestBody(state),
       );
@@ -63,13 +65,16 @@ export default function TenantWizard({ onCreated, onCancel }: Props) {
         setErr(res.error.message);
         return;
       }
-      await onCreated();
+      if (res.data?.initial_credentials) setCredentials(res.data.initial_credentials);
+      else await onCreated();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   };
+
+  if (credentials) return <InitialCredentials credentials={credentials} onDone={() => { setCredentials(null); onCreated(); }} />;
 
   return (
     <form

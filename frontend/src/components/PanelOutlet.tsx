@@ -1,4 +1,6 @@
 import React from 'react';
+import MfaPanel from './MfaPanel';
+import LoginSessionsPanel from './LoginSessionsPanel';
 import { Tab } from '../nav';
 import ServerStatusPanel from './ServerStatusPanel';
 import NetworkPanel from './NetworkPanel';
@@ -26,6 +28,7 @@ import MailPanel from './MailPanel';
 import SwapPanel from './SwapPanel';
 import SessionsPanel from './SessionsPanel';
 import DnsPanel from './DnsPanel';
+import ScopeSettingsPanel from './ScopeSettingsPanel';
 import UserManagementPanel from './UserManagementPanel';
 import NotificationsPanel from './NotificationsPanel';
 import AlertRulesPanel from './AlertRulesPanel';
@@ -59,6 +62,8 @@ interface Props {
 /// stays within the line budget.
 export default function PanelOutlet({ activeTab, onNavigate, onEnterFocus }: Props) {
   switch (activeTab) {
+    case 'mfa': return <MfaPanel />;
+    case 'loginSessions': return <LoginSessionsPanel />;
     case 'server': return <ServerStatusPanel />;
     case 'network': return <NetworkPanel />;
     case 'containers': return <ContainersPanel />;
@@ -84,6 +89,7 @@ export default function PanelOutlet({ activeTab, onNavigate, onEnterFocus }: Pro
     case 'swap': return <SwapPanel />;
     case 'sessions': return <SessionsPanel />;
     case 'dns': return <DnsPanel />;
+    case 'scopeSettings': return <ScopeSettingsPanel />;
     case 'usermgmt': return <UserManagementPanel />;
     case 'notifications': return <NotificationsPanel />;
     case 'alertrules': return <AlertRulesPanel />;

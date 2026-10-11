@@ -1,0 +1,36 @@
+import React from 'react';
+import { fireEvent, render, screen, within, waitFor } from '@testing-library/react';
+import { I18nProvider } from '../i18n';
+import { apiPost, apiRequest, useApi } from '../hooks/useApi';
+import CronPanel from './CronPanel';
+jest.mock('../hooks/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn(), apiRequest: jest.fn() }));
+const job = { user: 'root', id: 4, revision: 'old-revision', schedule: '@reboot', command: '/bin/true', can_manage: true };
+let rows = [job]; let canWrite = true; let error: string | null = null;
+const snapshot = { user: 'root', uid: 0, revision: 'reviewed-revision', content: '# existing\nSHELL=/bin/sh\n', can_write: true };
+const view = () => <I18nProvider><CronPanel /></I18nProvider>;
+beforeEach(() => { jest.clearAllMocks(); rows = [{ ...job }]; canWrite = true; error = null; localStorage.setItem('nabiman_lang', 'en');
+  (useApi as jest.Mock).mockImplementation(path => ({ data: path === '/api/cron' ? rows : { ...snapshot, can_write: canWrite }, error: path === '/api/cron' ? error : null, loading: false, refetch: jest.fn() }));
+  (apiRequest as jest.Mock).mockResolvedValue({ success: true, data: snapshot });
+  (apiPost as jest.Mock).mockResolvedValue({ success: true, data: 'Installed and verified' });
+});
+test('read-only actors have no change controls and unavailable inventory is not empty success', () => { canWrite = false;error = 'inventory unavailable';render(view());expect(screen.queryByRole('button', { name: 'Add Job' })).not.toBeInTheDocument();expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();expect(screen.queryByText('No cron jobs found.')).not.toBeInTheDocument();expect(screen.getByRole('alert')).toHaveTextContent('inventory unavailable'); });
+test('addition reads existing environment and sends reviewed revision only after confirmation', async () => { render(view());fireEvent.click(screen.getByRole('button', { name: 'Add Job' }));expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument();fireEvent.click(screen.getByRole('button', { name: 'Read current crontab for review' }));expect(await screen.findByLabelText('Reviewed existing crontab (read only)')).toHaveValue(snapshot.content);fireEvent.change(screen.getByLabelText('Schedule'), { target: { value: '0 1 * * *' } });fireEvent.change(screen.getByLabelText('Command'), { target: { value: '/bin/true' } });expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(screen.getByRole('button', { name: 'Add' }));await waitFor(() => expect(apiPost).toHaveBeenCalledWith('/api/cron/add', { user: 'root', expected_revision: 'reviewed-revision', schedule: '0 1 * * *', command: '/bin/true' })); });
+test('changed inventory blocks deletion of a previously selected physical line', () => { const { rerender } = render(view());fireEvent.click(screen.getByRole('button', { name: 'Delete' }));fireEvent.click(screen.getByRole('checkbox'));rows = [{ ...job, revision: 'changed' }];rerender(view());const form = screen.getByRole('checkbox').closest('form')!;expect(within(form).getByRole('button', { name: 'Delete' })).toBeDisabled();expect(screen.getByRole('alert')).toHaveTextContent('Settings changed');expect(apiPost).not.toHaveBeenCalled(); });
+test('deletion confirmation submits observed revision and handles uncertain outcome without retry', async () => { (apiPost as jest.Mock).mockRejectedValue(new Error('lost response'));render(view());fireEvent.click(screen.getByRole('button', { name: 'Delete' }));const form = screen.getByRole('checkbox').closest('form')!;expect(within(form).getByRole('button', { name: 'Delete' })).toBeDisabled();fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(within(form).getByRole('button', { name: 'Delete' }));await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(1));expect(apiPost).toHaveBeenCalledWith('/api/cron/delete', { user: 'root', id: 4, expected_revision: 'old-revision' });expect(await screen.findByRole('status')).toHaveTextContent('No automatic retry'); });
+test('failed review never enables addition', async () => { (apiRequest as jest.Mock).mockRejectedValue(new Error('read unavailable'));render(view());fireEvent.click(screen.getByRole('button', { name: 'Add Job' }));fireEvent.click(screen.getByRole('button', { name: 'Read current crontab for review' }));expect(await screen.findByRole('status')).toHaveTextContent('Could not read existing settings');expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument();expect(apiPost).not.toHaveBeenCalled(); });
+test('edit reviews the same snapshot and resets confirmation when the proposed command changes', async () => {
+  (apiRequest as jest.Mock).mockResolvedValue({ success: true, data: { ...snapshot, revision: job.revision } });
+  render(view());fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+  expect(screen.getByLabelText('Job before change')).toHaveValue('@reboot /bin/true');
+  expect(screen.getByLabelText('User')).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Read current crontab for review' }));
+  await screen.findByLabelText('Reviewed existing crontab (read only)');
+  fireEvent.click(screen.getByRole('checkbox'));fireEvent.change(screen.getByLabelText('Command'), { target: { value: '/bin/echo changed' } });
+  expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(apiPost).toHaveBeenCalledWith('/api/cron/update', { user: 'root', id: 4, expected_revision: job.revision, schedule: '@reboot', command: '/bin/echo changed' }));
+});
+test('edit cannot silently adopt a newer snapshot than the selected job', async () => {
+  render(view());fireEvent.click(screen.getByRole('button', { name: 'Edit' }));fireEvent.click(screen.getByRole('button', { name: 'Read current crontab for review' }));
+  expect(await screen.findByRole('status')).toHaveTextContent('Settings changed');expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();expect(apiPost).not.toHaveBeenCalled();
+});

@@ -175,3 +175,45 @@
   .rw-rail { width: 100%; flex: none; max-height: 260px; }
   .rw-work { min-height: 460px; }
 }
+
+/* ── Right-click menu on a rail entry ─────────────────────────────────── */
+.rw-menu {
+  position: fixed;
+  z-index: 2000;
+  min-width: 200px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+.rw-menu-title {
+  padding: 6px 10px 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+.rw-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 13px;
+  text-align: left;
+  color: var(--text);
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.rw-menu-item:hover:not(:disabled), .rw-menu-item:focus-visible { background: rgba(59, 130, 246, 0.14); outline: none; }
+.rw-menu-item:disabled { opacity: 0.45; cursor: default; }
+.rw-menu-item.is-danger { color: var(--danger); }
+.rw-menu-item.is-danger:hover, .rw-menu-item.is-danger:focus-visible { background: rgba(231, 76, 60, 0.14); }
+.rw-menu-icon { width: 16px; text-align: center; color: var(--text-secondary); }
+.rw-menu-item.is-danger .rw-menu-icon { color: inherit; }
+.rw-menu-sep { height: 1px; margin: 4px 6px; background: var(--border); }

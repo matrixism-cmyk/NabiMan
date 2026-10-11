@@ -105,7 +105,11 @@ fn parse_time(s: Option<String>) -> DateTime<Utc> {
 impl HarborService for HarborReal {
     async fn list_projects(&self) -> ServiceResult<Vec<HarborProject>> {
         let url = self.url("/projects");
-        let res = self.auth(self.http.get(&url)).send().await.map_err(upstream)?;
+        let res = self
+            .auth(self.http.get(&url))
+            .send()
+            .await
+            .map_err(upstream)?;
         if !res.status().is_success() {
             return Err(upstream(format!("list projects: HTTP {}", res.status())));
         }
@@ -127,11 +131,7 @@ impl HarborService for HarborReal {
             .collect())
     }
 
-    async fn create_project(
-        &self,
-        name: &str,
-        public: bool,
-    ) -> ServiceResult<HarborProject> {
+    async fn create_project(&self, name: &str, public: bool) -> ServiceResult<HarborProject> {
         let url = self.url("/projects");
         let body = json!({
             "project_name": name,
@@ -147,10 +147,7 @@ impl HarborService for HarborReal {
             return Err(ServiceError::Conflict(format!("project {} exists", name)));
         }
         if !res.status().is_success() {
-            return Err(upstream(format!(
-                "create project: HTTP {}",
-                res.status()
-            )));
+            return Err(upstream(format!("create project: HTTP {}", res.status())));
         }
         // Harbor returns Location header; fetch project by name.
         let list = self.list_projects().await?;
@@ -167,7 +164,11 @@ impl HarborService for HarborReal {
             .map(|p| p.id)
             .ok_or_else(|| ServiceError::NotFound(format!("harbor project {}", name)))?;
         let url = self.url(&format!("/projects/{}", id));
-        let res = self.auth(self.http.delete(&url)).send().await.map_err(upstream)?;
+        let res = self
+            .auth(self.http.delete(&url))
+            .send()
+            .await
+            .map_err(upstream)?;
         if res.status().is_success() || res.status() == reqwest::StatusCode::NOT_FOUND {
             Ok(())
         } else {
@@ -177,7 +178,11 @@ impl HarborService for HarborReal {
 
     async fn list_repositories(&self, project: &str) -> ServiceResult<Vec<HarborRepository>> {
         let url = self.url(&format!("/projects/{}/repositories", project));
-        let res = self.auth(self.http.get(&url)).send().await.map_err(upstream)?;
+        let res = self
+            .auth(self.http.get(&url))
+            .send()
+            .await
+            .map_err(upstream)?;
         if res.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(ServiceError::NotFound(format!(
                 "harbor project {}",

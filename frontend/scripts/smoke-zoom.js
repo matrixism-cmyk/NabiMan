@@ -38,6 +38,7 @@ const zoom = async (p, steps) => {
   await page.waitForSelector('.app-header');
   await page.click('.cat-btn:has-text("원격")');
   await page.click('.rw-item:has-text("로컬 셸")');
+  await page.click('.rw-tabs button:has-text("터미널")');  // a target opens on its sessions
   await page.waitForTimeout(700);
   const c = await page.$('.rw-connect-card button.btn-primary'); if (c) await c.click();
   await page.waitForSelector('.xterm-screen', { timeout: 20000 });

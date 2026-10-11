@@ -1,0 +1,36 @@
+# REVIEW TEMPLATE: remaining legacy root operations must migrate before production rollout.
+[Unit]
+Description=NabiMan unprivileged API
+After=network.target nabiman-privileged-helper.service
+Requires=nabiman-privileged-helper.service
+
+[Service]
+Type=simple
+User=nabiman
+Group=nabiman
+ExecStart=/usr/local/bin/nabiman-server
+ExecStartPost=+/usr/local/bin/nabiman-privileged-helper --pin-api $MAINPID
+Environment=NABIMAN_PORT=8080
+Environment=NABIMAN_STATIC=/usr/local/share/nabiman/static
+Environment=NABIMAN_DATA_DIR=/var/lib/nabiman
+Environment=NABIMAN_HELPER_SOCKET=/run/nabiman-helper/control.sock
+EnvironmentFile=-/etc/nabiman/nabiman.env
+StateDirectory=nabiman
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+CapabilityBoundingSet=
+ProtectSystem=strict
+ReadWritePaths=/var/lib/nabiman
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

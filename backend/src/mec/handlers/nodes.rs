@@ -30,25 +30,17 @@ pub async fn patch_labels(
     body: web::Json<LabelPatch>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let user = current_user(&req);
+    let user = match current_user(&req) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
     let node = path.into_inner();
-    let add: Vec<(String, String)> = body
-        .add
-        .clone()
-        .unwrap_or_default()
-        .into_iter()
-        .collect();
+    let add: Vec<(String, String)> = body.add.clone().unwrap_or_default().into_iter().collect();
     let remove = body.remove.clone().unwrap_or_default();
-    let audit = super::audit_helper::begin_audit(
-        &req, &state, &user, "node_patch_labels", "node", &node,
-    )
-    .with_input(serde_json::to_value(&*body).unwrap_or_default());
-    match state
-        .services
-        .kube
-        .patch_labels(&node, &add, &remove)
-        .await
-    {
+    let audit =
+        super::audit_helper::begin_audit(&req, &state, &user, "node_patch_labels", "node", &node)
+            .with_input(serde_json::to_value(&*body).unwrap_or_default());
+    match state.services.kube.patch_labels(&node, &add, &remove).await {
         Ok(_) => {
             audit.success(None);
             no_content()
@@ -66,7 +58,10 @@ pub async fn patch_taints(
     body: web::Json<TaintPatch>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let user = current_user(&req);
+    let user = match current_user(&req) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
     let node = path.into_inner();
     let add: Vec<Taint> = body.add.clone().unwrap_or_default();
     let remove: Vec<(String, Option<crate::models::mec::TaintEffect>)> = body
@@ -76,16 +71,10 @@ pub async fn patch_taints(
         .into_iter()
         .map(|r| (r.key, r.effect))
         .collect();
-    let audit = super::audit_helper::begin_audit(
-        &req, &state, &user, "node_patch_taints", "node", &node,
-    )
-    .with_input(serde_json::to_value(&*body).unwrap_or_default());
-    match state
-        .services
-        .kube
-        .patch_taints(&node, &add, &remove)
-        .await
-    {
+    let audit =
+        super::audit_helper::begin_audit(&req, &state, &user, "node_patch_taints", "node", &node)
+            .with_input(serde_json::to_value(&*body).unwrap_or_default());
+    match state.services.kube.patch_taints(&node, &add, &remove).await {
         Ok(_) => {
             audit.success(None);
             no_content()
@@ -102,10 +91,12 @@ pub async fn cordon(
     path: web::Path<String>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let user = current_user(&req);
+    let user = match current_user(&req) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
     let node = path.into_inner();
-    let audit =
-        super::audit_helper::begin_audit(&req, &state, &user, "node_cordon", "node", &node);
+    let audit = super::audit_helper::begin_audit(&req, &state, &user, "node_cordon", "node", &node);
     match state.services.kube.cordon(&node, false).await {
         Ok(_) => {
             audit.success(None);
@@ -123,7 +114,10 @@ pub async fn uncordon(
     path: web::Path<String>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let user = current_user(&req);
+    let user = match current_user(&req) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
     let node = path.into_inner();
     let audit =
         super::audit_helper::begin_audit(&req, &state, &user, "node_uncordon", "node", &node);
@@ -145,7 +139,10 @@ pub async fn gpu_mode(
     body: web::Json<GpuModeSwitchRequest>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let user = current_user(&req);
+    let user = match current_user(&req) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
     let node = path.into_inner();
     let current = state
         .services

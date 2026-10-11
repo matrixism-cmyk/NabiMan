@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { useT } from '../../i18n';
 import { useMecList } from '../../hooks/mec/useMecApi';
 import JobProgress from './JobProgress';
+import RecoveryInspection from './RecoveryInspection';
+import { useApi } from '../../hooks/useApi';
+import { MemberUser } from '../MembershipEditor';
 import {
   ErrorBanner,
   PanelLayout,
@@ -13,7 +16,7 @@ import {
 interface JobSummary {
   id: string;
   kind: string;
-  status: { state: string; error?: string };
+  status: { state: string; error?: string; reason?: string };
   started_at: string;
   completed_at?: string | null;
   progress_percent: number;
@@ -29,6 +32,7 @@ function ProgressBar({ value, tone }: { value: number; tone: string }) {
   const color =
     tone === 'completed' ? '#10b981' :
     tone === 'failed' ? '#ef4444' :
+    tone === 'unknown_result' ? '#d97706' :
     tone === 'cancelled' ? '#9ca3af' :
     '#3b82f6';
   return (
@@ -61,6 +65,8 @@ export default function MecJobsPanel() {
     '/api/mec/v1/jobs',
     5_000,
   );
+  const { data: me } = useApi<MemberUser>('/api/users/me');
+  const [recoveryId, setRecoveryId] = useState<string | null>(null);
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
 
@@ -84,8 +90,9 @@ export default function MecJobsPanel() {
       {streamingId && (
         <div
           style={{
-            background: 'white',
-            border: '1px solid #e5e7eb',
+            background: 'var(--surface-alt)',
+            color: 'var(--text)',
+            border: '1px solid var(--border)',
             borderRadius: '8px',
             padding: '14px',
             marginBottom: '16px',
@@ -109,9 +116,11 @@ export default function MecJobsPanel() {
               {t('mec.jobs.close')}
             </button>
           </div>
-          <JobProgress jobId={streamingId} />
+          <JobProgress key={streamingId} jobId={streamingId} />
         </div>
       )}
+
+      {recoveryId && <RecoveryInspection key={recoveryId} jobId={recoveryId} />}
 
       <Toolbar>
         <input
@@ -136,7 +145,7 @@ export default function MecJobsPanel() {
             key: 'id',
             header: t('mec.jobs.colId'),
             accessor: (j) => j.id,
-            render: (j) => <code>{j.id}</code>,
+            render: (j) => <code style={{ display: 'block', maxWidth: '180px', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{j.id}</code>,
             sortable: true,
           },
           {
@@ -153,22 +162,25 @@ export default function MecJobsPanel() {
             render: (j) => (
               <div>
                 <StatusBadge tone={j.status.state}>
-                  {j.status.state}
+                  {j.status.state === 'unknown_result' ? t('mec.jobs.stateUnknownResult') : j.status.state}
                 </StatusBadge>
-                {j.status.error && (
+                {(j.status.error || j.status.reason) && (
                   <div
                     style={{
                       color: '#ef4444',
                       fontSize: '11px',
                       marginTop: '2px',
+                      maxWidth: '220px',
+                      overflowWrap: 'anywhere',
                     }}
                   >
-                    {j.status.error}
+                    {j.status.reason || j.status.error}
                   </div>
                 )}
               </div>
             ),
-            width: '140px',
+            width: '180px',
+            wrap: true,
             sortable: true,
           },
           {
@@ -224,6 +236,7 @@ export default function MecJobsPanel() {
             sortable: false,
             width: '100px',
             render: (j) => (
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
               <button
                 className={
                   j.status.state === 'running' || j.status.state === 'pending'
@@ -236,6 +249,8 @@ export default function MecJobsPanel() {
                   ? t('mec.jobs.actionLive')
                   : t('mec.jobs.actionHistory')}
               </button>
+              {me?.role === 'admin' && ['failed', 'unknown_result'].includes(j.status.state) && ['tenant_create', 'tenant_delete'].includes(j.kind) && <button className="btn btn-secondary btn-small" onClick={() => setRecoveryId(j.id)}>{t('mec.recovery.inspect')}</button>}
+              </div>
             ),
           },
         ]}

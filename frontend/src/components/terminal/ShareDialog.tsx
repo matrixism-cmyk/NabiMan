@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { apiPost, apiRequest } from '../../hooks/useApi';
 import { useT } from '../../i18n';
 
@@ -13,6 +14,7 @@ export interface ShareLink {
   needs_password: boolean;
   /** Whether the session behind the link is still running. */
   alive?: boolean;
+  usable?: boolean;
 }
 
 const EXPIRY_CHOICES: { labelKey: string; secs: number }[] = [
@@ -23,7 +25,6 @@ const EXPIRY_CHOICES: { labelKey: string; secs: number }[] = [
   { labelKey: 'share.5d', secs: 5 * 86400 },
   { labelKey: 'share.10d', secs: 10 * 86400 },
   { labelKey: 'share.30d', secs: 30 * 86400 },
-  { labelKey: 'share.forever', secs: 0 },
 ];
 
 const shareUrl = (token: string) => `${window.location.origin}/share/${token}`;
@@ -42,9 +43,13 @@ interface Props {
 /** Hand one running terminal to someone who has no NabiMan account. */
 export default function ShareDialog({ sessionId, sessionLabel, onClose }: Props) {
   const { t } = useT();
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   const [expiry, setExpiry] = useState(24 * 3600);
   const [password, setPassword] = useState('');
-  const [readOnly, setReadOnly] = useState(false);
+  const [readOnly, setReadOnly] = useState(true);
   const [links, setLinks] = useState<ShareLink[]>([]);
   const [created, setCreated] = useState<ShareLink | null>(null);
   const [message, setMessage] = useState('');
@@ -53,7 +58,8 @@ export default function ShareDialog({ sessionId, sessionLabel, onClose }: Props)
   const load = useCallback(async () => {
     const res = await apiRequest<ShareLink[]>('/api/terminal/share-links');
     if (res.success && res.data) setLinks(res.data.filter((l) => l.session_id === sessionId));
-  }, [sessionId]);
+    else setMessage(res.message || t('common.error'));
+  }, [sessionId, t]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -74,7 +80,12 @@ export default function ShareDialog({ sessionId, sessionLabel, onClose }: Props)
 
   const revoke = async (token: string) => {
     if (!window.confirm(t('share.revokeConfirm'))) return;
-    await apiRequest(`/api/terminal/share-links/${token}`, { method: 'DELETE' });
+    setBusy(true);
+    const res = await apiRequest(`/api/terminal/share-links/${token}`, { method: 'DELETE' });
+    setBusy(false);
+    if (!res.success) { setMessage(res.message || t('common.error')); return; }
+    setMessage(t('share.revoked'));
+    dialogRef.current?.focus();
     if (created?.token === token) setCreated(null);
     load();
   };
@@ -85,12 +96,32 @@ export default function ShareDialog({ sessionId, sessionLabel, onClose }: Props)
       .catch(() => setMessage(shareUrl(token)));
   };
 
-  return (
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeRef.current(); }
+    };
+    document.addEventListener('keydown', escape, true);
+    return () => { document.removeEventListener('keydown', escape, true); previous?.focus(); };
+  }, []);
+
+  return createPortal(
     <div className="modal-overlay term-settings-overlay" onClick={onClose}>
-      <div className="modal-content share-dialog" onClick={(e) => e.stopPropagation()}>
-        <h3>{t('share.title')}</h3>
+      <div ref={dialogRef} className="modal-content share-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (e.key === 'Tab') {
+            const controls = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), [tabindex="0"]'));
+            const first = controls[0], last = controls[controls.length - 1];
+            if (e.shiftKey && (document.activeElement === first || document.activeElement === e.currentTarget)) { e.preventDefault(); last?.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+          }
+        }}>
+        <h3 id={titleId}>{t('share.title')}</h3>
         <p className="text-secondary">{sessionLabel}</p>
         <p className="share-warning">{t('share.warning')}</p>
+        <p className="text-secondary">{t('share.lifetimePolicy')}</p>
         {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
 
         <div className="form-group">
@@ -131,21 +162,6 @@ export default function ShareDialog({ sessionId, sessionLabel, onClose }: Props)
           <button className="btn btn-secondary" onClick={onClose}>{t('common.close')}</button>
         </div>
 
-        {created && (
-          <div className="share-created">
-            <label>{t('share.linkReady')}</label>
-            <div className="filter-row">
-              <input className="filter-input" readOnly value={shareUrl(created.token)} onFocus={(e) => e.target.select()} />
-              <button className="btn btn-primary btn-sm" onClick={() => copy(created.token)}>{t('share.copy')}</button>
-            </div>
-            <small className="text-secondary">
-              {t('share.expiresAt')}: {formatExpiry(created.expires_unix, t)}
-              {created.needs_password ? ` · ${t('share.withPassword')}` : ` · ${t('share.noPassword')}`}
-              {created.read_only ? ` · ${t('share.readOnly')}` : ''}
-            </small>
-          </div>
-        )}
-
         {links.length > 0 && (
           <div className="share-list">
             <label>{t('share.existing')}</label>
@@ -156,16 +172,19 @@ export default function ShareDialog({ sessionId, sessionLabel, onClose }: Props)
               <tbody>
                 {links.map((link) => (
                   <tr key={link.token}>
-                    <td><code>/share/{link.token.slice(0, 8)}…</code></td>
+                    <td>{created?.token === link.token
+                      ? <input className="filter-input" aria-label={t('share.linkReady')} readOnly value={shareUrl(link.token)} onFocus={(e) => e.target.select()} />
+                      : <code>/share/{link.token.slice(0, 8)}…</code>}</td>
                     <td>{formatExpiry(link.expires_unix, t)}</td>
                     <td>
                       {link.needs_password ? t('share.withPassword') : t('share.noPassword')}
                       {link.read_only ? ` · ${t('share.readOnly')}` : ''}
+                      {link.usable === false && <span className="status-badge down">{t('share.unusable')}</span>}
                     </td>
                     <td>
                       <button className="btn btn-secondary btn-sm" style={{ marginRight: 4 }}
-                        onClick={() => copy(link.token)}>{t('share.copy')}</button>
-                      <button className="btn btn-danger btn-sm" onClick={() => revoke(link.token)}>
+                        disabled={link.usable === false} onClick={() => copy(link.token)}>{t('share.copy')}</button>
+                      <button className="btn btn-danger btn-sm" disabled={busy} onClick={() => revoke(link.token)}>
                         {t('share.revoke')}
                       </button>
                     </td>
@@ -176,6 +195,6 @@ export default function ShareDialog({ sessionId, sessionLabel, onClose }: Props)
           </div>
         )}
       </div>
-    </div>
+    </div>, document.body
   );
 }

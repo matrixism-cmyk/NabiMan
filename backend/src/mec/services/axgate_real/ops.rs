@@ -2,35 +2,19 @@ use super::client::{upstream, AxgateReal};
 use super::parser::parse_nat_rules;
 use super::session::AxgateSession;
 use crate::mec::services::{ServiceError, ServiceResult};
-use crate::models::mec::{
-    AnyMarker, CreateNatRuleRequest, NatRule, NatSource, NatType, Protocol,
-};
+use crate::models::mec::{AnyMarker, CreateNatRuleRequest, NatRule, NatSource, NatType, Protocol};
 use chrono::Utc;
-use std::time::Duration;
 
-pub async fn add_nat_rule(
-    r: &AxgateReal,
-    req: &CreateNatRuleRequest,
-) -> ServiceResult<NatRule> {
+pub async fn add_nat_rule(r: &AxgateReal, req: &CreateNatRuleRequest) -> ServiceResult<NatRule> {
     let cfg = r.config();
-    let mut session = AxgateSession::connect(
-        &cfg.host,
-        cfg.port,
-        &cfg.username,
-        &cfg.password,
-        Duration::from_secs(cfg.timeout_secs),
-    )
-    .await?;
+    let mut session = AxgateSession::connect(cfg).await?;
 
     let existing = parse_nat_rules(&session.fetch_running_config().await?);
     let next_id = next_id(&existing);
     let label = escape(&req.label);
     let mut commands = vec![
         format!("configure terminal"),
-        format!(
-            "ip nat policy from untrust to trust {}",
-            next_id
-        ),
+        format!("ip nat policy from untrust to trust {}", next_id),
         format!("dnat destination {}/32", req.public_ip),
         format!("translated {}", req.private_ip),
         format!("source {}", req.source),
@@ -90,14 +74,7 @@ pub async fn delete_nat_rule(r: &AxgateReal, id: &str) -> ServiceResult<()> {
         .ok_or_else(|| ServiceError::InvalidInput(format!("invalid nat id: {}", id)))?;
 
     let cfg = r.config();
-    let mut session = AxgateSession::connect(
-        &cfg.host,
-        cfg.port,
-        &cfg.username,
-        &cfg.password,
-        Duration::from_secs(cfg.timeout_secs),
-    )
-    .await?;
+    let mut session = AxgateSession::connect(cfg).await?;
     let commands = [
         "configure terminal".to_string(),
         format!("no ip nat policy from untrust to trust {}", numeric),
@@ -108,24 +85,13 @@ pub async fn delete_nat_rule(r: &AxgateReal, id: &str) -> ServiceResult<()> {
     Ok(())
 }
 
-pub async fn toggle_nat_rule(
-    r: &AxgateReal,
-    id: &str,
-    enabled: bool,
-) -> ServiceResult<()> {
+pub async fn toggle_nat_rule(r: &AxgateReal, id: &str, enabled: bool) -> ServiceResult<()> {
     let numeric = id
         .strip_prefix("nat-")
         .ok_or_else(|| ServiceError::InvalidInput(format!("invalid nat id: {}", id)))?;
 
     let cfg = r.config();
-    let mut session = AxgateSession::connect(
-        &cfg.host,
-        cfg.port,
-        &cfg.username,
-        &cfg.password,
-        Duration::from_secs(cfg.timeout_secs),
-    )
-    .await?;
+    let mut session = AxgateSession::connect(cfg).await?;
     let action = if enabled { "enable" } else { "no enable" };
     let commands = [
         "configure terminal".to_string(),
@@ -142,7 +108,10 @@ pub async fn toggle_nat_rule(
 fn next_id(existing: &[NatRule]) -> u32 {
     existing
         .iter()
-        .filter_map(|r| r.id.strip_prefix("nat-").and_then(|s| s.parse::<u32>().ok()))
+        .filter_map(|r| {
+            r.id.strip_prefix("nat-")
+                .and_then(|s| s.parse::<u32>().ok())
+        })
         .max()
         .map(|m| m + 1)
         .unwrap_or(10)

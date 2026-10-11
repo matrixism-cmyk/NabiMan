@@ -2,13 +2,18 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import './App.css';
 import './components.css';
 import './design.css';
+import { TerminalSettingsProvider } from './components/terminal/settings';
+import { TerminalWindowsProvider } from './components/terminal/TerminalWindows';
+import MfaPanel from './components/MfaPanel';
 import LoginScreen from './components/LoginScreen';
+import ScopeResourcesPanel from './components/ScopeResourcesPanel';
+import { MemberUser } from './components/MembershipEditor';
 import PanelOutlet from './components/PanelOutlet';
 import ChangePasswordModal from './components/ChangePasswordModal';
 import CommandPalette from './components/CommandPalette';
 import LanguageSelector from './components/LanguageSelector';
 import { Tab, Category, CatDef, categories } from './nav';
-import { clearToken, useApi } from './hooks/useApi';
+import { apiPost, clearToken, useApi } from './hooks/useApi';
 import { useT } from './i18n';
 import { ThemeProvider, ThemeSelector } from './theme';
 
@@ -19,6 +24,7 @@ function parseHash(): { cat: Category; tab: Tab } | null {
   if ((catKey === 'system' && tabKey === 'terminal') || (catKey === 'dashboard' && tabKey === 'multiserver')) {
     return { cat: 'remote', tab: 'remote' };
   }
+  if (catKey === 'security' && tabKey === 'usermgmt') return { cat: 'administration', tab: 'usermgmt' };
   const cat = categories.find((c) => c.key === catKey);
   if (!cat) return null;
   const tab = cat.tabs.find((tb) => tb.key === tabKey);
@@ -92,26 +98,69 @@ function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const { data: dockerAvailable } = useApi<boolean>(loggedIn ? '/api/containers/available' : '');
-  const { data: dbAvailable } = useApi<boolean>(loggedIn ? '/api/database/available' : '');
-  const { data: mailAvailable } = useApi<boolean>(loggedIn ? '/api/mail/available' : '');
-  const { data: dnsAvailable } = useApi<boolean>(loggedIn ? '/api/dns/available' : '');
+  const { data: currentUser, refetch: refetchCurrentUser } = useApi<MemberUser>(loggedIn ? '/api/users/me' : '');
+  useEffect(() => {
+    const changed = () => { refetchCurrentUser(); };
+    window.addEventListener('nabiman_mfa_required', changed);
+    return () => window.removeEventListener('nabiman_mfa_required', changed);
+  }, [refetchCurrentUser]);
+  const scoped = !!currentUser && currentUser.role !== 'admin' && (currentUser.scope_restricted || currentUser.memberships.length > 0);
+  const { data: dockerAvailable } = useApi<boolean>(loggedIn && currentUser && !scoped ? '/api/containers/available' : '');
+  const { data: dbAvailable } = useApi<boolean>(loggedIn && currentUser && !scoped ? '/api/database/available' : '');
+  const { data: mailAvailable } = useApi<boolean>(loggedIn && currentUser && !scoped ? '/api/mail/available' : '');
+  const { data: dnsAvailable } = useApi<boolean>(loggedIn && currentUser && !scoped ? '/api/dns/available' : '');
   useEffect(() => {
     const hidden = new Set<Tab>();
     if (dockerAvailable === false) hidden.add('containers');
     if (dbAvailable === false) hidden.add('database');
     if (mailAvailable === false) hidden.add('mail');
     if (dnsAvailable === false) hidden.add('dns');
+    if (currentUser?.role === 'viewer' || currentUser?.role === 'operator') {
+      hidden.add('backup');
+      hidden.add('audit');
+      hidden.add('files');
+      hidden.add('config');
+      hidden.add('vhost');
+      hidden.add('remote');
+    }
+    if (currentUser?.role === 'operator') {
+      for (const tab of ['cron', 'backup', 'packages', 'database', 'usermgmt', 'enterpriseauth', 'accounts'] as Tab[]) {
+        hidden.add(tab);
+      }
+    }
+    if (scoped) {
+      const allowed = new Set<Tab>(['usermgmt', 'scopeSettings', 'loginSessions', 'mfa', 'remote', 'mecTenants']);
+      hidden.clear();
+      categories.forEach(c => c.tabs.forEach(tab => { if (!allowed.has(tab.key)) hidden.add(tab.key); }));
+    }
     setHiddenTabs(hidden);
-  }, [dockerAvailable, dbAvailable, mailAvailable, dnsAvailable]);
+  }, [dockerAvailable, dbAvailable, mailAvailable, dnsAvailable, currentUser, scoped]);
 
   const visibleCategories = useMemo(() => {
     return categories
-      .map(cat => ({ ...cat, tabs: cat.tabs.filter(tab => !hiddenTabs.has(tab.key)) }))
+      .map(cat => ({ ...cat, labelKey: cat.key === 'administration' && currentUser?.role !== 'admin' ? 'cat.scopeAdministration' : cat.labelKey, tabs: cat.tabs.filter(tab => scoped
+        ? ['usermgmt', 'scopeSettings', 'loginSessions', 'mfa', 'remote', 'mecTenants'].includes(tab.key) : !hiddenTabs.has(tab.key)) }))
       .filter(cat => cat.tabs.length > 0);
-  }, [hiddenTabs]);
+  }, [hiddenTabs, scoped, currentUser?.role]);
 
-  const handleLogout = () => { clearToken(); setLoggedIn(false); };
+  useEffect(() => {
+    if (!loggedIn || !currentUser) return;
+    const cat = visibleCategories.find(c => c.key === activeCat);
+    if (!cat || !cat.tabs.some(t => t.key === activeTab)) {
+      const fallback = visibleCategories[0];
+      if (fallback) { setActiveCat(fallback.key); setActiveTab(fallback.tabs[0].key); }
+    }
+  }, [loggedIn, currentUser, visibleCategories, activeCat, activeTab]);
+
+  const handleLogout = async () => {
+    const request = apiPost('/api/auth/logout', {});
+    clearToken();
+    setLoggedIn(false);
+    setShowChangePw(false);
+    setShowPalette(false);
+    exitFocus();
+    try { await request; } catch { /* local logout completes even if offline */ }
+  };
   const handleNavigate = (tab: Tab) => { setActiveCat('mec'); setActiveTab(tab); };
   const navigateTo = (cat: Category, tab: Tab) => { setActiveCat(cat); setActiveTab(tab); };
   const handleCatClick = (cat: CatDef) => {
@@ -121,12 +170,27 @@ function App() {
 
   if (!loggedIn) return <LoginScreen onLogin={() => setLoggedIn(true)} />;
 
+  if (!currentUser) return <div className="panel loading">권한을 확인하는 중…</div>;
+
+  if (currentUser.mfa_blocked) return <main className="app">
+    <p role="alert">{t('mfa.policyGate')}</p>
+    <MfaPanel />
+    <div className="btn-group">
+      <button className="btn btn-secondary" onClick={() => refetchCurrentUser()}>{t('mfa.checkPolicy')}</button>
+      <button className="btn btn-secondary" onClick={handleLogout}>{t('app.logout')}</button>
+    </div>
+  </main>;
+
   const currentCat = visibleCategories.find(c => c.key === activeCat) || visibleCategories[0];
 
+  const visibleTab = currentCat.tabs.some(tab => tab.key === activeTab) ? activeTab : currentCat.tabs[0].key;
+
   return (
+    <TerminalSettingsProvider key={currentUser.username} enabled={currentUser.role === 'admin'}>
+    <TerminalWindowsProvider key={currentUser.username} owner={currentUser.username} active={currentUser.role === 'admin'}>
     <div className={`app ${focusMode ? 'focus-mode' : ''}`}>
       <header className="app-header">
-        <h1><button className="logo-link" onClick={() => navigateTo('dashboard', 'server')}>
+        <h1><button className="logo-link" onClick={() => navigateTo(scoped ? 'administration' : 'dashboard', scoped ? 'usermgmt' : 'server')}>
           <img src={`${process.env.PUBLIC_URL}/favicon.svg`} alt="" width="32" height="32" />
           {t('app.title')}
         </button></h1>
@@ -169,11 +233,13 @@ function App() {
           </aside>
         )}
         <main className={`main-content ${currentCat.tabs.length <= 1 ? 'full-width' : ''}`}>
-          <PanelOutlet
-            activeTab={activeTab}
+          {scoped && (visibleTab === 'remote' || visibleTab === 'mecTenants')
+            ? <ScopeResourcesPanel key={visibleTab} kind={visibleTab === 'remote' ? 'server' : 'tenant'} />
+            : <PanelOutlet
+            activeTab={visibleTab}
             onNavigate={handleNavigate}
             onEnterFocus={enterFocus}
-          />
+          />}
         </main>
       </div>
       {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
@@ -190,6 +256,8 @@ function App() {
         </button>
       )}
     </div>
+    </TerminalWindowsProvider>
+    </TerminalSettingsProvider>
   );
 }
 

@@ -124,9 +124,7 @@ fn convert_pod(p: &Pod) -> PodInfo {
     }
 }
 
-fn to_port(
-    target: &Option<k8s_openapi::apimachinery::pkg::util::intstr::IntOrString>,
-) -> u16 {
+fn to_port(target: &Option<k8s_openapi::apimachinery::pkg::util::intstr::IntOrString>) -> u16 {
     use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
     match target {
         Some(IntOrString::Int(i)) => *i as u16,

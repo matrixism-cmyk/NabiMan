@@ -1,16 +1,15 @@
-use super::client::upstream;
+use super::client::{upstream, AxgateRealConfig};
+use super::host_trust::HostTrust;
 use crate::mec::services::ServiceResult;
-use async_trait::async_trait;
 use russh::client::{self, Config, Handle, Handler};
+use russh::keys::Algorithm;
 use russh::{kex, Channel, ChannelMsg, Preferred};
-use russh_keys::key;
 use std::borrow::Cow;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::time::{timeout, Instant};
 
-/// AXGATE's SSH stack only negotiates legacy algorithms — we extend russh's
-/// safe defaults so modern endpoints still work elsewhere.
+/// Legacy algorithms require a host-specific, unexpired exception.
 fn legacy_preferred() -> Preferred {
     let mut kex_list = Preferred::DEFAULT.kex.to_vec();
     for name in [kex::DH_G14_SHA1, kex::DH_G1_SHA1] {
@@ -19,8 +18,8 @@ fn legacy_preferred() -> Preferred {
         }
     }
     let mut key_list = Preferred::DEFAULT.key.to_vec();
-    if !key_list.contains(&key::SSH_RSA) {
-        key_list.push(key::SSH_RSA);
+    if !key_list.contains(&Algorithm::Rsa { hash: None }) {
+        key_list.push(Algorithm::Rsa { hash: None });
     }
     Preferred {
         kex: Cow::Owned(kex_list),
@@ -28,6 +27,7 @@ fn legacy_preferred() -> Preferred {
         cipher: Preferred::DEFAULT.cipher.clone(),
         mac: Preferred::DEFAULT.mac.clone(),
         compression: Preferred::DEFAULT.compression.clone(),
+        ..Preferred::DEFAULT
     }
 }
 
@@ -36,52 +36,81 @@ pub struct AxgateSession {
     password: String,
 }
 
-struct SshClient;
+struct SshClient {
+    trust: HostTrust,
+    rejected: Arc<Mutex<Option<String>>>,
+}
 
-#[async_trait]
 impl Handler for SshClient {
     type Error = russh::Error;
     async fn check_server_key(
         &mut self,
-        _server_public_key: &russh_keys::key::PublicKey,
+        server_public_key: &russh::keys::PublicKeyOrCertificate,
     ) -> Result<bool, Self::Error> {
-        Ok(true)
+        let russh::keys::PublicKeyOrCertificate::PublicKey {
+            key: server_public_key,
+            ..
+        } = server_public_key
+        else {
+            *self.rejected.lock().unwrap() = Some("AXGate host certificates require a separately configured CA policy; raw host key pin expected".into());
+            return Ok(false);
+        };
+        let trusted = self.trust.matches(server_public_key);
+        if !trusted {
+            *self.rejected.lock().unwrap() = Some(format!(
+                "AXGate SSH host key mismatch; received {}; independently verify rotation before changing the trusted key",
+                server_public_key.fingerprint(russh::keys::HashAlg::Sha256)));
+        }
+        Ok(trusted)
     }
 }
 
 impl AxgateSession {
-    pub async fn connect(
-        host: &str,
-        port: u16,
-        username: &str,
-        password: &str,
-        timeout_dur: Duration,
-    ) -> ServiceResult<Self> {
+    pub async fn connect(cfg: &AxgateRealConfig) -> ServiceResult<Self> {
+        // Validate before opening the socket or sending any credentials.
+        let trust = HostTrust::parse(
+            &cfg.host_key_sha256,
+            cfg.legacy_until.as_deref(),
+            chrono::Utc::now(),
+        )?;
+        let timeout_dur = Duration::from_secs(cfg.timeout_secs);
         let config = Arc::new(Config {
-            preferred: legacy_preferred(),
+            preferred: if trust.legacy {
+                legacy_preferred()
+            } else {
+                Preferred::DEFAULT
+            },
             ..Default::default()
         });
+        let rejected = Arc::new(Mutex::new(None));
+        let handler = SshClient {
+            trust,
+            rejected: rejected.clone(),
+        };
         let mut handle = timeout(
             timeout_dur,
-            client::connect(config, (host, port), SshClient),
+            client::connect(config, (cfg.host.as_str(), cfg.port), handler),
         )
         .await
-        .map_err(|_| upstream(format!("connect timeout: {}:{}", host, port)))?
-        .map_err(upstream)?;
+        .map_err(|_| upstream("AXGate connect timeout"))?
+        .map_err(|err| {
+            let reason = rejected.lock().unwrap().clone();
+            upstream(reason.unwrap_or_else(|| err.to_string()))
+        })?;
 
         let ok = timeout(
             timeout_dur,
-            handle.authenticate_password(username, password),
+            handle.authenticate_password(&cfg.username, &cfg.password),
         )
         .await
         .map_err(|_| upstream("auth timeout"))?
         .map_err(upstream)?;
-        if !ok {
+        if !ok.success() {
             return Err(upstream("authentication failed"));
         }
         Ok(Self {
             handle,
-            password: password.to_string(),
+            password: cfg.password.clone(),
         })
     }
 
@@ -98,11 +127,7 @@ impl AxgateSession {
     }
 
     pub async fn run_commands(&mut self, commands: &[&str]) -> ServiceResult<String> {
-        let mut channel = self
-            .handle
-            .channel_open_session()
-            .await
-            .map_err(upstream)?;
+        let mut channel = self.handle.channel_open_session().await.map_err(upstream)?;
         channel
             .request_pty(true, "vt100", 200, 50, 0, 0, &[])
             .await
@@ -117,7 +142,10 @@ impl AxgateSession {
         // Step 1: wait for the CLI-level Password prompt.
         let greet = read_until_idle(&mut channel, idle, start, overall).await?;
         if debug {
-            eprintln!("[axgate:greet] {:?}", greet.chars().take(200).collect::<String>());
+            eprintln!(
+                "[axgate:greet] {:?}",
+                greet.chars().take(200).collect::<String>()
+            );
         }
 
         if greet.contains("blocked for") {
@@ -203,8 +231,7 @@ async fn read_until_idle(
             Ok(Some(ChannelMsg::Data { data })) => {
                 let chunk = String::from_utf8_lossy(&data);
                 buf.push_str(&chunk);
-                let tail = buf
-                    .trim_end_matches(|c: char| c.is_whitespace() || c.is_control());
+                let tail = buf.trim_end_matches(|c: char| c.is_whitespace() || c.is_control());
                 if tail.ends_with("--More--") || tail.ends_with("---- More ----") {
                     // advance paginator
                     let _ = channel.data(&b" "[..]).await;
@@ -221,3 +248,7 @@ async fn read_until_idle(
         }
     }
 }
+
+#[cfg(test)]
+#[path = "host_trust_tests.rs"]
+mod host_trust_tests;

@@ -17,13 +17,9 @@ pub async fn apply_deployment(
         crate::mec::services::ServiceError::InvalidInput(format!("deployment json: {}", e))
     })?;
     let api: Api<Deployment> = Api::namespaced(client.clone(), namespace);
-    let name = d
-        .metadata
-        .name
-        .clone()
-        .ok_or_else(|| crate::mec::services::ServiceError::InvalidInput(
-            "deployment missing metadata.name".into(),
-        ))?;
+    let name = d.metadata.name.clone().ok_or_else(|| {
+        crate::mec::services::ServiceError::InvalidInput("deployment missing metadata.name".into())
+    })?;
     match api.create(&PostParams::default(), &d).await {
         Ok(_) => Ok(()),
         Err(kube::Error::Api(ae)) if ae.code == 409 => {
@@ -37,11 +33,7 @@ pub async fn apply_deployment(
     }
 }
 
-pub async fn delete_deployment(
-    client: &Client,
-    namespace: &str,
-    name: &str,
-) -> ServiceResult<()> {
+pub async fn delete_deployment(client: &Client, namespace: &str, name: &str) -> ServiceResult<()> {
     let api: Api<Deployment> = Api::namespaced(client.clone(), namespace);
     match api.delete(name, &DeleteParams::default()).await {
         Ok(_) => Ok(()),
@@ -50,22 +42,14 @@ pub async fn delete_deployment(
     }
 }
 
-pub async fn apply_service(
-    client: &Client,
-    namespace: &str,
-    spec_json: &str,
-) -> ServiceResult<()> {
+pub async fn apply_service(client: &Client, namespace: &str, spec_json: &str) -> ServiceResult<()> {
     let s: Service = serde_json::from_str(spec_json).map_err(|e| {
         crate::mec::services::ServiceError::InvalidInput(format!("service json: {}", e))
     })?;
     let api: Api<Service> = Api::namespaced(client.clone(), namespace);
-    let name = s
-        .metadata
-        .name
-        .clone()
-        .ok_or_else(|| crate::mec::services::ServiceError::InvalidInput(
-            "service missing metadata.name".into(),
-        ))?;
+    let name = s.metadata.name.clone().ok_or_else(|| {
+        crate::mec::services::ServiceError::InvalidInput("service missing metadata.name".into())
+    })?;
     match api.create(&PostParams::default(), &s).await {
         Ok(_) => Ok(()),
         Err(kube::Error::Api(ae)) if ae.code == 409 => {
@@ -79,11 +63,7 @@ pub async fn apply_service(
     }
 }
 
-pub async fn delete_service(
-    client: &Client,
-    namespace: &str,
-    name: &str,
-) -> ServiceResult<()> {
+pub async fn delete_service(client: &Client, namespace: &str, name: &str) -> ServiceResult<()> {
     let api: Api<Service> = Api::namespaced(client.clone(), namespace);
     match api.delete(name, &DeleteParams::default()).await {
         Ok(_) => Ok(()),

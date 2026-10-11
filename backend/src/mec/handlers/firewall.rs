@@ -1,4 +1,6 @@
-use super::util::{created, current_user, from_service_error, list_response, no_content, ok_response};
+use super::util::{
+    created, current_user, from_service_error, list_response, no_content, ok_response,
+};
 use crate::mec::MecState;
 use crate::models::mec::{CreateNatRuleRequest, UpdateNatRuleRequest};
 use actix_web::{web, HttpRequest, HttpResponse};
@@ -22,7 +24,10 @@ pub async fn add_nat(
     body: web::Json<CreateNatRuleRequest>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let user = current_user(&req);
+    let user = match current_user(&req) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
     let audit = super::audit_helper::begin_audit(
         &req,
         &state,
@@ -58,13 +63,22 @@ pub async fn delete_nat(
     path: web::Path<String>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let user = current_user(&req);
+    let user = match current_user(&req) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
     let id = path.into_inner();
     if let Err(e) = crate::mec::safety::require_confirm_header(&req, &id) {
         return from_service_error(e);
     }
-    let audit =
-        super::audit_helper::begin_audit(&req, &state, &user, "firewall_nat_delete", "nat_rule", &id);
+    let audit = super::audit_helper::begin_audit(
+        &req,
+        &state,
+        &user,
+        "firewall_nat_delete",
+        "nat_rule",
+        &id,
+    );
     match state.services.axgate.delete_nat_rule(&id).await {
         Ok(_) => {
             audit.success(None);
@@ -83,7 +97,10 @@ pub async fn patch_nat(
     body: web::Json<UpdateNatRuleRequest>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let user = current_user(&req);
+    let user = match current_user(&req) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
     let id = path.into_inner();
     let audit = super::audit_helper::begin_audit(
         &req,

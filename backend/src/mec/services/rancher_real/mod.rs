@@ -1,6 +1,6 @@
 mod client;
 mod projects;
-mod users;
 mod prtb;
+mod users;
 
 pub use client::{RancherReal, RancherRealConfig};

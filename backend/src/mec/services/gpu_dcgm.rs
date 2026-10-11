@@ -17,7 +17,10 @@ pub async fn node_gpu_util() -> HashMap<String, f32> {
         Ok(u) if !u.is_empty() => u,
         _ => return HashMap::new(),
     };
-    let client = match reqwest::Client::builder().timeout(Duration::from_secs(5)).build() {
+    let client = match reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+    {
         Ok(c) => c,
         Err(_) => return HashMap::new(),
     };
@@ -41,7 +44,10 @@ pub fn parse_dcgm(text: &str) -> HashMap<String, f32> {
             Some(h) => h,
             None => continue,
         };
-        let value = match line.rsplit(|c: char| c == '}' || c.is_whitespace()).find(|t| !t.is_empty()) {
+        let value = match line
+            .rsplit(|c: char| c == '}' || c.is_whitespace())
+            .find(|t| !t.is_empty())
+        {
             Some(v) => match v.parse::<f32>() {
                 Ok(n) => n,
                 Err(_) => continue,
@@ -94,7 +100,10 @@ DCGM_FI_DEV_DEC_UTIL{gpu="0",Hostname="mec-gpu01"} 5
 
     #[test]
     fn extracts_label_value() {
-        assert_eq!(label_value(r#"x{Hostname="n1",gpu="0"} 5"#, "Hostname"), Some("n1".into()));
+        assert_eq!(
+            label_value(r#"x{Hostname="n1",gpu="0"} 5"#, "Hostname"),
+            Some("n1".into())
+        );
         assert_eq!(label_value("x{gpu=\"0\"} 5", "Hostname"), None);
     }
 }

@@ -1,0 +1,10 @@
+/* Circled digits are one terminal cell in tmux and xterm. Bundle glyphs that
+   fit that cell so a browser's proportional fallback cannot cover the next. */
+@font-face {
+  font-family: 'NabiMan Circled Digits';
+  src: url('../../assets/circled-digits.woff') format('woff');
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: block;
+  unicode-range: U+2460-2469;
+}

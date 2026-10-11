@@ -1,5 +1,5 @@
-use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MecAuditLog {
@@ -74,7 +74,11 @@ mod tests {
 
     #[test]
     fn status_roundtrip() {
-        for s in [AuditStatus::Success, AuditStatus::Failed, AuditStatus::Partial] {
+        for s in [
+            AuditStatus::Success,
+            AuditStatus::Failed,
+            AuditStatus::Partial,
+        ] {
             assert_eq!(AuditStatus::from_str(s.as_str()), Some(s));
         }
     }

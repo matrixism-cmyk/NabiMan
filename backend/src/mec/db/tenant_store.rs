@@ -1,7 +1,5 @@
 use super::DbHandle;
-use crate::models::mec::{
-    NodeAllocation, ResourceQuota, StarterKit, Tenant, TenantStatus,
-};
+use crate::models::mec::{NodeAllocation, ResourceQuota, StarterKit, Tenant, TenantStatus};
 use chrono::{DateTime, Utc};
 use rusqlite::params;
 
@@ -14,8 +12,34 @@ impl TenantStore {
         Self { db }
     }
 
+    /// Reserve a tenant ID without replacing an existing profile, including a
+    /// failed/provisioning record that may own partially created resources.
+    pub fn reserve(&self, t: &Tenant, created_by: &str) -> rusqlite::Result<bool> {
+        let mut conn = self.db.lock().unwrap();
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        let exists: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM tenant_profiles WHERE id=?1)",
+            params![t.id],
+            |r| r.get(0),
+        )?;
+        if exists {
+            return Ok(false);
+        }
+        Self::upsert_on(&tx, t, created_by)?;
+        tx.commit()?;
+        Ok(true)
+    }
+
     pub fn upsert(&self, t: &Tenant, created_by: &str) -> rusqlite::Result<()> {
         let conn = self.db.lock().unwrap();
+        Self::upsert_on(&conn, t, created_by)
+    }
+
+    pub(super) fn upsert_on(
+        conn: &rusqlite::Connection,
+        t: &Tenant,
+        created_by: &str,
+    ) -> rusqlite::Result<()> {
         conn.execute(
             "INSERT INTO tenant_profiles
                 (id, display_name, task_name, contact_email, namespace,
@@ -44,7 +68,9 @@ impl TenantStore {
                 t.rancher_user_id,
                 serde_json::to_string(&t.allocation).unwrap_or_default(),
                 serde_json::to_string(&t.quota).unwrap_or_default(),
-                t.starter_kit.as_ref().map(|s| serde_json::to_string(s).unwrap_or_default()),
+                t.starter_kit
+                    .as_ref()
+                    .map(|s| serde_json::to_string(s).unwrap_or_default()),
                 serde_json::to_string(&t.status).unwrap_or_default(),
                 t.created_at.to_rfc3339(),
                 created_by,
@@ -82,6 +108,7 @@ impl TenantStore {
         rows.collect()
     }
 
+    #[cfg(test)]
     pub fn delete(&self, id: &str) -> rusqlite::Result<bool> {
         let conn = self.db.lock().unwrap();
         let n = conn.execute("DELETE FROM tenant_profiles WHERE id = ?1", params![id])?;
@@ -117,10 +144,10 @@ fn row_to_tenant(row: &rusqlite::Row) -> rusqlite::Result<Tenant> {
     let quota: ResourceQuota = serde_json::from_str(&quota_str).map_err(|e| {
         rusqlite::Error::FromSqlConversionFailure(8, rusqlite::types::Type::Text, Box::new(e))
     })?;
-    let starter_kit: Option<StarterKit> =
-        kit_str.and_then(|s| serde_json::from_str(&s).ok());
-    let status: TenantStatus = serde_json::from_str(&status_str)
-        .unwrap_or(TenantStatus::Failed { reason: "unknown".into() });
+    let starter_kit: Option<StarterKit> = kit_str.and_then(|s| serde_json::from_str(&s).ok());
+    let status: TenantStatus = serde_json::from_str(&status_str).unwrap_or(TenantStatus::Failed {
+        reason: "unknown".into(),
+    });
 
     Ok(Tenant {
         id: row.get(0)?,
@@ -202,5 +229,56 @@ mod tests {
         store.upsert(&sample_tenant("x"), "admin").unwrap();
         assert!(store.delete("x").unwrap());
         assert!(store.get("x").unwrap().is_none());
+    }
+
+    #[test]
+    fn concurrent_connections_reserve_only_one_owner_and_preserve_it() {
+        let dir = std::env::temp_dir().join(format!("nabiman-reserve-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&dir).unwrap();
+        let path = dir.join("state.db");
+        let first = db::open_persistent(path.clone()).unwrap();
+        let second = db::open_persistent(path.clone()).unwrap();
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+        let threads: Vec<_> = [first, second]
+            .into_iter()
+            .enumerate()
+            .map(|(i, handle)| {
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    let store = TenantStore::new(handle);
+                    let mut tenant = sample_tenant("reserved");
+                    let owner = format!("owner-{i}");
+                    tenant.display_name = owner.clone();
+                    tenant.status = TenantStatus::Provisioning;
+                    barrier.wait();
+                    (store.reserve(&tenant, &owner).unwrap(), owner)
+                })
+            })
+            .collect();
+        let results: Vec<_> = threads.into_iter().map(|t| t.join().unwrap()).collect();
+        assert_eq!(results.iter().filter(|(won, _)| *won).count(), 1);
+        let winner = &results.iter().find(|(won, _)| *won).unwrap().1;
+        let handle = db::open_persistent(path).unwrap();
+        let store = TenantStore::new(handle.clone());
+        assert_eq!(
+            &store.get("reserved").unwrap().unwrap().display_name,
+            winner
+        );
+        assert!(!store
+            .reserve(&sample_tenant("reserved"), "replacement")
+            .unwrap());
+        let creator: String = handle
+            .lock()
+            .unwrap()
+            .query_row(
+                "SELECT created_by FROM tenant_profiles WHERE id='reserved'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(&creator, winner);
+        drop(store);
+        drop(handle);
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

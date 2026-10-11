@@ -79,8 +79,8 @@ describe('terminal windows', () => {
 
   it('minimises and restores from the taskbar', () => {
     renderDesktop();
-    const win = openWindow();
-    const minimise = win.querySelectorAll('.term-window-actions button')[2] as HTMLElement;
+    openWindow();
+    const minimise = screen.getByTitle('Minimise');
     fireEvent.pointerDown(minimise, { bubbles: true, button: 0 });
     fireEvent.click(minimise);
     expect(document.querySelector('.term-window-minimized')).toBeTruthy();
@@ -94,7 +94,7 @@ describe('terminal windows', () => {
   it('maximises and restores the previous geometry', () => {
     renderDesktop();
     const win = openWindow();
-    const maximise = win.querySelectorAll('.term-window-actions button')[3] as HTMLElement;
+    const maximise = screen.getByTitle('Maximise');
     const before = win.style.width;
     fireEvent.pointerDown(maximise, { bubbles: true, button: 0 });
     fireEvent.click(maximise);
@@ -105,8 +105,8 @@ describe('terminal windows', () => {
 
   it('ends a session only after confirmation', () => {
     renderDesktop();
-    const win = openWindow();
-    const end = win.querySelectorAll('.term-window-actions button')[4] as HTMLElement;
+    openWindow();
+    const end = screen.getByTitle('End session (also closes the remote shell)');
     (window.confirm as jest.Mock).mockReturnValueOnce(false);
     fireEvent.click(end);
     expect(document.querySelector('.term-window')).toBeTruthy();

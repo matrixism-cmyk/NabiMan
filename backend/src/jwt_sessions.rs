@@ -1,20 +1,26 @@
-use actix_web::{web, post, get, HttpResponse, HttpRequest};
+use crate::auth::JwtSecret;
+use crate::models::ApiResponse;
+use crate::users::UserStore;
+use actix_web::{post, web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use crate::models::ApiResponse;
-use crate::auth::JwtSecret;
 
-const ACCESS_TTL: usize = 900;     // 15 minutes
+const ACCESS_TTL: usize = 900; // 15 minutes
 const REFRESH_TTL: usize = 604800; // 7 days
 
 #[derive(Serialize, Clone)]
 pub struct SessionInfo {
     pub session_id: String,
     pub username: String,
+    pub user_id: String,
     pub created_at: String,
     pub last_active: String,
     pub ip: String,
+    #[serde(skip_serializing)]
+    pub(crate) refresh_generation: u64,
+    #[serde(skip_serializing)]
+    pub(crate) mfa_verified: bool,
 }
 
 pub type SessionStore = Arc<Mutex<HashMap<String, SessionInfo>>>;
@@ -31,31 +37,58 @@ pub struct RefreshClaims {
     pub exp: usize,
     pub iat: usize,
     pub typ: String, // "refresh"
+    pub generation: u64,
 }
 
-pub fn create_token_pair(secret: &str, username: &str, role: &str, session_id: &str)
-    -> Result<(String, String), String>
-{
+pub fn create_token_pair(
+    secret: &str,
+    username: &str,
+    role: &str,
+    session_id: &str,
+) -> Result<(String, String), String> {
+    let expires = chrono::Utc::now().timestamp() as usize + REFRESH_TTL;
+    token_pair(secret, username, role, session_id, 0, expires)
+}
+
+fn token_pair(
+    secret: &str,
+    username: &str,
+    role: &str,
+    session_id: &str,
+    generation: u64,
+    refresh_expires: usize,
+) -> Result<(String, String), String> {
     let now = chrono::Utc::now().timestamp() as usize;
 
     let access = crate::auth::Claims {
-        sub: username.into(), role: role.into(), iat: now, exp: now + ACCESS_TTL,
+        sub: username.into(),
+        role: role.into(),
+        iat: now,
+        exp: now + ACCESS_TTL,
+        sid: session_id.into(),
     };
     let access_token = jsonwebtoken::encode(
         &jsonwebtoken::Header::default(),
         &access,
         &jsonwebtoken::EncodingKey::from_secret(secret.as_bytes()),
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     let refresh = RefreshClaims {
-        sub: username.into(), role: role.into(), sid: session_id.into(),
-        iat: now, exp: now + REFRESH_TTL, typ: "refresh".into(),
+        sub: username.into(),
+        role: role.into(),
+        sid: session_id.into(),
+        iat: now,
+        exp: refresh_expires,
+        typ: "refresh".into(),
+        generation,
     };
     let refresh_tok = jsonwebtoken::encode(
         &jsonwebtoken::Header::default(),
         &refresh,
         &jsonwebtoken::EncodingKey::from_secret(secret.as_bytes()),
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok((access_token, refresh_tok))
 }
@@ -66,15 +99,63 @@ pub fn generate_session_id() -> String {
     format!("{:032x}", id)
 }
 
-pub fn register_session(store: &SessionStore, sid: &str, username: &str, ip: &str) {
+pub fn register_session(store: &SessionStore, sid: &str, username: &str, user_id: &str, ip: &str) {
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
-    store.lock().unwrap().insert(sid.to_string(), SessionInfo {
-        session_id: sid.to_string(),
-        username: username.to_string(),
-        created_at: now.clone(),
-        last_active: now,
-        ip: ip.to_string(),
-    });
+    store.lock().unwrap().insert(
+        sid.to_string(),
+        SessionInfo {
+            session_id: sid.to_string(),
+            username: username.to_string(),
+            user_id: user_id.to_string(),
+            created_at: now.clone(),
+            last_active: now,
+            ip: ip.to_string(),
+            refresh_generation: 0,
+            mfa_verified: false,
+        },
+    );
+}
+
+/// Hold the account lock through registration: reset/delete/review either runs
+/// before this check and rejects stale authentication, or afterwards and revokes it.
+pub fn register_authenticated_session(
+    store: &SessionStore,
+    users: &UserStore,
+    sid: &str,
+    authenticated: &crate::models::NabimanUser,
+    mfa_verified: bool,
+    ip: &str,
+) -> bool {
+    let users = users.lock().unwrap();
+    let Some(current) = users
+        .iter()
+        .find(|u| u.id == authenticated.id && u.username == authenticated.username)
+    else {
+        return false;
+    };
+    if !current.active()
+        || current.password_hash != authenticated.password_hash
+        || current.totp_enabled != authenticated.totp_enabled
+        || current.totp_secret != authenticated.totp_secret
+        || current.role != authenticated.role
+        || current.share_authorization_version != authenticated.share_authorization_version
+        || current.memberships != authenticated.memberships
+        || current.scope_restricted != authenticated.scope_restricted
+    {
+        return false;
+    }
+    register_session(store, sid, &current.username, &current.id, ip);
+    if let Some(session) = store.lock().unwrap().get_mut(sid) {
+        session.mfa_verified = mfa_verified && current.totp_enabled;
+    }
+    true
+}
+
+pub fn revoke_user_sessions(store: &SessionStore, username: &str, keep_sid: Option<&str>) {
+    store
+        .lock()
+        .unwrap()
+        .retain(|sid, session| session.username != username || keep_sid == Some(sid.as_str()));
 }
 
 #[derive(Deserialize)]
@@ -87,6 +168,7 @@ async fn refresh_token(
     body: web::Json<RefreshRequest>,
     secret: web::Data<JwtSecret>,
     sessions: web::Data<SessionStore>,
+    users: web::Data<UserStore>,
 ) -> HttpResponse {
     let claims = match jsonwebtoken::decode::<RefreshClaims>(
         &body.refresh_token,
@@ -94,87 +176,89 @@ async fn refresh_token(
         &jsonwebtoken::Validation::default(),
     ) {
         Ok(d) => d.claims,
-        Err(_) => return HttpResponse::Unauthorized()
-            .json(ApiResponse::<()>::error("Invalid refresh token")),
+        Err(_) => {
+            return HttpResponse::Unauthorized()
+                .json(ApiResponse::<()>::error("Invalid refresh token"))
+        }
     };
 
     if claims.typ != "refresh" {
         return HttpResponse::Unauthorized().json(ApiResponse::<()>::error("Not a refresh token"));
     }
 
-    // Check session still exists
-    let exists = sessions.lock().unwrap().contains_key(&claims.sid);
-    if !exists {
+    // Account -> session is the same lock order used by review and login.
+    // Keep both through consume+mint+commit so only one request can rotate.
+    let users = users.lock().unwrap();
+    let mut sessions = sessions.lock().unwrap();
+    let Some(session) = sessions.get(&claims.sid) else {
         return HttpResponse::Unauthorized().json(ApiResponse::<()>::error("Session revoked"));
-    }
-
-    // Update last_active
-    if let Some(s) = sessions.lock().unwrap().get_mut(&claims.sid) {
-        s.last_active = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
-    }
-
-    // Issue new access token only
-    let now = chrono::Utc::now().timestamp() as usize;
-    let access = crate::auth::Claims {
-        sub: claims.sub, role: claims.role, iat: now, exp: now + ACCESS_TTL,
     };
-    match jsonwebtoken::encode(
-        &jsonwebtoken::Header::default(), &access,
-        &jsonwebtoken::EncodingKey::from_secret(secret.as_ref().as_bytes()),
+    let Some(user) = users.iter().find(|u| {
+        u.active()
+            && u.username == claims.sub
+            && u.id == session.user_id
+            && !u.id.is_empty()
+            && session.username == claims.sub
+    }) else {
+        return HttpResponse::Unauthorized().json(ApiResponse::<()>::error("Account unavailable"));
+    };
+    let now = chrono::Utc::now().timestamp().max(0) as usize;
+    if claims.exp <= now || claims.iat > now || session.refresh_generation != claims.generation {
+        sessions.remove(&claims.sid);
+        return HttpResponse::Unauthorized().json(ApiResponse::<()>::error(
+            "Login expired or refresh token reused; sign in again",
+        ));
+    }
+    let Some(next) = claims.generation.checked_add(1) else {
+        sessions.remove(&claims.sid);
+        return HttpResponse::Unauthorized().finish();
+    };
+    match token_pair(
+        &secret,
+        &user.username,
+        user.role.as_str(),
+        &claims.sid,
+        next,
+        claims.exp,
     ) {
-        Ok(token) => HttpResponse::Ok().json(ApiResponse::ok(
-            serde_json::json!({ "token": token })
-        )),
-        Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<()>::error(&e.to_string())),
-    }
-}
-
-#[get("/api/auth/sessions")]
-async fn list_sessions(sessions: web::Data<SessionStore>) -> HttpResponse {
-    let map = sessions.lock().unwrap();
-    let list: Vec<SessionInfo> = map.values().cloned().collect();
-    HttpResponse::Ok().json(ApiResponse::ok(list))
-}
-
-#[derive(Deserialize)]
-pub struct RevokeRequest {
-    pub session_id: String,
-}
-
-#[post("/api/auth/sessions/revoke")]
-async fn revoke_session(body: web::Json<RevokeRequest>, sessions: web::Data<SessionStore>) -> HttpResponse {
-    let removed = sessions.lock().unwrap().remove(&body.session_id).is_some();
-    if removed {
-        HttpResponse::Ok().json(ApiResponse::ok("Session revoked"))
-    } else {
-        HttpResponse::Ok().json(ApiResponse::<()>::error("Session not found"))
-    }
-}
-
-#[post("/api/auth/sessions/revoke-all")]
-async fn revoke_all(req: HttpRequest, sessions: web::Data<SessionStore>) -> HttpResponse {
-    let username = extract_username(&req);
-    let mut map = sessions.lock().unwrap();
-    map.retain(|_, s| s.username != username);
-    HttpResponse::Ok().json(ApiResponse::ok("All sessions revoked"))
-}
-
-fn extract_username(req: &HttpRequest) -> String {
-    if let Some(auth) = req.headers().get("Authorization") {
-        if let Ok(val) = auth.to_str() {
-            if let Some(token) = val.strip_prefix("Bearer ") {
-                if let Ok(data) = crate::auth::decode_claims_unverified(token) {
-                    return data.claims.sub;
-                }
-            }
+        Ok((token, refresh_token)) => {
+            let session = sessions.get_mut(&claims.sid).unwrap();
+            session.refresh_generation = next;
+            session.last_active = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+            HttpResponse::Ok()
+                .insert_header(("Cache-Control", "no-store"))
+                .json(ApiResponse::ok(
+                    serde_json::json!({ "token": token, "refresh_token": refresh_token }),
+                ))
         }
+        Err(_) => HttpResponse::InternalServerError()
+            .json(ApiResponse::<()>::error("Token issuance failed")),
     }
-    String::new()
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(refresh_token)
-       .service(list_sessions)
-       .service(revoke_session)
-       .service(revoke_all);
+        .configure(crate::session_management::config);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn password_change_can_keep_only_current_session() {
+        let store = new_session_store();
+        register_session(&store, "current", "alice", "alice", "127.0.0.1");
+        register_session(&store, "other", "alice", "alice", "127.0.0.2");
+        register_session(&store, "third", "bob", "bob", "127.0.0.3");
+        revoke_user_sessions(&store, "alice", Some("current"));
+        let sessions = store.lock().unwrap();
+        assert!(sessions.contains_key("current"));
+        assert!(!sessions.contains_key("other"));
+        assert!(sessions.contains_key("third"));
+    }
+}
+
+#[cfg(test)]
+#[path = "refresh_rotation_tests.rs"]
+mod rotation_tests;

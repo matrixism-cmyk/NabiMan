@@ -139,9 +139,7 @@ fn footer_text(ts: &str) -> Paragraph {
 mod tests {
     use super::*;
     use crate::mec::db;
-    use crate::models::mec::{
-        AllocationType, NodeAllocation, ResourceQuota, TenantStatus,
-    };
+    use crate::models::mec::{AllocationType, NodeAllocation, ResourceQuota, TenantStatus};
 
     fn sample() -> Tenant {
         Tenant {
@@ -167,10 +165,7 @@ mod tests {
     }
 
     fn tempdir() -> PathBuf {
-        let p = std::env::temp_dir().join(format!(
-            "mec-docx-test-{}",
-            uuid::Uuid::new_v4()
-        ));
+        let p = std::env::temp_dir().join(format!("mec-docx-test-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&p).unwrap();
         p
     }

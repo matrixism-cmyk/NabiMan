@@ -2,7 +2,7 @@ use super::util::from_service_error;
 use crate::mec::job_runner::JobEvent;
 use crate::mec::services::ServiceError;
 use crate::mec::MecState;
-use actix_web::{web, HttpResponse};
+use actix_web::{web, HttpRequest, HttpResponse};
 use futures::stream::{self, Stream, StreamExt};
 use std::convert::Infallible;
 use std::pin::Pin;
@@ -11,46 +11,69 @@ use tokio_stream::wrappers::BroadcastStream;
 
 type SseStream = Pin<Box<dyn Stream<Item = Result<web::Bytes, Infallible>> + Send>>;
 
-pub async fn stream(path: web::Path<String>, state: web::Data<MecState>) -> HttpResponse {
+pub async fn stream(
+    req: HttpRequest,
+    path: web::Path<String>,
+    state: web::Data<MecState>,
+    sessions: web::Data<crate::jwt_sessions::SessionStore>,
+    users: web::Data<crate::users::UserStore>,
+) -> HttpResponse {
+    let Some(grant) = crate::terminal_tickets::ConnectionGrant::from_request(
+        &req,
+        sessions.get_ref().clone(),
+        users.get_ref().clone(),
+    )
+    .filter(|g| g.valid()) else {
+        return HttpResponse::Unauthorized().finish();
+    };
     let job_id = path.into_inner();
 
-    let existing = state
-        .job_store
-        .get(&job_id)
-        .unwrap_or(None);
-    if existing.is_none() {
-        return from_service_error(ServiceError::NotFound(format!("job {}", job_id)));
-    }
-
+    // Subscribe before reading the snapshot so completion during the read is
+    // either represented in the snapshot or retained in the event buffer.
     let rx = state.jobs.subscribe(&job_id);
+    let existing = match state.job_store.get(&job_id) {
+        Ok(Some(job)) => job,
+        Ok(None) => return from_service_error(ServiceError::NotFound(format!("job {job_id}"))),
+        Err(e) => return from_service_error(e.into()),
+    };
+    let rx = if existing.status.is_terminal() {
+        None
+    } else {
+        rx
+    };
     let initial = serde_json::json!({
-        "event": "snapshot",
-        "job_id": job_id,
-        "status": existing.as_ref().map(|j| j.status.clone()),
+        "event": "snapshot", "job_id": job_id, "status": existing.status,
+        "steps": existing.steps, "error": existing.error,
     });
     let initial_bytes = sse_event("snapshot", &initial.to_string());
 
-    let stream: SseStream = if let Some(rx) = rx {
-        let live = BroadcastStream::new(rx).filter_map(|r| async move {
-            match r {
-                Ok(ev) => Some(Ok::<web::Bytes, Infallible>(format_event(ev))),
-                Err(_) => None,
-            }
-        });
-        let combined = stream::once(async move { Ok::<web::Bytes, Infallible>(web::Bytes::from(initial_bytes)) }).chain(live);
-        Box::pin(with_heartbeat(combined))
-    } else {
-        // Terminal job: just emit snapshot then close.
-        let once = stream::once(async move { Ok::<web::Bytes, Infallible>(web::Bytes::from(initial_bytes)) });
-        Box::pin(once)
-    };
+    let stream: SseStream =
+        if let Some(rx) = rx {
+            let live = BroadcastStream::new(rx).filter_map(|r| async move {
+                match r {
+                    Ok(ev) => Some(Ok::<web::Bytes, Infallible>(format_event(ev))),
+                    Err(_) => None,
+                }
+            });
+            let combined = stream::once(async move {
+                Ok::<web::Bytes, Infallible>(web::Bytes::from(initial_bytes))
+            })
+            .chain(live);
+            Box::pin(with_heartbeat(combined))
+        } else {
+            // Terminal job: just emit snapshot then close.
+            let once = stream::once(async move {
+                Ok::<web::Bytes, Infallible>(web::Bytes::from(initial_bytes))
+            });
+            Box::pin(once)
+        };
 
     HttpResponse::Ok()
         .content_type("text/event-stream")
-        .insert_header(("Cache-Control", "no-cache"))
+        .insert_header(("Cache-Control", "no-store"))
         .insert_header(("Connection", "keep-alive"))
         .insert_header(("X-Accel-Buffering", "no"))
-        .streaming(stream)
+        .streaming(crate::stream_access::guard(stream, grant))
 }
 
 fn format_event(e: JobEvent) -> web::Bytes {
@@ -78,8 +101,9 @@ fn with_heartbeat<S>(inner: S) -> impl Stream<Item = Result<web::Bytes, Infallib
 where
     S: Stream<Item = Result<web::Bytes, Infallible>> + Send + 'static,
 {
-    let hb = tokio_stream::wrappers::IntervalStream::new(tokio::time::interval(Duration::from_secs(15)))
-        .map(|_| Ok(heartbeat_bytes()));
+    let hb =
+        tokio_stream::wrappers::IntervalStream::new(tokio::time::interval(Duration::from_secs(15)))
+            .map(|_| Ok(heartbeat_bytes()));
     stream::select(inner, hb)
 }
 

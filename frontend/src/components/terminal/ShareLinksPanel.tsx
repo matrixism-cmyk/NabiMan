@@ -46,12 +46,14 @@ export default function ShareLinksPanel() {
   const [links, setLinks] = useState<ShareLink[]>([]);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const res = await apiRequest<ShareLink[]>('/api/terminal/share-links');
     if (res.success && res.data) setLinks(res.data);
+    else setMessage(res.message || t('common.error'));
     setLoading(false);
-  }, []);
+  }, [t]);
 
   const [, setTick] = useState(0);
 
@@ -65,7 +67,10 @@ export default function ShareLinksPanel() {
 
   const revoke = async (link: ShareLink) => {
     if (!window.confirm(t('share.revokeConfirm'))) return;
-    await apiRequest(`/api/terminal/share-links/${link.token}`, { method: 'DELETE' });
+    setDeleting(link.token);
+    const res = await apiRequest(`/api/terminal/share-links/${link.token}`, { method: 'DELETE' });
+    setDeleting(null);
+    if (!res.success) { setMessage(res.message || t('common.error')); return; }
     setMessage(t('share.revoked'));
     load();
   };
@@ -125,12 +130,13 @@ export default function ShareLinksPanel() {
                     <td>
                       {link.needs_password ? t('share.withPassword') : t('share.noPassword')}
                       {link.read_only ? ` · ${t('share.readOnly')}` : ''}
+                      {link.usable === false && <span className="status-badge down">{t('share.unusable')}</span>}
                     </td>
                     <td>{used(link.last_used_unix, t)}</td>
                     <td>
                       <button className="btn btn-secondary btn-sm" style={{ marginRight: 4 }}
-                        onClick={() => copy(link.token)}>{t('share.copy')}</button>
-                      <button className="btn btn-danger btn-sm" onClick={() => revoke(link)}>{t('share.revoke')}</button>
+                        disabled={link.usable === false} onClick={() => copy(link.token)}>{t('share.copy')}</button>
+                      <button className="btn btn-danger btn-sm" disabled={deleting !== null} onClick={() => revoke(link)}>{t('share.revoke')}</button>
                     </td>
                   </tr>
                   );

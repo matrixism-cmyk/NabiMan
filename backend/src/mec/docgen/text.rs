@@ -103,8 +103,8 @@ impl DocGenerator {
 mod tests {
     use super::*;
     use crate::mec::db;
-    use crate::models::mec::{AllocationType, NodeAllocation, ResourceQuota};
     use crate::models::mec::TenantStatus;
+    use crate::models::mec::{AllocationType, NodeAllocation, ResourceQuota};
 
     fn sample_tenant() -> Tenant {
         Tenant {
@@ -155,10 +155,7 @@ mod tests {
     }
 
     fn tempdir() -> PathBuf {
-        let p = std::env::temp_dir().join(format!(
-            "mec-docs-test-{}",
-            uuid::Uuid::new_v4()
-        ));
+        let p = std::env::temp_dir().join(format!("mec-docs-test-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&p).unwrap();
         p
     }

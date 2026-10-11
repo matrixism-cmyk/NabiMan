@@ -60,11 +60,18 @@ pub fn write_password_file(password: &str) -> Result<PwFile, String> {
         format!("{}/pw_{:016x}", dir, rand::thread_rng().gen::<u64>())
     };
     let mut f = fs::OpenOptions::new()
-        .write(true).create(true).truncate(true).mode(0o600)
-        .open(&name).map_err(|e| format!("pw file: {}", e))?;
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(&name)
+        .map_err(|e| format!("pw file: {}", e))?;
     // sshpass -f reads the first line, so a trailing newline is expected.
     writeln!(f, "{}", password).map_err(|e| format!("pw write: {}", e))?;
-    Ok(PwFile { path: name, keep: false })
+    Ok(PwFile {
+        path: name,
+        keep: false,
+    })
 }
 
 /// Remove password files left behind by a crash/restart.
@@ -80,17 +87,23 @@ pub fn cleanup_password_files() {
 /// back to a key and then hang on an unanswerable prompt).
 pub fn password_auth_opts() -> Vec<&'static str> {
     vec![
-        "-o", "PreferredAuthentications=password,keyboard-interactive",
-        "-o", "PubkeyAuthentication=no",
-        "-o", "NumberOfPasswordPrompts=1",
+        "-o",
+        "PreferredAuthentications=password,keyboard-interactive",
+        "-o",
+        "PubkeyAuthentication=no",
+        "-o",
+        "NumberOfPasswordPrompts=1",
     ]
 }
 
 /// TCP/SSH level keep-alive: the server side never lets an idle session die.
 pub fn keepalive_opts(interval_secs: u64) -> Vec<String> {
     vec![
-        "-o".into(), format!("ServerAliveInterval={}", interval_secs.clamp(5, 3600)),
-        "-o".into(), "ServerAliveCountMax=1000000".into(),
-        "-o".into(), "TCPKeepAlive=yes".into(),
+        "-o".into(),
+        format!("ServerAliveInterval={}", interval_secs.clamp(5, 3600)),
+        "-o".into(),
+        "ServerAliveCountMax=1000000".into(),
+        "-o".into(),
+        "TCPKeepAlive=yes".into(),
     ]
 }

@@ -1,5 +1,5 @@
-use actix_web::{web, HttpResponse};
 use crate::models::ApiResponse;
+use actix_web::{web, HttpResponse};
 use serde::Serialize;
 
 #[derive(Serialize, Clone)]
@@ -41,17 +41,32 @@ async fn status() -> HttpResponse {
     let mut free: u64 = 0;
     for line in meminfo.lines() {
         if line.starts_with("SwapTotal:") {
-            total = line.split_whitespace().nth(1).and_then(|v| v.parse().ok()).unwrap_or(0);
+            total = line
+                .split_whitespace()
+                .nth(1)
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0);
         } else if line.starts_with("SwapFree:") {
-            free = line.split_whitespace().nth(1).and_then(|v| v.parse().ok()).unwrap_or(0);
+            free = line
+                .split_whitespace()
+                .nth(1)
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0);
         }
     }
 
     let swappiness: u32 = std::fs::read_to_string("/proc/sys/vm/swappiness")
-        .unwrap_or_default().trim().parse().unwrap_or(60);
+        .unwrap_or_default()
+        .trim()
+        .parse()
+        .unwrap_or(60);
 
     HttpResponse::Ok().json(ApiResponse::ok(SwapStatus {
-        total, used: total.saturating_sub(free), free, swappiness, entries,
+        total,
+        used: total.saturating_sub(free),
+        free,
+        swappiness,
+        entries,
     }))
 }
 

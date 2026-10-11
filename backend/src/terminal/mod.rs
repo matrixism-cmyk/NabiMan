@@ -1,21 +1,29 @@
 //! The terminal WebSocket: one browser pane attached to one tmux session.
 
+#[path = "ssh_command.rs"]
+mod ssh_command;
+use ssh_command::build_ssh_command;
+
 mod handlers;
+mod history;
 mod paste_file;
 mod pty;
-pub mod share;
-mod share_ticket;
-mod session;
+mod registry;
+mod remote_access;
+pub(crate) mod session;
 mod settings;
+pub mod share;
+pub mod share_store;
+pub(crate) mod share_ticket;
 
 use actix_web::{get, web, HttpRequest, HttpResponse};
-use std::os::unix::io::FromRawFd;
 use actix_web_actors::ws;
+use std::os::unix::io::FromRawFd;
 
-pub use session::{new_pty_store, restore_sessions, start_pty_cleanup, PtyStore};
-pub use settings::settings_for;
+pub use registry::open as open_registry;
+pub use session::{restore_sessions, start_pty_cleanup, PtyStore};
+pub use settings::{open as open_settings_registry, SettingsStore};
 
-use crate::auth::JwtSecret;
 use crate::ssh_auth;
 use pty::{attach_tmux, parse_size, NoticeSocket, WsBridge};
 use session::{
@@ -30,103 +38,52 @@ const FAILED_PANE_LINGER_SECS: u64 = 900;
 
 // --- WebSocket endpoint ---
 
-/// Resolve the SSH target of a new session: either a saved server (`server_id`,
-/// which may carry a stored password) or explicit host/port/user parameters.
-/// Returns the shell command tmux should run, plus a label for the UI.
-fn build_ssh_command(query: &str, keepalive: bool, ka_interval: u64) -> Result<Option<(String, String)>, String> {
-    let (host, port, user, password) = if let Some(server_id) = parse_query_param(query, "server_id") {
-        let srv = crate::remote_servers::find_server(&server_id)
-            .ok_or_else(|| "Saved server not found".to_string())?;
-        // `no_saved_password=1` connects as if nothing were stored, so the
-        // operator can type the password (or a one-time code) in the pane.
-        let skip = parse_query_param(query, "no_saved_password").map(|v| v == "1").unwrap_or(false);
-        let pw = if skip { None } else { crate::remote_servers::server_password(&srv) };
-        (srv.host, srv.port.to_string(), srv.user, pw)
-    } else if let Some(host) = parse_query_param(query, "ssh_host") {
-        let port = parse_query_param(query, "ssh_port").unwrap_or_else(|| "22".into());
-        let user = parse_query_param(query, "ssh_user").unwrap_or_else(|| "root".into());
-        (host, port, user, None)
-    } else {
-        return Ok(None);
-    };
-
-    if !validate_ssh_input(&host) || !validate_ssh_input(&port) || !validate_ssh_input(&user) {
-        return Err("Invalid SSH params".into());
-    }
-
-    let mut cmd = String::new();
-    let using_saved_password = password.is_some();
-    if let Some(pw) = password {
-        // sshpass reads the password from a 0600 file that is deleted shortly
-        // after: it never appears in `ps` output or in the environment.
-        let pw_file = ssh_auth::write_password_file(&pw)?;
-        let path = pw_file.delete_after(PW_FILE_TTL_SECS);
-        cmd.push_str(&format!("sshpass -f {} ", path));
-    }
-    cmd.push_str("ssh -o StrictHostKeyChecking=accept-new ");
-    if using_saved_password {
-        // Go straight to password auth. Offering keys first can exhaust the
-        // server's MaxAuthTries before the password is ever tried, which the
-        // server then reports as a plain "Permission denied".
-        cmd.push_str(&ssh_auth::password_auth_opts().join(" "));
-        cmd.push(' ');
-    }
-    if keepalive {
-        cmd.push_str(&ssh_auth::keepalive_opts(ka_interval).join(" "));
-        cmd.push(' ');
-    } else {
-        cmd.push_str("-o ServerAliveInterval=30 ");
-    }
-    cmd.push_str(&format!("-p {} {}@{}", port, user, host));
-
-    // When ssh fails (refused, wrong password, unreachable) it exits in well
-    // under a second. Without this guard tmux would tear the pane down before
-    // the browser ever rendered the reason, and the client — seeing only a
-    // closed socket — would reconnect forever. Holding the pane open on a
-    // non-zero exit keeps the message on screen; a clean logout still ends the
-    // session, which the browser is told about explicitly.
-    let hint = if using_saved_password {
-        "저장된 비밀번호가 거부되면(exit 5) 서버 편집에서 비밀번호를 다시 저장하거나,          \"직접 입력\" 버튼으로 접속해 보세요."
-    } else {
-        "위의 메시지에서 원인을 확인하세요."
-    };
-    let guarded = format!(
-        concat!(
-            r#"{}; __code=$?; if [ "$__code" -ne 0 ]; then "#,
-            r#"printf '
-[1;31m[SSH 연결 종료 · exit %s][0m "#,
-            r#"{} Enter 키를 누르면 세션이 닫힙니다.
-' "$__code"; "#,
-            // Bounded wait: the operator can close it with Enter, and an
-            // unattended failed session does not linger for ever.
-            r#"if command -v timeout >/dev/null 2>&1; then "#,
-            r#"timeout --foreground {} sh -c 'read -r __nabiman_wait'; else read -r __nabiman_wait; fi; fi"#,
-        ),
-        cmd, hint, FAILED_PANE_LINGER_SECS,
-    );
-
-    Ok(Some((guarded, format!("ssh:{}@{}:{}", user, host, port))))
-}
-
 #[get("/api/terminal")]
 async fn ws_terminal(
-    req: HttpRequest, stream: web::Payload,
-    secret: web::Data<JwtSecret>, store: web::Data<PtyStore>,
+    req: HttpRequest,
+    stream: web::Payload,
+    store: web::Data<PtyStore>,
+    sessions: web::Data<crate::jwt_sessions::SessionStore>,
+    users: web::Data<crate::users::UserStore>,
+    preferences: web::Data<SettingsStore>,
 ) -> Result<HttpResponse, actix_web::Error> {
+    ws::handshake(&req)?;
     let query = req.query_string();
-    if !parse_query_param(query, "token").map(|t| crate::auth::check_auth_token(&secret, &t)).unwrap_or(false) {
-        return Ok(HttpResponse::Unauthorized().json(crate::models::ApiResponse::<()>::error("Unauthorized")));
-    }
-    let username = parse_query_param(query, "token")
-        .and_then(|t| crate::auth::decode_claims_unverified(&t).ok())
-        .map(|d| d.claims.sub).unwrap_or_default();
+    let Some(username) = crate::auth::extract_username(&req) else {
+        return Ok(HttpResponse::Unauthorized().finish());
+    };
+
+    let Some(grant) = crate::terminal_tickets::ConnectionGrant::from_request(
+        &req,
+        sessions.get_ref().clone(),
+        users.get_ref().clone(),
+    )
+    .filter(|g| g.valid()) else {
+        return Ok(HttpResponse::Unauthorized().finish());
+    };
 
     // Reconnect/join existing session via tmux attach
-    let join_only = parse_query_param(query, "join").map(|v| v == "1").unwrap_or(false);
+    let join_only = parse_query_param(query, "join")
+        .map(|v| v == "1")
+        .unwrap_or(false);
     if let Some(sid) = parse_query_param(query, "session_id") {
+        let revoked = store
+            .lock()
+            .ok()
+            .and_then(|m| m.get(&sid).cloned())
+            .is_some_and(|s| !grant.can_access_session(&s) || !remote_access::allowed(&s));
+        if revoked {
+            return ws::start(
+                NoticeSocket::new("Session ownership or server approval is no longer valid; open a new authorized session"),
+                &req,
+                stream,
+            );
+        }
         let can_join = {
             let map = store.lock().unwrap();
-            map.get(&sid).map(|s| s.owner == username || s.shared).unwrap_or(false)
+            map.get(&sid)
+                .map(|s| grant.can_access_session(s) && remote_access::allowed(s))
+                .unwrap_or(false)
         };
         if can_join {
             let tmux_name = {
@@ -134,6 +91,15 @@ async fn ws_terminal(
                 map.get(&sid).map(|s| s.tmux_name.clone())
             };
             if let Some(name) = tmux_name {
+                if session::tmux_session_state(&name).is_err() {
+                    return ws::start(
+                        NoticeSocket::new(
+                            "Unable to confirm this session; verify the terminal service",
+                        ),
+                        &req,
+                        stream,
+                    );
+                }
                 if tmux_session_exists(&name) {
                     match attach_tmux(&name, parse_size(query)) {
                         Ok((fd, pid)) => {
@@ -146,13 +112,34 @@ async fn ws_terminal(
                                 persist(&map);
                             }
                             let file = unsafe { std::fs::File::from_raw_fd(fd) };
-                            return ws::start(WsBridge {
-                                session_id: sid, tmux_name: name, store: store.get_ref().clone(),
-                                master_fd: fd, master_file: Some(file), child_pid: pid, ended: false,
-                                read_only: false, mirror_size: false, last_size: None, client_tty: None,
-                            }, &req, stream);
+                            return ws::start(
+                                WsBridge {
+                                    session_id: sid,
+                                    tmux_name: name,
+                                    store: store.get_ref().clone(),
+                                    master_fd: fd,
+                                    master_file: Some(file),
+                                    child_pid: pid,
+                                    ended: false,
+                                    read_only: false,
+                                    grant: Some(grant.clone()),
+                                    share_grant: None,
+                                    share_lease: None,
+                                    mirror_size: false,
+                                    last_size: None,
+                                    client_tty: pty::slave_tty(fd),
+                                    history: (parse_query_param(query, "history").as_deref()
+                                        == Some("1"))
+                                    .then(|| None),
+                                },
+                                &req,
+                                stream,
+                            );
                         }
-                        Err(e) => return Ok(HttpResponse::InternalServerError().json(crate::models::ApiResponse::<()>::error(&e))),
+                        Err(e) => {
+                            return Ok(HttpResponse::InternalServerError()
+                                .json(crate::models::ApiResponse::<()>::error(&e)))
+                        }
                     }
                 }
             }
@@ -163,12 +150,16 @@ async fn ws_terminal(
     if join_only {
         return ws::start(
             NoticeSocket::new("이 세션은 종료되었습니다 / session no longer exists"),
-            &req, stream,
+            &req,
+            stream,
         );
     }
 
     // --- New session ---
-    let user_settings = settings_for(&username);
+    let user_settings = match preferences.lock().unwrap().get(&username) {
+        Ok(settings) => settings,
+        Err(_) => return ws::start(NoticeSocket::new("Terminal preferences unavailable; contact your administrator before opening a new session"), &req, stream),
+    };
     let scrollback = parse_query_param(query, "scrollback")
         .and_then(|v| v.parse::<u32>().ok())
         .unwrap_or(user_settings.scrollback_lines)
@@ -185,67 +176,153 @@ async fn ws_terminal(
             .min(MAX_TIMEOUT_SECS)
     };
 
-    let (shell_cmd, label) = match build_ssh_command(query, keepalive, user_settings.keepalive_interval_secs) {
-        Ok(Some((cmd, label))) => (Some(cmd), label),
-        Ok(None) => (None, "local".to_string()),
-        // A target we cannot resolve (deleted server, bad parameters) is
-        // reported on screen instead of failing the handshake, which the
-        // browser could only read as "connection lost" and keep retrying.
-        Err(e) => return ws::start(NoticeSocket::new(&e), &req, stream),
-    };
+    let (shell_cmd, label, remote_binding) =
+        match build_ssh_command(query, keepalive, user_settings.keepalive_interval_secs) {
+            Ok(Some((cmd, label, binding))) => (Some(cmd), label, Some(binding)),
+            Ok(None) => (None, "local".to_string(), None),
+            // A target we cannot resolve (deleted server, bad parameters) is
+            // reported on screen instead of failing the handshake, which the
+            // browser could only read as "connection lost" and keep retrying.
+            Err(e) => return ws::start(NoticeSocket::new(&e), &req, stream),
+        };
 
+    if !grant.valid() || remote_binding.as_ref().is_some_and(|b| !b.valid()) {
+        return Ok(HttpResponse::Forbidden().finish());
+    }
     let sid = generate_session_id();
-    let safe_user: String = username.chars().filter(|c| c.is_alphanumeric() || *c == '_').collect();
+    let safe_user: String = username
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '_')
+        .scan(0usize, |bytes, c| {
+            *bytes += c.len_utf8();
+            (*bytes <= 128).then_some(c)
+        })
+        .collect();
     let tmux_name = format!("nb_{}_{}", safe_user, sid);
 
+    let mut map = store.lock().unwrap();
+    let candidate = match registry::prepare_insert(
+        &map,
+        sid.clone(),
+        TmuxSession {
+            tmux_name: tmux_name.clone(),
+            owner: username,
+            owner_id: grant.user_id.clone(),
+            label,
+            ssh_cmd: shell_cmd.clone(),
+            remote_binding,
+            created_unix: now_unix(),
+            last_active_unix: now_unix(),
+            ws_count: 0,
+            shared: false,
+            timeout_secs,
+            scrollback,
+            keepalive,
+            title: String::new(),
+        },
+    ) {
+        Ok(candidate) => candidate,
+        Err(_) => {
+            drop(map);
+            return ws::start(
+                NoticeSocket::new("Terminal capacity or account metadata limit reached; review existing sessions or contact your administrator"),
+                &req,
+                stream,
+            );
+        }
+    };
+    // The mutex spans validation and creation/publication: another admission
+    // cannot consume the reserved space in between.
+    if !grant.valid() || !remote_access::allowed(&candidate[&sid]) {
+        return Ok(HttpResponse::Forbidden().finish());
+    }
     let size = parse_size(query);
     if let Err(e) = create_tmux_session(&tmux_name, shell_cmd.as_deref(), scrollback, size) {
-        return Ok(HttpResponse::InternalServerError().json(crate::models::ApiResponse::<()>::error(&format!("tmux: {}", e))));
+        return Ok(HttpResponse::InternalServerError().json(
+            crate::models::ApiResponse::<()>::error(&format!("tmux: {}", e)),
+        ));
     }
+
+    // Record the successfully created shell even if attaching subsequently
+    // fails, so it remains visible and can be retried or explicitly closed.
+    *map = candidate;
+    persist(&map);
 
     let (fd, pid) = match attach_tmux(&tmux_name, size) {
         Ok(r) => r,
-        Err(e) => return Ok(HttpResponse::InternalServerError().json(crate::models::ApiResponse::<()>::error(&e))),
+        Err(e) => {
+            return Ok(HttpResponse::InternalServerError()
+                .json(crate::models::ApiResponse::<()>::error(&e)))
+        }
     };
 
-    {
-        let mut map = store.lock().unwrap();
-        map.insert(sid.clone(), TmuxSession {
-            tmux_name: tmux_name.clone(), owner: username, label, ssh_cmd: shell_cmd,
-            created_unix: now_unix(), last_active_unix: now_unix(), ws_count: 1, shared: false,
-            timeout_secs, scrollback, keepalive, title: String::new(),
-        });
-        persist(&map);
-    }
+    map.get_mut(&sid).unwrap().ws_count = 1;
+    drop(map);
 
     let file = unsafe { std::fs::File::from_raw_fd(fd) };
-    ws::start(WsBridge {
-        session_id: sid, tmux_name, store: store.get_ref().clone(),
-        master_fd: fd, master_file: Some(file), child_pid: pid, ended: false,
-        read_only: false, mirror_size: false, last_size: None, client_tty: None,
-    }, &req, stream)
+    ws::start(
+        WsBridge {
+            session_id: sid,
+            tmux_name,
+            store: store.get_ref().clone(),
+            master_fd: fd,
+            master_file: Some(file),
+            child_pid: pid,
+            ended: false,
+            read_only: false,
+            grant: Some(grant),
+            share_grant: None,
+            share_lease: None,
+            mirror_size: false,
+            last_size: None,
+            client_tty: pty::slave_tty(fd),
+            history: (parse_query_param(query, "history").as_deref() == Some("1")).then(|| None),
+        },
+        &req,
+        stream,
+    )
 }
 
 // --- Helpers ---
 pub(crate) fn parse_query_param(query: &str, key: &str) -> Option<String> {
     query.split('&').find_map(|p| {
         let mut kv = p.splitn(2, '=');
-        if kv.next() == Some(key) { kv.next().map(urlencoding_decode) } else { None }
+        if kv.next() == Some(key) {
+            kv.next().map(urlencoding_decode)
+        } else {
+            None
+        }
     })
 }
 fn urlencoding_decode(s: &str) -> String {
     let mut r = String::with_capacity(s.len());
     let mut c = s.bytes();
     while let Some(b) = c.next() {
-        if b == b'%' { let h = c.next().unwrap_or(b'0'); let l = c.next().unwrap_or(b'0');
-            r.push((hv(h)*16+hv(l)) as char); }
-        else if b == b'+' { r.push(' '); } else { r.push(b as char); }
+        if b == b'%' {
+            let h = c.next().unwrap_or(b'0');
+            let l = c.next().unwrap_or(b'0');
+            r.push((hv(h) * 16 + hv(l)) as char);
+        } else if b == b'+' {
+            r.push(' ');
+        } else {
+            r.push(b as char);
+        }
     }
     r
 }
-fn hv(b: u8) -> u8 { match b { b'0'..=b'9'=>b-b'0', b'a'..=b'f'=>b-b'a'+10, b'A'..=b'F'=>b-b'A'+10, _=>0 } }
+fn hv(b: u8) -> u8 {
+    match b {
+        b'0'..=b'9' => b - b'0',
+        b'a'..=b'f' => b - b'a' + 10,
+        b'A'..=b'F' => b - b'A' + 10,
+        _ => 0,
+    }
+}
 fn validate_ssh_input(s: &str) -> bool {
-    !s.is_empty() && s.len() < 256 && s.chars().all(|c| c.is_alphanumeric() || ".-_@:".contains(c))
+    !s.is_empty()
+        && s.len() < 256
+        && s.chars()
+            .all(|c| c.is_alphanumeric() || ".-_@:".contains(c))
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {

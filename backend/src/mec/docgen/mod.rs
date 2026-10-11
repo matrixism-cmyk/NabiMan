@@ -1,5 +1,5 @@
-pub mod text;
 pub mod docx;
+pub mod text;
 
-pub use text::DocGenerator;
 pub use docx::DocxGenerator;
+pub use text::DocGenerator;

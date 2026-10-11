@@ -6,13 +6,11 @@ use super::kube_mock::KubeMock;
 use super::kube_real::{KubeReal, KubeRealConfig};
 use super::rancher_mock::RancherMock;
 use super::rancher_real::{RancherReal, RancherRealConfig};
-use super::{
-    AxgateServiceArc, HarborServiceArc, KubeService, KubeServiceArc, RancherServiceArc,
-    ServiceBundle,
-};
+use super::unavailable::UnavailableService;
+use super::{AxgateServiceArc, HarborServiceArc, KubeServiceArc, RancherServiceArc, ServiceBundle};
 use std::sync::Arc;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ServiceMode {
     Mock,
     Real,
@@ -20,17 +18,21 @@ pub enum ServiceMode {
 }
 
 impl ServiceMode {
-    pub fn from_env() -> Self {
-        match std::env::var("NABIMAN_MEC_MODE").ok().as_deref() {
-            Some("real") => Self::Real,
-            Some("mock") => Self::Mock,
-            _ => Self::Auto,
+    pub fn parse(value: Option<&str>) -> Result<Self, String> {
+        match value {
+            Some("real") => Ok(Self::Real),
+            Some("mock") => Ok(Self::Mock),
+            Some("auto") | None => Ok(Self::Auto),
+            Some(_) => Err("NABIMAN_MEC_MODE must be real, auto, or mock".into()),
         }
+    }
+    pub fn from_env() -> Result<Self, String> {
+        Self::parse(std::env::var("NABIMAN_MEC_MODE").ok().as_deref())
     }
 }
 
-/// Build a service bundle, preferring real clients when their env credentials
-/// are present, and falling back to mocks otherwise.
+/// Demo data requires explicit mock mode. Configured real clients remain live
+/// across connection failures, allowing recovery without a server restart.
 pub async fn bootstrap(mode: ServiceMode) -> ServiceBundle {
     let kube = bootstrap_kube(mode).await;
     let rancher = bootstrap_rancher(mode);
@@ -49,56 +51,50 @@ async fn bootstrap_kube(mode: ServiceMode) -> KubeServiceArc {
     if force_mock {
         return Arc::new(KubeMock::new());
     }
-    let cfg = KubeRealConfig::from_env();
+    kube_from_config(KubeRealConfig::from_env()).await
+}
+async fn kube_from_config(cfg: KubeRealConfig) -> KubeServiceArc {
     match KubeReal::connect(cfg).await {
-        // Building the client only reads the kubeconfig; it never authenticates.
-        // Probe with a lightweight authed call so an expired/invalid token falls
-        // back to mock at boot instead of 401-ing on every dashboard request.
-        Ok(real) => match real.health_check().await {
-            Ok(_) => {
-                eprintln!("[mec] kube: real client connected");
-                Arc::new(real)
-            }
-            Err(e) => {
-                kube_fallback_warn(mode, "auth check failed", &e);
-                Arc::new(KubeMock::new())
-            }
-        },
-        Err(e) => {
-            kube_fallback_warn(mode, "connect failed", &e);
-            Arc::new(KubeMock::new())
+        Ok(real) => {
+            eprintln!("[mec] kube: real client configured; health is checked live");
+            Arc::new(real)
+        }
+        Err(_) => {
+            eprintln!("[mec] kube: configuration failed; demo fallback disabled");
+            Arc::new(UnavailableService::new(
+                "kubernetes",
+                "configuration unavailable; check kubeconfig",
+            ))
         }
     }
-}
-
-fn kube_fallback_warn(mode: ServiceMode, what: &str, e: &impl std::fmt::Display) {
-    if matches!(mode, ServiceMode::Real) {
-        eprintln!("[mec] kube real mode forced but {}: {}", what, e);
-    }
-    eprintln!("[mec] kube: {}, falling back to mock ({})", what, e);
 }
 
 fn bootstrap_rancher(mode: ServiceMode) -> RancherServiceArc {
     if matches!(mode, ServiceMode::Mock) {
         return Arc::new(RancherMock::new());
     }
-    match RancherRealConfig::from_env() {
+    rancher_from_config(RancherRealConfig::from_env())
+}
+
+fn rancher_from_config(config: Option<RancherRealConfig>) -> RancherServiceArc {
+    match config {
         Some(cfg) => match RancherReal::new(cfg) {
             Ok(r) => {
                 eprintln!("[mec] rancher: real client configured");
                 Arc::new(r)
             }
-            Err(e) => {
-                eprintln!("[mec] rancher real build failed: {}; using mock", e);
-                Arc::new(RancherMock::new())
+            Err(_) => {
+                eprintln!("[mec] rancher: configuration failed; demo fallback disabled");
+                Arc::new(UnavailableService::new(
+                    "rancher",
+                    "configuration unavailable",
+                ))
             }
         },
-        None => {
-            if matches!(mode, ServiceMode::Real) {
-                eprintln!("[mec] rancher real mode forced but env missing; using mock");
-            }
-            Arc::new(RancherMock::new())
-        }
+        None => Arc::new(UnavailableService::new(
+            "rancher",
+            "configure URL and token",
+        )),
     }
 }
 
@@ -106,17 +102,19 @@ fn bootstrap_axgate(mode: ServiceMode) -> AxgateServiceArc {
     if matches!(mode, ServiceMode::Mock) {
         return Arc::new(AxgateMock::new());
     }
-    match AxgateRealConfig::from_env() {
+    axgate_from_config(AxgateRealConfig::from_env())
+}
+
+fn axgate_from_config(config: Option<AxgateRealConfig>) -> AxgateServiceArc {
+    match config {
         Some(cfg) => {
             eprintln!("[mec] axgate: real client configured");
             Arc::new(AxgateReal::new(cfg))
         }
-        None => {
-            if matches!(mode, ServiceMode::Real) {
-                eprintln!("[mec] axgate real mode forced but env missing; using mock");
-            }
-            Arc::new(AxgateMock::new())
-        }
+        None => Arc::new(UnavailableService::new(
+            "axgate",
+            "configure SSH connection credentials",
+        )),
     }
 }
 
@@ -124,34 +122,31 @@ fn bootstrap_harbor(mode: ServiceMode) -> HarborServiceArc {
     if matches!(mode, ServiceMode::Mock) {
         return Arc::new(HarborMock::new());
     }
-    match HarborRealConfig::from_env() {
+    harbor_from_config(HarborRealConfig::from_env())
+}
+
+fn harbor_from_config(config: Option<HarborRealConfig>) -> HarborServiceArc {
+    match config {
         Some(cfg) => match HarborReal::new(cfg) {
             Ok(r) => {
                 eprintln!("[mec] harbor: real client configured");
                 Arc::new(r)
             }
-            Err(e) => {
-                eprintln!("[mec] harbor real build failed: {}; using mock", e);
-                Arc::new(HarborMock::new())
+            Err(_) => {
+                eprintln!("[mec] harbor: configuration failed; demo fallback disabled");
+                Arc::new(UnavailableService::new(
+                    "harbor",
+                    "configuration unavailable",
+                ))
             }
         },
-        None => {
-            if matches!(mode, ServiceMode::Real) {
-                eprintln!("[mec] harbor real mode forced but env missing; using mock");
-            }
-            Arc::new(HarborMock::new())
-        }
+        None => Arc::new(UnavailableService::new(
+            "harbor",
+            "configure URL and credentials",
+        )),
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn mock_mode_returns_mocks() {
-        let b = bootstrap(ServiceMode::Mock).await;
-        let ips = b.axgate.list_public_ips().await.unwrap();
-        assert!(!ips.is_empty());
-    }
-}
+#[path = "bootstrap_tests.rs"]
+mod tests;

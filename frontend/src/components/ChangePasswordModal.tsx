@@ -14,7 +14,7 @@ export default function ChangePasswordModal({ onClose }: { onClose: () => void }
     e.preventDefault();
     setMsg('');
     if (newPw !== confirmPw) { setMsg(t('app.passwordMismatch')); return; }
-    if (newPw.length < 4) { setMsg(t('app.passwordTooShort')); return; }
+    if (newPw.length < 8) { setMsg(t('app.passwordTooShort')); return; }
     const res = await apiPost<string>('/api/auth/change-password', { current_password: currentPw, new_password: newPw });
     if (res.success) { setSuccess(true); setMsg(t('app.passwordChanged')); }
     else { setMsg(res.message || t('app.failed')); }

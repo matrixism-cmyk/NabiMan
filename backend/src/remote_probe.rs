@@ -8,9 +8,12 @@ use crate::ssh_auth;
 
 use crate::remote_servers::{now_iso, server_password};
 
-pub(crate) fn ssh_command(srv: &RemoteServer, connect_timeout: u32, remote_cmd: &str)
-    -> Result<(Command, Option<ssh_auth::PwFile>), String>
-{
+pub(crate) fn ssh_command(
+    srv: &RemoteServer,
+    connect_timeout: u32,
+    remote_cmd: &str,
+) -> Result<(Command, Option<ssh_auth::PwFile>), String> {
+    let trust = crate::remote_host_trust::options(srv)?;
     let port = srv.port.to_string();
     let target = format!("{}@{}", srv.user, srv.host);
     let timeout = format!("ConnectTimeout={}", connect_timeout);
@@ -19,20 +22,27 @@ pub(crate) fn ssh_command(srv: &RemoteServer, connect_timeout: u32, remote_cmd: 
     if let Some(pw) = password {
         let pw_file = ssh_auth::write_password_file(&pw)?;
         let mut cmd = Command::new("sshpass");
-        cmd.args(["-f", pw_file.path(), "ssh",
-                  "-o", "StrictHostKeyChecking=accept-new",
-                  "-o", &timeout]);
+        cmd.args(["-f", pw_file.path(), "ssh", "-o", &timeout]);
+        cmd.args(&trust);
         cmd.args(ssh_auth::password_auth_opts());
         cmd.args(["-p", &port, &target, remote_cmd]);
         return Ok((cmd, Some(pw_file)));
     }
 
     let mut cmd = Command::new("ssh");
-    cmd.args(["-o", "StrictHostKeyChecking=accept-new",
-              "-o", &timeout,
-              "-o", "BatchMode=yes",
-              "-o", "ServerAliveInterval=15",
-              "-p", &port, &target, remote_cmd]);
+    cmd.args(&trust);
+    cmd.args([
+        "-o",
+        &timeout,
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ServerAliveInterval=15",
+        "-p",
+        &port,
+        &target,
+        remote_cmd,
+    ]);
     Ok((cmd, None))
 }
 
@@ -50,12 +60,22 @@ pub(crate) fn ssh_probe(server: &RemoteServer) -> RemoteServerStatus {
 
     let (mut cmd, _pw_guard) = match ssh_command(server, 5, remote_cmd) {
         Ok(c) => c,
-        Err(e) => return RemoteServerStatus {
-            id: server.id.clone(), name: server.name.clone(), host: server.host.clone(),
-            status: "offline".into(), hostname: format!("SSH setup error: {}", e),
-            os: String::new(), uptime: String::new(), cpu_usage: String::new(),
-            memory: String::new(), disk: String::new(), load: String::new(), checked_at,
-        },
+        Err(e) => {
+            return RemoteServerStatus {
+                id: server.id.clone(),
+                name: server.name.clone(),
+                host: server.host.clone(),
+                status: "offline".into(),
+                hostname: format!("SSH setup error: {}", e),
+                os: String::new(),
+                uptime: String::new(),
+                cpu_usage: String::new(),
+                memory: String::new(),
+                disk: String::new(),
+                load: String::new(),
+                checked_at,
+            }
+        }
     };
     let output = cmd.output();
 
@@ -64,7 +84,9 @@ pub(crate) fn ssh_probe(server: &RemoteServer) -> RemoteServerStatus {
             let stdout = String::from_utf8_lossy(&result.stdout).to_string();
             let lines: Vec<&str> = stdout.lines().collect();
             RemoteServerStatus {
-                id: server.id.clone(), name: server.name.clone(), host: server.host.clone(),
+                id: server.id.clone(),
+                name: server.name.clone(),
+                host: server.host.clone(),
                 status: "online".into(),
                 hostname: lines.first().unwrap_or(&"unknown").to_string(),
                 os: lines.get(1).unwrap_or(&"unknown").to_string(),
@@ -86,25 +108,49 @@ pub(crate) fn ssh_probe(server: &RemoteServer) -> RemoteServerStatus {
                 Some(7) => Some("Host key changed"),
                 _ => None,
             };
-            let reason = if stderr.contains("Connection refused") { "Connection refused" }
-                else if stderr.contains("timed out") { "Connection timed out" }
-                else if stderr.contains("Permission denied") { "Auth failed (Permission denied)" }
-                else if stderr.contains("No route to host") { "No route to host" }
-                else if stderr.contains("Host key verification") { "Host key verification failed" }
-                else if let Some(r) = code_reason { r }
-                else { "Connection failed" };
+            let reason = if stderr.contains("Connection refused") {
+                "Connection refused"
+            } else if stderr.contains("timed out") {
+                "Connection timed out"
+            } else if stderr.contains("Permission denied") {
+                "Auth failed (Permission denied)"
+            } else if stderr.contains("No route to host") {
+                "No route to host"
+            } else if stderr.contains("Host key verification") {
+                "Host key verification failed"
+            } else if let Some(r) = code_reason {
+                r
+            } else {
+                "Connection failed"
+            };
             RemoteServerStatus {
-                id: server.id.clone(), name: server.name.clone(), host: server.host.clone(),
-                status: "offline".into(), hostname: reason.into(),
-                os: String::new(), uptime: String::new(), cpu_usage: String::new(),
-                memory: String::new(), disk: String::new(), load: String::new(), checked_at,
+                id: server.id.clone(),
+                name: server.name.clone(),
+                host: server.host.clone(),
+                status: "offline".into(),
+                hostname: reason.into(),
+                os: String::new(),
+                uptime: String::new(),
+                cpu_usage: String::new(),
+                memory: String::new(),
+                disk: String::new(),
+                load: String::new(),
+                checked_at,
             }
         }
         Err(e) => RemoteServerStatus {
-            id: server.id.clone(), name: server.name.clone(), host: server.host.clone(),
-            status: "offline".into(), hostname: format!("SSH error: {}", e),
-            os: String::new(), uptime: String::new(), cpu_usage: String::new(),
-            memory: String::new(), disk: String::new(), load: String::new(), checked_at,
+            id: server.id.clone(),
+            name: server.name.clone(),
+            host: server.host.clone(),
+            status: "offline".into(),
+            hostname: format!("SSH error: {}", e),
+            os: String::new(),
+            uptime: String::new(),
+            cpu_usage: String::new(),
+            memory: String::new(),
+            disk: String::new(),
+            load: String::new(),
+            checked_at,
         },
     }
 }

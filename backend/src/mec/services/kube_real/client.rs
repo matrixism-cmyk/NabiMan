@@ -42,9 +42,8 @@ impl KubeReal {
 
 async fn build_client(config: KubeRealConfig) -> ServiceResult<(Client, String)> {
     let kube_config = if let Some(path) = config.kubeconfig_path.as_ref() {
-        let kc = kube::config::Kubeconfig::read_from(path).map_err(|e| {
-            ServiceError::Unavailable(format!("read kubeconfig {}: {}", path, e))
-        })?;
+        let kc = kube::config::Kubeconfig::read_from(path)
+            .map_err(|e| ServiceError::Unavailable(format!("read kubeconfig {}: {}", path, e)))?;
         kube::Config::from_custom_kubeconfig(kc, &Default::default())
             .await
             .map_err(|e| ServiceError::Unavailable(format!("kubeconfig: {}", e)))?
@@ -108,11 +107,7 @@ impl KubeService for KubeReal {
         super::namespaces::list(&self.client).await
     }
 
-    async fn create_namespace(
-        &self,
-        name: &str,
-        labels: &[(String, String)],
-    ) -> ServiceResult<()> {
+    async fn create_namespace(&self, name: &str, labels: &[(String, String)]) -> ServiceResult<()> {
         super::namespaces::create(&self.client, name, labels).await
     }
 
@@ -215,7 +210,10 @@ impl KubeService for KubeReal {
         super::live::pod_phase_summary(&self.client).await
     }
 
-    async fn list_events(&self, limit: u32) -> ServiceResult<Vec<crate::models::mec::ClusterEvent>> {
+    async fn list_events(
+        &self,
+        limit: u32,
+    ) -> ServiceResult<Vec<crate::models::mec::ClusterEvent>> {
         super::live::list_events(&self.client, limit).await
     }
 
@@ -223,12 +221,13 @@ impl KubeService for KubeReal {
         let start = Instant::now();
         let api: kube::Api<k8s_openapi::api::core::v1::Namespace> =
             kube::Api::all(self.client.clone());
-        let _ = api.list(&Default::default()).await.map_err(|e| {
-            ServiceError::Upstream {
+        let _ = api
+            .list(&Default::default())
+            .await
+            .map_err(|e| ServiceError::Upstream {
                 source: "kubernetes".into(),
                 message: e.to_string(),
-            }
-        })?;
+            })?;
         Ok(KubeHealth {
             connected: true,
             api_version: Some("v1".into()),

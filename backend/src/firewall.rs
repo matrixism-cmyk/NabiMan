@@ -1,5 +1,7 @@
+use crate::models::{
+    ApiResponse, FirewallAddRuleRequest, FirewallDeleteRuleRequest, FirewallRule, FirewallStatus,
+};
 use actix_web::{web, HttpResponse};
-use crate::models::{ApiResponse, FirewallStatus, FirewallRule, FirewallAddRuleRequest, FirewallDeleteRuleRequest};
 
 fn run_cmd(cmd: &str, args: &[&str]) -> Result<String, String> {
     let output = std::process::Command::new(cmd)
@@ -21,11 +23,26 @@ enum FwBackend {
 }
 
 fn detect_backend() -> FwBackend {
-    if std::process::Command::new("ufw").arg("version").output().map(|o| o.status.success()).unwrap_or(false) {
+    if std::process::Command::new("ufw")
+        .arg("version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+    {
         FwBackend::Ufw
-    } else if std::process::Command::new("firewall-cmd").arg("--version").output().map(|o| o.status.success()).unwrap_or(false) {
+    } else if std::process::Command::new("firewall-cmd")
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+    {
         FwBackend::Firewalld
-    } else if std::process::Command::new("iptables").arg("-V").output().map(|o| o.status.success()).unwrap_or(false) {
+    } else if std::process::Command::new("iptables")
+        .arg("-V")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+    {
         FwBackend::Iptables
     } else {
         FwBackend::None
@@ -37,8 +54,11 @@ fn parse_ufw_rules(output: &str) -> Vec<FirewallRule> {
     let mut num = 1u32;
     for line in output.lines() {
         let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with("Status:") || trimmed.starts_with("To")
-            || trimmed.starts_with("--") || trimmed.starts_with("Logging:")
+        if trimmed.is_empty()
+            || trimmed.starts_with("Status:")
+            || trimmed.starts_with("To")
+            || trimmed.starts_with("--")
+            || trimmed.starts_with("Logging:")
             || trimmed.starts_with("Default:")
         {
             continue;
@@ -74,7 +94,9 @@ fn parse_iptables_rules(output: &str) -> Vec<FirewallRule> {
     let mut num = 1u32;
     for line in output.lines() {
         let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with("Chain") || trimmed.starts_with("target")
+        if trimmed.is_empty()
+            || trimmed.starts_with("Chain")
+            || trimmed.starts_with("target")
             || trimmed.starts_with("num")
         {
             continue;
@@ -90,7 +112,14 @@ fn parse_iptables_rules(output: &str) -> Vec<FirewallRule> {
             } else {
                 "*".to_string()
             };
-            rules.push(FirewallRule { number: num, action, protocol, port, source, destination });
+            rules.push(FirewallRule {
+                number: num,
+                action,
+                protocol,
+                port,
+                source,
+                destination,
+            });
             num += 1;
         }
     }
@@ -130,8 +159,12 @@ async fn get_status() -> HttpResponse {
                             (port_entry.to_string(), "tcp".to_string())
                         };
                         rules.push(FirewallRule {
-                            number: num, action: "ALLOW".to_string(), protocol: proto,
-                            port, source: "any".to_string(), destination: "any".to_string(),
+                            number: num,
+                            action: "ALLOW".to_string(),
+                            protocol: proto,
+                            port,
+                            source: "any".to_string(),
+                            destination: "any".to_string(),
                         });
                         num += 1;
                     }
@@ -144,7 +177,8 @@ async fn get_status() -> HttpResponse {
             }))
         }
         FwBackend::Iptables => {
-            let rules_output = run_cmd("iptables", &["-L", "INPUT", "-n", "--line-numbers"]).unwrap_or_default();
+            let rules_output =
+                run_cmd("iptables", &["-L", "INPUT", "-n", "--line-numbers"]).unwrap_or_default();
             let rules = parse_iptables_rules(&rules_output);
             HttpResponse::Ok().json(ApiResponse::ok(FirewallStatus {
                 backend: "iptables".to_string(),
@@ -152,9 +186,9 @@ async fn get_status() -> HttpResponse {
                 rules,
             }))
         }
-        FwBackend::None => {
-            HttpResponse::Ok().json(ApiResponse::<FirewallStatus>::error("No firewall backend found"))
-        }
+        FwBackend::None => HttpResponse::Ok().json(ApiResponse::<FirewallStatus>::error(
+            "No firewall backend found",
+        )),
     }
 }
 
@@ -176,7 +210,9 @@ async fn add_rule(body: web::Json<FirewallAddRuleRequest>) -> HttpResponse {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid port"));
     }
     if !validate_protocol(&body.protocol) {
-        return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid protocol (tcp/udp/any)"));
+        return HttpResponse::Ok().json(ApiResponse::<String>::error(
+            "Invalid protocol (tcp/udp/any)",
+        ));
     }
 
     let port_proto = if body.protocol == "any" {
@@ -187,7 +223,11 @@ async fn add_rule(body: web::Json<FirewallAddRuleRequest>) -> HttpResponse {
 
     let result = match detect_backend() {
         FwBackend::Ufw => {
-            let action = if body.action == "deny" { "deny" } else { "allow" };
+            let action = if body.action == "deny" {
+                "deny"
+            } else {
+                "allow"
+            };
             run_cmd("ufw", &[action, &port_proto])
         }
         FwBackend::Firewalld => {
@@ -195,15 +235,38 @@ async fn add_rule(body: web::Json<FirewallAddRuleRequest>) -> HttpResponse {
                 .and_then(|_| run_cmd("firewall-cmd", &["--reload"]))
         }
         FwBackend::Iptables => {
-            let action_flag = if body.action == "deny" { "DROP" } else { "ACCEPT" };
-            let proto = if body.protocol == "any" { "tcp" } else { &body.protocol };
-            run_cmd("iptables", &["-A", "INPUT", "-p", proto, "--dport", &body.port, "-j", action_flag])
+            let action_flag = if body.action == "deny" {
+                "DROP"
+            } else {
+                "ACCEPT"
+            };
+            let proto = if body.protocol == "any" {
+                "tcp"
+            } else {
+                &body.protocol
+            };
+            run_cmd(
+                "iptables",
+                &[
+                    "-A",
+                    "INPUT",
+                    "-p",
+                    proto,
+                    "--dport",
+                    &body.port,
+                    "-j",
+                    action_flag,
+                ],
+            )
         }
         FwBackend::None => Err("No firewall backend found".to_string()),
     };
 
     match result {
-        Ok(_) => HttpResponse::Ok().json(ApiResponse::ok(format!("Rule added: {} {}", body.action, port_proto))),
+        Ok(_) => HttpResponse::Ok().json(ApiResponse::ok(format!(
+            "Rule added: {} {}",
+            body.action, port_proto
+        ))),
         Err(e) => HttpResponse::Ok().json(ApiResponse::<String>::error(&e)),
     }
 }

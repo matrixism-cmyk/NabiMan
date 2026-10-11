@@ -94,7 +94,11 @@ impl From<&OAuthConfig> for OAuthConfigMasked {
             enabled: cfg.enabled,
             provider_name: cfg.provider_name.clone(),
             client_id: cfg.client_id.clone(),
-            client_secret: if cfg.client_secret.is_empty() { String::new() } else { "***".into() },
+            client_secret: if cfg.client_secret.is_empty() {
+                String::new()
+            } else {
+                "***".into()
+            },
             authorize_url: cfg.authorize_url.clone(),
             token_url: cfg.token_url.clone(),
             userinfo_url: cfg.userinfo_url.clone(),
@@ -107,24 +111,22 @@ impl From<&OAuthConfig> for OAuthConfigMasked {
     }
 }
 
-pub fn load_config() -> OAuthConfig {
+pub fn load_config() -> Result<OAuthConfig, String> {
     let path = oauth_config_path();
-    if path.exists() {
-        std::fs::read_to_string(&path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default()
-    } else {
-        OAuthConfig::default()
+    match std::fs::read_to_string(&path) {
+        Ok(content) => {
+            serde_json::from_str(&content).map_err(|e| format!("OAuth config is invalid: {e}"))
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(OAuthConfig::default()),
+        Err(error) => Err(format!("Cannot read OAuth config: {error}")),
     }
 }
 
-pub fn save_config(cfg: &OAuthConfig) {
+pub fn save_config(cfg: &OAuthConfig) -> Result<(), String> {
     let path = oauth_config_path();
-    if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    let _ = std::fs::write(&path, serde_json::to_string_pretty(cfg).unwrap_or_default());
+    let json = serde_json::to_vec_pretty(cfg).map_err(|e| e.to_string())?;
+    crate::private_storage::write(&path, &json)
+        .map_err(|e| format!("Cannot save OAuth config: {e}"))
 }
 
 #[cfg(test)]

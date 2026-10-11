@@ -1,0 +1,29 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NabiMan 관리 데이터 복구</title>
+<style>body{font:16px/1.7 system-ui,sans-serif;max-width:900px;margin:40px auto;padding:0 24px;color:#152238;background:#f5f8fc}a{color:#0757ab}pre{background:#102030;color:#eef6ff;padding:18px;border-radius:8px;overflow:auto}h1,h2{line-height:1.3}li{margin:8px 0}code{font-family:monospace}aside{padding:16px;border-left:4px solid #176ec1;background:#e8f1fc}</style>
+<h1>나비맨 관리 데이터 복구</h1>
+<p>서버 운영자용 오프라인 도구입니다. 실행 중인 API를 직접 중지하거나 운영 경로를 덮어쓰지 않습니다. 새 디렉터리에 복원한 후 검증과 활성화를 별도로 수행합니다.</p>
+<aside>관리 묶음: 회원·MFA 설정·소속 정책·서버 등록과 저장된 비밀번호/키·터미널 등록 정보·SQLite 관리 DB·해당 실행 바이너리와 웹 화면.<br>제외: 실행 중인 tmux와 로그인 세션, 원격 서버 디스크, OS SSH 키/agent, 외부 환경 변수·kubeconfig, reverse proxy/TLS·OS 설정, 기존 백업 파일. 전체 서버 또는 원격 시스템 재해 복구를 대신하지 않습니다.</aside>
+<h2>1. 점검과 백업</h2>
+<p>설치 경로는 예시입니다. 실제 서비스의 인증 저장소·DB·바이너리·웹 화면 경로를 확인하세요. 서비스 관리자에서 API를 중지한 후 실행합니다. 도구는 저장소 잠금을 획득하지 못하면 백업을 거부합니다. 백업 중 API를 다시 시작하지 마세요.</p>
+<pre>python3 /opt/nabiman/management-recovery.py capture \
+  --auth /var/lib/nabiman \
+  --database /opt/nabiman/data/mec.db \
+  --runtime /opt/nabiman/nabiman-server \
+  --static /opt/nabiman/static \
+  --output /srv/nabiman-recovery</pre>
+<p>출력 폴더는 실행 계정 소유의 0700 폴더여야 합니다. 12자 이상의 길고 예측하기 어려운 복구 비밀번호를 프롬프트에서 두 번 입력합니다. 비밀번호는 명령 인수·환경 변수에 넣지 않습니다. 백업 결과와 오류를 확인한 뒤 기존 API를 다시 시작합니다. 복구 비밀번호와 묶음은 별도 안전한 위치에도 보관해야 하며, 같은 서버에만 둔 사본은 서버 전체 손실에 대비할 수 없습니다.</p>
+<h2>2. 새 위치에 복원</h2>
+<pre>python3 /opt/nabiman/management-recovery.py restore \
+  --archive /srv/nabiman-recovery/backup-UUID.tar.gz.age \
+  --target /srv/nabiman-restored
+python3 /opt/nabiman/management-recovery.py verify \
+  --target /srv/nabiman-restored</pre>
+<p>대상은 존재하지 않아야 합니다. 전체 암호 인증, 파일 목록·SHA-256, 필수 관리 데이터, 원격 비밀번호 해독 키, SQLite quick_check를 확인한 뒤 결과를 공개합니다. 검증은 저장된 상태를 확인하며 원격 호스트 접속이나 서비스의 업무 기능까지 증명하지 않습니다.</p>
+<h2>3. 기동 검증과 활성화</h2>
+<p>현재 버전 복원 사본은 <code>NABIMAN_API_TOKENS_DISABLED=1</code>로 자동화 토큰 인증을 중지합니다. 과거 백업 복원은 이미 회수한 토큰도 복원할 수 있으므로 토큰 목록을 검토하고 불필요한 토큰을 회수한 뒤 운영 전환합니다. 또한 <code>NABIMAN_AUDIT_FORWARDING_DISABLED=1</code>로 기동하여 감사 전송을 일시 중지합니다. 목적지·자격 증명·대기열을 검토한 후 운영 전환 시 해제합니다. 구버전 실행 파일이나 다른 외부 연동에는 적용되지 않으므로 네트워크도 격리합니다.</p>
+<p>복구 디렉터리의 <code>auth</code>, <code>database/mec.db</code>, <code>runtime/nabiman-server</code>, <code>runtime/static</code>을 사용합니다. 격리 환경에서 관리자와 소속 회원의 로그인·권한·정책을 확인하고 외부 의존성·OS 권한·예약 백업·알림·중단된 작업을 검토합니다. 이 도구는 복원된 프로그램이나 예약 작업을 자동으로 실행하지 않습니다.</p>
+<p>실제 배포에서는 검토한 서비스 설정에 <code>NABIMAN_DATA_DIR</code>, <code>NABIMAN_MEC_DB</code>, <code>NABIMAN_STATIC</code>을 새 경로로 지정하고 복구된 바이너리를 사용합니다. 외부 접속·TLS·helper·OS SSH 설정은 별도로 재구성해야 합니다. 기존 운영 데이터는 복구 확인이 끝나기 전에 삭제하지 마세요.</p>
+<p>파일은 기본 0600, 디렉터리는 0700, 복구한 바이너리는 0700입니다. 원래 UID/GID·ACL·xattr·OS 권한을 복원하지 않습니다. 캡처와 복원에는 private 평문 작업 폴더가 필요하며 crash 후 잔여 폴더를 운영자가 확인해야 합니다. 암호화 사본 생성은 원격 보관·복원 훈련 완료를 뜻하지 않습니다.</p>
+<h2>Operator summary</h2><p>Stop the API before capture. Use the paths from the actual service configuration. Keep the recovery passphrase separately. Restore only into a new directory; verify the manifest, credential keys and database, then validate logins and scopes in an isolated environment. Activation, external providers, OS permissions, schedules and remote-host recovery require separate operator review. The tool never starts or stops a service.</p>
+<h2>運用者向け要約</h2><p>取得前にAPIを停止し、実際のサービス設定のパスを指定してください。復旧パスフレーズは別途保管します。新しいディレクトリへ復元し、ファイル・鍵・DBを検証した後、隔離環境でログインと権限を確認します。有効化・外部サービス・OS権限・予約処理・リモートホスト復旧は別途確認が必要です。ツールはサービスを自動起動・停止しません。</p>
+<p><a href="/#management/backup">나비맨 백업 화면으로 돌아가기</a></p></html>

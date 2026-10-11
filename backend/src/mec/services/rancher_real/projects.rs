@@ -67,7 +67,10 @@ pub async fn delete(r: &RancherReal, id: &str) -> ServiceResult<()> {
     } else {
         let code = res.status();
         let body = res.text().await.unwrap_or_default();
-        Err(upstream_err(format!("delete project {}: {} {}", id, code, body)))
+        Err(upstream_err(format!(
+            "delete project {}: {} {}",
+            id, code, body
+        )))
     }
 }
 

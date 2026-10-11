@@ -1,0 +1,43 @@
+import React from 'react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import ExternalIdentityEditor from './ExternalIdentityEditor';
+import { fetchWithRefresh } from '../hooks/useApi';
+import { MemberUser } from './MembershipEditor';
+jest.mock('../hooks/useApi', () => ({ fetchWithRefresh: jest.fn() }));
+const fetchMock = fetchWithRefresh as jest.Mock;
+const user: MemberUser = { id: 'local-alice', username: 'alice', role: 'viewer', status: 'active', memberships: [], requested_memberships: [], scope_restricted: true, created_at: '', last_login: null };
+const response = (ok: boolean, data: unknown) => ({ ok, json: async () => ({ data, error: ok ? null : { code: 'CONFLICT' } }) });
+beforeEach(() => fetchMock.mockReset());
+it('shows the realm and explicitly posts stable ID and reason, without granting a project role', async () => {
+  fetchMock.mockResolvedValueOnce(response(true, { realm: 'https://rancher.example', link: null }));
+  fetchMock.mockResolvedValueOnce(response(true, { remote_user_id: 'u-external', remote_username: 'different-name', verified_at: '2026-10-05T00:00:00Z', linked_by: 'admin', reason: 'Verified owner' }));
+  render(<ExternalIdentityEditor user={user} onClose={() => {}} />);
+  await screen.findByText('https://rancher.example');
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  fireEvent.change(screen.getByLabelText('Rancher 계정 ID'), { target: { value: 'u-external' } });
+  fireEvent.change(screen.getByLabelText('계정 확인 및 연결 사유'), { target: { value: 'Verified owner' } });
+  fireEvent.click(screen.getByText('확인하고 연결'));
+  await screen.findByText('different-name · u-external');
+  const body = JSON.parse(fetchMock.mock.calls[1][1].body);
+  expect(body).toEqual({ realm: 'https://rancher.example', remote_user_id: 'u-external', reason: 'Verified owner' });
+  expect(screen.queryByText('확인하고 연결')).not.toBeInTheDocument();
+});
+it('keeps the form on failed linking and never presents a successful identity', async () => {
+  fetchMock.mockResolvedValueOnce(response(true, { realm: 'mock://rancher', link: null }));
+  fetchMock.mockResolvedValueOnce(response(false, null));
+  render(<ExternalIdentityEditor user={user} onClose={() => {}} />);
+  await screen.findByLabelText('Rancher 계정 ID');
+  fireEvent.change(screen.getByLabelText('Rancher 계정 ID'), { target: { value: 'u-1' } });
+  fireEvent.change(screen.getByLabelText('계정 확인 및 연결 사유'), { target: { value: 'Verified owner' } });
+  fireEvent.click(screen.getByText('확인하고 연결'));
+  await screen.findByRole('alert');
+  await waitFor(() => expect(screen.getByText('확인하고 연결')).toBeEnabled());
+  expect(screen.queryByText('연결된 계정')).not.toBeInTheDocument();
+});
+it('cannot submit before the current realm has loaded', async () => {
+  fetchMock.mockResolvedValueOnce(response(false, null));
+  render(<ExternalIdentityEditor user={user} onClose={() => {}} />);
+  await screen.findByRole('alert');
+  expect(screen.queryByText('확인하고 연결')).not.toBeInTheDocument();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});

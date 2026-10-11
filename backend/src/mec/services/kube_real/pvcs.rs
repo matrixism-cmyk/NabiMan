@@ -8,10 +8,7 @@ use kube::{
     Client,
 };
 
-pub async fn list(
-    client: &Client,
-    namespace: Option<&str>,
-) -> ServiceResult<Vec<PvcRow>> {
+pub async fn list(client: &Client, namespace: Option<&str>) -> ServiceResult<Vec<PvcRow>> {
     let api: Api<PersistentVolumeClaim> = match namespace {
         Some(ns) => Api::namespaced(client.clone(), ns),
         None => Api::all(client.clone()),

@@ -11,13 +11,13 @@ import TenantMembersTab from './TenantMembersTab';
 
 type TabKey = 'overview' | 'resources' | 'quota' | 'members' | 'starter' | 'audit';
 
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'resources', label: 'Resources' },
-  { key: 'quota', label: 'Quota' },
-  { key: 'members', label: 'Members' },
-  { key: 'starter', label: 'Starter Kit' },
-  { key: 'audit', label: 'Audit' },
+const TABS: { key: TabKey }[] = [
+  { key: 'overview' },
+  { key: 'resources' },
+  { key: 'quota' },
+  { key: 'members' },
+  { key: 'starter' },
+  { key: 'audit' },
 ];
 
 interface Props {
@@ -60,7 +60,7 @@ export default function TenantDetail({ tenantId, onClose }: Props) {
         </div>
       </div>
 
-      <div className="tab-bar" style={{ display: 'flex', gap: '4px', marginBottom: '16px', borderBottom: '1px solid #e5e7eb' }}>
+      <div className="tab-bar" style={{ display: 'flex', gap: '4px', marginBottom: '16px', borderBottom: '1px solid var(--border)' }}>
         {TABS.map((tabItem) => (
           <button
             key={tabItem.key}
@@ -73,10 +73,10 @@ export default function TenantDetail({ tenantId, onClose }: Props) {
               cursor: 'pointer',
               borderBottom: tab === tabItem.key ? '2px solid #3b82f6' : '2px solid transparent',
               fontWeight: tab === tabItem.key ? 600 : 400,
-              color: tab === tabItem.key ? '#111827' : '#6b7280',
+              color: tab === tabItem.key ? 'var(--text)' : 'var(--text-secondary)',
             }}
           >
-            {tabItem.label}
+            {t(`mec.tenant.tab.${tabItem.key}`)}
           </button>
         ))}
       </div>

@@ -44,11 +44,10 @@ impl RancherMock {
 
 #[async_trait]
 impl RancherService for RancherMock {
-    async fn create_project(
-        &self,
-        cluster_id: &str,
-        name: &str,
-    ) -> ServiceResult<RancherProject> {
+    fn identity_realm(&self) -> ServiceResult<String> {
+        Ok("mock://rancher".into())
+    }
+    async fn create_project(&self, cluster_id: &str, name: &str) -> ServiceResult<RancherProject> {
         let id = self.gen_id("p");
         let p = RancherProject {
             id: id.clone(),
@@ -101,7 +100,7 @@ impl RancherService for RancherMock {
             username: username.into(),
             display_name: Some(username.into()),
             enabled: true,
-            must_change_password: false,
+            must_change_password: true,
         };
         self.state.lock().unwrap().users.push(u.clone());
         Ok(u)

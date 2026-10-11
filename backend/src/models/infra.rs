@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 // --- Process models ---
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ProcessInfo {
+    pub identity: String,
+    pub can_signal: bool,
     pub pid: u32,
     pub user: String,
     pub cpu: f32,
@@ -14,7 +16,9 @@ pub struct ProcessInfo {
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct KillProcessRequest {
+    pub expected_identity: String,
     pub pid: u32,
     pub signal: Option<String>,
 }
@@ -148,6 +152,8 @@ pub struct LogQueryRequest {
 // --- Cron models ---
 #[derive(Serialize, Deserialize, Clone)]
 pub struct CronJob {
+    pub can_manage: bool,
+    pub revision: String,
     pub id: u32,
     pub user: String,
     pub schedule: String,
@@ -155,14 +161,28 @@ pub struct CronJob {
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CreateCronRequest {
+    pub expected_revision: String,
     pub user: String,
     pub schedule: String,
     pub command: String,
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DeleteCronRequest {
+    pub expected_revision: String,
     pub user: String,
     pub id: u32,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UpdateCronRequest {
+    pub expected_revision: String,
+    pub user: String,
+    pub id: u32,
+    pub schedule: String,
+    pub command: String,
 }
