@@ -15,12 +15,16 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: backend
+      - name: Install terminal test dependencies
+        run: sudo apt-get update && sudo apt-get install -y tmux openssh-client
+      - name: Verify backend HTTP dependency boundary
+        run: python3 scripts/verify-http-dependencies.py
       - name: Run tests
         working-directory: backend
-        run: cargo test --verbose
+        run: cargo test --locked --verbose
       - name: Build release
         working-directory: backend
-        run: cargo build --release
+        run: cargo build --release --locked
 
   frontend-build:
     runs-on: ubuntu-latest
@@ -34,9 +38,16 @@ jobs:
       - name: Install dependencies
         working-directory: frontend
         run: npm ci --no-audit
+      - name: Audit frontend dependencies
+        working-directory: frontend
+        run: npm audit
       - name: Build
         working-directory: frontend
-        run: npm run build
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test -- --watch=false --runInBand
+          npm run build
       - name: Check line counts
         run: |
           echo "Checking all source files are under 400 lines..."
@@ -47,3 +58,64 @@ jobs:
             exit 1
           fi
           echo "All files under 400 lines."
+
+  terminal-access-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install tmux
+        run: sudo apt-get update && sudo apt-get install -y tmux cron
+      - name: Build fixture server
+        working-directory: backend
+        run: cargo build
+      - name: Build browser UI and install Chromium
+        working-directory: frontend
+        run: |
+          npm ci --no-audit
+          npm run build
+          npx --no-install playwright install --with-deps chromium
+      - name: Verify non-root API and root service-control helper
+        run: python3 scripts/smoke-privileged-helper.py
+      - name: Verify OS accounts and crontab preservation in private chroot
+        run: |
+          browser_path=$(cd frontend && node -e "process.stdout.write(require('playwright').chromium.executablePath())")
+          sudo env NABIMAN_SMOKE_BINARY="$PWD/backend/target/debug/nabiman-server" NABIMAN_CHROMIUM="$browser_path" python3 scripts/smoke-os-accounts.py
+      - name: Verify pidfd signals with owned process fixtures
+        run: |
+          browser_path=$(cd frontend && node -e "process.stdout.write(require('playwright').chromium.executablePath())")
+          NABIMAN_SMOKE_BINARY=backend/target/debug/nabiman-server NABIMAN_CHROMIUM="$browser_path" python3 scripts/smoke-process-signals.py
+      - name: Verify bounded authentication admission and browser retry feedback
+        run: NABIMAN_SMOKE_BINARY=backend/target/debug/nabiman-server python3 scripts/smoke-auth-admission.py
+      - name: Verify account ownership and terminal storage recovery
+        run: |
+          NABIMAN_SMOKE_BINARY=backend/target/debug/nabiman-server NABIMAN_RECOVERY_TOOL=backend/target/debug/nabiman-recovery python3 scripts/smoke-management-recovery.py
+          python3 scripts/smoke-encrypted-backup.py
+          python3 scripts/smoke-backup-schedules.py
+          NABIMAN_AUDIT_BROWSER=1 python3 scripts/smoke-audit.py
+          NABIMAN_FORWARD_BROWSER=1 python3 scripts/smoke-audit-forwarding.py
+          NABIMAN_SMOKE_BINARY=backend/target/debug/nabiman-server NABIMAN_TOKENS_BROWSER=1 python3 scripts/smoke-api-tokens.py
+          python3 scripts/smoke-support-report.py
+          python3 scripts/smoke-mfa.py
+          python3 scripts/smoke-mfa.py --policy
+          python3 scripts/smoke-mfa.py --history
+          python3 scripts/smoke-login-sessions.py
+          python3 scripts/smoke-login-sessions.py --browser smoke-refresh-rotation.js
+          python3 scripts/smoke-runtime-identity.py
+          python3 scripts/test-deploy-preservation.py
+          python3 scripts/test-release-verification.py
+          python3 scripts/smoke-terminal-owner.py
+          python3 scripts/smoke-terminal-registry.py
+      - name: Verify account and public shared admission
+        run: |
+          python3 scripts/smoke-terminal-tickets.py
+          python3 scripts/smoke-shared-revocation.py

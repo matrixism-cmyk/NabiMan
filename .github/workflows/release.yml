@@ -1,5 +1,8 @@
 name: Release
 
+permissions:
+  contents: write
+
 on:
   push:
     tags: ['v*']
@@ -15,7 +18,13 @@ jobs:
           node-version: 20
       - name: Build frontend
         working-directory: frontend
-        run: npm ci --no-audit && npm run build
+        run: |
+          npm ci --no-audit
+          npm audit
+          npm run typecheck
+          npm run lint
+          npm test -- --watch=false --runInBand
+          npm run build
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -26,18 +35,37 @@ jobs:
         run: |
           mkdir -p static
           cp -r ../frontend/build/* static/
-          cargo build --release
+          cargo test --locked
+          cargo build --release --locked
+
+      - name: Verify backend HTTP dependency boundary
+        run: python3 scripts/verify-http-dependencies.py
 
       - name: Package
         run: |
-          cp backend/target/release/nabiman-server nabiman-x86_64
-          chmod +x nabiman-x86_64
-          tar czf nabiman-x86_64.tar.gz nabiman-x86_64
+          bash scripts/package-release.sh \
+            backend/target/release/nabiman-server frontend/build release
+          cd release
+          sha256sum -c nabiman-linux-x86_64.tar.gz.sha256
+          tar -tzf nabiman-linux-x86_64.tar.gz | grep -Fx 'nabiman/static/index.html'
+          cd ..
+          python3 scripts/smoke-release.py release/nabiman-linux-x86_64.tar.gz
+
+      - name: Validate release manifest and CycloneDX inventory
+        run: |
+          python3 scripts/test-release-verification.py
+          python3 -m venv "$RUNNER_TEMP/nabiman-sbom-validation"
+          "$RUNNER_TEMP/nabiman-sbom-validation/bin/pip" install 'jsonschema[format-nongpl]==4.23.0'
+          "$RUNNER_TEMP/nabiman-sbom-validation/bin/python" scripts/validate-sbom.py release/nabiman-linux-x86_64.tar.gz.cdx.json
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            nabiman-x86_64
-            nabiman-x86_64.tar.gz
+            release/nabiman-linux-x86_64.tar.gz
+            release/nabiman-linux-x86_64.tar.gz.sha256
+            release/*.cdx.json
+            release/*.manifest.json
+            release/*.inventory.json
+            release/verify-release.py
             install.sh
