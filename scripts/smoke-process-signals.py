@@ -42,7 +42,7 @@ with tempfile.TemporaryDirectory(prefix='nb-process-fixture-') as temporary:
    code,v=send(victim,'TERM',reviewed);assert code==200 and v['data']['accepted'];victim.wait(timeout=5);assert v['data']['observation']=='exited'
    stubborn=target(True);reviewed=identity(stubborn)
    code,v=send(stubborn,'TERM',reviewed);assert code==200 and v['data']['observation']=='still_present' and stubborn.poll() is None
-   result=subprocess.run(['node',str(ROOT/'frontend/scripts/smoke-process-signals.js')],input=json.dumps({'base':base,'token':token,'pid':stubborn.pid,'chromiumPath':os.environ.get('NABIMAN_CHROMIUM','/workspace/nabi/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome')}),capture_output=True,text=True,timeout=60,cwd=ROOT/'frontend')
+   result=subprocess.run(['node',str(ROOT/'frontend/scripts/smoke-process-signals.js')],input=json.dumps({'base':base,'token':token,'pid':stubborn.pid,'chromiumPath':os.environ.get('NABIMAN_CHROMIUM')}),capture_output=True,text=True,timeout=60,cwd=ROOT/'frontend')
    assert result.returncode==0,result.stderr[-1800:] or 'Process browser fixture failed'
    assert stubborn.poll() is None
    code,v=send(stubborn,'KILL',identity(stubborn));assert code==200 and v['data']['accepted'];stubborn.wait(timeout=5)

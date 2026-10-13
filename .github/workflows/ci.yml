@@ -96,8 +96,9 @@ jobs:
           sudo env NABIMAN_SMOKE_BINARY="$PWD/backend/target/debug/nabiman-server" NABIMAN_CHROMIUM="$browser_path" python3 scripts/smoke-os-accounts.py
       - name: Verify pidfd signals with owned process fixtures
         run: |
-          browser_path=$(cd frontend && node -e "process.stdout.write(require('playwright').chromium.executablePath())")
-          NABIMAN_SMOKE_BINARY=backend/target/debug/nabiman-server NABIMAN_CHROMIUM="$browser_path" python3 scripts/smoke-process-signals.py
+          # Playwright's own headless build: the full Chrome binary dies with SIGTRAP
+          # on the runner when it starts as a regular user.
+          NABIMAN_SMOKE_BINARY=backend/target/debug/nabiman-server python3 scripts/smoke-process-signals.py
       - name: Verify bounded authentication admission and browser retry feedback
         run: NABIMAN_SMOKE_BINARY=backend/target/debug/nabiman-server python3 scripts/smoke-auth-admission.py
       - name: Verify account ownership and terminal storage recovery
