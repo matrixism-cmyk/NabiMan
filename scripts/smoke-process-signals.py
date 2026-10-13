@@ -43,7 +43,7 @@ with tempfile.TemporaryDirectory(prefix='nb-process-fixture-') as temporary:
    stubborn=target(True);reviewed=identity(stubborn)
    code,v=send(stubborn,'TERM',reviewed);assert code==200 and v['data']['observation']=='still_present' and stubborn.poll() is None
    result=subprocess.run(['node',str(ROOT/'frontend/scripts/smoke-process-signals.js')],input=json.dumps({'base':base,'token':token,'pid':stubborn.pid,'chromiumPath':os.environ.get('NABIMAN_CHROMIUM','/workspace/nabi/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome')}),capture_output=True,text=True,timeout=60,cwd=ROOT/'frontend')
-   assert result.returncode==0,result.stderr[-400:] or 'Process browser fixture failed'
+   assert result.returncode==0,result.stderr[-1800:] or 'Process browser fixture failed'
    assert stubborn.poll() is None
    code,v=send(stubborn,'KILL',identity(stubborn));assert code==200 and v['data']['accepted'];stubborn.wait(timeout=5)
    print(json.dumps({'passed':True,'stale_identity_and_legacy_request_rejected':True,'self_parent_system_pids_protected':True,'owned_child_term_exit_observed':True,'ignored_term_not_reported_exited':True,'owned_child_kill_verified':True,'browser':json.loads(result.stdout),'limits':['Signals target only fixture children; no actual PID reuse forced','Exit observed within 100ms is distinct from graceful shutdown or service recovery']}))
