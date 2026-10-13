@@ -12,7 +12,7 @@ mod registry;
 mod remote_access;
 pub(crate) mod session;
 mod settings;
-mod sftp;
+pub(crate) mod sftp;
 pub mod share;
 pub mod share_store;
 pub(crate) mod share_ticket;

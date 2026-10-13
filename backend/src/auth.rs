@@ -290,6 +290,17 @@ pub fn check_auth(
             Some(c) => c,
             None => return AuthDecision::Unauthorized,
         }
+    } else if let Some(admitted) = crate::terminal::sftp::links::redeem(
+        req.method().as_str(),
+        path,
+        req.query_string(),
+    ) {
+        // A file dragged onto the desktop is fetched by the browser itself,
+        // without the Authorization header; a single-use link stands in.
+        match admitted {
+            Some(c) => c,
+            None => return AuthDecision::Unauthorized,
+        }
     } else {
         // Account JWTs must never be accepted from a terminal URL.
         if path == "/api/terminal"

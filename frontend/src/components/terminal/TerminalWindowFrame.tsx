@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import TerminalView, { TerminalStatus, TerminalViewHandle } from './TerminalView';
+import TerminalWithFiles from '../remote/TerminalWithFiles';
 import { useTerminalSettings } from './settings';
 import { useT } from '../../i18n';
 import ShareDialog from './ShareDialog';
@@ -147,15 +148,18 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
         </span>
       </div>
       <div className="term-window-body">
-        <TerminalView
-          ref={viewRef}
-          target={win.target}
-          storageKey={win.id}
-          settings={settings}
-          active={!win.minimized}
-          onStatus={setStatus}
-          onSessionId={setSessionId}
-        />
+        <TerminalWithFiles target={win.target} name={win.title} place="window"
+          onInsert={(text) => viewRef.current?.insertText(text)}>
+          <TerminalView
+            ref={viewRef}
+            target={win.target}
+            storageKey={win.id}
+            settings={settings}
+            active={!win.minimized}
+            onStatus={setStatus}
+            onSessionId={setSessionId}
+          />
+        </TerminalWithFiles>
       </div>
       {showShare && sessionId && (
         <ShareDialog sessionId={sessionId} sessionLabel={`${win.title} · ${win.subtitle}`} onClose={() => setShowShare(false)} />

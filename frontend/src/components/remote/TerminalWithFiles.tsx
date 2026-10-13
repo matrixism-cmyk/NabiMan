@@ -2,18 +2,28 @@ import React, { useRef, useState } from 'react';
 import { useT } from '../../i18n';
 import SftpPanel from './sftp/SftpPanel';
 import { draggingOwnRows } from './sftp/sftpDrop';
+import type { TerminalTarget } from '../terminal/terminalTypes';
 import './sftp/sftp.css';
 
 interface Props {
-  /** The saved server the terminal is on; without one there are no files to show. */
-  server?: { id: string; name: string };
+  /** What the terminal is connected to: a saved server or the local shell
+   *  have files to show; an unsaved SSH target does not. */
+  target: TerminalTarget | null;
+  /** Shown as the panel's accessible name. */
+  name: string;
+  /** The workspace pane opens the panel; a floating window starts folded. */
+  place?: 'pane' | 'window';
   /** Types text into the terminal. */
   onInsert: (text: string) => void;
   children: React.ReactNode;
 }
 
-const OPEN_KEY = 'nabiman_sftp_open';
-const WIDTH_KEY = 'nabiman_sftp_width';
+/** The file panel's scope for a terminal target: a saved server id or `local`. */
+export function filesScope(target: TerminalTarget | null): string | null {
+  if (!target) return null;
+  if (target.kind === 'local') return 'local';
+  return target.serverId || null;
+}
 const MIN_WIDTH = 240;
 const MIN_TERMINAL = 320;
 
@@ -26,14 +36,17 @@ const write = (key: string, value: string) => { try { localStorage.setItem(key, 
  * remembered. Rows dragged out of the panel onto the terminal type their
  * paths at the prompt.
  */
-export default function TerminalWithFiles({ server, onInsert, children }: Props) {
+export default function TerminalWithFiles({ target, name, place = 'pane', onInsert, children }: Props) {
   const { t } = useT();
-  const [open, setOpen] = useState(() => read(OPEN_KEY) !== '0');
-  const [width, setWidth] = useState(() => Number(read(WIDTH_KEY)) || 360);
+  const OPEN_KEY = place === 'pane' ? 'nabiman_sftp_open' : 'nabiman_sftp_open_window';
+  const WIDTH_KEY = place === 'pane' ? 'nabiman_sftp_width' : 'nabiman_sftp_width_window';
+  const [open, setOpen] = useState(() => (place === 'pane' ? read(OPEN_KEY) !== '0' : read(OPEN_KEY) === '1'));
+  const [width, setWidth] = useState(() => Number(read(WIDTH_KEY)) || (place === 'pane' ? 360 : 300));
   const [dropping, setDropping] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  if (!server) return <>{children}</>;
+  const scope = filesScope(target);
+  if (!scope) return <>{children}</>;
 
   const toggle = (next: boolean) => {
     setOpen(next);
@@ -71,7 +84,7 @@ export default function TerminalWithFiles({ server, onInsert, children }: Props)
   };
 
   return (
-    <div className="rw-split" ref={rootRef}>
+    <div className={`rw-split rw-split-${place}`} ref={rootRef}>
       <div
         className={`rw-split-term ${dropping ? 'is-drop' : ''}`}
         onDragOver={(e) => {
@@ -98,7 +111,7 @@ export default function TerminalWithFiles({ server, onInsert, children }: Props)
             aria-label={t('sftp.resize')} aria-valuenow={width}
             onPointerDown={startResize} onKeyDown={resizeByKey} onDoubleClick={() => toggle(false)} />
           <div className="rw-split-files" style={{ width }}>
-            <SftpPanel serverId={server.id} serverName={server.name} onInsert={onInsert} onClose={() => toggle(false)} />
+            <SftpPanel serverId={scope} serverName={name} onInsert={onInsert} onClose={() => toggle(false)} />
           </div>
         </>
       ) : (

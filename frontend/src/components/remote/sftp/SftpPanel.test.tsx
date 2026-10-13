@@ -11,7 +11,7 @@ jest.mock('./sftpApi', () => {
   return {
     ...actual,
     listDir: jest.fn(), makeDir: jest.fn(), movePath: jest.fn(), removePath: jest.fn(),
-    uploadFile: jest.fn(), downloadFile: jest.fn(),
+    uploadFile: jest.fn(), downloadFile: jest.fn(), downloadLink: jest.fn(),
   };
 });
 
@@ -125,6 +125,22 @@ describe('SFTP panel', () => {
     await waitFor(() => expect(mocked.movePath).toHaveBeenCalledWith('srv_1', '/home/me/app.conf', '/home/me/app.conf.bak'));
   });
 
+  it('offers a file to the desktop once its link is ready', async () => {
+    mocked.downloadLink.mockImplementation(() => Promise.resolve('https://man.example/api/terminal/sftp/srv_1/download?path=x&ticket=t'));
+    renderPanel();
+    await screen.findByText('app.conf');
+    await act(async () => { fireEvent.pointerDown(row('app.conf')); });
+    expect(mocked.downloadLink).toHaveBeenCalledWith('srv_1', '/home/me/app.conf');
+    const dt = transfer({});
+    fireEvent.dragStart(row('app.conf'), { dataTransfer: dt });
+    expect(dt.setData).toHaveBeenCalledWith('DownloadURL',
+      'application/octet-stream:app.conf:https://man.example/api/terminal/sftp/srv_1/download?path=x&ticket=t');
+
+    // Folders cannot be saved that way, and need no link.
+    fireEvent.pointerDown(row('logs'));
+    expect(mocked.downloadLink).toHaveBeenCalledTimes(1);
+  });
+
   it('types quoted paths into the terminal from the menu', async () => {
     const onInsert = renderPanel();
     mocked.listDir.mockImplementation(() => ok({ ...HOME, entries: [
@@ -141,7 +157,7 @@ describe('terminal with files', () => {
     const onInsert = jest.fn();
     render(
       <I18nProvider>
-        <TerminalWithFiles server={{ id: 'srv_1', name: 'web-01' }} onInsert={onInsert}>
+        <TerminalWithFiles target={{ kind: 'ssh', serverId: 'srv_1' }} name="web-01" onInsert={onInsert}>
           <div data-testid="terminal" />
         </TerminalWithFiles>
       </I18nProvider>,
@@ -157,7 +173,7 @@ describe('terminal with files', () => {
   it('folds away to a tab and remembers it', async () => {
     render(
       <I18nProvider>
-        <TerminalWithFiles server={{ id: 'srv_1', name: 'web-01' }} onInsert={jest.fn()}>
+        <TerminalWithFiles target={{ kind: 'ssh', serverId: 'srv_1' }} name="web-01" onInsert={jest.fn()}>
           <div data-testid="terminal" />
         </TerminalWithFiles>
       </I18nProvider>,
@@ -170,13 +186,39 @@ describe('terminal with files', () => {
     expect(await screen.findByText('logs')).toBeInTheDocument();
   });
 
-  it('shows no panel without a saved server', () => {
+  it('shows no panel for an SSH target that is not saved', () => {
     render(
       <I18nProvider>
-        <TerminalWithFiles onInsert={jest.fn()}><div data-testid="terminal" /></TerminalWithFiles>
+        <TerminalWithFiles target={{ kind: 'ssh', host: 'h', user: 'u' }} name="h" onInsert={jest.fn()}>
+          <div data-testid="terminal" />
+        </TerminalWithFiles>
       </I18nProvider>,
     );
     expect(screen.getByTestId('terminal')).toBeInTheDocument();
     expect(document.querySelector('.rw-split')).toBeNull();
+  });
+
+  it('shows this machine\'s files beside the local shell', async () => {
+    render(
+      <I18nProvider>
+        <TerminalWithFiles target={{ kind: 'local' }} name="로컬 셸" onInsert={jest.fn()}>
+          <div data-testid="terminal" />
+        </TerminalWithFiles>
+      </I18nProvider>,
+    );
+    await screen.findByText('logs');
+    expect(mocked.listDir).toHaveBeenCalledWith('local', '');
+  });
+
+  it('starts folded in a floating window', () => {
+    render(
+      <I18nProvider>
+        <TerminalWithFiles target={{ kind: 'local' }} name="로컬 셸" place="window" onInsert={jest.fn()}>
+          <div data-testid="terminal" />
+        </TerminalWithFiles>
+      </I18nProvider>,
+    );
+    expect(document.querySelector('.sftp')).toBeNull();
+    expect(document.querySelector('.rw-split-tab')).toBeTruthy();
   });
 });

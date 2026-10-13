@@ -287,7 +287,7 @@ export default function RemoteWorkspace() {
               to 상태 and back does not drop the shell. */}
           {showTerminalPane && terminalTarget && (
             <div className={`rw-view rw-view-terminal ${terminalVisible ? '' : 'rw-view-hidden'}`}>
-              <TerminalWithFiles server={selectedServer} onInsert={(text) => viewRef.current?.insertText(text)}>
+              <TerminalWithFiles target={terminalTarget} name={headTitle} onInsert={(text) => viewRef.current?.insertText(text)}>
                 <TerminalView
                   key={storageKey}
                   ref={viewRef}

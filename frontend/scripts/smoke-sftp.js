@@ -109,6 +109,26 @@ const check = (name, ok, detail = '') => {
   const body = require('fs').readFileSync(saved, 'utf8');
   check('download returns the uploaded bytes', body === 'hello from the browser\n' && download.suggestedFilename() === 'hello.txt');
 
+  // 4b. Dragged out of the browser, a file is saved from a single-use link.
+  await page.hover('.sftp-row:has-text("hello.txt")');
+  await page.waitForTimeout(800);
+  const downloadUrl = await page.evaluate(() => {
+    const row = Array.from(document.querySelectorAll('.sftp-row')).find((r) => r.textContent.includes('hello.txt'));
+    const dt = new DataTransfer();
+    row.dispatchEvent(new DragEvent('dragstart', { dataTransfer: dt, bubbles: true }));
+    row.dispatchEvent(new DragEvent('dragend', { dataTransfer: dt, bubbles: true }));
+    return dt.getData('DownloadURL');
+  });
+  const linkUrl = downloadUrl.split(':').slice(2).join(':');
+  check('a file dragged out carries a desktop download', downloadUrl.startsWith('application/octet-stream:hello.txt:http'),
+    downloadUrl.slice(0, 60));
+  // The browser fetches it without the page's sign-in, and only once.
+  const first = await fetch(linkUrl);
+  const firstBody = await first.text();
+  const again = await fetch(linkUrl);
+  check('the link downloads once without a sign-in, then is spent',
+    first.status === 200 && firstBody === 'hello from the browser\n' && again.status === 401, `${first.status} → ${again.status}`);
+
   // 5. Up through the ".." row, then delete the folder with its contents.
   await page.dblclick('.sftp-row.is-up');
   await page.waitForSelector('.sftp-row:has-text("받은 파일")');
@@ -128,6 +148,23 @@ const check = (name, ok, detail = '') => {
   await page.click('.rw-split-tab');
   await page.waitForFunction((dir) => document.querySelector('.sftp-crumbs .is-here')?.textContent === dir.split('/').pop(), DIR);
   check('after a reload it reopens in the same folder', true);
+
+  // 7. The local shell has this machine's files beside it.
+  await page.locator('.rw-item', { hasText: '로컬 셸' }).click();
+  await page.click('.rw-tabs button:has-text("터미널")');
+  const connectLocal = await page.$('.rw-connect button:has-text("접속")');
+  if (connectLocal) await connectLocal.click();
+  await page.waitForSelector('.rw-view-terminal:not(.rw-view-hidden) .sftp-crumbs', { timeout: 20000 });
+  check('the local shell has a file panel', await page.isVisible('.rw-view-terminal:not(.rw-view-hidden) .sftp-row'));
+
+  // 8. A floating window starts with the panel folded, and opens it on request.
+  await page.locator('.rw-item', { hasText: SERVER }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '새 창으로 열기', exact: true }).click();
+  await page.waitForSelector('.term-window .rw-split-tab', { timeout: 20000 });
+  await page.click('.term-window .rw-split-tab');
+  await page.waitForSelector('.term-window .sftp-row', { timeout: 20000 });
+  check('a floating window opens the panel from its tab', true);
+  await page.screenshot({ path: `${OUT}/sftp-window.png` });
 
   check('no page errors', problems.length === 0, problems.slice(0, 3).join(' | '));
   await browser.close();

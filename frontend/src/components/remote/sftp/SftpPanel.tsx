@@ -4,6 +4,7 @@ import RailContextMenu, { RailMenuItem } from '../RailContextMenu';
 import SftpList, { Editing } from './SftpList';
 import SftpTransfers from './SftpTransfers';
 import { useTransfers } from './useTransfers';
+import { useDragOut } from './useDragOut';
 import { draggingDesktopFiles, draggingOwnRows, ownRows, SFTP_MIME, takeDrop } from './sftpDrop';
 import {
   baseName, isFolder, joinPath, listDir, makeDir, movePath, removePath, SftpEntry, SftpListing, shellQuote,
@@ -80,6 +81,7 @@ export default function SftpPanel({ serverId, serverName, onInsert, onClose }: P
     if (dir === current.current) refresh();
   }, [refresh]));
 
+  const dragOut = useDragOut(serverId);
   const here = listing?.path || '';
   const pathOf = useCallback((name: string) => joinPath(current.current, name), []);
   const visible = useMemo(
@@ -181,6 +183,8 @@ export default function SftpPanel({ serverId, serverName, onInsert, onClose }: P
     e.dataTransfer.setData(SFTP_MIME, JSON.stringify(paths));
     e.dataTransfer.setData('text/plain', paths.map(shellQuote).join(' '));
     e.dataTransfer.effectAllowed = 'copyMove';
+    // A single file can also be dropped onto the desktop to save it.
+    if (names.length === 1 && !isFolder(entry)) dragOut.attach(e.dataTransfer, paths[0], entry.name);
   };
 
   const dragOver = (e: React.DragEvent, dir: string) => {
@@ -294,7 +298,9 @@ export default function SftpPanel({ serverId, serverName, onInsert, onClose }: P
               if (!selected.has(entry.name)) { anchor.current = entry.name; setSelected(new Set([entry.name])); }
               setMenu({ x: e.clientX, y: e.clientY, entry, opener: e.currentTarget as HTMLElement });
             }}
-            onDragStart={dragStart} onDragOverDir={dragOver} onDropDir={drop} onEditDone={finishEdit} />
+            onDragStart={dragStart} onDragOverDir={dragOver} onDropDir={drop} onEditDone={finishEdit}
+            onDragEnd={(entry) => dragOut.spent(pathOf(entry.name))}
+            onPrefetch={(entry, now) => { if (!isFolder(entry)) dragOut.prefetch(pathOf(entry.name), now); }} />
         )}
         {listing && !visible.length && !editing && <p className="sftp-empty">{t('sftp.empty')}</p>}
         {listing?.truncated && <p className="sftp-empty">{t('sftp.truncated', { count: listing.entries.length })}</p>}

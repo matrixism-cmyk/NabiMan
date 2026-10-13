@@ -52,6 +52,19 @@ pub(crate) fn base_name(path: &str) -> &str {
         .unwrap_or("download")
 }
 
+/// `path` as a URL query value.
+pub(crate) fn query_escape(path: &str) -> String {
+    let mut out = String::new();
+    for b in path.bytes() {
+        if b.is_ascii_alphanumeric() || b"-._~/".contains(&b) {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
+}
+
 /// `Content-Disposition` for a download, with the name encoded per RFC 5987
 /// so Korean and other non-ASCII names survive, and an ASCII fallback.
 pub(crate) fn disposition(name: &str) -> String {
@@ -94,14 +107,14 @@ pub(crate) fn kind_of(meta: &Metadata) -> &'static str {
     }
 }
 
-pub(crate) fn entry(name: String, meta: &Metadata) -> Entry {
+pub(crate) fn entry(name: String, meta: &super::fs::Meta) -> Entry {
     Entry {
         name,
-        kind: kind_of(meta),
+        kind: meta.kind,
         to_dir: false,
-        size: meta.size.unwrap_or(0),
+        size: meta.size,
         mtime: meta.mtime,
-        mode: meta.permissions.map(|p| p & 0o7777),
+        mode: meta.mode,
     }
 }
 
@@ -148,6 +161,14 @@ mod tests {
         assert_eq!(parent("/"), None);
         assert_eq!(base_name("/var/log/syslog"), "syslog");
         assert_eq!(base_name("/"), "download");
+    }
+
+    #[test]
+    fn link_paths_round_trip_through_a_query() {
+        let path = "/srv/보고서 & 결과?.txt";
+        let query = format!("path={}&ticket=x", query_escape(path));
+        let parsed = actix_web::web::Query::<std::collections::HashMap<String, String>>::from_query(&query).unwrap();
+        assert_eq!(parsed.get("path").map(String::as_str), Some(path));
     }
 
     #[test]

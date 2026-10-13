@@ -21,6 +21,9 @@ interface Props {
   onUp: () => void;
   onMenu: (e: React.MouseEvent, entry: SftpEntry) => void;
   onDragStart: (e: React.DragEvent, entry: SftpEntry) => void;
+  onDragEnd: (entry: SftpEntry) => void;
+  /** The pointer rests on, or presses, a row that may be dragged out next. */
+  onPrefetch: (entry: SftpEntry, now: boolean) => void;
   /** Drag over a folder row: the row's own path is the drop target. */
   onDragOverDir: (e: React.DragEvent, dir: string) => void;
   onDropDir: (e: React.DragEvent, dir: string) => void;
@@ -114,6 +117,9 @@ export default function SftpList(props: Props) {
             onDoubleClick={() => props.onOpen(entry)}
             onContextMenu={(e) => props.onMenu(e, entry)}
             onDragStart={(e) => props.onDragStart(e, entry)}
+            onDragEnd={() => props.onDragEnd(entry)}
+            onPointerEnter={() => props.onPrefetch(entry, false)}
+            onPointerDown={() => props.onPrefetch(entry, true)}
             onDragOver={folder ? (e) => props.onDragOverDir(e, path) : undefined}
             onDrop={folder ? (e) => props.onDropDir(e, path) : undefined}
             title={entry.mode !== null ? `${entry.name}  (${entry.mode.toString(8).padStart(4, '0')})` : entry.name}

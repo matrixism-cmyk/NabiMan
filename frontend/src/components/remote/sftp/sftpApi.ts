@@ -62,6 +62,14 @@ export function removePath(serverId: string, path: string) {
   return apiRequest<number>(`${base(serverId)}/delete`, { method: 'POST', body: JSON.stringify({ path }) });
 }
 
+/** A single-use URL the browser can fetch on its own, for a drag onto the desktop. */
+export async function downloadLink(serverId: string, path: string): Promise<string | null> {
+  const res = await apiRequest<{ url: string }>(`${base(serverId)}/link`, {
+    method: 'POST', body: JSON.stringify({ path }),
+  });
+  return res.success && res.data?.url ? new URL(`${API_BASE}${res.data.url}`, window.location.href).href : null;
+}
+
 export interface TransferResult {
   ok: boolean;
   /** The upload stopped because something by that name is already there. */
