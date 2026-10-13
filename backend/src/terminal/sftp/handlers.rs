@@ -7,7 +7,7 @@ use serde::Deserialize;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use super::paths::{self, entry, join, parent, sort, valid_name, valid_path, Entry};
-use super::{bad, fail, links, target};
+use super::{bad, fail, links, resolve};
 use crate::models::ApiResponse;
 
 /// A folder listing stops here; the rest is reported as left out.
@@ -31,8 +31,8 @@ pub(super) struct PathQuery {
     path: String,
 }
 
-pub(super) async fn list(req: HttpRequest, id: web::Path<String>, q: web::Query<PathQuery>) -> HttpResponse {
-    let t = tryr!(target(&req, &id));
+pub(super) async fn list(req: HttpRequest, q: web::Query<PathQuery>) -> HttpResponse {
+    let t = tryr!(resolve(&req));
     let asked = if q.path.is_empty() { "." } else { q.path.as_str() };
     if !valid_path(asked) {
         return bad("Invalid path");
@@ -56,8 +56,8 @@ pub(super) async fn list(req: HttpRequest, id: web::Path<String>, q: web::Query<
     })))
 }
 
-pub(super) async fn download(req: HttpRequest, id: web::Path<String>, q: web::Query<PathQuery>) -> HttpResponse {
-    let t = tryr!(target(&req, &id));
+pub(super) async fn download(req: HttpRequest, q: web::Query<PathQuery>) -> HttpResponse {
+    let t = tryr!(resolve(&req));
     if !valid_path(&q.path) {
         return bad("Invalid path");
     }
@@ -92,21 +92,21 @@ pub(super) struct PathBody {
 }
 
 /// A single-use URL for `path`, for a drag onto the desktop.
-pub(super) async fn link(req: HttpRequest, id: web::Path<String>, b: web::Json<PathBody>) -> HttpResponse {
-    let t = tryr!(target(&req, &id));
+pub(super) async fn link(req: HttpRequest, b: web::Json<PathBody>) -> HttpResponse {
+    let t = tryr!(resolve(&req));
     if !valid_path(&b.path) {
         return bad("Invalid path");
     }
-    let Some(claims) = crate::auth::verified_claims(&req) else {
-        return fail(StatusCode::UNAUTHORIZED, "Sign in again");
+    let owner = match &t.share {
+        Some(token) => links::Owner::Share(token.clone()),
+        None => match crate::auth::verified_claims(&req) {
+            Some(claims) => links::Owner::Session(claims),
+            None => return fail(StatusCode::UNAUTHORIZED, "Sign in again"),
+        },
     };
-    match links::issue(claims, &t.scope, &b.path) {
+    match links::issue(owner, &t.scope, &b.path) {
         Ok(ticket) => {
-            let url = format!(
-                "/api/terminal/sftp/{}/download?path={}&ticket={ticket}",
-                t.scope,
-                paths::query_escape(&b.path),
-            );
+            let url = format!("{}/download?path={}&ticket={ticket}", t.base, paths::query_escape(&b.path));
             HttpResponse::Ok().json(ApiResponse::ok(serde_json::json!({
                 "url": url, "expires_in_seconds": links::ttl_secs(),
             })))
@@ -125,11 +125,10 @@ pub(super) struct UploadQuery {
 
 pub(super) async fn upload(
     req: HttpRequest,
-    id: web::Path<String>,
     q: web::Query<UploadQuery>,
     mut body: web::Payload,
 ) -> HttpResponse {
-    let t = tryr!(target(&req, &id));
+    let t = tryr!(resolve(&req));
     if !valid_path(&q.dir) || !valid_name(&q.name) {
         return bad("Invalid file name");
     }
@@ -172,8 +171,8 @@ pub(super) async fn upload(
     HttpResponse::Ok().json(ApiResponse::ok(serde_json::json!({ "path": path, "size": written })))
 }
 
-pub(super) async fn mkdir(req: HttpRequest, id: web::Path<String>, b: web::Json<PathBody>) -> HttpResponse {
-    let t = tryr!(target(&req, &id));
+pub(super) async fn mkdir(req: HttpRequest, b: web::Json<PathBody>) -> HttpResponse {
+    let t = tryr!(resolve(&req));
     if !valid_path(&b.path) {
         return bad("Invalid path");
     }
@@ -191,8 +190,8 @@ pub(super) struct MoveBody {
 }
 
 /// Renames or moves. Never replaces something already at the destination.
-pub(super) async fn rename(req: HttpRequest, id: web::Path<String>, b: web::Json<MoveBody>) -> HttpResponse {
-    let t = tryr!(target(&req, &id));
+pub(super) async fn rename(req: HttpRequest, b: web::Json<MoveBody>) -> HttpResponse {
+    let t = tryr!(resolve(&req));
     if !valid_path(&b.from) || !valid_path(&b.to) {
         return bad("Invalid path");
     }
@@ -211,8 +210,8 @@ pub(super) async fn rename(req: HttpRequest, id: web::Path<String>, b: web::Json
 
 /// Deletes a file, a link (not what it points to) or a folder with everything
 /// in it.
-pub(super) async fn delete(req: HttpRequest, id: web::Path<String>, b: web::Json<PathBody>) -> HttpResponse {
-    let t = tryr!(target(&req, &id));
+pub(super) async fn delete(req: HttpRequest, b: web::Json<PathBody>) -> HttpResponse {
+    let t = tryr!(resolve(&req));
     if !valid_path(&b.path) || parent(&b.path).is_none() {
         return bad("Invalid path");
     }

@@ -15,6 +15,7 @@ fn link() -> ShareLink {
         needs_password: false,
         alive: true,
         usable: true,
+        files: Default::default(),
     }
 }
 #[test]

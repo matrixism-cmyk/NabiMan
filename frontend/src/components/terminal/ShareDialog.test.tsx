@@ -53,3 +53,15 @@ test('defaults to read-only, offers finite expiry and identifies links requiring
   expect(await screen.findByText('사용 불가 · 필요 시 재발급')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '복사' })).toBeDisabled();
 });
+
+test('file access is off unless chosen, and the choice is sent with the link', async () => {
+  request.mockResolvedValueOnce({ success: true, data: [] });
+  post.mockResolvedValue({ success: true, data: { ...link, files: 'write' } });
+  setup();
+  await waitFor(() => expect(request).toHaveBeenCalled());
+  expect(screen.getByRole('radio', { name: '끄기' })).toHaveAttribute('aria-checked', 'true');
+  fireEvent.click(screen.getByRole('radio', { name: '올리기·수정까지' }));
+  fireEvent.click(screen.getByRole('button', { name: '링크 만들기' }));
+  await waitFor(() => expect(post).toHaveBeenCalledWith('/api/terminal/sessions/session-1/share-link',
+    expect.objectContaining({ files: 'write', read_only: true })));
+});

@@ -7,7 +7,8 @@ const t: T = {
   'sftp.tab': { ko: '파일', en: 'Files', ja: 'ファイル' },
   'sftp.panelLabel': { ko: '{name} 파일', en: 'Files on {name}', ja: '{name} のファイル' },
   'sftp.openHint': { ko: '이 서버의 파일을 SFTP로 엽니다', en: 'Open this server\'s files over SFTP', ja: 'このサーバーのファイルを SFTP で開きます' },
-  'sftp.close': { ko: '파일 패널 닫기', en: 'Close the file panel', ja: 'ファイルパネルを閉じる' },
+  'sftp.close': { ko: '파일 패널 숨기기', en: 'Hide the file panel', ja: 'ファイルパネルを隠す' },
+  'sftp.show': { ko: '파일 패널 보이기', en: 'Show the file panel', ja: 'ファイルパネルを表示' },
   'sftp.resize': { ko: '파일 패널 크기 조절', en: 'Resize the file panel', ja: 'ファイルパネルのサイズ変更' },
   'sftp.location': { ko: '현재 위치', en: 'Current folder', ja: '現在の場所' },
   'sftp.up': { ko: '상위 폴더', en: 'Up one folder', ja: '上のフォルダー' },
@@ -33,6 +34,8 @@ const t: T = {
   'sftp.connecting': { ko: '연결하는 중…', en: 'Connecting…', ja: '接続中…' },
   'sftp.retry': { ko: '다시 시도', en: 'Retry', ja: '再試行' },
   'sftp.empty': { ko: '빈 폴더입니다. 파일을 끌어다 놓으면 이곳에 올라갑니다.', en: 'This folder is empty. Drop files here to upload them.', ja: '空のフォルダーです。ファイルをドロップするとアップロードされます。' },
+  'sftp.emptyReadOnly': { ko: '빈 폴더입니다.', en: 'This folder is empty.', ja: '空のフォルダーです。' },
+  'sftp.dragHintReadOnly': { ko: '보기·내려받기만 허용된 링크입니다. 파일을 바탕화면이나 터미널로 끌 수 있습니다.', en: 'This link allows browsing and downloading. Drag files onto the desktop or the terminal.', ja: '閲覧とダウンロードのみ許可されたリンクです。ファイルはデスクトップやターミナルへドラッグできます。' },
   'sftp.truncated': { ko: '항목이 너무 많아 {count}개까지만 보여 줍니다.', en: 'Too many entries; showing the first {count}.', ja: '項目が多すぎるため最初の {count} 件のみ表示します。' },
   'sftp.selected': { ko: '{count}개 선택됨', en: '{count} selected', ja: '{count} 件選択' },
   'sftp.dragHint': { ko: '파일을 끌어다 놓으면 올라갑니다. 항목을 폴더로 끌면 옮겨지고, 터미널로 끌면 경로가 입력되며, 바탕화면으로 끌면 내려받습니다.', en: 'Drop files to upload. Drag items onto a folder to move them, onto the terminal to type their paths, or onto the desktop to download.', ja: 'ドロップでアップロード。フォルダーへドラッグで移動、ターミナルへでパス入力、デスクトップへでダウンロードします。' },
@@ -44,6 +47,15 @@ const t: T = {
   'sftp.failed': { ko: '실패', en: 'Failed', ja: '失敗' },
   'sftp.cancelled': { ko: '취소됨', en: 'Cancelled', ja: 'キャンセル' },
   'sftp.cancel': { ko: '전송 취소', en: 'Cancel transfer', ja: '転送をキャンセル' },
+
+  // Share links
+  'share.files': { ko: '파일(SFTP) 접근', en: 'File access (SFTP)', ja: 'ファイルアクセス (SFTP)' },
+  'share.filesNone': { ko: '끄기', en: 'Off', ja: 'オフ' },
+  'share.filesRead': { ko: '보기·내려받기', en: 'Browse & download', ja: '閲覧・ダウンロード' },
+  'share.filesWrite': { ko: '올리기·수정까지', en: 'Also upload & change', ja: 'アップロード・変更も' },
+  'share.filesHint': { ko: '링크를 받은 사람에게 터미널 옆 파일 패널을 열어 줍니다. 공유하는 세션이 접속한 서버(로컬 셸이면 이 서버)의 파일이며, 세션 소유자와 같은 권한으로 열립니다.', en: 'Gives the visitor the file panel beside the terminal: the files of the server the shared session is on (this server for a local shell), with the session owner\'s permissions.', ja: 'リンクの受け手にターミナル横のファイルパネルを開きます。共有セッションの接続先(ローカルシェルならこのサーバー)のファイルで、セッション所有者と同じ権限です。' },
+  'share.filesTagRead': { ko: '파일 보기', en: 'files: read', ja: 'ファイル閲覧' },
+  'share.filesTagWrite': { ko: '파일 수정', en: 'files: write', ja: 'ファイル変更' },
 };
 
 export default t;

@@ -23,6 +23,7 @@
   background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
 }
 .rw-split-tab:hover, .rw-split-tab:focus-visible { color: var(--text); border-color: var(--primary); outline: none; }
+.rw-split-tab-arrow { writing-mode: horizontal-tb; margin-bottom: 6px; font-size: 14px; color: var(--primary); }
 
 /* ── Panel ─────────────────────────────────────────────────────────── */
 .sftp {
@@ -38,6 +39,7 @@
 }
 .sftp-tools button:hover:not(:disabled), .sftp-tools button:focus-visible { color: var(--text); border-color: var(--border); outline: none; }
 .sftp-tools button.is-on { color: var(--primary); }
+.sftp-tools .sftp-hide { font-size: 17px; }
 .sftp-tools button:disabled { opacity: 0.35; cursor: default; }
 
 .sftp-crumbs {

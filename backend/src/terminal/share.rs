@@ -65,16 +65,33 @@ pub struct ShareLink {
     /// Admission is denied for legacy, expired or invalid-owner links even if tmux runs.
     #[serde(default)]
     pub usable: bool,
+    /// Whether the visitor also gets the file panel, and what it may do.
+    #[serde(default)]
+    pub files: ShareFiles,
+}
+
+/// File access a link grants alongside its terminal. Links made before this
+/// existed carry none.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ShareFiles {
+    #[default]
+    None,
+    /// Browse and download.
+    Read,
+    /// Also upload, make folders, rename, move and delete.
+    Write,
 }
 
 impl ShareLink {
-    pub(super) fn same_authorization(&self, other: &Self) -> bool {
+    pub(crate) fn same_authorization(&self, other: &Self) -> bool {
         self.token == other.token
             && self.owner_id == other.owner_id
             && self.owner_authorization_version == other.owner_authorization_version
             && self.owner == other.owner
             && self.session_id == other.session_id
             && self.read_only == other.read_only
+            && self.files == other.files
             && self.password_hash == other.password_hash
             && self.created_unix == other.created_unix
             && self.expires_unix == other.expires_unix
@@ -89,7 +106,7 @@ fn expired(link: &ShareLink) -> bool {
         || link.expires_unix.saturating_sub(link.created_unix) > MAX_EXPIRY_SECS
 }
 
-fn live_link(shares: &ShareStore, users: &UserStore, token: &str) -> Option<ShareLink> {
+pub(crate) fn live_link(shares: &ShareStore, users: &UserStore, token: &str) -> Option<ShareLink> {
     let link = shares.lock().ok()?.get(token)?;
     (!expired(&link)
         && !link.owner_id.is_empty()
@@ -175,6 +192,7 @@ struct ShareInfo {
     label: String,
     needs_password: bool,
     read_only: bool,
+    files: ShareFiles,
     expires_unix: u64,
     /// False once the shell behind the link has exited.
     alive: bool,
@@ -224,6 +242,7 @@ async fn share_info(
                 label: link.label,
                 needs_password: link.password_hash.is_some(),
                 read_only: link.read_only,
+                files: link.files,
                 expires_unix: link.expires_unix,
                 alive,
                 cols,

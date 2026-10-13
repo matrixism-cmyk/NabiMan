@@ -39,6 +39,7 @@ impl Fixture {
             needs_password: false,
             alive: true,
             usable: true,
+            files: Default::default(),
         };
         shares
             .lock()

@@ -20,8 +20,14 @@ use crate::auth::Claims;
 const TTL: Duration = Duration::from_secs(5 * 60);
 const CAPACITY: usize = 4096;
 
+/// Whose link it is: a signed-in session, or a share link's visitor.
+pub(crate) enum Owner {
+    Session(Claims),
+    Share(String),
+}
+
 struct Link {
-    claims: Claims,
+    owner: Owner,
     scope: String,
     path: String,
     expires: Instant,
@@ -41,8 +47,8 @@ pub(crate) fn ttl_secs() -> u64 {
     TTL.as_secs()
 }
 
-/// A new ticket for `scope` (a server id or `local`) and `path`.
-pub(crate) fn issue(claims: Claims, scope: &str, path: &str) -> Result<String, String> {
+/// A new ticket for `scope` (a server id, `local`, or a share token) and `path`.
+pub(crate) fn issue(owner: Owner, scope: &str, path: &str) -> Result<String, String> {
     let mut bytes = [0u8; 32];
     OsRng
         .try_fill_bytes(&mut bytes)
@@ -56,7 +62,7 @@ pub(crate) fn issue(claims: Claims, scope: &str, path: &str) -> Result<String, S
     }
     map.insert(
         digest(&ticket),
-        Link { claims, scope: scope.into(), path: path.into(), expires: now + TTL },
+        Link { owner, scope: scope.into(), path: path.into(), expires: now + TTL },
     );
     Ok(ticket)
 }
@@ -84,7 +90,26 @@ pub(crate) fn redeem(method: &str, path: &str, query: &str) -> Option<Option<Cla
     let admitted = link.expires > Instant::now()
         && link.scope == scope
         && params.get("path").is_some_and(|p| *p == link.path);
-    Some(admitted.then_some(link.claims))
+    match link.owner {
+        Owner::Session(claims) if admitted => Some(Some(claims)),
+        _ => Some(None),
+    }
+}
+
+/// For a share visitor's download: whether `ticket` was issued to the share
+/// `token` for exactly `path`. Spent either way.
+pub(crate) fn redeem_share(token: &str, path: &str, ticket: &str) -> bool {
+    let Some(link) = store()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .remove(&digest(ticket))
+    else {
+        return false;
+    };
+    link.expires > Instant::now()
+        && link.scope == token
+        && link.path == path
+        && matches!(&link.owner, Owner::Share(t) if t == token)
 }
 
 fn web_params(query: &str) -> HashMap<String, String> {
@@ -103,7 +128,7 @@ mod tests {
 
     #[test]
     fn a_link_opens_one_file_once() {
-        let ticket = issue(claims(), "srv_1", "/home/me/a b.txt").unwrap();
+        let ticket = issue(Owner::Session(claims()), "srv_1", "/home/me/a b.txt").unwrap();
         let path = "/api/terminal/sftp/srv_1/download";
         let query = format!("path=%2Fhome%2Fme%2Fa%20b.txt&ticket={ticket}");
         assert!(matches!(redeem("GET", path, &query), Some(Some(c)) if c.sid == "s1"));
@@ -113,12 +138,26 @@ mod tests {
 
     #[test]
     fn a_link_is_bound_to_its_file_and_server() {
-        let ticket = issue(claims(), "srv_1", "/etc/hosts").unwrap();
+        let ticket = issue(Owner::Session(claims()), "srv_1", "/etc/hosts").unwrap();
         let other_file = format!("path=%2Fetc%2Fshadow&ticket={ticket}");
         assert!(matches!(redeem("GET", "/api/terminal/sftp/srv_1/download", &other_file), Some(None)));
-        let ticket = issue(claims(), "srv_1", "/etc/hosts").unwrap();
+        let ticket = issue(Owner::Session(claims()), "srv_1", "/etc/hosts").unwrap();
         let query = format!("path=%2Fetc%2Fhosts&ticket={ticket}");
         assert!(matches!(redeem("GET", "/api/terminal/sftp/srv_2/download", &query), Some(None)));
+    }
+
+    #[test]
+    fn share_links_never_stand_in_for_a_session() {
+        let token = "t".repeat(64);
+        let ticket = issue(Owner::Share(token.clone()), &token, "/etc/hosts").unwrap();
+        // Replayed against the account route, it admits nothing.
+        let query = format!("path=%2Fetc%2Fhosts&ticket={ticket}");
+        assert!(matches!(redeem("GET", &format!("/api/terminal/sftp/{token}/download"), &query), Some(None)));
+        let ticket = issue(Owner::Share(token.clone()), &token, "/etc/hosts").unwrap();
+        assert!(!redeem_share(&token, "/etc/passwd", &ticket));
+        let ticket = issue(Owner::Share(token.clone()), &token, "/etc/hosts").unwrap();
+        assert!(redeem_share(&token, "/etc/hosts", &ticket));
+        assert!(!redeem_share(&token, "/etc/hosts", &ticket), "single use");
     }
 
     #[test]

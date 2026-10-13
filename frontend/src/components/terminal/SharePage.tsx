@@ -1,7 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TerminalView, { TerminalViewHandle } from './TerminalView';
 import { DEFAULT_TERMINAL_SETTINGS } from './settings';
-import { issueShareTicket, readShareInfo, ShareAdmissionError, ShareInfo } from './shareAdmission';
+import { issueShareTicket, readShareInfo, ShareAdmissionError, ShareFilesGrant, ShareInfo } from './shareAdmission';
+import TerminalWithFiles from '../remote/TerminalWithFiles';
+import { shareSource } from '../remote/sftp/sftpApi';
 import { useT } from '../../i18n';
 import './terminal-windows.css';
 
@@ -25,11 +27,25 @@ function SharePageContent({ token }: { token: string }) {
   const prepared = useRef<{ ticket: string; expires: number; query: string } | null>(null);
   const submitController = useRef<AbortController | null>(null);
   const [checking, setChecking] = useState(false);
+  // The file panel's key comes with each admission and lives in memory only.
+  const [files, setFiles] = useState<ShareFilesGrant | null>(null);
+  const filesSource = useMemo(
+    () => (files ? shareSource(token, files.key, files.mode === 'write') : null),
+    [token, files],
+  );
 
   const load = useCallback(async (signal: AbortSignal) => {
     try {
       const data = await readShareInfo(token, signal);
       if (signal.aborted) return;
+      if (!data.needs_password && (data.files === 'read' || data.files === 'write')) {
+        // Admit now, as a password would, so the file panel is there before
+        // the terminal mounts instead of wrapping it (and reconnecting) later.
+        const admitted = await issueShareTicket(token, '', '', signal);
+        if (signal.aborted) return;
+        prepared.current = { ticket: admitted.ticket, query: '', expires: performance.now() + admitted.expires_in_seconds * 1000 };
+        setFiles(admitted.files || null);
+      }
       setInfo(data); setError('');
       if (!data.needs_password) setAuthorized(true);
     } catch (cause) {
@@ -50,7 +66,9 @@ function SharePageContent({ token }: { token: string }) {
     const ready = prepared.current; prepared.current = null;
     if (ready && ready.query === query && ready.expires > performance.now()) return ready.ticket;
     try {
-      return (await issueShareTicket(token, passwordRef.current, query, signal)).ticket;
+      const admitted = await issueShareTicket(token, passwordRef.current, query, signal);
+      if (admitted.files) setFiles(admitted.files);
+      return admitted.ticket;
     } catch (cause) {
       if (signal?.aborted) throw cause;
       throw new Error(t(cause instanceof ShareAdmissionError ? cause.translationKey : 'share.authUnavailable'), { cause });
@@ -67,6 +85,7 @@ function SharePageContent({ token }: { token: string }) {
       if (controller.signal.aborted) return;
       passwordRef.current = password;
       prepared.current = { ticket: data.ticket, query: '', expires: performance.now() + data.expires_in_seconds * 1000 };
+      setFiles(data.files || null);
       setPassword(''); setAuthorized(true); setError('');
     } catch (cause) {
       if (!controller.signal.aborted) setError(t(cause instanceof ShareAdmissionError ? cause.translationKey : 'share.authUnavailable'));
@@ -128,15 +147,18 @@ function SharePageContent({ token }: { token: string }) {
         </button>
       </header>
       <div className="share-body">
-        <TerminalView
-          ref={viewRef}
-          target={{ kind: 'local' }}
-          storageKey={`share_${token}`}
-          settings={DEFAULT_TERMINAL_SETTINGS}
-          share={{ token, acquireTicket }}
-          grid={{ cols: info.cols, rows: info.rows }}
-          active
-        />
+        <TerminalWithFiles target={null} name={info.label} source={filesSource}
+          onInsert={(text) => viewRef.current?.insertText(text)}>
+          <TerminalView
+            ref={viewRef}
+            target={{ kind: 'local' }}
+            storageKey={`share_${token}`}
+            settings={DEFAULT_TERMINAL_SETTINGS}
+            share={{ token, acquireTicket }}
+            grid={{ cols: info.cols, rows: info.rows }}
+            active
+          />
+        </TerminalWithFiles>
       </div>
     </div>
   );

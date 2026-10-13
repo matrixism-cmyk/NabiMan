@@ -7,11 +7,11 @@ import { useTransfers } from './useTransfers';
 import { useDragOut } from './useDragOut';
 import { draggingDesktopFiles, draggingOwnRows, ownRows, SFTP_MIME, takeDrop } from './sftpDrop';
 import {
-  baseName, isFolder, joinPath, listDir, makeDir, movePath, removePath, SftpEntry, SftpListing, shellQuote,
+  baseName, isFolder, joinPath, listDir, makeDir, movePath, removePath, SftpEntry, SftpListing, SftpSource, shellQuote,
 } from './sftpApi';
 
 interface Props {
-  serverId: string;
+  source: SftpSource;
   serverName: string;
   /** Types text into the terminal next to the panel. */
   onInsert: (text: string) => void;
@@ -33,9 +33,10 @@ interface Menu { x: number; y: number; entry?: SftpEntry; opener: HTMLElement | 
  * it are uploaded (folders too), rows dragged onto a folder are moved there,
  * and rows dragged onto the terminal type their paths.
  */
-export default function SftpPanel({ serverId, serverName, onInsert, onClose }: Props) {
+export default function SftpPanel({ source, serverName, onInsert, onClose }: Props) {
   const { t } = useT();
-  const pathKey = `nabiman_sftp_path_${serverId}`;
+  const pathKey = `nabiman_sftp_path_${source.key}`;
+  const writable = source.writable;
   const [listing, setListing] = useState<SftpListing | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -54,7 +55,7 @@ export default function SftpPanel({ serverId, serverName, onInsert, onClose }: P
     setLoading(true);
     setError('');
     try {
-      const res = await listDir(serverId, path);
+      const res = await listDir(source, path);
       if (res.success && res.data) {
         if (res.data.path !== current.current) setSelected(new Set());
         current.current = res.data.path;
@@ -72,16 +73,16 @@ export default function SftpPanel({ serverId, serverName, onInsert, onClose }: P
     } finally {
       setLoading(false);
     }
-  }, [serverId, pathKey, t]);
+  }, [source, pathKey, t]);
 
   useEffect(() => { load(read(pathKey), true); }, [load, pathKey]);
 
   const refresh = useCallback(() => load(current.current), [load]);
-  const transfers = useTransfers(serverId, useCallback((dir: string) => {
+  const transfers = useTransfers(source, useCallback((dir: string) => {
     if (dir === current.current) refresh();
   }, [refresh]));
 
-  const dragOut = useDragOut(serverId);
+  const dragOut = useDragOut(source);
   const here = listing?.path || '';
   const pathOf = useCallback((name: string) => joinPath(current.current, name), []);
   const visible = useMemo(
@@ -106,7 +107,7 @@ export default function SftpPanel({ serverId, serverName, onInsert, onClose }: P
     let moved = 0;
     for (const path of paths) {
       if (parentOf(path) === dir.replace(/\/+$/, '') || path === dir) continue;
-      const res = await movePath(serverId, path, joinPath(dir, baseName(path)));
+      const res = await movePath(source, path, joinPath(dir, baseName(path)));
       if (res.success) moved += 1;
       else failures.push(`${baseName(path)}: ${res.message}`);
     }
@@ -122,7 +123,7 @@ export default function SftpPanel({ serverId, serverName, onInsert, onClose }: P
     if (!window.confirm(question)) return;
     const failures: string[] = [];
     for (const entry of entries) {
-      const res = await removePath(serverId, pathOf(entry.name));
+      const res = await removePath(source, pathOf(entry.name));
       if (!res.success) failures.push(`${entry.name}: ${res.message}`);
     }
     report(failures, t('sftp.deleted', { count: entries.length - failures.length }));
@@ -136,8 +137,8 @@ export default function SftpPanel({ serverId, serverName, onInsert, onClose }: P
     if (!edit || !name || name === edit.from) return;
     if (name.includes('/')) { setError(t('sftp.badName')); return; }
     const res = edit.mode === 'new'
-      ? await makeDir(serverId, pathOf(name))
-      : await movePath(serverId, pathOf(edit.from), pathOf(name));
+      ? await makeDir(source, pathOf(name))
+      : await movePath(source, pathOf(edit.from), pathOf(name));
     if (!res.success) setError(res.message || t('common.error'));
     else setSelected(new Set([name]));
     refresh();
@@ -168,8 +169,8 @@ export default function SftpPanel({ serverId, serverName, onInsert, onClose }: P
       if (next) { anchor.current = next; setSelected(new Set([next])); }
     } else if (e.key === 'Enter' && chosen.length === 1) open(chosen[0]);
     else if (e.key === 'Backspace' && listing?.parent) load(listing.parent);
-    else if (e.key === 'Delete') remove(chosen);
-    else if (e.key === 'F2' && chosen.length === 1) setEditing({ mode: 'rename', from: chosen[0].name });
+    else if (e.key === 'Delete' && writable) remove(chosen);
+    else if (e.key === 'F2' && writable && chosen.length === 1) setEditing({ mode: 'rename', from: chosen[0].name });
     else if (e.key.toLowerCase() === 'a' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       setSelected(new Set(names));
@@ -188,6 +189,8 @@ export default function SftpPanel({ serverId, serverName, onInsert, onClose }: P
   };
 
   const dragOver = (e: React.DragEvent, dir: string) => {
+    // A browse-only link takes nothing in; rows still drag onto the terminal.
+    if (!writable) return;
     const own = draggingOwnRows(e.dataTransfer);
     if (!own && !draggingDesktopFiles(e.dataTransfer)) return;
     e.preventDefault();
@@ -197,6 +200,7 @@ export default function SftpPanel({ serverId, serverName, onInsert, onClose }: P
   };
 
   const drop = (e: React.DragEvent, dir: string) => {
+    if (!writable) return;
     e.preventDefault();
     e.stopPropagation();
     setDropOn(null);
@@ -211,8 +215,10 @@ export default function SftpPanel({ serverId, serverName, onInsert, onClose }: P
   const menuItems = (entry?: SftpEntry): RailMenuItem[] => {
     if (!entry) {
       return [
-        { key: 'mkdir', label: t('sftp.newFolder'), icon: '＋', onSelect: () => setEditing({ mode: 'new', from: '' }) },
-        { key: 'upload', label: t('sftp.upload'), icon: '↑', onSelect: () => fileInput.current?.click() },
+        ...(writable ? [
+          { key: 'mkdir', label: t('sftp.newFolder'), icon: '＋', onSelect: () => setEditing({ mode: 'new', from: '' }) },
+          { key: 'upload', label: t('sftp.upload'), icon: '↑', onSelect: () => fileInput.current?.click() },
+        ] : []),
         { key: 'refresh', label: t('sftp.refresh'), icon: '⟳', onSelect: refresh },
         { key: 'hidden', label: showHidden ? t('sftp.hideHidden') : t('sftp.showHidden'), icon: '◌', separated: true,
           onSelect: () => toggleHidden() },
@@ -229,10 +235,12 @@ export default function SftpPanel({ serverId, serverName, onInsert, onClose }: P
       { key: 'insert', label: t('sftp.insertPath'), icon: '⌨', onSelect: () => onInsert(`${quoted(targets)} `) },
       { key: 'copy', label: t('sftp.copyPath'), icon: '⧉',
         onSelect: () => { navigator.clipboard?.writeText(quoted(targets)).catch(() => undefined); } },
-      { key: 'rename', label: t('sftp.rename'), icon: '✎', disabled: !single,
-        onSelect: () => setEditing({ mode: 'rename', from: entry.name }) },
-      { key: 'delete', label: t('common.delete'), icon: '🗑', danger: true, separated: true,
-        onSelect: () => remove(targets) },
+      ...(writable ? [
+        { key: 'rename', label: t('sftp.rename'), icon: '✎', disabled: !single,
+          onSelect: () => setEditing({ mode: 'rename', from: entry.name }) },
+        { key: 'delete', label: t('common.delete'), icon: '🗑', danger: true, separated: true,
+          onSelect: () => remove(targets) },
+      ] : []),
     ];
   };
 
@@ -253,13 +261,18 @@ export default function SftpPanel({ serverId, serverName, onInsert, onClose }: P
             title={t('sftp.up')} aria-label={t('sftp.up')}>↰</button>
           <button type="button" onClick={() => load('')} title={t('sftp.home')} aria-label={t('sftp.home')}>⌂</button>
           <button type="button" onClick={refresh} title={t('sftp.refresh')} aria-label={t('sftp.refresh')}>⟳</button>
-          <button type="button" onClick={() => setEditing({ mode: 'new', from: '' })}
-            title={t('sftp.newFolder')} aria-label={t('sftp.newFolder')}>＋</button>
-          <button type="button" onClick={() => fileInput.current?.click()}
-            title={t('sftp.upload')} aria-label={t('sftp.upload')}>↑</button>
+          {writable && (
+            <>
+              <button type="button" onClick={() => setEditing({ mode: 'new', from: '' })}
+                title={t('sftp.newFolder')} aria-label={t('sftp.newFolder')}>＋</button>
+              <button type="button" onClick={() => fileInput.current?.click()}
+                title={t('sftp.upload')} aria-label={t('sftp.upload')}>↑</button>
+            </>
+          )}
           <button type="button" className={showHidden ? 'is-on' : ''} onClick={toggleHidden}
             aria-pressed={showHidden} title={t('sftp.showHidden')} aria-label={t('sftp.showHidden')}>◌</button>
-          <button type="button" onClick={onClose} title={t('sftp.close')} aria-label={t('sftp.close')}>✕</button>
+          <button type="button" className="sftp-hide" onClick={onClose}
+            title={t('sftp.close')} aria-label={t('sftp.close')}>»</button>
         </div>
       </div>
       <nav className="sftp-crumbs" aria-label={t('sftp.location')}>
@@ -302,11 +315,15 @@ export default function SftpPanel({ serverId, serverName, onInsert, onClose }: P
             onDragEnd={(entry) => dragOut.spent(pathOf(entry.name))}
             onPrefetch={(entry, now) => { if (!isFolder(entry)) dragOut.prefetch(pathOf(entry.name), now); }} />
         )}
-        {listing && !visible.length && !editing && <p className="sftp-empty">{t('sftp.empty')}</p>}
+        {listing && !visible.length && !editing && (
+          <p className="sftp-empty">{t(writable ? 'sftp.empty' : 'sftp.emptyReadOnly')}</p>
+        )}
         {listing?.truncated && <p className="sftp-empty">{t('sftp.truncated', { count: listing.entries.length })}</p>}
       </div>
       <SftpTransfers rows={transfers.rows} onCancel={transfers.cancel} onClear={transfers.clearFinished} />
-      <p className="sftp-hint">{chosen.length > 1 ? t('sftp.selected', { count: chosen.length }) : t('sftp.dragHint')}</p>
+      <p className="sftp-hint">
+        {chosen.length > 1 ? t('sftp.selected', { count: chosen.length }) : t(writable ? 'sftp.dragHint' : 'sftp.dragHintReadOnly')}
+      </p>
       <input ref={fileInput} type="file" multiple hidden onChange={(e) => {
         const files = Array.from(e.target.files || []);
         if (files.length) transfers.upload(here, { files: files.map((file) => ({ rel: file.name, file })), dirs: [] });

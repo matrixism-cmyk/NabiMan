@@ -11,6 +11,14 @@ pub struct ShareAuthRequest {
 pub(super) struct TicketResponse {
     ticket: String,
     expires_in_seconds: u64,
+    /// Present when the link grants files: the key for the file panel.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    files: Option<FilesGrant>,
+}
+#[derive(Serialize)]
+pub(super) struct FilesGrant {
+    key: String,
+    mode: ShareFiles,
 }
 pub(super) fn admission_error(status: actix_web::http::StatusCode, message: &str) -> HttpResponse {
     no_store(HttpResponse::build(status).json(ApiResponse::<()>::error(message)))
@@ -105,10 +113,16 @@ pub(super) async fn share_auth(
         Err(_) => return storage_error(),
     };
     match issued {
-        Ok(ticket) => no_store(HttpResponse::Ok().json(ApiResponse::ok(TicketResponse {
-            ticket,
-            expires_in_seconds: lifetime.as_secs(),
-        }))),
+        Ok(ticket) => {
+            // The same admission that opens the terminal opens its files.
+            let files = super::super::sftp::share_keys::issue(&link)
+                .map(|key| FilesGrant { key, mode: link.files });
+            no_store(HttpResponse::Ok().json(ApiResponse::ok(TicketResponse {
+                ticket,
+                expires_in_seconds: lifetime.as_secs(),
+                files,
+            })))
+        }
         Err(share_ticket::IssueError::Capacity) => limited(),
         Err(share_ticket::IssueError::Entropy) => storage_error(),
     }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { downloadLink } from './sftpApi';
+import { downloadLink, SftpSource } from './sftpApi';
 
 /** Links live five minutes on the server; one this old is not offered. */
 const FRESH_MS = 4 * 60 * 1000;
@@ -13,7 +13,7 @@ const DWELL_MS = 250;
  * header, so a single-use link is fetched ahead of time: when the pointer
  * rests on a file row, or presses it.
  */
-export function useDragOut(serverId: string) {
+export function useDragOut(source: SftpSource) {
   const cache = useRef(new Map<string, { url: string; at: number }>());
   const pending = useRef(new Set<string>());
   const timer = useRef<number | undefined>(undefined);
@@ -23,14 +23,14 @@ export function useDragOut(serverId: string) {
     if ((hit && Date.now() - hit.at < FRESH_MS) || pending.current.has(path)) return;
     pending.current.add(path);
     try {
-      const url = await downloadLink(serverId, path);
+      const url = await downloadLink(source, path);
       if (url) cache.current.set(path, { url, at: Date.now() });
     } catch {
       /* no link: the drag still works inside the page */
     } finally {
       pending.current.delete(path);
     }
-  }, [serverId]);
+  }, [source]);
 
   const prefetch = useCallback((path: string, now: boolean) => {
     window.clearTimeout(timer.current);
@@ -51,7 +51,7 @@ export function useDragOut(serverId: string) {
   const spent = useCallback((path: string) => { cache.current.delete(path); }, []);
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
-  useEffect(() => { cache.current.clear(); }, [serverId]);
+  useEffect(() => { cache.current.clear(); }, [source]);
 
   return { prefetch, attach, spent };
 }

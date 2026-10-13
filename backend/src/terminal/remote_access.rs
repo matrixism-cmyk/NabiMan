@@ -52,6 +52,9 @@ impl RemoteBinding {
             && self.public_key == other.public_key
             && self.fingerprint == other.fingerprint
     }
+    pub(crate) fn server_id(&self) -> &str {
+        &self.server_id
+    }
     pub(crate) fn valid(&self) -> bool {
         crate::remote_servers::find_server(&self.server_id)
             .ok()

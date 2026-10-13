@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { useT } from '../../../i18n';
 import { Dropped } from './sftpDrop';
-import { baseName, downloadFile, joinPath, makeDir, saveBlob, Transfer, uploadFile } from './sftpApi';
+import { baseName, downloadFile, joinPath, makeDir, saveBlob, SftpSource, Transfer, uploadFile } from './sftpApi';
 
 export interface TransferRow {
   id: number;
@@ -17,7 +17,7 @@ export interface TransferRow {
  * Uploads and downloads for one server's file panel, one at a time so a large
  * batch does not open dozens of connections, each with its own progress row.
  */
-export function useTransfers(serverId: string, onUploaded: (dir: string) => void) {
+export function useTransfers(source: SftpSource, onUploaded: (dir: string) => void) {
   const { t } = useT();
   const [rows, setRows] = useState<TransferRow[]>([]);
   const nextId = useRef(1);
@@ -59,7 +59,7 @@ export function useTransfers(serverId: string, onUploaded: (dir: string) => void
       for (const folder of dropped.dirs) {
         // A folder that is already there is fine; anything else shows up as
         // failed uploads for the files that were meant to go in it.
-        await makeDir(serverId, joinPath(dir, folder)).catch(() => undefined);
+        await makeDir(source, joinPath(dir, folder)).catch(() => undefined);
       }
       let changed = false;
       for (const job of jobs) {
@@ -67,10 +67,10 @@ export function useTransfers(serverId: string, onUploaded: (dir: string) => void
         const name = parts.pop() || job.file.name;
         const target = parts.length ? joinPath(dir, parts.join('/')) : dir;
         const progress = (loaded: number) => patch(job.id, { loaded });
-        let result = await run(job.id, () => uploadFile(serverId, target, name, job.file, false, progress));
+        let result = await run(job.id, () => uploadFile(source, target, name, job.file, false, progress));
         if (result?.exists) {
           if (window.confirm(t('sftp.overwriteConfirm', { name: job.rel }))) {
-            result = await run(job.id, () => uploadFile(serverId, target, name, job.file, true, progress));
+            result = await run(job.id, () => uploadFile(source, target, name, job.file, true, progress));
           } else {
             patch(job.id, { status: 'cancelled', message: t('sftp.skipped') });
             continue;
@@ -83,13 +83,13 @@ export function useTransfers(serverId: string, onUploaded: (dir: string) => void
       }
       if (changed) onUploaded(dir);
     });
-  }, [add, enqueue, onUploaded, patch, run, serverId, t]);
+  }, [add, enqueue, onUploaded, patch, run, source, t]);
 
   const download = useCallback((paths: string[]) => {
     const jobs = paths.map((path) => ({ path, id: add(baseName(path), 'down', 0) }));
     enqueue(async () => {
       for (const job of jobs) {
-        const result = await run(job.id, () => downloadFile(serverId, job.path,
+        const result = await run(job.id, () => downloadFile(source, job.path,
           (loaded, total) => patch(job.id, { loaded, total })));
         if (result?.ok && result.blob) {
           saveBlob(baseName(job.path), result.blob);
@@ -97,7 +97,7 @@ export function useTransfers(serverId: string, onUploaded: (dir: string) => void
         }
       }
     });
-  }, [add, enqueue, patch, run, serverId]);
+  }, [add, enqueue, patch, run, source]);
 
   const cancel = useCallback((id: number) => {
     cancelled.current.add(id);

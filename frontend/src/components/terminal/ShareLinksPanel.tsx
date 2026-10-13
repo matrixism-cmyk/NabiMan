@@ -130,6 +130,7 @@ export default function ShareLinksPanel() {
                     <td>
                       {link.needs_password ? t('share.withPassword') : t('share.noPassword')}
                       {link.read_only ? ` · ${t('share.readOnly')}` : ''}
+                      {link.files === 'read' ? ` · ${t('share.filesTagRead')}` : link.files === 'write' ? ` · ${t('share.filesTagWrite')}` : ''}
                       {link.usable === false && <span className="status-badge down">{t('share.unusable')}</span>}
                     </td>
                     <td>{used(link.last_used_unix, t)}</td>

@@ -9,6 +9,9 @@ pub struct CreateShareRequest {
     pub password: Option<String>,
     #[serde(default = "default_read_only")]
     pub read_only: bool,
+    /// Off unless asked for.
+    #[serde(default)]
+    pub files: ShareFiles,
 }
 pub(super) fn default_read_only() -> bool {
     true
@@ -104,6 +107,7 @@ pub(super) async fn create_share(
         needs_password: false,
         alive: true,
         usable: true,
+        files: body.files,
     };
 
     let Some(grant) = crate::terminal_tickets::ConnectionGrant::from_request(

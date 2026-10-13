@@ -4,8 +4,13 @@ import { I18nProvider } from '../../i18n';
 import { ShareConnection } from './terminalUrl';
 import { issueShareTicket, readShareInfo } from './shareAdmission';
 import SharePage from './SharePage';
+import { listDir } from '../remote/sftp/sftpApi';
 let mockShare: ShareConnection | undefined;
 jest.mock('./TerminalView', () => ({ __esModule: true, default: ({ share }: { share: ShareConnection }) => { mockShare = share; return <div data-testid="shared-terminal" />; } }));
+jest.mock('../remote/sftp/sftpApi', () => {
+  const actual = jest.requireActual('../remote/sftp/sftpApi');
+  return { ...actual, listDir: jest.fn() };
+});
 jest.mock('./shareAdmission', () => {
   const actual = jest.requireActual('./shareAdmission');
   return { ...actual, issueShareTicket: jest.fn(), readShareInfo: jest.fn() };
@@ -50,4 +55,19 @@ it('a different link clears authorized state and ignores a pending response from
   await act(async () => { complete({ ticket: 'a'.repeat(64), expires_in_seconds: 30 }); await pending; });
   expect(screen.queryByTestId('shared-terminal')).not.toBeInTheDocument();
   await waitFor(() => expect(info).toHaveBeenLastCalledWith('two', expect.any(AbortSignal)));
+});
+it('opens the file panel for a link that grants files, admitted before the terminal mounts', async () => {
+  (listDir as jest.Mock).mockResolvedValue({ success: true, message: '', data: {
+    path: '/root', parent: '/', truncated: false,
+    entries: [{ name: 'notes.txt', kind: 'file', to_dir: false, size: 3, mtime: null, mode: null }] } });
+  info.mockResolvedValue({ ...metadata, needs_password: false, files: 'read' });
+  issue.mockResolvedValue({ ticket: 'a'.repeat(64), expires_in_seconds: 30, files: { key: 'k'.repeat(64), mode: 'read' } });
+  setup();
+  await screen.findByTestId('shared-terminal');
+  expect(await screen.findByText('notes.txt')).toBeInTheDocument();
+  // Browse-only: nothing to upload with.
+  expect(screen.queryByRole('button', { name: '파일 올리기' })).toBeNull();
+  // The admission made for the panel is the terminal's first ticket, not a wasted one.
+  expect(await mockShare!.acquireTicket('')).toBe('a'.repeat(64));
+  expect(issue).toHaveBeenCalledTimes(1);
 });

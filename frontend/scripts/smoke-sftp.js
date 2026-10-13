@@ -141,7 +141,7 @@ const check = (name, ok, detail = '') => {
   check('delete removes a folder with its contents, and a file', await page.isVisible('.sftp-empty'));
 
   // 6. Folded away and back after a reload, where it was.
-  await page.click('.sftp-tools button[aria-label="파일 패널 닫기"]');
+  await page.click('.sftp-tools button[aria-label="파일 패널 숨기기"]');
   check('the panel folds to a tab', await page.isVisible('.rw-split-tab') && !(await page.$('.sftp')));
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForSelector('.rw-split-tab', { timeout: 20000 });
@@ -165,6 +165,70 @@ const check = (name, ok, detail = '') => {
   await page.waitForSelector('.term-window .sftp-row', { timeout: 20000 });
   check('a floating window opens the panel from its tab', true);
   await page.screenshot({ path: `${OUT}/sftp-window.png` });
+
+  // 9. Share links: files only when the link grants them, and only as far.
+  const api = (path, init = {}) => page.evaluate(async ([p, i]) => {
+    const res = await fetch(p, { ...i, headers: { 'Content-Type': 'application/json',
+      Authorization: `Bearer ${sessionStorage.getItem('nabiman_token')}`, ...(i.headers || {}) } });
+    return { status: res.status, body: await res.json().catch(() => null) };
+  }, [path, init]);
+  const sessions = (await api('/api/terminal/sessions')).body.data;
+  const shared = sessions.find((x) => x.alive && x.label.includes(':22022'));
+  const makeLink = async (files) => (await api(`/api/terminal/sessions/${shared.id}/share-link`, {
+    method: 'POST', body: JSON.stringify({ expires_in_secs: 3600, password: '', read_only: true, files }) })).body.data.token;
+  const readLink = await makeLink('read');
+  const writeLink = await makeLink('write');
+  const plainLink = await makeLink('none');
+  require('fs').writeFileSync(`${DIR}/shared.txt`, 'for the visitor\n');
+
+  const visitor = await browser.newContext({ viewport: { width: 1280, height: 800 }, acceptDownloads: true });
+  const guest = await visitor.newPage();
+  guest.on('pageerror', (e) => problems.push(`guest: ${e.message.split('\n')[0]}`));
+  guest.on('dialog', (d) => d.accept());
+  const openShare = async (token) => {
+    await guest.evaluate((dir) => {
+      Object.keys(localStorage).filter((k) => k.startsWith('nabiman_sftp_path_share_')).forEach((k) => localStorage.setItem(k, dir));
+    }, DIR).catch(() => {});
+    await guest.goto(`${BASE}/share/${token}`, { waitUntil: 'networkidle' });
+    await guest.evaluate(([t, dir]) => localStorage.setItem(`nabiman_sftp_path_share_${t.slice(0, 16)}`, dir), [token, DIR]);
+    await guest.reload({ waitUntil: 'networkidle' });
+  };
+
+  await openShare(plainLink);
+  await guest.waitForSelector('.xterm-screen', { timeout: 20000 });
+  await guest.waitForTimeout(1500);
+  check('a link without files shows no file panel', !(await guest.$('.sftp')) && !(await guest.$('.rw-split-tab')));
+  const noKey = await guest.evaluate(async (t) => (await fetch(`/api/share/${t}/files/list`)).status, plainLink);
+  check('and its file API refuses a visitor', noKey === 401, String(noKey));
+
+  await openShare(readLink);
+  await guest.waitForSelector('.sftp-row:has-text("shared.txt")', { timeout: 20000 });
+  check('a browse-only link lists files for the visitor', true);
+  check('without write controls', !(await guest.$('.sftp-tools button[aria-label="파일 올리기"]'))
+    && !(await guest.$('.sftp-tools button[aria-label="새 폴더"]')));
+  await guest.click('.sftp-row:has-text("shared.txt")', { button: 'right' });
+  const [guestDownload] = await Promise.all([
+    guest.waitForEvent('download'),
+    guest.getByRole('menuitem', { name: '내려받기', exact: true }).click(),
+  ]);
+  check('the visitor can download', require('fs').readFileSync(await guestDownload.path(), 'utf8') === 'for the visitor\n');
+  await guest.screenshot({ path: `${OUT}/sftp-share.png` });
+
+  await openShare(writeLink);
+  await guest.waitForSelector('.sftp-tools button[aria-label="새 폴더"]', { timeout: 20000 });
+  const dt = await guest.evaluateHandle(() => { const t = new DataTransfer(); t.items.add(new File(['from a visitor\n'], 'visitor.txt')); return t; });
+  await guest.dispatchEvent('.sftp-body', 'dragover', { dataTransfer: dt });
+  await guest.dispatchEvent('.sftp-body', 'drop', { dataTransfer: dt });
+  await guest.waitForSelector('.sftp-row:has-text("visitor.txt")', { timeout: 15000 });
+  check('a writable link lets the visitor upload', require('fs').readFileSync(`${DIR}/visitor.txt`, 'utf8') === 'from a visitor\n');
+
+  // Revoking the link ends file access at once.
+  await api(`/api/terminal/share-links/${writeLink}`, { method: 'DELETE' });
+  await guest.click('.sftp-tools button[aria-label="새로고침"]');
+  await guest.waitForSelector('.sftp-msg.is-error', { timeout: 10000 });
+  check('revoking the link ends file access', true, await guest.textContent('.sftp-msg'));
+  await visitor.close();
+  for (const token of [readLink, plainLink]) await api(`/api/terminal/share-links/${token}`, { method: 'DELETE' });
 
   check('no page errors', problems.length === 0, problems.slice(0, 3).join(' | '));
   await browser.close();

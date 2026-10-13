@@ -1,7 +1,8 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useT } from '../../i18n';
 import SftpPanel from './sftp/SftpPanel';
 import { draggingOwnRows } from './sftp/sftpDrop';
+import { accountSource, SftpSource } from './sftp/sftpApi';
 import type { TerminalTarget } from '../terminal/terminalTypes';
 import './sftp/sftp.css';
 
@@ -13,6 +14,9 @@ interface Props {
   name: string;
   /** The workspace pane opens the panel; a floating window starts folded. */
   place?: 'pane' | 'window';
+  /** Files from somewhere other than the target's own: a share link's
+   *  visitor. `null` shows no panel. */
+  source?: SftpSource | null;
   /** Types text into the terminal. */
   onInsert: (text: string) => void;
   children: React.ReactNode;
@@ -36,7 +40,7 @@ const write = (key: string, value: string) => { try { localStorage.setItem(key, 
  * remembered. Rows dragged out of the panel onto the terminal type their
  * paths at the prompt.
  */
-export default function TerminalWithFiles({ target, name, place = 'pane', onInsert, children }: Props) {
+export default function TerminalWithFiles({ target, name, place = 'pane', source: given, onInsert, children }: Props) {
   const { t } = useT();
   const OPEN_KEY = place === 'pane' ? 'nabiman_sftp_open' : 'nabiman_sftp_open_window';
   const WIDTH_KEY = place === 'pane' ? 'nabiman_sftp_width' : 'nabiman_sftp_width_window';
@@ -46,7 +50,9 @@ export default function TerminalWithFiles({ target, name, place = 'pane', onInse
   const rootRef = useRef<HTMLDivElement>(null);
 
   const scope = filesScope(target);
-  if (!scope) return <>{children}</>;
+  const own = useMemo(() => (scope ? accountSource(scope) : null), [scope]);
+  const source = given === undefined ? own : given;
+  if (!source) return <>{children}</>;
 
   const toggle = (next: boolean) => {
     setOpen(next);
@@ -111,11 +117,13 @@ export default function TerminalWithFiles({ target, name, place = 'pane', onInse
             aria-label={t('sftp.resize')} aria-valuenow={width}
             onPointerDown={startResize} onKeyDown={resizeByKey} onDoubleClick={() => toggle(false)} />
           <div className="rw-split-files" style={{ width }}>
-            <SftpPanel serverId={scope} serverName={name} onInsert={onInsert} onClose={() => toggle(false)} />
+            <SftpPanel source={source} serverName={name} onInsert={onInsert} onClose={() => toggle(false)} />
           </div>
         </>
       ) : (
-        <button type="button" className="rw-split-tab" onClick={() => toggle(true)} title={t('sftp.openHint')}>
+        <button type="button" className="rw-split-tab" onClick={() => toggle(true)}
+          title={t('sftp.openHint')} aria-label={t('sftp.show')}>
+          <span className="rw-split-tab-arrow" aria-hidden="true">«</span>
           <span aria-hidden="true">📁</span> {t('sftp.tab')}
         </button>
       )}

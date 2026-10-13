@@ -25,8 +25,48 @@ export interface SftpListing {
 }
 
 const API_BASE = process.env.REACT_APP_API_URL || '';
-const base = (serverId: string) => `/api/terminal/sftp/${encodeURIComponent(serverId)}`;
 const token = () => sessionStorage.getItem('nabiman_token') || '';
+
+/**
+ * Where a panel's files come from, and how it signs its requests: a signed-in
+ * account (a saved server or the local shell), or the visitor of a share link,
+ * who has no account and carries the link's file key instead.
+ */
+export interface SftpSource {
+  /** Route prefix: `/api/terminal/sftp/<id>` or `/api/share/<token>/files`. */
+  base: string;
+  /** Names what the panel remembers (the last folder) for this source. */
+  key: string;
+  /** False when a share link allows browsing and downloading only. */
+  writable: boolean;
+  /** A share visitor's file key; absent for an account. */
+  shareKey?: string;
+}
+
+export const accountSource = (scope: string): SftpSource =>
+  ({ base: `/api/terminal/sftp/${encodeURIComponent(scope)}`, key: scope, writable: true });
+
+export const shareSource = (shareToken: string, shareKey: string, writable: boolean): SftpSource =>
+  ({ base: `/api/share/${encodeURIComponent(shareToken)}/files`, key: `share_${shareToken.slice(0, 16)}`, writable, shareKey });
+
+interface Reply<T> { success: boolean; data: T | null; message: string }
+
+/** Accounts go through the shared helper (token refresh); visitors send their key only. */
+async function request<T>(src: SftpSource, path: string, init: RequestInit = {}): Promise<Reply<T>> {
+  if (!src.shareKey) return apiRequest<T>(`${src.base}${path}`, init) as Promise<Reply<T>>;
+  const res = await fetch(`${API_BASE}${src.base}${path}`, {
+    ...init, credentials: 'omit', cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', 'X-Share-Files': src.shareKey },
+  });
+  try {
+    return await res.json();
+  } catch {
+    return { success: false, data: null, message: `HTTP ${res.status}` };
+  }
+}
+
+const authHeader = (src: SftpSource): [string, string] =>
+  (src.shareKey ? ['X-Share-Files', src.shareKey] : ['Authorization', `Bearer ${token()}`]);
 
 export const joinPath = (dir: string, name: string) => (dir.endsWith('/') ? `${dir}${name}` : `${dir}/${name}`);
 export const baseName = (path: string) => path.replace(/\/+$/, '').split('/').pop() || path;
@@ -46,27 +86,25 @@ export function formatSize(bytes: number): string {
   return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
 }
 
-export function listDir(serverId: string, path: string) {
-  return apiRequest<SftpListing>(`${base(serverId)}/list?path=${encodeURIComponent(path)}`);
+export function listDir(src: SftpSource, path: string) {
+  return request<SftpListing>(src, `/list?path=${encodeURIComponent(path)}`);
 }
 
-export function makeDir(serverId: string, path: string) {
-  return apiRequest<string>(`${base(serverId)}/mkdir`, { method: 'POST', body: JSON.stringify({ path }) });
+export function makeDir(src: SftpSource, path: string) {
+  return request<string>(src, '/mkdir', { method: 'POST', body: JSON.stringify({ path }) });
 }
 
-export function movePath(serverId: string, from: string, to: string) {
-  return apiRequest<string>(`${base(serverId)}/rename`, { method: 'POST', body: JSON.stringify({ from, to }) });
+export function movePath(src: SftpSource, from: string, to: string) {
+  return request<string>(src, '/rename', { method: 'POST', body: JSON.stringify({ from, to }) });
 }
 
-export function removePath(serverId: string, path: string) {
-  return apiRequest<number>(`${base(serverId)}/delete`, { method: 'POST', body: JSON.stringify({ path }) });
+export function removePath(src: SftpSource, path: string) {
+  return request<number>(src, '/delete', { method: 'POST', body: JSON.stringify({ path }) });
 }
 
 /** A single-use URL the browser can fetch on its own, for a drag onto the desktop. */
-export async function downloadLink(serverId: string, path: string): Promise<string | null> {
-  const res = await apiRequest<{ url: string }>(`${base(serverId)}/link`, {
-    method: 'POST', body: JSON.stringify({ path }),
-  });
+export async function downloadLink(src: SftpSource, path: string): Promise<string | null> {
+  const res = await request<{ url: string }>(src, '/link', { method: 'POST', body: JSON.stringify({ path }) });
   return res.success && res.data?.url ? new URL(`${API_BASE}${res.data.url}`, window.location.href).href : null;
 }
 
@@ -85,13 +123,13 @@ export interface Transfer {
 }
 
 function send(
-  method: 'GET' | 'POST', url: string, body: Blob | null,
+  src: SftpSource, method: 'GET' | 'POST', url: string, body: Blob | null,
   onProgress: (loaded: number, total: number) => void,
 ): Transfer {
   const xhr = new XMLHttpRequest();
   const promise = new Promise<TransferResult>((resolve) => {
-    xhr.open(method, `${API_BASE}${url}`);
-    xhr.setRequestHeader('Authorization', `Bearer ${token()}`);
+    xhr.open(method, `${API_BASE}${src.base}${url}`);
+    xhr.setRequestHeader(...authHeader(src));
     if (method === 'GET') xhr.responseType = 'blob';
     else xhr.setRequestHeader('Content-Type', 'application/octet-stream');
     const progress = (e: ProgressEvent) => onProgress(e.loaded, e.lengthComputable ? e.total : 0);
@@ -121,17 +159,17 @@ function send(
 }
 
 export function uploadFile(
-  serverId: string, dir: string, name: string, file: Blob, overwrite: boolean,
+  src: SftpSource, dir: string, name: string, file: Blob, overwrite: boolean,
   onProgress: (loaded: number, total: number) => void,
 ): Transfer {
   const query = `dir=${encodeURIComponent(dir)}&name=${encodeURIComponent(name)}&overwrite=${overwrite}`;
-  return send('POST', `${base(serverId)}/upload?${query}`, file, onProgress);
+  return send(src, 'POST', `/upload?${query}`, file, onProgress);
 }
 
 export function downloadFile(
-  serverId: string, path: string, onProgress: (loaded: number, total: number) => void,
+  src: SftpSource, path: string, onProgress: (loaded: number, total: number) => void,
 ): Transfer {
-  return send('GET', `${base(serverId)}/download?path=${encodeURIComponent(path)}`, null, onProgress);
+  return send(src, 'GET', `/download?path=${encodeURIComponent(path)}`, null, onProgress);
 }
 
 /** Hands a downloaded file to the browser's own save flow. */

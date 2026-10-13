@@ -15,7 +15,16 @@ export interface ShareLink {
   /** Whether the session behind the link is still running. */
   alive?: boolean;
   usable?: boolean;
+  /** File panel access the link grants. Older links have none. */
+  files?: ShareFiles;
 }
+
+export type ShareFiles = 'none' | 'read' | 'write';
+const FILES_CHOICES: { value: ShareFiles; labelKey: string }[] = [
+  { value: 'none', labelKey: 'share.filesNone' },
+  { value: 'read', labelKey: 'share.filesRead' },
+  { value: 'write', labelKey: 'share.filesWrite' },
+];
 
 const EXPIRY_CHOICES: { labelKey: string; secs: number }[] = [
   { labelKey: 'share.1h', secs: 3600 },
@@ -50,6 +59,7 @@ export default function ShareDialog({ sessionId, sessionLabel, onClose }: Props)
   const [expiry, setExpiry] = useState(24 * 3600);
   const [password, setPassword] = useState('');
   const [readOnly, setReadOnly] = useState(true);
+  const [files, setFiles] = useState<ShareFiles>('none');
   const [links, setLinks] = useState<ShareLink[]>([]);
   const [created, setCreated] = useState<ShareLink | null>(null);
   const [message, setMessage] = useState('');
@@ -69,6 +79,7 @@ export default function ShareDialog({ sessionId, sessionLabel, onClose }: Props)
       expires_in_secs: expiry,
       password: password.trim(),
       read_only: readOnly,
+      files,
     });
     setBusy(false);
     if (!res.success || !res.data) { setMessage(res.message || t('common.error')); return; }
@@ -155,6 +166,20 @@ export default function ShareDialog({ sessionId, sessionLabel, onClose }: Props)
           <small className="text-secondary">{t('share.readOnlyHint')}</small>
         </div>
 
+        <div className="form-group">
+          <label id={`${titleId}-files`}>{t('share.files')}</label>
+          <div className="filter-row" role="radiogroup" aria-labelledby={`${titleId}-files`}>
+            {FILES_CHOICES.map((choice) => (
+              <button
+                key={choice.value} type="button" role="radio" aria-checked={files === choice.value}
+                className={`btn btn-sm ${files === choice.value ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setFiles(choice.value)}
+              >{t(choice.labelKey)}</button>
+            ))}
+          </div>
+          <small className="text-secondary">{t('share.filesHint')}</small>
+        </div>
+
         <div className="btn-group">
           <button className="btn btn-primary" onClick={create} disabled={busy}>
             {busy ? t('common.working') : t('share.create')}
@@ -179,6 +204,7 @@ export default function ShareDialog({ sessionId, sessionLabel, onClose }: Props)
                     <td>
                       {link.needs_password ? t('share.withPassword') : t('share.noPassword')}
                       {link.read_only ? ` · ${t('share.readOnly')}` : ''}
+                      {link.files === 'read' ? ` · ${t('share.filesTagRead')}` : link.files === 'write' ? ` · ${t('share.filesTagWrite')}` : ''}
                       {link.usable === false && <span className="status-badge down">{t('share.unusable')}</span>}
                     </td>
                     <td>
