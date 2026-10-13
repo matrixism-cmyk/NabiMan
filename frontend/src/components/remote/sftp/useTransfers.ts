@@ -98,13 +98,17 @@ export function useTransfers(source: SftpSource, onUploaded: (dir: string) => vo
   }, [add, enqueue, onUploaded, patch, run, source, t]);
 
   /** Downloads go to the browser's downloader; the row says it was handed over. */
-  const download = useCallback((paths: string[]) => {
-    const jobs = paths.map((path) => ({ path, id: add(baseName(path), 'down', 0) }));
+  /** Folders arrive as a ZIP archive of everything in them. */
+  const download = useCallback((items: { path: string; folder?: boolean }[]) => {
+    const jobs = items.map(({ path, folder }) => {
+      const name = folder ? `${baseName(path)}.zip` : baseName(path);
+      return { path, name, id: add(name, 'down', 0) };
+    });
     enqueue(async () => {
       for (const job of jobs) {
         if (cancelled.current.has(job.id)) continue;
         patch(job.id, { status: 'running' });
-        const started = await saveFile(source, job.path).catch(() => false);
+        const started = await saveFile(source, job.path, job.name).catch(() => false);
         patch(job.id, started
           ? { status: 'done', message: t('sftp.handedToBrowser') }
           : { status: 'failed', message: t('sftp.downloadFailed') });

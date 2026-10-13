@@ -132,6 +132,19 @@ const check = (name, ok, detail = '') => {
   // 5. Up through the ".." row, then delete the folder with its contents.
   await page.dblclick('.sftp-row.is-up');
   await page.waitForSelector('.sftp-row:has-text("받은 파일")');
+  // 5a. A folder downloads as one ZIP archive of everything in it.
+  await page.click('.sftp-row:has-text("받은 파일")', { button: 'right' });
+  const [zipDownload] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('menuitem', { name: '폴더 내려받기 (ZIP)', exact: true }).click(),
+  ]);
+  const zipPath = await zipDownload.path();
+  const listed = require('child_process').execFileSync('python3', ['-c',
+    'import sys, zipfile; z = zipfile.ZipFile(sys.argv[1]); assert z.testzip() is None; '
+    + 'print(sorted(z.namelist())); print(z.read("받은 파일/hello.txt").decode(), end="")', zipPath]).toString();
+  check('a folder downloads as a ZIP of its contents', zipDownload.suggestedFilename() === '받은 파일.zip'
+    && listed.includes("'받은 파일/hello.txt'") && listed.endsWith('hello from the browser\n'), listed.split('\n')[0]);
+
   await page.click('.sftp-row:has-text("받은 파일")');
   await page.keyboard.press('Delete');
   await page.waitForSelector('.sftp-row:has-text("받은 파일")', { state: 'detached', timeout: 10000 });

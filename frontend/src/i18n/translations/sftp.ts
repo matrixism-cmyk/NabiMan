@@ -20,6 +20,7 @@ const t: T = {
   'sftp.hideHidden': { ko: '숨김 파일 감추기', en: 'Hide hidden files', ja: '隠しファイルを非表示' },
   'sftp.open': { ko: '열기', en: 'Open', ja: '開く' },
   'sftp.download': { ko: '내려받기', en: 'Download', ja: 'ダウンロード' },
+  'sftp.downloadFolder': { ko: '폴더 내려받기 (ZIP)', en: 'Download folder (ZIP)', ja: 'フォルダーをダウンロード (ZIP)' },
   'sftp.insertPath': { ko: '터미널에 경로 입력', en: 'Type path in terminal', ja: 'ターミナルにパスを入力' },
   'sftp.copyPath': { ko: '경로 복사', en: 'Copy path', ja: 'パスをコピー' },
   'sftp.rename': { ko: '이름 바꾸기', en: 'Rename', ja: '名前を変更' },

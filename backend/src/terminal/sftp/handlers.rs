@@ -104,11 +104,15 @@ pub(super) async fn link(req: HttpRequest, b: web::Json<PathBody>) -> HttpRespon
             None => return fail(StatusCode::UNAUTHORIZED, "Sign in again"),
         },
     };
+    // A folder is fetched as a ZIP archive of everything in it.
+    let fs = tryr!(t.fs().await);
+    let folder = fs.stat(&b.path).await.is_ok_and(|m| m.is_dir());
+    let route = if folder { "download-folder" } else { "download" };
     match links::issue(owner, &t.scope, &b.path) {
         Ok(ticket) => {
-            let url = format!("{}/download?path={}&ticket={ticket}", t.base, paths::query_escape(&b.path));
+            let url = format!("{}/{route}?path={}&ticket={ticket}", t.base, paths::query_escape(&b.path));
             HttpResponse::Ok().json(ApiResponse::ok(serde_json::json!({
-                "url": url, "expires_in_seconds": links::ttl_secs(),
+                "url": url, "folder": folder, "expires_in_seconds": links::ttl_secs(),
             })))
         }
         Err(e) => fail(StatusCode::SERVICE_UNAVAILABLE, &e),

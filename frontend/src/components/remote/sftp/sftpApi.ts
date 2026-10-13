@@ -241,12 +241,12 @@ export function downloadFile(
  * it streams to disk with the browser's progress and pause, whatever the size,
  * instead of being held in the page's memory first.
  */
-export async function saveFile(src: SftpSource, path: string): Promise<boolean> {
+export async function saveFile(src: SftpSource, path: string, name = baseName(path)): Promise<boolean> {
   const url = await downloadLink(src, path);
   if (!url) return false;
   const link = document.createElement('a');
   link.href = url;
-  link.download = baseName(path);
+  link.download = name;
   link.rel = 'noopener';
   document.body.appendChild(link);
   link.click();

@@ -71,9 +71,10 @@ pub(crate) fn issue(owner: Owner, scope: &str, path: &str) -> Result<String, Str
 /// usual. `Some(None)`: a ticket that does not admit this request.
 /// `Some(Some(claims))`: admitted, as the session that asked for the link.
 pub(crate) fn redeem(method: &str, path: &str, query: &str) -> Option<Option<Claims>> {
-    let scope = path
-        .strip_prefix("/api/terminal/sftp/")?
+    let rest = path.strip_prefix("/api/terminal/sftp/")?;
+    let scope = rest
         .strip_suffix("/download")
+        .or_else(|| rest.strip_suffix("/download-folder"))
         .filter(|s| !s.is_empty() && !s.contains('/'))?;
     let params = web_params(query);
     let ticket = params.get("ticket")?;
@@ -158,6 +159,13 @@ mod tests {
         let ticket = issue(Owner::Share(token.clone()), &token, "/etc/hosts").unwrap();
         assert!(redeem_share(&token, "/etc/hosts", &ticket));
         assert!(!redeem_share(&token, "/etc/hosts", &ticket), "single use");
+    }
+
+    #[test]
+    fn a_folder_link_opens_that_folder_as_an_archive() {
+        let ticket = issue(Owner::Session(claims()), "srv_1", "/var/log").unwrap();
+        let query = format!("path=%2Fvar%2Flog&ticket={ticket}");
+        assert!(matches!(redeem("GET", "/api/terminal/sftp/srv_1/download-folder", &query), Some(Some(_))));
     }
 
     #[test]

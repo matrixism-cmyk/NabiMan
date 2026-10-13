@@ -99,7 +99,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
 
   const open = (entry: SftpEntry) => {
     if (isFolder(entry)) load(pathOf(entry.name));
-    else transfers.download([pathOf(entry.name)]);
+    else transfers.download([{ path: pathOf(entry.name) }]);
   };
 
   const moveInto = async (paths: string[], dir: string) => {
@@ -185,7 +185,8 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
     e.dataTransfer.setData('text/plain', paths.map(shellQuote).join(' '));
     e.dataTransfer.effectAllowed = 'copyMove';
     // A single file can also be dropped onto the desktop to save it.
-    if (names.length === 1 && !isFolder(entry)) dragOut.attach(e.dataTransfer, paths[0], entry.name);
+    // A single file — or folder, as a ZIP — can also be dropped onto the desktop to save it.
+    if (names.length === 1) dragOut.attach(e.dataTransfer, paths[0], isFolder(entry) ? `${entry.name}.zip` : entry.name);
   };
 
   const dragOver = (e: React.DragEvent, dir: string) => {
@@ -225,13 +226,15 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
       ];
     }
     const targets = selected.has(entry.name) ? chosen : [entry];
-    const files = targets.filter((e) => !isFolder(e));
+    const saving = targets.map((e) => ({ path: pathOf(e.name), folder: isFolder(e) }));
     const single = targets.length === 1;
     return [
       single && isFolder(entry)
         ? { key: 'open', label: t('sftp.open'), icon: '📂', onSelect: () => open(entry) }
-        : { key: 'download', label: t('sftp.download'), icon: '↓', disabled: !files.length,
-            onSelect: () => transfers.download(files.map((f) => pathOf(f.name))) },
+        : { key: 'download', label: t('sftp.download'), icon: '↓', onSelect: () => transfers.download(saving) },
+      ...(single && isFolder(entry)
+        ? [{ key: 'zip', label: t('sftp.downloadFolder'), icon: '↓', onSelect: () => transfers.download(saving) }]
+        : []),
       { key: 'insert', label: t('sftp.insertPath'), icon: '⌨', onSelect: () => onInsert(`${quoted(targets)} `) },
       { key: 'copy', label: t('sftp.copyPath'), icon: '⧉',
         onSelect: () => { navigator.clipboard?.writeText(quoted(targets)).catch(() => undefined); } },
@@ -313,7 +316,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
             }}
             onDragStart={dragStart} onDragOverDir={dragOver} onDropDir={drop} onEditDone={finishEdit}
             onDragEnd={(entry) => dragOut.spent(pathOf(entry.name))}
-            onPrefetch={(entry, now) => { if (!isFolder(entry)) dragOut.prefetch(pathOf(entry.name), now); }} />
+            onPrefetch={(entry, now) => dragOut.prefetch(pathOf(entry.name), now)} />
         )}
         {listing && !visible.length && !editing && (
           <p className="sftp-empty">{t(writable ? 'sftp.empty' : 'sftp.emptyReadOnly')}</p>

@@ -11,7 +11,7 @@ const DWELL_MS = 250;
  * browsers, through a `DownloadURL` set when the drag starts. That has to
  * happen synchronously and the browser fetches the URL without our sign-in
  * header, so a single-use link is fetched ahead of time: when the pointer
- * rests on a file row, or presses it.
+ * rests on a row, or presses it. A folder's link fetches it as a ZIP archive.
  */
 export function useDragOut(source: SftpSource) {
   const cache = useRef(new Map<string, { url: string; at: number }>());

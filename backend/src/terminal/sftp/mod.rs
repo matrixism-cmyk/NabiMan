@@ -8,6 +8,7 @@
 //! approval. The local panel works as the NabiMan process, as the local shell
 //! does.
 
+mod folder;
 mod fs;
 mod handlers;
 pub(crate) mod links;
@@ -15,6 +16,7 @@ mod parts;
 mod paths;
 mod pool;
 pub(crate) mod share_keys;
+mod zip;
 
 use actix_web::http::StatusCode;
 use actix_web::{web, HttpRequest, HttpResponse};
@@ -98,7 +100,7 @@ fn share_target(req: &HttpRequest, token: &str) -> Result<(Target, bool), HttpRe
             let q = web::Query::<std::collections::HashMap<String, String>>::from_query(req.query_string())
                 .map(|q| q.into_inner())
                 .unwrap_or_default();
-            req.path().ends_with("/download")
+            (req.path().ends_with("/download") || req.path().ends_with("/download-folder"))
                 && matches!((q.get("path"), q.get("ticket")), (Some(p), Some(t)) if links::redeem_share(token, p, t))
         }
     };
@@ -159,6 +161,7 @@ fn routes(prefix: &str) -> actix_web::Scope {
     web::scope(prefix)
         .route("/list", web::get().to(handlers::list))
         .route("/download", web::get().to(handlers::download))
+        .route("/download-folder", web::get().to(folder::download))
         .route("/link", web::post().to(handlers::link))
         .route("/upload", web::post().to(handlers::upload))
         .route("/upload-part", web::post().to(parts::chunk))

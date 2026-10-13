@@ -11,7 +11,7 @@ jest.mock('./sftpApi', () => {
   return {
     ...actual,
     listDir: jest.fn(), makeDir: jest.fn(), movePath: jest.fn(), removePath: jest.fn(),
-    uploadFile: jest.fn(), downloadFile: jest.fn(), downloadLink: jest.fn(),
+    uploadFile: jest.fn(), downloadFile: jest.fn(), downloadLink: jest.fn(), saveFile: jest.fn(),
   };
 });
 
@@ -138,9 +138,24 @@ describe('SFTP panel', () => {
     expect(dt.setData).toHaveBeenCalledWith('DownloadURL',
       'application/octet-stream:app.conf:https://man.example/api/terminal/sftp/srv_1/download?path=x&ticket=t');
 
-    // Folders cannot be saved that way, and need no link.
-    fireEvent.pointerDown(row('logs'));
-    expect(mocked.downloadLink).toHaveBeenCalledTimes(1);
+    // A folder goes out the same way, as a ZIP archive named after it.
+    mocked.downloadLink.mockImplementation(() => Promise.resolve('https://man.example/api/terminal/sftp/srv_1/download-folder?path=y&ticket=u'));
+    await act(async () => { fireEvent.pointerDown(row('logs')); });
+    expect(mocked.downloadLink).toHaveBeenLastCalledWith(SRV, '/home/me/logs');
+    const folderDrag = transfer({});
+    fireEvent.dragStart(row('logs'), { dataTransfer: folderDrag });
+    expect(folderDrag.setData).toHaveBeenCalledWith('DownloadURL',
+      'application/octet-stream:logs.zip:https://man.example/api/terminal/sftp/srv_1/download-folder?path=y&ticket=u');
+  });
+
+  it('downloads a folder as a ZIP from its menu', async () => {
+    mocked.saveFile.mockResolvedValue(true);
+    renderPanel();
+    await screen.findByText('logs');
+    fireEvent.contextMenu(row('logs'));
+    fireEvent.click(screen.getByRole('menuitem', { name: '폴더 내려받기 (ZIP)' }));
+    await waitFor(() => expect(mocked.saveFile).toHaveBeenCalledWith(SRV, '/home/me/logs', 'logs.zip'));
+    expect(await screen.findByText('logs.zip')).toBeInTheDocument();
   });
 
   it('types quoted paths into the terminal from the menu', async () => {

@@ -32,6 +32,8 @@ aes-gcm = "0.10"
 age = { version = "=0.11.5", default-features = false }
 tar = { version = "=0.4.46", default-features = false }
 flate2 = "1"
+# Checksums for the ZIP archives a folder downloads as (already used by flate2).
+crc32fast = "1"
 
 # MEC Management 모듈
 kube = { version = "0.95", features = ["runtime", "derive", "rustls-tls"], default-features = false }
