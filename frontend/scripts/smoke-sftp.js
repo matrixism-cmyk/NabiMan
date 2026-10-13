@@ -154,8 +154,10 @@ const check = (name, ok, detail = '') => {
   await page.click('.rw-tabs button:has-text("터미널")');
   const connectLocal = await page.$('.rw-connect button:has-text("접속")');
   if (connectLocal) await connectLocal.click();
-  await page.waitForSelector('.rw-view-terminal:not(.rw-view-hidden) .sftp-crumbs', { timeout: 20000 });
-  check('the local shell has a file panel', await page.isVisible('.rw-view-terminal:not(.rw-view-hidden) .sftp-row'));
+  // The path bar is there before the listing; wait for the rows themselves.
+  const localRows = await page.waitForSelector('.rw-view-terminal:not(.rw-view-hidden) .sftp-row', { timeout: 20000 })
+    .then(() => true, () => false);
+  check('the local shell has a file panel', localRows);
 
   // 8. A floating window starts with the panel folded, and opens it on request.
   await page.locator('.rw-item', { hasText: SERVER }).click({ button: 'right' });

@@ -43,6 +43,8 @@ const t: T = {
   'sftp.transfers': { ko: '전송', en: 'Transfers', ja: '転送' },
   'sftp.clearDone': { ko: '끝난 항목 지우기', en: 'Clear finished', ja: '完了分を消去' },
   'sftp.waiting': { ko: '대기', en: 'Waiting', ja: '待機中' },
+  'sftp.handedToBrowser': { ko: '브라우저 다운로드로 받는 중', en: 'Saving with the browser', ja: 'ブラウザでダウンロード中' },
+  'sftp.downloadFailed': { ko: '내려받기를 시작하지 못했습니다', en: 'Could not start the download', ja: 'ダウンロードを開始できません' },
   'sftp.done': { ko: '완료', en: 'Done', ja: '完了' },
   'sftp.failed': { ko: '실패', en: 'Failed', ja: '失敗' },
   'sftp.cancelled': { ko: '취소됨', en: 'Cancelled', ja: 'キャンセル' },

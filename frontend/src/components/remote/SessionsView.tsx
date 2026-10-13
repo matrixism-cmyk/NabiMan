@@ -144,9 +144,9 @@ export default function SessionsView({
             </div>
 
             <div className="session-actions">
-              {session.id !== currentSessionId && (
-                <button className="btn btn-primary btn-sm" disabled={!attachable} onClick={() => onAttach(session)}>{t('terminal.join')}</button>
-              )}
+              <button className="btn btn-primary btn-sm" disabled={!attachable} onClick={() => onAttach(session)}>
+                {session.id === currentSessionId ? t('terminal.showPane') : t('terminal.join')}
+              </button>
               <button className="btn btn-secondary btn-sm" title={t('remote.detachHint')} disabled={!attachable} onClick={() => onPopOut(session)}>⧉</button>
               {onShare && (
                 <button className="btn btn-secondary btn-sm" title={t('share.hint')} disabled={!attachable} onClick={() => onShare(session)}>🔗</button>

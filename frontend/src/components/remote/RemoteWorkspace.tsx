@@ -50,7 +50,8 @@ export default function RemoteWorkspace() {
   const [manualPassword, setManualPassword] = useState(false);
   const [joinSessionId, setJoinSessionId] = useState<string | undefined>(restored.join);
   const [connected, setConnected] = useState<Set<string>>(() => new Set(restored.connected));
-  const [currentSessionId, setCurrentSessionId] = useState('');
+  // The session each mounted pane is attached to, by pane key.
+  const [paneSessions, setPaneSessions] = useState<Record<string, string>>({});
   const [termStatus, setTermStatus] = useState<TerminalStatus>('connecting');
   const [showSettings, setShowSettings] = useState(false);
   const [showShare, setShowShare] = useState(false);
@@ -77,7 +78,6 @@ export default function RemoteWorkspace() {
     if (selection.kind === 'overview' ? overviewView === 'sessions'
       : (selection.kind === 'server' || selection.kind === 'local') && serverView === 'sessions') refetchSessions();
   }, [selection, overviewView, serverView, refetchSessions]);
-  useEffect(() => { if (currentSessionId) refetchSessions(); }, [currentSessionId, refetchSessions]);
 
   const selectedServer = selection.kind === 'server'
     ? servers.find(s => s.id === selection.id)
@@ -96,7 +96,6 @@ export default function RemoteWorkspace() {
     setServerView(view);
     setManualPassword(false);
     setJoinSessionId(undefined);
-    setCurrentSessionId('');
   }, []);
 
   const label = selection.kind === 'local' ? 'local'
@@ -154,6 +153,7 @@ export default function RemoteWorkspace() {
   };
 
   const attachSession = (session: SessionInfo) => {
+    if (session.id === currentSessionId) { setServerView('terminal'); return; } // already open here
     const server = servers.find(s => sessionLabel(s) === session.label);
     if (server) setSelection({ kind: 'server', id: server.id });
     else if (session.label === 'local') setSelection({ kind: 'local' });
@@ -191,6 +191,9 @@ export default function RemoteWorkspace() {
   /** Targets that open on their session list: a saved server or the local shell. */
   const hasSessionsView = isServerTarget || selection.kind === 'local';
   const showTerminalPane = attached && Boolean(terminalTarget);
+  // "This pane" is the pane mounted for this target, even kept behind the list.
+  const currentSessionId = showTerminalPane ? paneSessions[storageKey] || '' : '';
+  useEffect(() => { if (currentSessionId) refetchSessions(); }, [currentSessionId, refetchSessions]);
   const terminalVisible = (hasSessionsView && serverView === 'terminal')
     || (selection.kind === 'adhoc' && Boolean(adhocTarget));
 
@@ -297,7 +300,7 @@ export default function RemoteWorkspace() {
                   joinSessionId={joinSessionId}
                   active={terminalVisible}
                   onStatus={setTermStatus}
-                  onSessionId={setCurrentSessionId}
+                  onSessionId={(sid) => setPaneSessions(p => (p[storageKey] === sid ? p : { ...p, [storageKey]: sid }))}
                 />
               </TerminalWithFiles>
             </div>

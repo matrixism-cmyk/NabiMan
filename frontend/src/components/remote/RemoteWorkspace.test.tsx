@@ -24,7 +24,10 @@ jest.mock('../terminal/TerminalView', () => {
   const react = require('react');
   return {
     __esModule: true,
-    default: react.forwardRef(function FakeTerminalView(props: { storageKey: string }) {
+    default: react.forwardRef(function FakeTerminalView(props: { storageKey: string; onSessionId?: (id: string) => void }) {
+      // Like the real pane, it reports its session once attached.
+      const { onSessionId } = props;
+      react.useEffect(() => { onSessionId?.('pty_a'); }, [onSessionId]);
       return react.createElement('div', { 'data-testid': 'terminal', 'data-key': props.storageKey });
     }),
     forgetTerminalStorage: jest.fn(),
@@ -123,6 +126,27 @@ describe('remote workspace', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '참여' }));
     expect(screen.getByTestId('terminal')).toHaveAttribute('data-key', 'ws_join_pty_a');
+  });
+
+  // The pane stays connected behind the list. Coming back to the target from
+  // elsewhere must not hide the way into that session until a second click.
+  it('marks the session open behind the list, every time, with a way back to it', () => {
+    renderWorkspace();
+    fireEvent.click(itemByName('로컬 셸'));
+    fireEvent.click(tabs().getByRole('button', { name: '터미널' }));
+    fireEvent.click(screen.getByText('접속'));
+    fireEvent.click(itemByName('전체 현황'));
+
+    for (let visit = 0; visit < 2; visit++) {
+      fireEvent.click(itemByName('로컬 셸'));
+      const card = document.querySelector('.session-card') as HTMLElement;
+      expect(card.className).toContain('is-current');
+      expect(within(card).queryByRole('button', { name: '참여' })).toBeNull();
+      expect(within(card).getByRole('button', { name: '터미널 보기' })).toBeEnabled();
+    }
+    fireEvent.click(screen.getByRole('button', { name: '터미널 보기' }));
+    expect((screen.getByTestId('terminal').closest('.rw-view') as HTMLElement).className).not.toContain('rw-view-hidden');
+    expect(screen.getByTestId('terminal')).toHaveAttribute('data-key', 'ws_local');
   });
 
   it('says so when nothing is running on a target', () => {

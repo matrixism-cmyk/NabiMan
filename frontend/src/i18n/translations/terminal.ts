@@ -292,6 +292,7 @@ const t: T = {
   'remote.menuWindow': { ko: '새 창으로 열기', en: 'Open in a window', ja: '別ウィンドウで開く' },
   'remote.menuExec': { ko: '원격 실행', en: 'Run a command', ja: 'コマンド実行' },
   'remote.menuCheck': { ko: '연결 확인', en: 'Check connection', ja: '接続確認' },
+  'terminal.showPane': { ko: '터미널 보기', en: 'Show terminal', ja: 'ターミナルを表示' },
   'remote.menuEdit': { ko: '수정', en: 'Edit', ja: '編集' },
   'remote.serverSaved': { ko: '저장되었습니다.', en: 'Saved.', ja: '保存しました。' },
   'remote.deleteConfirm': {

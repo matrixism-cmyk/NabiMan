@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { useT } from '../../../i18n';
 import { Dropped } from './sftpDrop';
-import { baseName, downloadFile, joinPath, makeDir, saveBlob, SftpSource, Transfer, uploadFile } from './sftpApi';
+import { baseName, joinPath, makeDir, saveFile, SftpSource, Transfer, uploadFile } from './sftpApi';
 
 export interface TransferRow {
   id: number;
@@ -85,19 +85,20 @@ export function useTransfers(source: SftpSource, onUploaded: (dir: string) => vo
     });
   }, [add, enqueue, onUploaded, patch, run, source, t]);
 
+  /** Downloads go to the browser's downloader; the row says it was handed over. */
   const download = useCallback((paths: string[]) => {
     const jobs = paths.map((path) => ({ path, id: add(baseName(path), 'down', 0) }));
     enqueue(async () => {
       for (const job of jobs) {
-        const result = await run(job.id, () => downloadFile(source, job.path,
-          (loaded, total) => patch(job.id, { loaded, total })));
-        if (result?.ok && result.blob) {
-          saveBlob(baseName(job.path), result.blob);
-          patch(job.id, { status: 'done', loaded: result.blob.size, total: result.blob.size });
-        }
+        if (cancelled.current.has(job.id)) continue;
+        patch(job.id, { status: 'running' });
+        const started = await saveFile(source, job.path).catch(() => false);
+        patch(job.id, started
+          ? { status: 'done', message: t('sftp.handedToBrowser') }
+          : { status: 'failed', message: t('sftp.downloadFailed') });
       }
     });
-  }, [add, enqueue, patch, run, source]);
+  }, [add, enqueue, patch, source, t]);
 
   const cancel = useCallback((id: number) => {
     cancelled.current.add(id);

@@ -115,6 +115,9 @@ export interface TransferResult {
   aborted?: boolean;
   message?: string;
   blob?: Blob;
+  status?: number;
+  /** Where the server's part file ends, when a piece arrived out of step. */
+  size?: number;
 }
 
 export interface Transfer {
@@ -140,7 +143,7 @@ function send(
         resolve({ ok: true, blob: xhr.response as Blob });
         return;
       }
-      let json: { success?: boolean; message?: string; data?: { exists?: boolean } } = {};
+      let json: { success?: boolean; message?: string; data?: { exists?: boolean; size?: number } } = {};
       try {
         const text = method === 'GET' ? await (xhr.response as Blob).text() : xhr.responseText;
         json = JSON.parse(text);
@@ -148,6 +151,8 @@ function send(
       resolve({
         ok: xhr.status === 200 && json.success !== false,
         exists: xhr.status === 409 && Boolean(json.data?.exists),
+        status: xhr.status,
+        size: typeof json.data?.size === 'number' ? json.data.size : undefined,
         message: json.message || (xhr.status === 401 ? 'Sign in again' : `HTTP ${xhr.status}`),
       });
     };
@@ -158,12 +163,71 @@ function send(
   return { promise, abort: () => xhr.abort() };
 }
 
+/** Files above this go up in pieces of this size. */
+export const PART_SIZE = 32 * 1024 * 1024;
+/** Tries per piece before the upload gives up. */
+const PART_TRIES = 4;
+
 export function uploadFile(
   src: SftpSource, dir: string, name: string, file: Blob, overwrite: boolean,
   onProgress: (loaded: number, total: number) => void,
 ): Transfer {
+  if (file.size > PART_SIZE) return uploadInParts(src, dir, name, file, overwrite, onProgress);
   const query = `dir=${encodeURIComponent(dir)}&name=${encodeURIComponent(name)}&overwrite=${overwrite}`;
   return send(src, 'POST', `/upload?${query}`, file, onProgress);
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function uploadId(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * A large file in pieces, so one dropped connection costs one piece rather
+ * than gigabytes, and no proxy has to hold the whole file before passing it
+ * on. A piece that fails is retried; if the server's part file ends somewhere
+ * else (a piece arrived but its answer was lost), the upload continues from
+ * there. Only the last step gives the file its name.
+ */
+export function uploadInParts(
+  src: SftpSource, dir: string, name: string, file: Blob, overwrite: boolean,
+  onProgress: (loaded: number, total: number) => void,
+): Transfer {
+  const id = uploadId();
+  const query = (extra: string) =>
+    `dir=${encodeURIComponent(dir)}&name=${encodeURIComponent(name)}&id=${id}&overwrite=${overwrite}&${extra}`;
+  let current: Transfer | null = null;
+  let stopped = false;
+  const discard = () => request(src, `/upload-abort?${query('offset=0')}`, { method: 'POST' }).catch(() => undefined);
+
+  const promise = (async (): Promise<TransferResult> => {
+    let offset = 0;
+    let tries = 0;
+    while (offset < file.size) {
+      if (stopped) { discard(); return { ok: false, aborted: true }; }
+      const end = Math.min(file.size, offset + PART_SIZE);
+      const start = offset;
+      current = send(src, 'POST', `/upload-part?${query(`offset=${start}`)}`, file.slice(start, end),
+        (loaded) => onProgress(start + loaded, file.size));
+      const result = await current.promise;
+      if (result.aborted) { discard(); return result; }
+      if (result.exists) return result;
+      if (result.ok) { offset = end; tries = 0; continue; }
+      if (result.status === 409 && result.size !== undefined) { offset = result.size; continue; }
+      const final = result.status !== undefined && [400, 401, 403, 404].includes(result.status);
+      if (final || ++tries >= PART_TRIES) { discard(); return result; }
+      await sleep(1000 * tries);
+    }
+    const done = await request<{ size: number }>(src, `/upload-finish?${query(`size=${file.size}`)}`, { method: 'POST' });
+    if (done.success) return { ok: true };
+    const exists = Boolean((done.data as { exists?: boolean } | null)?.exists);
+    discard();
+    return { ok: false, exists, message: done.message };
+  })();
+  return { promise, abort: () => { stopped = true; current?.abort(); } };
 }
 
 export function downloadFile(
@@ -172,14 +236,20 @@ export function downloadFile(
   return send(src, 'GET', `/download?path=${encodeURIComponent(path)}`, null, onProgress);
 }
 
-/** Hands a downloaded file to the browser's own save flow. */
-export function saveBlob(name: string, blob: Blob) {
-  const url = URL.createObjectURL(blob);
+/**
+ * Saves a file through the browser's own downloader, from a single-use link:
+ * it streams to disk with the browser's progress and pause, whatever the size,
+ * instead of being held in the page's memory first.
+ */
+export async function saveFile(src: SftpSource, path: string): Promise<boolean> {
+  const url = await downloadLink(src, path);
+  if (!url) return false;
   const link = document.createElement('a');
   link.href = url;
-  link.download = name;
+  link.download = baseName(path);
+  link.rel = 'noopener';
   document.body.appendChild(link);
   link.click();
   link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  return true;
 }

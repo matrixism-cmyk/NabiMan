@@ -11,6 +11,7 @@
 mod fs;
 mod handlers;
 pub(crate) mod links;
+mod parts;
 mod paths;
 mod pool;
 pub(crate) mod share_keys;
@@ -54,7 +55,8 @@ fn resolve(req: &HttpRequest) -> Result<Target, HttpResponse> {
         None => (account_target(req, req.match_info().get("id").unwrap_or(""))?, true),
     };
     let op = req.path().rsplit('/').next().unwrap_or("");
-    if matches!(op, "upload" | "mkdir" | "rename" | "delete") && !writable {
+    let writes = ["upload", "upload-part", "upload-finish", "upload-abort", "mkdir", "rename", "delete"];
+    if writes.contains(&op) && !writable {
         return Err(fail(StatusCode::FORBIDDEN, "This link allows browsing and downloading only"));
     }
     Ok(target)
@@ -159,6 +161,9 @@ fn routes(prefix: &str) -> actix_web::Scope {
         .route("/download", web::get().to(handlers::download))
         .route("/link", web::post().to(handlers::link))
         .route("/upload", web::post().to(handlers::upload))
+        .route("/upload-part", web::post().to(parts::chunk))
+        .route("/upload-finish", web::post().to(parts::finish))
+        .route("/upload-abort", web::post().to(parts::abort))
         .route("/mkdir", web::post().to(handlers::mkdir))
         .route("/rename", web::post().to(handlers::rename))
         .route("/delete", web::post().to(handlers::delete))

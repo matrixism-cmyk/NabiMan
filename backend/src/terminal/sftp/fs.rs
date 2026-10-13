@@ -168,6 +168,26 @@ impl Fs {
         }
     }
 
+    /// Opens an existing file for writing at `offset`, keeping what is there:
+    /// the next piece of an upload that arrives in parts.
+    pub async fn open_at(&self, path: &str, offset: u64) -> Result<Writer> {
+        use tokio::io::AsyncSeekExt;
+        let start = std::io::SeekFrom::Start(offset);
+        match self {
+            Fs::Remote(c) => {
+                let flags = russh_sftp::protocol::OpenFlags::WRITE;
+                let mut file = c.sftp.open_with_flags(path, flags).await?;
+                file.seek(start).await?;
+                Ok(Box::pin(file))
+            }
+            Fs::Local => {
+                let mut file = tokio::fs::OpenOptions::new().write(true).open(path).await?;
+                file.seek(start).await?;
+                Ok(Box::pin(file))
+            }
+        }
+    }
+
     pub async fn mkdir(&self, path: &str) -> Result<()> {
         match self {
             Fs::Remote(c) => Ok(c.sftp.create_dir(path).await?),

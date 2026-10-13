@@ -30,7 +30,7 @@ export default function SftpTransfers({ rows, onCancel, onClear }: Props) {
             <span className="sftp-transfer-state">
               {row.status === 'running' && (percent !== null ? `${percent}%` : formatSize(row.loaded))}
               {row.status === 'waiting' && t('sftp.waiting')}
-              {row.status === 'done' && t('sftp.done')}
+              {row.status === 'done' && (row.message || t('sftp.done'))}
               {row.status === 'failed' && (row.message || t('sftp.failed'))}
               {row.status === 'cancelled' && (row.message || t('sftp.cancelled'))}
             </span>
