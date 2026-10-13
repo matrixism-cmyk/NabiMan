@@ -57,6 +57,10 @@ export function useTerminalHandle(ref: Ref<TerminalViewHandle>, {
     },
     resetZoom: () => zoom.forget(settingsRef.current.font_size),
     sessionId: () => sessionIdRef.current,
+    insertText: (text: string) => {
+      termRef.current?.paste(text);
+      termRef.current?.focus();
+    },
   }), [
     clearBuffer, connect, storageKey, zoom, attemptsRef, endedRef, everConnectedRef,
     joinRef, sessionIdRef, settingsRef, termRef, wsRef,

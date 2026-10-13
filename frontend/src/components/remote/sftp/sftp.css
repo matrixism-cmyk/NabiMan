@@ -1,0 +1,116 @@
+/* A terminal with the server's files beside it. */
+
+.rw-split { display: flex; height: 100%; min-height: 0; gap: 0; }
+.rw-split-term { position: relative; flex: 1; min-width: 0; height: 100%; }
+.rw-split-term.is-drop { outline: 2px dashed var(--primary); outline-offset: -4px; }
+.rw-split-drop {
+  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+  padding: 6px 12px; border-radius: 6px; font-size: 12px; pointer-events: none;
+  background: var(--primary); color: var(--primary-fg);
+}
+
+.rw-splitter {
+  flex: 0 0 6px; cursor: col-resize; touch-action: none;
+  background: transparent; border-left: 1px solid var(--border);
+}
+.rw-splitter:hover, .rw-splitter:focus-visible { background: rgba(59, 130, 246, 0.25); outline: none; }
+
+.rw-split-files { flex: 0 0 auto; min-width: 240px; max-width: calc(100% - 320px); height: 100%; }
+
+.rw-split-tab {
+  flex: 0 0 auto; writing-mode: vertical-rl; padding: 12px 4px; margin-left: 4px;
+  font-size: 12px; color: var(--text-secondary); cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+}
+.rw-split-tab:hover, .rw-split-tab:focus-visible { color: var(--text); border-color: var(--primary); outline: none; }
+
+/* ── Panel ─────────────────────────────────────────────────────────── */
+.sftp {
+  display: flex; flex-direction: column; height: 100%; min-height: 0;
+  background: var(--surface); color: var(--text); font-size: 13px;
+}
+.sftp-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.sftp-head strong { font-size: 13px; }
+.sftp-tools { display: flex; gap: 2px; margin-left: auto; }
+.sftp-tools button {
+  width: 26px; height: 26px; padding: 0; border: 1px solid transparent; border-radius: 4px;
+  background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 14px; line-height: 1;
+}
+.sftp-tools button:hover:not(:disabled), .sftp-tools button:focus-visible { color: var(--text); border-color: var(--border); outline: none; }
+.sftp-tools button.is-on { color: var(--primary); }
+.sftp-tools button:disabled { opacity: 0.35; cursor: default; }
+
+.sftp-crumbs {
+  display: flex; flex-wrap: wrap; gap: 0; padding: 4px 6px; border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px;
+}
+.sftp-crumbs button {
+  padding: 2px 4px; border: 1px solid transparent; border-radius: 3px; background: none;
+  color: var(--text-secondary); cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+}
+.sftp-crumbs button + button::before { content: '/'; margin-right: 4px; color: var(--border); }
+.sftp-crumbs button:nth-child(2)::before { content: ''; margin: 0; }
+.sftp-crumbs button:hover { color: var(--text); }
+.sftp-crumbs button.is-here { color: var(--text); }
+.sftp-crumbs button.is-drop { border-color: var(--primary); background: rgba(59, 130, 246, 0.15); }
+
+.sftp-msg {
+  display: flex; gap: 8px; align-items: center; padding: 6px 8px; font-size: 12px;
+  background: rgba(46, 204, 113, 0.12); color: var(--success); border-bottom: 1px solid var(--border);
+}
+.sftp-msg.is-error { background: rgba(231, 76, 60, 0.12); color: var(--danger); }
+.sftp-msg span { flex: 1; overflow-wrap: anywhere; }
+
+.sftp-body { position: relative; flex: 1; min-height: 0; overflow-y: auto; outline: none; padding: 2px 0; }
+.sftp-body.is-drop { box-shadow: inset 0 0 0 2px var(--primary); background: rgba(59, 130, 246, 0.06); }
+.sftp-body.is-loading { opacity: 0.6; }
+.sftp-empty { padding: 16px 12px; margin: 0; color: var(--text-secondary); font-size: 12px; text-align: center; }
+
+.sftp-row {
+  display: grid; grid-template-columns: 20px minmax(0, 1fr) auto auto; gap: 8px; align-items: center;
+  padding: 3px 8px; cursor: default; user-select: none; border: 1px solid transparent;
+}
+.sftp-row:hover { background: rgba(255, 255, 255, 0.04); }
+.sftp-row.is-selected { background: rgba(59, 130, 246, 0.18); }
+.sftp-body:focus-visible .sftp-row.is-selected { border-color: rgba(59, 130, 246, 0.6); }
+.sftp-row.is-drop { border-color: var(--primary); background: rgba(59, 130, 246, 0.25); }
+.sftp-row.is-up { color: var(--text-secondary); }
+.sftp-icon { text-align: center; font-size: 13px; }
+.sftp-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sftp-row.is-folder .sftp-name { color: var(--text); font-weight: 500; }
+.sftp-size, .sftp-time { font-size: 11px; color: var(--text-secondary); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sftp-size { text-align: right; min-width: 48px; }
+.sftp-edit {
+  grid-column: 2 / -1; width: 100%; padding: 2px 4px; font: inherit; color: var(--text);
+  background: var(--bg); border: 1px solid var(--primary); border-radius: 3px; outline: none;
+}
+
+.sftp-transfers { border-top: 1px solid var(--border); max-height: 32%; overflow-y: auto; padding: 4px 0; }
+.sftp-transfers-head { display: flex; justify-content: space-between; padding: 2px 8px; font-size: 11px; color: var(--text-secondary); }
+.sftp-transfer {
+  position: relative; display: grid; grid-template-columns: 14px minmax(0, 1fr) auto auto; gap: 6px;
+  align-items: center; padding: 3px 8px; font-size: 12px;
+}
+.sftp-transfer-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sftp-transfer-state { font-size: 11px; color: var(--text-secondary); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sftp-transfer.is-done .sftp-transfer-state { color: var(--success); }
+.sftp-transfer.is-failed .sftp-transfer-state { color: var(--danger); }
+.sftp-bar { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--primary); transition: width 0.2s; }
+
+.sftp-link {
+  padding: 0 4px; border: none; background: none; color: var(--primary); cursor: pointer; font-size: 11px;
+}
+.sftp-link:hover { text-decoration: underline; }
+.sftp-hint {
+  margin: 0; padding: 5px 8px; font-size: 11px; color: var(--text-secondary);
+  border-top: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* On a narrow screen the panel covers the terminal instead of squeezing it. */
+@media (max-width: 760px) {
+  .rw-split { position: relative; }
+  .rw-splitter { display: none; }
+  .rw-split-files {
+    position: absolute; inset: 0 0 0 auto; width: 100% !important; max-width: none; min-width: 0; z-index: 5;
+  }
+}

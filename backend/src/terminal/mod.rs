@@ -12,6 +12,7 @@ mod registry;
 mod remote_access;
 pub(crate) mod session;
 mod settings;
+mod sftp;
 pub mod share;
 pub mod share_store;
 pub(crate) mod share_ticket;
@@ -329,5 +330,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(ws_terminal);
     handlers::configure(cfg);
     paste_file::config(cfg);
+    sftp::config(cfg);
     share::config(cfg);
 }

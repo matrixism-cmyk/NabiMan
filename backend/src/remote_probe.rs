@@ -13,6 +13,17 @@ pub(crate) fn ssh_command(
     connect_timeout: u32,
     remote_cmd: &str,
 ) -> Result<(Command, Option<ssh_auth::PwFile>), String> {
+    ssh_invocation(srv, connect_timeout, &[], remote_cmd)
+}
+
+/// [`ssh_command`] with extra options placed before the destination, such as
+/// `-s` to ask for a subsystem (SFTP) instead of a command.
+pub(crate) fn ssh_invocation(
+    srv: &RemoteServer,
+    connect_timeout: u32,
+    extra: &[&str],
+    remote_cmd: &str,
+) -> Result<(Command, Option<ssh_auth::PwFile>), String> {
     let trust = crate::remote_host_trust::options(srv)?;
     let port = srv.port.to_string();
     let target = format!("{}@{}", srv.user, srv.host);
@@ -25,6 +36,7 @@ pub(crate) fn ssh_command(
         cmd.args(["-f", pw_file.path(), "ssh", "-o", &timeout]);
         cmd.args(&trust);
         cmd.args(ssh_auth::password_auth_opts());
+        cmd.args(extra);
         cmd.args(["-p", &port, &target, remote_cmd]);
         return Ok((cmd, Some(pw_file)));
     }
@@ -38,11 +50,9 @@ pub(crate) fn ssh_command(
         "BatchMode=yes",
         "-o",
         "ServerAliveInterval=15",
-        "-p",
-        &port,
-        &target,
-        remote_cmd,
     ]);
+    cmd.args(extra);
+    cmd.args(["-p", &port, &target, remote_cmd]);
     Ok((cmd, None))
 }
 

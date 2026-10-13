@@ -25,6 +25,8 @@ export interface TerminalViewHandle {
   /** Drop a hand-made zoom and go back to filling the window. */
   resetZoom: () => void;
   sessionId: () => string;
+  /** Types text at the prompt, as a paste would. */
+  insertText: (text: string) => void;
 }
 
 export interface TerminalViewProps {

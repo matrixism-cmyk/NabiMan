@@ -17,6 +17,7 @@ import SessionsView, { SessionInfo } from './SessionsView';
 import TargetSessionsView from './TargetSessionsView';
 import TargetRail from './TargetRail';
 import AdhocConnect from './AdhocConnect';
+import TerminalWithFiles from './TerminalWithFiles';
 import { useTargetActions } from './useTargetActions';
 import {
   OverviewView, readPaneState, readSelection, rememberPaneState, rememberSelection, Selection, ServerView,
@@ -286,17 +287,19 @@ export default function RemoteWorkspace() {
               to 상태 and back does not drop the shell. */}
           {showTerminalPane && terminalTarget && (
             <div className={`rw-view rw-view-terminal ${terminalVisible ? '' : 'rw-view-hidden'}`}>
-              <TerminalView
-                key={storageKey}
-                ref={viewRef}
-                target={terminalTarget}
-                storageKey={storageKey}
-                settings={settings}
-                joinSessionId={joinSessionId}
-                active={terminalVisible}
-                onStatus={setTermStatus}
-                onSessionId={setCurrentSessionId}
-              />
+              <TerminalWithFiles server={selectedServer} onInsert={(text) => viewRef.current?.insertText(text)}>
+                <TerminalView
+                  key={storageKey}
+                  ref={viewRef}
+                  target={terminalTarget}
+                  storageKey={storageKey}
+                  settings={settings}
+                  joinSessionId={joinSessionId}
+                  active={terminalVisible}
+                  onStatus={setTermStatus}
+                  onSessionId={setCurrentSessionId}
+                />
+              </TerminalWithFiles>
             </div>
           )}
 

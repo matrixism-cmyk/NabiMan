@@ -39,6 +39,9 @@ k8s-openapi = { version = "0.23", features = ["latest"] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 rusqlite = { version = "0.31", features = ["bundled"] }
 russh = "=0.64.1"
+# SFTP over the system ssh client, so host-key pinning and stored passwords
+# work exactly as they do for the terminal.
+russh-sftp = "=3.0.1"
 uuid = { version = "1", features = ["v4", "serde"] }
 async-trait = "0.1"
 futures = "0.3"

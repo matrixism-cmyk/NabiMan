@@ -30,7 +30,8 @@
     "smoke:share": "node scripts/smoke-share.js",
     "smoke:paste": "node scripts/smoke-paste.js",
     "smoke:zoom": "node scripts/smoke-zoom.js",
-    "smoke:rail": "node scripts/smoke-rail.js"
+    "smoke:rail": "node scripts/smoke-rail.js",
+    "smoke:sftp": "node scripts/smoke-sftp.js"
   },
   "browserslist": {
     "production": [

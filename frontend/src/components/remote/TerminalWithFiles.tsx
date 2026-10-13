@@ -1,0 +1,111 @@
+import React, { useRef, useState } from 'react';
+import { useT } from '../../i18n';
+import SftpPanel from './sftp/SftpPanel';
+import { draggingOwnRows } from './sftp/sftpDrop';
+import './sftp/sftp.css';
+
+interface Props {
+  /** The saved server the terminal is on; without one there are no files to show. */
+  server?: { id: string; name: string };
+  /** Types text into the terminal. */
+  onInsert: (text: string) => void;
+  children: React.ReactNode;
+}
+
+const OPEN_KEY = 'nabiman_sftp_open';
+const WIDTH_KEY = 'nabiman_sftp_width';
+const MIN_WIDTH = 240;
+const MIN_TERMINAL = 320;
+
+const read = (key: string) => { try { return localStorage.getItem(key); } catch { return null; } };
+const write = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* private mode */ } };
+
+/**
+ * A terminal with the server's files beside it. The panel can be closed to a
+ * thin tab and resized by dragging the edge between the two; both are
+ * remembered. Rows dragged out of the panel onto the terminal type their
+ * paths at the prompt.
+ */
+export default function TerminalWithFiles({ server, onInsert, children }: Props) {
+  const { t } = useT();
+  const [open, setOpen] = useState(() => read(OPEN_KEY) !== '0');
+  const [width, setWidth] = useState(() => Number(read(WIDTH_KEY)) || 360);
+  const [dropping, setDropping] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  if (!server) return <>{children}</>;
+
+  const toggle = (next: boolean) => {
+    setOpen(next);
+    write(OPEN_KEY, next ? '1' : '0');
+  };
+
+  const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const handle = e.currentTarget;
+    handle.setPointerCapture(e.pointerId);
+    const total = rootRef.current?.clientWidth || window.innerWidth;
+    const right = rootRef.current?.getBoundingClientRect().right || window.innerWidth;
+    let latest = width;
+    const move = (ev: PointerEvent) => {
+      latest = Math.round(Math.max(MIN_WIDTH, Math.min(total - MIN_TERMINAL, right - ev.clientX)));
+      setWidth(latest);
+    };
+    const up = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', up);
+      handle.removeEventListener('pointercancel', up);
+      write(WIDTH_KEY, String(latest));
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up);
+    handle.addEventListener('pointercancel', up);
+  };
+
+  const resizeByKey = (e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const next = Math.max(MIN_WIDTH, width + (e.key === 'ArrowLeft' ? 24 : -24));
+    setWidth(next);
+    write(WIDTH_KEY, String(next));
+  };
+
+  return (
+    <div className="rw-split" ref={rootRef}>
+      <div
+        className={`rw-split-term ${dropping ? 'is-drop' : ''}`}
+        onDragOver={(e) => {
+          if (!draggingOwnRows(e.dataTransfer)) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+          setDropping(true);
+        }}
+        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false); }}
+        onDrop={(e) => {
+          if (!draggingOwnRows(e.dataTransfer)) return;
+          e.preventDefault();
+          setDropping(false);
+          const text = e.dataTransfer.getData('text/plain');
+          if (text) onInsert(`${text} `);
+        }}
+      >
+        {children}
+        {dropping && <div className="rw-split-drop" aria-hidden="true">{t('sftp.dropOnTerminal')}</div>}
+      </div>
+      {open ? (
+        <>
+          <div className="rw-splitter" role="separator" aria-orientation="vertical" tabIndex={0}
+            aria-label={t('sftp.resize')} aria-valuenow={width}
+            onPointerDown={startResize} onKeyDown={resizeByKey} onDoubleClick={() => toggle(false)} />
+          <div className="rw-split-files" style={{ width }}>
+            <SftpPanel serverId={server.id} serverName={server.name} onInsert={onInsert} onClose={() => toggle(false)} />
+          </div>
+        </>
+      ) : (
+        <button type="button" className="rw-split-tab" onClick={() => toggle(true)} title={t('sftp.openHint')}>
+          <span aria-hidden="true">📁</span> {t('sftp.tab')}
+        </button>
+      )}
+    </div>
+  );
+}
