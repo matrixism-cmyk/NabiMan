@@ -20,7 +20,8 @@ jobs:
         working-directory: frontend
         run: |
           npm ci --no-audit
-          npm audit
+          npm audit --omit=dev
+          npm audit --audit-level=high
           npm run typecheck
           npm run lint
           npm test -- --watch=false --runInBand

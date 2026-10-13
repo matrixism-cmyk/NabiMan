@@ -12,6 +12,9 @@ def cron_hashes():
 cron_before=cron_hashes()
 with tempfile.TemporaryDirectory(prefix='nb-os-account-root-') as temporary:
  root=pathlib.Path(temporary);installed=set()
+ # Merged-/usr layout, like current hosts: libpam looks for modules under /lib on
+ # Ubuntu 22.04 and under /usr/lib on 24.04, and both must reach the copy.
+ for name in ['bin','sbin','lib','lib64']:(root/'usr'/name).mkdir(parents=True);(root/name).symlink_to('usr/'+name)
  def copy_binary(source,destination=None):
   source=pathlib.Path(source);destination=destination or str(source)
   target=root/destination.lstrip('/');target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(source,target);target.chmod(0o755)
