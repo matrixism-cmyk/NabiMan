@@ -94,8 +94,9 @@
   align-items: center; padding: 3px 8px; font-size: 12px;
 }
 .sftp-transfer-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sftp-transfer-state { font-size: 11px; color: var(--text-secondary); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sftp-transfer-state { font-size: 11px; color: var(--text-secondary); max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sftp-transfer.is-done .sftp-transfer-state { color: var(--success); }
+.sftp-transfer-rate { font-variant-numeric: tabular-nums; }
 .sftp-transfer.is-failed .sftp-transfer-state { color: var(--danger); }
 .sftp-bar { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--primary); transition: width 0.2s; }
 

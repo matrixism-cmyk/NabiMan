@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useT } from '../../../i18n';
 import { Dropped } from './sftpDrop';
 import { baseName, joinPath, makeDir, saveFile, SftpSource, Transfer, uploadFile } from './sftpApi';
+import { RateState, startRate, updateRate } from './transferRate';
 
 export interface TransferRow {
   id: number;
@@ -11,6 +12,10 @@ export interface TransferRow {
   total: number;
   status: 'waiting' | 'running' | 'done' | 'failed' | 'cancelled';
   message?: string;
+  /** Bytes per second, once there is enough to tell. */
+  rate?: number | null;
+  /** Seconds left, once there is enough to tell. */
+  eta?: number | null;
 }
 
 /**
@@ -24,6 +29,7 @@ export function useTransfers(source: SftpSource, onUploaded: (dir: string) => vo
   const running = useRef<Map<number, Transfer>>(new Map());
   const cancelled = useRef<Set<number>>(new Set());
   const queue = useRef<Promise<void>>(Promise.resolve());
+  const rates = useRef<Map<number, RateState>>(new Map());
 
   const patch = useCallback((id: number, change: Partial<TransferRow>) => {
     setRows((list) => list.map((r) => (r.id === id ? { ...r, ...change } : r)));
@@ -66,7 +72,13 @@ export function useTransfers(source: SftpSource, onUploaded: (dir: string) => vo
         const parts = job.rel.split('/');
         const name = parts.pop() || job.file.name;
         const target = parts.length ? joinPath(dir, parts.join('/')) : dir;
-        const progress = (loaded: number) => patch(job.id, { loaded });
+        rates.current.set(job.id, startRate(performance.now()));
+        const progress = (loaded: number) => {
+          const before = rates.current.get(job.id) || startRate(performance.now());
+          const [after, view] = updateRate(before, loaded, job.file.size, performance.now());
+          rates.current.set(job.id, after);
+          patch(job.id, view ? { loaded, ...view } : { loaded });
+        };
         let result = await run(job.id, () => uploadFile(source, target, name, job.file, false, progress));
         if (result?.exists) {
           if (window.confirm(t('sftp.overwriteConfirm', { name: job.rel }))) {
@@ -77,7 +89,7 @@ export function useTransfers(source: SftpSource, onUploaded: (dir: string) => vo
           }
         }
         if (result?.ok) {
-          patch(job.id, { status: 'done', loaded: job.file.size });
+          patch(job.id, { status: 'done', loaded: job.file.size, rate: null, eta: null });
           changed = true;
         }
       }
