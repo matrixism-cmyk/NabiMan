@@ -1,3 +1,4 @@
+import type { BarKey, Mods } from './stickyKeys';
 import type { TerminalSettings } from './settings';
 import type { ShareConnection } from './terminalUrl';
 
@@ -32,6 +33,13 @@ export interface TerminalViewHandle {
   /** Sends keys as if they were pressed: unlike a paste, a "\r" here is Enter
    *  even in shells that take pasted line breaks as text. */
   sendKeys: (keys: string) => void;
+  /** A key a phone's keyboard lacks (or a character, typed as is), from the
+   *  key bar; the terminal keeps or leaves focus as it was. */
+  pressKey: (key: BarKey | string, mods?: Mods) => void;
+  /** Holds Ctrl and/or Alt for the next key typed; `used` is told when it goes. */
+  armModifiers: (mods: Mods, used: () => void) => void;
+  /** Text a step larger (positive) or smaller. */
+  zoomBy: (delta: number) => void;
 }
 
 export interface TerminalViewProps {

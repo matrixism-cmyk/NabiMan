@@ -4,6 +4,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import 'xterm/css/xterm.css';
 import './terminal-symbols.css';
 import { TerminalSettings } from './settings';
+import { applyArmed } from './stickyKeys';
 import { blobsFromClipboardItems, pathsForClipboardFiles } from './pasteFile';
 
 const THEME = {
@@ -174,7 +175,8 @@ export function attachTerminalIo(
   send: (data: string | ArrayBuffer) => void,
   sendResize: ((cols: number, rows: number) => void) | null,
 ): void {
-  term.onData((data) => send(data));
+  // Ctrl or Alt tapped on a phone's key bar applies to the next key typed.
+  term.onData((data) => send(applyArmed(term, data)));
   term.onBinary((data) => {
     const buf = new Uint8Array(data.length);
     for (let i = 0; i < data.length; i++) buf[i] = data.charCodeAt(i);

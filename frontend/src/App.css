@@ -331,7 +331,22 @@ body {
 .message { padding: 8px 12px; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3); border-radius: 4px; font-size: 13px; margin-bottom: 12px; cursor: pointer; }
 
 /* Header */
-.header-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.header-menu { margin-left: auto; position: relative; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.header-more { display: none; }
+/* A phone: the header is one line, its controls under "⋯". */
+@media (max-width: 640px) {
+  .app-header { flex-wrap: nowrap; position: relative; z-index: 20; }
+  .header-more { display: inline-flex; font-size: 18px; padding: 2px 12px; min-height: 36px; align-items: center; }
+  .header-actions { display: none; }
+  .header-actions.is-open {
+    display: flex; flex-direction: column; align-items: stretch; gap: 8px;
+    position: absolute; right: 0; top: calc(100% + 8px); min-width: 210px; padding: 10px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  }
+  .header-actions.is-open .btn, .header-actions.is-open select { min-height: 40px; font-size: 14px; padding: 6px 12px; width: 100%; }
+}
 .lang-select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; font-size: 13px; cursor: pointer; }
 .lang-select:hover { border-color: var(--primary); }
 

@@ -9,8 +9,7 @@ import { pruneSessionZooms } from '../terminal/terminalStorage';
 import TerminalSettingsModal from '../terminal/TerminalSettingsModal';
 import ShareDialog from '../terminal/ShareDialog';
 import ShareLinksPanel from '../terminal/ShareLinksPanel';
-import SessionNameEdit from '../terminal/SessionNameEdit';
-import AccountDictation from '../terminal/dictation/AccountDictation';
+import MobileKeyBar from '../terminal/MobileKeyBar';
 import { SshKeyPanel } from '../SshKeyComponents';
 import MultiServerDashboard from '../MultiServerDashboard';
 import ServerForm from './ServerForm';
@@ -19,7 +18,9 @@ import SessionsView, { SessionInfo } from './SessionsView';
 import TargetSessionsView from './TargetSessionsView';
 import TargetRail from './TargetRail';
 import AdhocConnect from './AdhocConnect';
-import TerminalWithFiles from './TerminalWithFiles';
+import TerminalWithFiles, { filesScope } from './TerminalWithFiles';
+import WorkspaceActions from './WorkspaceActions';
+import { useCompact, useFullScreenPane, useMobilePane } from './useCompact';
 import WorkspaceTabs, { viewFor } from './WorkspaceTabs';
 import FilesView from './FilesView';
 import ProtocolBadges from './ProtocolBadges';
@@ -37,6 +38,10 @@ import './remote-workspace.css';
  *
  * It replaces the old split where the server list lived under "원격", the
  * terminal under "시스템", and the fleet summary under "대시보드".
+ *
+ * A phone shows one half at a time, like an app: the list, then the work
+ * full screen with a way back, a key bar under the terminal, and the file
+ * panel over it on demand.
  */
 export default function RemoteWorkspace() {
   const { t } = useT();
@@ -67,6 +72,10 @@ export default function RemoteWorkspace() {
   const [checkingAll, setCheckingAll] = useState(false);
   const [checkError, setCheckError] = useState('');
   const [adhocTarget, setAdhocTarget] = useState<{ host: string; port: number; user: string } | null>(null);
+  const compact = useCompact();
+  const { pane, showWork, showList } = useMobilePane(compact, selection.kind !== 'overview');
+  const [filesOpen, setFilesOpen] = useState(false);
+  useFullScreenPane(pane === 'work');
 
   useEffect(() => {
     rememberSelection(selection);
@@ -215,8 +224,9 @@ export default function RemoteWorkspace() {
       : '';
 
   return (
-    <div className="rw">
+    <div className={`rw ${compact ? `rw-compact rw-pane-${pane}` : ''}`}>
       <TargetRail
+        compact={compact}
         servers={servers}
         selection={selection}
         online={online}
@@ -224,8 +234,11 @@ export default function RemoteWorkspace() {
         checkingAll={checkingAll}
         localSessions={localCount}
         sessionsFor={countFor}
-        onSelect={select}
-        onAction={runRailAction}
+        onSelect={(next) => { select(next); showWork(); }}
+        onAction={(target, action) => {
+          runRailAction(target, action);
+          if (action !== 'check' && action !== 'delete' && action !== 'window') showWork();
+        }}
         onFilter={setFilter}
         onCheckAll={checkAll}
       />
@@ -233,6 +246,9 @@ export default function RemoteWorkspace() {
       <section className="rw-work">
         <header className="rw-head">
           <div className="rw-head-title">
+            {compact && (
+              <button type="button" className="rw-back" onClick={showList} aria-label={t('remote.backToList')}>‹</button>
+            )}
             <h2>{headTitle}</h2>
             {selectedServer && <ProtocolBadges server={selectedServer} />}
             {headSub && <code>{headSub}</code>}
@@ -246,33 +262,17 @@ export default function RemoteWorkspace() {
             onOverviewView={setOverviewView} serverView={serverView} onServerView={setServerView}
             allSessions={sessions.length} liveCount={liveCount} />
 
-          <div className="rw-head-actions">
-            {serverView === 'files' && selectedServer && (
-              <button className="btn btn-secondary btn-sm" onClick={() => setShareFiles(true)}>🔗 {t('share.filesButton')}</button>
-            )}
-            {showTerminalPane && terminalVisible && (
-              <>
-                <span className={`status-badge ${termStatus === 'connected' ? 'up' : 'down'}`}>
-                  {termStatus === 'connected' ? t('terminal.connected')
-                    : termStatus === 'reconnecting' ? t('terminal.reconnecting')
-                    : termStatus === 'ended' ? t('terminal.sessionEnded')
-                    : t('terminal.disconnected')}
-                </span>
-                <AccountDictation onText={(text) => viewRef.current?.insertText(text)} onKeys={(keys) => viewRef.current?.sendKeys(keys)} />
-                <button className="btn btn-secondary btn-sm" onClick={() => viewRef.current?.newSession()}>{t('terminal.newSession')}</button>
-                <button className="btn btn-secondary btn-sm" onClick={detach} title={t('remote.detachHint')}>⧉ {t('remote.detach')}</button>
-                {currentSessionId && (<>
-                  <SessionNameEdit sessionId={currentSessionId} onRenamed={refetchSessions}
-                    name={sessions.find(s => s.id === currentSessionId)?.title || ''} />
-                  <button className="btn btn-secondary btn-sm"
-                    onClick={() => { setShareTarget(currentSessionId); setShowShare(true); }} title={t('share.hint')}>
-                    🔗 {t('share.button')}
-                  </button>
-                </>)}
-              </>
-            )}
-            <button className="btn btn-secondary btn-sm" onClick={() => setShowSettings(true)} title={t('terminal.settings')}>⚙</button>
-          </div>
+          <WorkspaceActions compact={compact} viewRef={viewRef}
+            terminal={showTerminalPane && terminalVisible ? {
+              status: termStatus, sessionId: currentSessionId,
+              sessionName: sessions.find(s => s.id === currentSessionId)?.title || '',
+            } : null}
+            onRenamed={refetchSessions} onNewSession={() => viewRef.current?.newSession()} onDetach={detach}
+            onShareSession={() => { setShareTarget(currentSessionId); setShowShare(true); }}
+            onShareFiles={serverView === 'files' && selectedServer ? () => setShareFiles(true) : undefined}
+            onSettings={() => setShowSettings(true)}
+            files={compact && showTerminalPane && terminalVisible && filesScope(terminalTarget)
+              ? { open: filesOpen, toggle: () => setFilesOpen(o => !o) } : undefined} />
         </header>
 
         {checkError && <div role="alert" className="message">{checkError}</div>}
@@ -281,7 +281,8 @@ export default function RemoteWorkspace() {
               to 상태 and back does not drop the shell. */}
           {showTerminalPane && terminalTarget && (
             <div className={`rw-view rw-view-terminal ${terminalVisible ? '' : 'rw-view-hidden'}`}>
-              <TerminalWithFiles target={terminalTarget} name={headTitle} onInsert={(text) => viewRef.current?.insertText(text)}>
+              <TerminalWithFiles target={terminalTarget} name={headTitle} onInsert={(text) => viewRef.current?.insertText(text)}
+                {...(compact ? { open: filesOpen, onOpenChange: setFilesOpen } : {})}>
                 <TerminalView
                   key={storageKey}
                   ref={viewRef}
@@ -294,6 +295,7 @@ export default function RemoteWorkspace() {
                   onSessionId={(sid) => setPaneSessions(p => (p[storageKey] === sid ? p : { ...p, [storageKey]: sid }))}
                 />
               </TerminalWithFiles>
+              {compact && <MobileKeyBar handle={viewRef} disabled={termStatus !== 'connected'} />}
             </div>
           )}
 

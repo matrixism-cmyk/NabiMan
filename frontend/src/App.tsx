@@ -10,6 +10,7 @@ import ScopeResourcesPanel from './components/ScopeResourcesPanel';
 import { MemberUser } from './components/MembershipEditor';
 import PanelOutlet from './components/PanelOutlet';
 import ChangePasswordModal from './components/ChangePasswordModal';
+import HeaderMenu from './components/HeaderMenu';
 import CommandPalette from './components/CommandPalette';
 import LanguageSelector from './components/LanguageSelector';
 import { Tab, Category, CatDef, categories } from './nav';
@@ -195,14 +196,14 @@ function App() {
           {t('app.title')}
         </button></h1>
         <span className="subtitle">{t('app.subtitle')}</span>
-        <div className="header-actions">
+        <HeaderMenu>
           <ThemeSelector compact />
           <LanguageSelector />
           <button className="btn btn-secondary" title={t('app.commandPalette')} onClick={() => setShowPalette(true)}>⌘K</button>
           <button className="btn btn-secondary" title={t('app.focusMode')} onClick={enterFocus}>⛶</button>
           <button className="btn btn-secondary" onClick={() => setShowChangePw(true)}>{t('app.changePassword')}</button>
           <button className="btn btn-secondary logout-btn" onClick={handleLogout}>{t('app.logout')}</button>
-        </div>
+        </HeaderMenu>
       </header>
       <nav className="cat-nav">
         {visibleCategories.map((cat) => (

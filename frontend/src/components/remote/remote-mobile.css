@@ -1,0 +1,111 @@
+/* The remote workspace on a phone: one half at a time, the work full screen. */
+
+.rw.rw-compact { flex-direction: column; height: auto; min-height: 0; gap: 0; }
+.rw-compact.rw-pane-list .rw-work { display: none; }
+.rw-compact.rw-pane-work .rw-rail { display: none; }
+
+/* The list: the whole width, nothing to scroll inside a box. */
+.rw-compact .rw-rail { width: 100%; flex: none; max-height: none; border-radius: 10px; }
+.rw-compact .rw-rail-list { overflow: visible; padding: 6px; gap: 4px; }
+.rw-compact .rw-item { padding: 12px 12px; min-height: 52px; border-radius: 10px; }
+.rw-compact .rw-item-name { font-size: 15px; }
+.rw-compact .rw-item-sub { font-size: 12px; }
+.rw-compact .rw-item-count { font-size: 11px; padding: 2px 7px; }
+.rw-compact .rw-lamp { width: 10px; height: 10px; }
+.rw-compact .rw-rail-label { font-size: 12px; padding: 12px 10px 4px; }
+.rw-compact .rw-rail-head { padding: 12px; }
+.rw-compact .rw-rail-filters .filter-input,
+.rw-compact .rw-rail-filters .select-input { font-size: 16px; min-height: 40px; } /* 16px keeps iOS from zooming in */
+.rw-compact .rw-item { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+
+/* The work: the visible screen, above the keyboard when it is up. */
+.rw-compact.rw-pane-work .rw-work {
+  min-height: 0; position: fixed; left: 0; right: 0; top: var(--vv-top, 0px); height: var(--vv-height, 100dvh);
+  z-index: 950; border: 0; border-radius: 0;
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.rw-compact .rw-head {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "title actions" "tabs tabs";
+  align-items: center; gap: 0; padding: 0;
+}
+.rw-compact .rw-head-title { grid-area: title; }
+.rw-compact .rw-head-actions { grid-area: actions; }
+.rw-compact .rw-tabs { grid-area: tabs; }
+.rw-compact .rw-head-title {
+  flex-wrap: nowrap; gap: 6px; padding: 6px 6px 6px 2px; min-height: 48px;
+  overflow: hidden;
+}
+.rw-compact .rw-head-title h2 {
+  font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0;
+}
+.rw-compact .rw-head-title code,
+.rw-compact .rw-head-title .tag-badge { display: none; }
+.rw-compact .rw-head-title .proto-badges { flex: none; }
+.rw-back {
+  flex: none; width: 40px; height: 40px; font-size: 30px; line-height: 1; padding: 0 0 4px;
+  color: var(--text); background: none; border: 0; border-radius: 10px; cursor: pointer;
+}
+.rw-back:active { background: rgba(255, 255, 255, 0.08); }
+.rw-compact .rw-head-actions { margin: 0; padding-right: 6px; flex-wrap: nowrap; gap: 2px; }
+.rw-compact .rw-tabs {
+  flex-wrap: nowrap; overflow-x: auto; gap: 4px; padding: 0 8px 8px; scrollbar-width: none;
+}
+.rw-compact .rw-tabs::-webkit-scrollbar { display: none; }
+.rw-compact .rw-tabs button { flex: none; font-size: 14px; padding: 8px 14px; border-radius: 18px; }
+.rw-compact .rw-tabs:empty { display: none; }
+
+.rw-icon-btn {
+  width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 19px; color: var(--text); background: none; border: 1px solid transparent; border-radius: 10px; cursor: pointer;
+}
+.rw-icon-btn:active, .rw-icon-btn.is-on { background: rgba(59, 130, 246, 0.16); border-color: var(--primary); }
+.rw-status-dot { width: 9px; height: 9px; border-radius: 50%; margin: 0 4px; flex: none; }
+.rw-status-dot.is-up { background: var(--success); }
+.rw-status-dot.is-down { background: var(--danger); }
+.rw-compact .dictation-btn { min-width: 40px; height: 40px; }
+
+/* The terminal fills what is left, the key bar under it. */
+.rw-compact .rw-view-terminal { display: flex; flex-direction: column; padding: 0; }
+.rw-compact .rw-view-terminal > :first-child { flex: 1 1 auto; min-height: 0; height: auto; }
+.rw-compact .rw-split-files { z-index: 6; }
+.rw-compact .rw-view-scroll { padding: 10px; -webkit-overflow-scrolling: touch; }
+.rw-compact .rw-connect { padding: 16px; }
+.rw-compact .rw-connect-card { padding: 22px 18px; width: 100%; }
+.rw-compact .rw-connect-card .btn { min-height: 44px; }
+
+/* Out of the way while the work is full screen: the feedback launcher would cover the keys. */
+body.rw-fullscreen [data-nabiman-feedback-launcher] { display: none !important; }
+body.rw-fullscreen { overflow: hidden; }
+
+/* The sheet "⋯" opens: from the bottom, rows a thumb can hit. */
+@media (max-width: 760px) {
+  .common-modal-overlay:has(.rw-sheet) { align-items: flex-end; padding: 0; }
+  .common-modal.rw-sheet {
+    width: 100%; max-width: none; margin: 0; border-radius: 16px 16px 0 0;
+    padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+}
+.rw-sheet-list { display: flex; flex-direction: column; gap: 6px; }
+.rw-sheet-status { margin: 0 4px 4px; font-size: 13px; color: var(--text-secondary); }
+.rw-sheet-name { padding: 4px; }
+.rw-sheet-item {
+  width: 100%; min-height: 48px; padding: 0 14px; text-align: left; font-size: 15px;
+  color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 10px; cursor: pointer;
+}
+.rw-sheet-item:active { background: rgba(59, 130, 246, 0.16); }
+.rw-sheet-item.is-cancel { text-align: center; color: var(--text-secondary); margin-top: 4px; }
+
+/* Fingers, wherever the screen is: bigger menu rows and file rows. */
+@media (pointer: coarse) {
+  .rw-menu-item { padding: 12px 14px; font-size: 15px; }
+  .rw-menu { min-width: 220px; }
+  .sftp-row { padding: 10px 10px; -webkit-touch-callout: none; }
+  .sftp-name { font-size: 14.5px; }
+  .sftp-hint { display: none; } /* it is about dragging with a mouse */
+}
+
+/* Floating windows have no room on a phone. */
+.rw-compact .rw-wide-only { display: none; }
+/* Full screen means above the app's header: the content area must not trap it below. */
+body.rw-fullscreen .main-content { z-index: auto; }
+.rw-compact .rw-view-scroll .btn-group .btn { min-height: 38px; }

@@ -37,7 +37,7 @@ export default function TargetSessionsView({
         actions={(
           <>
             <button className="btn btn-primary btn-sm" onClick={onNewSession}>＋ {t('remote.menuNewSession')}</button>
-            <button className="btn btn-secondary btn-sm" onClick={onOpenWindow}>⧉ {t('remote.menuWindow')}</button>
+            <button className="btn btn-secondary btn-sm rw-wide-only" onClick={onOpenWindow}>⧉ {t('remote.menuWindow')}</button>
           </>
         )}
         empty={<p className="text-secondary">{t('remote.noTargetSessions')}</p>}

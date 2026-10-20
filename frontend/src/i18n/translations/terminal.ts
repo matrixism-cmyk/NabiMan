@@ -358,6 +358,18 @@ const t: T = {
   'dictation.testNotReady': { ko: '연결은 되었지만 음성 서비스가 아직 준비 중입니다.', en: 'Connected, but the speech service is still starting.', ja: '接続できましたが、音声サービスはまだ準備中です。' },
   'dictation.clearKey': { ko: 'API 키 지우기', en: 'Remove API key', ja: 'API キーを削除' },
   'dictation.saved': { ko: '저장했습니다.', en: 'Saved.', ja: '保存しました。' },
+  'remote.backToList': { ko: '목록으로', en: 'Back to the list', ja: '一覧に戻る' },
+  'remote.moreActions': { ko: '더 보기', en: 'More', ja: 'その他' },
+  'remote.railLongPressHint': { ko: '길게 누르면 메뉴', en: 'Press and hold for the menu', ja: '長押しでメニュー' },
+  'terminal.keyBar': { ko: '특수 키', en: 'Special keys', ja: '特殊キー' },
+  'terminal.keyboard': { ko: '키보드 열기/닫기', en: 'Show or hide the keyboard', ja: 'キーボードの表示/非表示' },
+  'terminal.key.left': { ko: '왼쪽', en: 'Left', ja: '左' },
+  'terminal.key.right': { ko: '오른쪽', en: 'Right', ja: '右' },
+  'terminal.key.up': { ko: '위', en: 'Up', ja: '上' },
+  'terminal.key.down': { ko: '아래', en: 'Down', ja: '下' },
+  'terminal.paste': { ko: '붙여넣기', en: 'Paste', ja: '貼り付け' },
+  'terminal.zoomIn': { ko: '글자 크게', en: 'Larger text', ja: '文字を大きく' },
+  'terminal.zoomOut': { ko: '글자 작게', en: 'Smaller text', ja: '文字を小さく' },
 };
 
 export default t;

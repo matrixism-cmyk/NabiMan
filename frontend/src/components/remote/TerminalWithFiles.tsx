@@ -19,6 +19,10 @@ interface Props {
   source?: SftpSource | null;
   /** Types text into the terminal. */
   onInsert: (text: string) => void;
+  /** Whether the panel is open, when the caller decides (a phone opens it
+   *  from its header, over the terminal, and shows no side tab). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   children: React.ReactNode;
 }
 
@@ -40,11 +44,15 @@ const write = (key: string, value: string) => { try { localStorage.setItem(key, 
  * remembered. Rows dragged out of the panel onto the terminal type their
  * paths at the prompt.
  */
-export default function TerminalWithFiles({ target, name, place = 'pane', source: given, onInsert, children }: Props) {
+export default function TerminalWithFiles({
+  target, name, place = 'pane', source: given, onInsert, open: openGiven, onOpenChange, children,
+}: Props) {
   const { t } = useT();
   const OPEN_KEY = place === 'pane' ? 'nabiman_sftp_open' : 'nabiman_sftp_open_window';
   const WIDTH_KEY = place === 'pane' ? 'nabiman_sftp_width' : 'nabiman_sftp_width_window';
-  const [open, setOpen] = useState(() => (place === 'pane' ? read(OPEN_KEY) !== '0' : read(OPEN_KEY) === '1'));
+  const [openOwn, setOpen] = useState(() => (place === 'pane' ? read(OPEN_KEY) !== '0' : read(OPEN_KEY) === '1'));
+  const controlled = onOpenChange !== undefined;
+  const open = controlled ? Boolean(openGiven) : openOwn;
   const [width, setWidth] = useState(() => Number(read(WIDTH_KEY)) || (place === 'pane' ? 360 : 300));
   const [dropping, setDropping] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -55,6 +63,7 @@ export default function TerminalWithFiles({ target, name, place = 'pane', source
   if (!source) return <>{children}</>;
 
   const toggle = (next: boolean) => {
+    if (controlled) { onOpenChange(next); return; }
     setOpen(next);
     write(OPEN_KEY, next ? '1' : '0');
   };
@@ -120,7 +129,7 @@ export default function TerminalWithFiles({ target, name, place = 'pane', source
             <SftpPanel source={source} serverName={name} onInsert={onInsert} onClose={() => toggle(false)} />
           </div>
         </>
-      ) : (
+      ) : controlled ? null : (
         <button type="button" className="rw-split-tab" onClick={() => toggle(true)}
           title={t('sftp.openHint')} aria-label={t('sftp.show')}>
           <span className="rw-split-tab-arrow" aria-hidden="true">«</span>

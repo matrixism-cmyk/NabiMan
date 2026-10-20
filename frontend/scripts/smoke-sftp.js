@@ -175,6 +175,9 @@ const check = (name, ok, detail = '') => {
   check('the local shell has a file panel', localRows);
 
   // 8. A floating window starts with the panel folded, and opens it on request.
+  // A menu closes when the list scrolls, as native ones do: bring the entry into view first.
+  await page.locator('.rw-item', { hasText: SERVER }).scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
   await page.locator('.rw-item', { hasText: SERVER }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: '새 창으로 열기', exact: true }).click();
   await page.waitForSelector('.term-window .rw-split-tab', { timeout: 20000 });

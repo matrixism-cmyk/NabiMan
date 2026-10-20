@@ -5,6 +5,7 @@ import type { TerminalViewHandle } from './terminalTypes';
 import type { TerminalSettings } from './settings';
 import { useTerminalZoom } from './useTerminalZoom';
 import { sidKey, writeStored } from './terminalStorage';
+import { armModifiers, isBarKey, keySequence, NO_MODS, withMods } from './stickyKeys';
 
 interface Controls {
   termRef: MutableRefObject<Terminal | null>;
@@ -65,6 +66,13 @@ export function useTerminalHandle(ref: Ref<TerminalViewHandle>, {
       if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(keys);
       termRef.current?.focus();
     },
+    pressKey: (key, mods = NO_MODS) => {
+      const appCursor = termRef.current?.modes.applicationCursorKeysMode ?? false;
+      const data = isBarKey(key) ? keySequence(key, appCursor, mods) : withMods(key, mods);
+      if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(data);
+    },
+    armModifiers: (mods, used) => { if (termRef.current) armModifiers(termRef.current, mods, used); },
+    zoomBy: (delta) => zoom.step(delta),
   }), [
     clearBuffer, connect, storageKey, zoom, attemptsRef, endedRef, everConnectedRef,
     joinRef, sessionIdRef, settingsRef, termRef, wsRef,

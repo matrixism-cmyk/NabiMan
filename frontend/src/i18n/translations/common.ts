@@ -42,6 +42,7 @@ const t: T = {
   'app.subtitle': { ko: '서버 관리 대시보드', en: 'Server Management Dashboard', ja: 'サーバー管理ダッシュボード' },
   'app.changePassword': { ko: '비밀번호 변경', en: 'Change Password', ja: 'パスワード変更' },
   'app.logout': { ko: '로그아웃', en: 'Logout', ja: 'ログアウト' },
+  'app.menu': { ko: '메뉴', en: 'Menu', ja: 'メニュー' },
   'app.focusMode': { ko: '전체화면 (콘텐츠만)', en: 'Fullscreen (content only)', ja: '全画面（コンテンツのみ）' },
   'app.commandPalette': { ko: '명령 팔레트 (Ctrl+K)', en: 'Command palette (Ctrl+K)', ja: 'コマンドパレット (Ctrl+K)' },
   'palette.placeholder': { ko: '이동할 페이지 검색…', en: 'Search for a page to open…', ja: '開くページを検索…' },

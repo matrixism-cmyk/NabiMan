@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { RemoteServer } from '../../types';
 import { useT } from '../../i18n';
 import RailContextMenu, { RailMenuItem } from './RailContextMenu';
+import { useLongPress } from '../common/useLongPress';
 import ProtocolBadges from './ProtocolBadges';
 import {
   addressOf, hasFiles, hasShell, hasTerminal, matchesProtocol, PROTOCOL_FILTERS, protocolName, protocolsOf, ProtocolFilter,
@@ -9,6 +10,8 @@ import {
 import { RailAction, Selection } from './workspaceState';
 
 interface Props {
+  /** A phone: no floating windows, and a long press opens the menu. */
+  compact?: boolean;
   servers: RemoteServer[];
   selection: Selection;
   online: number;
@@ -30,7 +33,7 @@ interface OpenMenu { x: number; y: number; target: MenuTarget; opener: HTMLEleme
 /** Everything you can connect to, in one list: the fleet, the servers, the
  *  local shell, and a one-off target that is not worth saving. */
 export default function TargetRail({
-  servers, selection, online, filter, checkingAll, localSessions,
+  compact, servers, selection, online, filter, checkingAll, localSessions,
   sessionsFor, onSelect, onAction, onFilter, onCheckAll,
 }: Props) {
   const { t } = useT();
@@ -38,8 +41,13 @@ export default function TargetRail({
   const [protocol, setProtocol] = useState<ProtocolFilter>('');
   const closeMenu = useCallback(() => setMenu(null), []);
 
+  // A finger has no right button: holding it on an entry opens the same menu.
+  const press = useLongPress<MenuTarget>((at, target) => setMenu({ x: at.x, y: at.y, target, opener: at.el }));
+  const pick = (next: Selection) => { if (!press.wasLong()) onSelect(next); };
+
   const openMenu = (e: React.MouseEvent<HTMLButtonElement>, target: MenuTarget) => {
     e.preventDefault();
+    if (press.justFired()) return;
     const opener = e.currentTarget;
     // The menu key and Shift+F10 report no pointer position: open by the entry.
     const box = opener.getBoundingClientRect();
@@ -67,7 +75,8 @@ export default function TargetRail({
         label: count > 0 ? `${t('remote.menuSessions')} (${count})` : t('remote.menuSessions'),
         onSelect: run('sessions'),
       },
-      { key: 'window', icon: '⧉', label: t('remote.menuWindow'), onSelect: run('window') },
+      // A floating window has no room on a phone.
+      ...(compact ? [] : [{ key: 'window', icon: '⧉', label: t('remote.menuWindow'), onSelect: run('window') }]),
     ] : [];
     if (target.kind === 'server') {
       if (!terminal && hasFiles(target.server)) {
@@ -134,9 +143,10 @@ export default function TargetRail({
             return (
               <button key={server.id}
                 className={`rw-item ${selection.kind === 'server' && selection.id === server.id ? 'is-active' : ''}`}
-                title={t('remote.railMenuHint')}
+                title={t(compact ? 'remote.railLongPressHint' : 'remote.railMenuHint')}
                 aria-haspopup="menu"
-                onClick={() => onSelect({ kind: 'server', id: server.id })}
+                {...press.bind({ kind: 'server', server })}
+                onClick={() => pick({ kind: 'server', id: server.id })}
                 onContextMenu={(e) => openMenu(e, { kind: 'server', server })}>
                 <span className={`rw-lamp rw-lamp-${state}`} />
                 <span className="rw-item-name">{server.name}</span>
@@ -151,9 +161,10 @@ export default function TargetRail({
 
           <div className="rw-rail-label">{t('remote.otherGroup')}</div>
           <button className={`rw-item ${selection.kind === 'local' ? 'is-active' : ''}`}
-            title={t('remote.railMenuHint')}
+            title={t(compact ? 'remote.railLongPressHint' : 'remote.railMenuHint')}
             aria-haspopup="menu"
-            onClick={() => onSelect({ kind: 'local' })}
+            {...press.bind({ kind: 'local' })}
+            onClick={() => pick({ kind: 'local' })}
             onContextMenu={(e) => openMenu(e, { kind: 'local' })}>
             <span className="rw-lamp rw-lamp-local" />
             <span className="rw-item-name">{t('remote.localShell')}</span>

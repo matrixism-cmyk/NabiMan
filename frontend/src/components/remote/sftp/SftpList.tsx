@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useT } from '../../../i18n';
+import { useLongPress } from '../../common/useLongPress';
 import { formatSize, isFolder, modeString, SftpEntry } from './sftpApi';
 
 export interface Editing {
@@ -82,9 +83,29 @@ function describe(e: SftpEntry): string {
   return parts.join('  ·  ');
 }
 
+const coarsePointer = () => typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+
+/** A click as if Ctrl were held: what a tap means while picking several. */
+const adding = (e: React.MouseEvent) => ({ ...e, ctrlKey: true, metaKey: false, shiftKey: false }) as React.MouseEvent;
+
 export default function SftpList(props: Props) {
   const { t } = useT();
   const { entries, parent, selected, dropOn, editing, pathOf } = props;
+  // On a touch screen a tap opens, as phones do; a long press opens the menu
+  // and starts picking, after which taps add and remove rows until none is left.
+  const [picking, setPicking] = useState(false);
+  useEffect(() => { if (!selected.size) setPicking(false); }, [selected.size]);
+  const press = useLongPress<SftpEntry | null>((at, entry) => {
+    if (!entry) return;
+    setPicking(true);
+    props.onMenu({ preventDefault() {}, stopPropagation() {}, clientX: at.x, clientY: at.y, currentTarget: at.el } as unknown as React.MouseEvent, entry);
+  });
+  const tap = (e: React.MouseEvent, entry: SftpEntry) => {
+    if (press.wasLong()) return;
+    if (!press.wasTouch()) { props.onClick(e, entry); return; }
+    if (picking) props.onClick(adding(e), entry);
+    else props.onOpen(entry);
+  };
 
   return (
     <div className="sftp-rows" role="listbox" aria-multiselectable="true" aria-label={t('sftp.title')}>
@@ -92,6 +113,8 @@ export default function SftpList(props: Props) {
         <div
           className={`sftp-row is-up ${dropOn === parent ? 'is-drop' : ''}`}
           onDoubleClick={props.onUp}
+          {...press.bind(null)}
+          onClick={() => { if (press.wasTouch()) props.onUp(); }}
           onDragOver={(e) => props.onDragOverDir(e, parent)}
           onDrop={(e) => props.onDropDir(e, parent)}
           title={t('sftp.up')}
@@ -121,14 +144,16 @@ export default function SftpList(props: Props) {
               folder ? 'is-folder' : '',
               dropOn === path ? 'is-drop' : '',
             ].join(' ')}
-            draggable={!renaming}
-            onClick={(e) => props.onClick(e, entry)}
-            onDoubleClick={() => props.onOpen(entry)}
-            onContextMenu={(e) => props.onMenu(e, entry)}
+            // A finger's long press opens the menu; dragging rows out is for a mouse.
+            draggable={!renaming && !coarsePointer()}
+            {...press.bind(entry)}
+            onClick={(e) => tap(e, entry)}
+            onDoubleClick={() => { if (!press.wasTouch()) props.onOpen(entry); }}
+            onContextMenu={(e) => { if (press.justFired()) e.preventDefault(); else props.onMenu(e, entry); }}
             onDragStart={(e) => props.onDragStart(e, entry)}
             onDragEnd={() => props.onDragEnd(entry)}
             onPointerEnter={() => props.onPrefetch(entry, false)}
-            onPointerDown={() => props.onPrefetch(entry, true)}
+            onPointerDown={(e) => { press.bind(entry).onPointerDown(e); props.onPrefetch(entry, true); }}
             onDragOver={folder ? (e) => props.onDragOverDir(e, path) : undefined}
             onDrop={folder ? (e) => props.onDropDir(e, path) : undefined}
             title={describe(entry)}

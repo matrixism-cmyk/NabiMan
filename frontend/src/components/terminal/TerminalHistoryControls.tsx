@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import type { Terminal } from 'xterm';
 import TerminalHistoryBar, { HistoryPosition } from './TerminalHistoryBar';
 import { useT } from '../../i18n';
+import { scrollTerminalHistory } from './touchGestures';
 
 interface Props {
   screenId: string;
@@ -15,21 +16,9 @@ export default function TerminalHistoryControls({ screenId, position, connected,
   const historyRef = useRef<HTMLDivElement>(null);
   const { t } = useT();
   const scrollHistory = useCallback((direction: number) => {
-    const term = termRef.current;
-    if (!term) return;
-    if (term.buffer.active.type === 'normal') {
-      term.scrollLines(direction * 3);
-      return;
-    }
-    // tmux owns alternate-screen history. Send the same mouse wheel event
-    // as scrolling over its text, rather than moving xterm's empty viewport.
-    const screen = term.element?.querySelector('.xterm-screen');
-    if (!screen) return;
-    const rect = screen.getBoundingClientRect();
-    screen.dispatchEvent(new WheelEvent('wheel', {
-      bubbles: true, cancelable: true, deltaY: direction * 120,
-      clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2,
-    }));
+    // tmux owns alternate-screen history: it gets the wheel event a mouse
+    // over its text would send, rather than xterm's empty viewport moving.
+    if (termRef.current) scrollTerminalHistory(termRef.current, direction);
   }, [termRef]);
 
   useEffect(() => {

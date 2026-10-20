@@ -2,6 +2,7 @@ import { MutableRefObject, RefObject, useCallback, useEffect, useMemo, useRef } 
 import { Terminal } from 'xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { adoptGrid, attachWheelZoom, mirrorGrid } from './terminalChrome';
+import { attachTouchGestures } from './touchGestures';
 import {
   forgetFontSize, readFontSize, sessionZoomKey, storedSessionId, writeFontSize,
 } from './terminalStorage';
@@ -33,6 +34,8 @@ export interface TerminalZoom {
   refresh: () => void;
   /** Drop the zoom and go back to the size from settings. */
   forget: (settingsFontSize: number) => void;
+  /** Make the text a step larger (or smaller, below 0), kept like a Ctrl+wheel zoom. */
+  step: (delta: number) => void;
 }
 
 /**
@@ -124,19 +127,36 @@ export function useTerminalZoom({
     relayout();
   }, [relayout, storageKey, termRef]);
 
+  const zoomTo = useCallback((size: number) => {
+    const term = termRef.current;
+    if (!term) return;
+    const next = Math.min(28, Math.max(8, Math.round(size)));
+    term.options.fontSize = next;
+    manualRef.current = true;
+    writeFontSize(keyRef.current, next);
+    relayout();
+  }, [relayout, termRef]);
+
+  const step = useCallback((delta: number) => {
+    zoomTo((termRef.current?.options.fontSize || 14) + delta);
+  }, [termRef, zoomTo]);
+
   // Ctrl + wheel resizes the text of this window alone; a plain wheel goes to
-  // tmux (mouse mode) as scrollback.
+  // tmux (mouse mode) as scrollback. On a touch screen, a pinch resizes and a
+  // drag scrolls.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    return attachWheelZoom(el, () => termRef.current, relayout, (size) => {
+    const unWheel = attachWheelZoom(el, () => termRef.current, relayout, (size) => {
       manualRef.current = true;
       writeFontSize(keyRef.current, size);
     });
-  }, [containerRef, relayout, termRef]);
+    const unTouch = attachTouchGestures(el, () => termRef.current, zoomTo);
+    return () => { unWheel(); unTouch(); };
+  }, [containerRef, relayout, termRef, zoomTo]);
 
   // One stable object, so effects that depend on it do not re-run every render.
   return useMemo(() => ({
-    relayout, followOwnerGrid, adoptSessionZoom, storedSize, applyInitialLayout, refresh, forget,
-  }), [adoptSessionZoom, applyInitialLayout, followOwnerGrid, forget, refresh, relayout, storedSize]);
+    relayout, followOwnerGrid, adoptSessionZoom, storedSize, applyInitialLayout, refresh, forget, step,
+  }), [adoptSessionZoom, applyInitialLayout, followOwnerGrid, forget, refresh, relayout, storedSize, step]);
 }
