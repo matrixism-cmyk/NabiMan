@@ -10,6 +10,9 @@ interface Options {
   onText: (text: string) => void;
   /** Presses keys: Enter ("\r") for a spoken "엔터", DEL to take back a correction. */
   onKeys: (keys: string) => void;
+  /** While true the microphone sends silence: nothing heard is typed (an
+   *  answer being read aloud must not be taken for the next question). */
+  muted?: boolean;
 }
 
 /** Hands the microphone's samples over as they come, off the audio thread. */
@@ -30,7 +33,7 @@ const PAUSE_MS = 1200;
  * changing — or once the service makes it final; never twice. "엔터" presses
  * Enter. What is heard but not typed yet shows as `partial`.
  */
-export function useDictation({ open, onText, onKeys }: Options) {
+export function useDictation({ open, onText, onKeys, muted = false }: Options) {
   const [state, setState] = useState<DictationState>('idle');
   const [partial, setPartial] = useState('');
   const [error, setError] = useState('');
@@ -40,6 +43,8 @@ export function useDictation({ open, onText, onKeys }: Options) {
   const pause = useRef<number | undefined>(undefined);
   const handlers = useRef({ onText, onKeys });
   handlers.current = { onText, onKeys };
+  const mutedRef = useRef(muted);
+  mutedRef.current = muted;
 
   /** Brings the prompt up to what has been said. */
   const typeUpTo = useCallback((said: string) => {
@@ -84,7 +89,8 @@ export function useDictation({ open, onText, onKeys }: Options) {
       const source = audio.createMediaStreamSource(media);
       const feed = (samples: Float32Array) => {
         if (ws.readyState !== WebSocket.OPEN) return;
-        for (const frame of resampler.push(samples)) ws.send(frame);
+        // Muted, the stream goes on (the service keeps listening) but hears silence.
+        for (const frame of resampler.push(samples)) ws.send(mutedRef.current ? new ArrayBuffer(frame.byteLength) : frame);
       };
       const url = URL.createObjectURL(new Blob([TAP], { type: 'application/javascript' }));
       await audio.audioWorklet.addModule(url);

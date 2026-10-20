@@ -24,22 +24,40 @@ fn target(s: &Settings) -> Result<(bool, String, u16), String> {
     Ok((tls, host, port))
 }
 
-/// `GET /api/health` with the key: whether the service is up and takes it.
-pub(super) async fn health(s: &Settings, key: &str) -> Result<serde_json::Value, String> {
+/// An HTTP client for the service, connecting to `address` when one is set.
+async fn http(s: &Settings, timeout: Duration) -> Result<reqwest::Client, String> {
     let (_, host, port) = target(s)?;
-    let mut client = reqwest::Client::builder().timeout(Duration::from_secs(15));
+    let mut client = reqwest::Client::builder().timeout(timeout);
     if !s.address.is_empty() {
         let addr = tokio::net::lookup_host(&s.address).await.ok().and_then(|mut a| a.next())
             .ok_or("The connect-to address does not resolve")?;
         client = client.resolve(&host, std::net::SocketAddr::new(addr.ip(), if addr.port() == 0 { port } else { addr.port() }));
     }
-    let client = client.build().map_err(|e| e.to_string())?;
+    client.build().map_err(|e| e.to_string())
+}
+
+/// `GET /api/health` with the key: whether the service is up and takes it.
+pub(super) async fn health(s: &Settings, key: &str) -> Result<serde_json::Value, String> {
+    let client = http(s, Duration::from_secs(15)).await?;
     let res = client.get(format!("{}/api/health", s.url())).bearer_auth(key).send().await
         .map_err(|e| format!("Cannot reach the dictation service: {e}"))?;
     match res.status().as_u16() {
         200 => res.json().await.map_err(|e| format!("Unexpected answer: {e}")),
         401 | 403 => Err("The dictation service refused the API key".into()),
         code => Err(format!("The dictation service answered HTTP {code}")),
+    }
+}
+
+/// `POST /api/tts`: `text` read aloud, as a WAV file. Nothing is kept by the service.
+pub(super) async fn speak(s: &Settings, key: &str, body: &serde_json::Value) -> Result<Vec<u8>, String> {
+    let client = http(s, Duration::from_secs(120)).await?;
+    let res = client.post(format!("{}/api/tts", s.url())).bearer_auth(key).json(body).send().await
+        .map_err(|e| format!("Cannot reach the speech service: {e}"))?;
+    match res.status().as_u16() {
+        200 => res.bytes().await.map(|b| b.to_vec()).map_err(|e| format!("The speech was cut off: {e}")),
+        401 | 403 => Err("The speech service refused the API key".into()),
+        400 | 422 => Err(format!("The speech service could not read this: {}", res.text().await.unwrap_or_default().chars().take(200).collect::<String>())),
+        code => Err(format!("The speech service answered HTTP {code}")),
     }
 }
 

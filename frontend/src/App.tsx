@@ -123,6 +123,8 @@ function App() {
       hidden.add('config');
       hidden.add('vhost');
       hidden.add('remote');
+      hidden.add('claudeChat');
+      hidden.add('claudeSettings');
     }
     if (currentUser?.role === 'operator') {
       for (const tab of ['cron', 'backup', 'packages', 'database', 'usermgmt', 'enterpriseauth', 'accounts'] as Tab[]) {

@@ -39,6 +39,7 @@
     "smoke:preview": "node scripts/smoke-preview.js",
     "smoke:media": "node scripts/smoke-media.js",
     "smoke:mobile": "node scripts/smoke-mobile.js",
+    "smoke:claude": "node scripts/smoke-claude.js",
     "smoke:dictation": "node scripts/smoke-dictation.js"
   },
   "browserslist": {

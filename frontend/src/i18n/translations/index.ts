@@ -17,6 +17,7 @@ import noc from './noc';
 import terminal from './terminal';
 import sftp from './sftp';
 import remoteProtocols from './remote-protocols';
+import claude from './claude';
 
 export type Lang = 'ko' | 'en' | 'ja';
 
@@ -45,6 +46,7 @@ const translations: Record<string, Record<Lang, string>> = {
   ...noc,
   ...terminal,
   ...sftp,
+  ...claude,
   ...remoteProtocols,
 };
 

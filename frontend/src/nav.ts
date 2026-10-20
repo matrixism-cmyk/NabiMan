@@ -9,10 +9,11 @@ export type Tab =
   | 'mfa' | 'loginSessions' | 'scopeSettings' | 'notifications' | 'alertrules' | 'vhost' | 'ipblock' | 'license' | 'enterpriseauth'
   | 'mecDashboard' | 'mecNoc' | 'mecLive' | 'mecTenants' | 'mecNodes' | 'mecGpu' | 'mecFirewall'
   | 'mecStorage' | 'mecIngress' | 'mecJobs' | 'mecAudit' | 'mecHealth'
-  | 'mecSettings' | 'mecDiscovery' | 'mecUsers';
+  | 'mecSettings' | 'mecDiscovery' | 'mecUsers'
+  | 'claudeChat' | 'claudeSettings';
 
 export type Category =
-  | 'administration' | 'dashboard' | 'monitoring' | 'management' | 'security' | 'system' | 'remote' | 'mec';
+  | 'administration' | 'dashboard' | 'monitoring' | 'management' | 'security' | 'system' | 'remote' | 'mec' | 'claude';
 
 export interface CatDef {
   key: Category;
@@ -89,5 +90,10 @@ export const categories: CatDef[] = [
     { key: 'mecJobs', labelKey: 'tab.mecJobs' },
     { key: 'mecAudit', labelKey: 'tab.mecAudit' },
     { key: 'mecSettings', labelKey: 'tab.mecSettings' },
+  ]},
+  // Talking with Claude by voice; last, at the right end.
+  { key: 'claude', labelKey: 'cat.claude', tabs: [
+    { key: 'claudeChat', labelKey: 'tab.claudeChat' },
+    { key: 'claudeSettings', labelKey: 'tab.claudeSettings' },
   ]},
 ];

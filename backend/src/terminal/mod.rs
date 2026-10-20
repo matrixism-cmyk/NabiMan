@@ -4,6 +4,7 @@
 mod ssh_command;
 use ssh_command::build_ssh_command;
 
+mod claude_voice;
 mod dictation;
 mod handlers;
 mod history;
@@ -338,5 +339,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     paste_file::config(cfg);
     sftp::config(cfg);
     dictation::config(cfg);
+    claude_voice::config(cfg);
     share::config(cfg);
 }

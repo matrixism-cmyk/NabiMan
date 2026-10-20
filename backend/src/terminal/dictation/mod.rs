@@ -90,7 +90,7 @@ pub(crate) fn valid_key(key: &str) -> bool {
     key.starts_with("vk_") && key.len() <= 200 && key.chars().all(|c| c.is_ascii_graphic())
 }
 
-fn super_admin(req: &HttpRequest) -> Result<(), HttpResponse> {
+pub(crate) fn super_admin(req: &HttpRequest) -> Result<(), HttpResponse> {
     let users = req.app_data::<web::Data<crate::users::UserStore>>()
         .ok_or_else(|| HttpResponse::ServiceUnavailable().finish())?;
     let actor = crate::membership::actor(req, users)?;
@@ -164,6 +164,20 @@ async fn put_settings(req: HttpRequest, body: web::Json<Change>) -> HttpResponse
         Ok(()) => get_settings(req).await,
         Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<()>::error(&e)),
     }
+}
+
+/// `text` read aloud by the speech service in `speaker`'s voice, as WAV, with
+/// the key kept here; nothing is saved there.
+pub(crate) async fn speak(text: &str, speaker: &str, language: &str, instruct: &str) -> Result<Vec<u8>, String> {
+    let s = load();
+    let key = s.key().ok_or("Dictation is not set up: no API key for the speech service")?;
+    let body = serde_json::json!({ "text": text, "speaker": speaker, "language": language, "instruct": instruct, "save": false });
+    voice::speak(&s, &key, &body).await
+}
+
+/// Whether the speech service has a key, so the microphone and voice can work.
+pub(crate) fn ready() -> bool {
+    load().key().is_some()
 }
 
 /// Signs in to the service and asks whether it is ready.
