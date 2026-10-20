@@ -56,8 +56,10 @@ async function createLink(page, { password, readOnly }) {
   if (password) await page.fill('.share-dialog input[type="password"]', password);
   await page.locator('.share-dialog input[type="checkbox"]').setChecked(Boolean(readOnly));
   await page.click('.share-dialog button:has-text("링크 만들기")');
-  await page.waitForSelector('.share-created input');
-  const url = await page.$eval('.share-created input', (el) => el.value);
+  // The new link shows in full at the top of the dialog's list.
+  const created = '.share-dialog input[aria-label="공유 링크"]';
+  await page.waitForSelector(created);
+  const url = await page.$eval(created, (el) => el.value);
   await page.click('.share-dialog button:has-text("닫기")');
   await page.waitForTimeout(400);
   return url;
@@ -158,7 +160,7 @@ async function createLink(page, { password, readOnly }) {
   await owner.click('button:has-text("공유")');
   await owner.waitForSelector('.share-dialog');
   owner.once('dialog', (d) => d.accept());
-  await owner.locator('.share-list tr', { hasText: token.slice(0, 8) }).locator('button:has-text("취소")').click();
+  await owner.locator('.share-list tr', { hasText: token.slice(0, 8) }).locator('button:has-text("삭제")').click();
   await owner.waitForTimeout(1500);
   const revokedCtx = await browser.newContext();
   const revoked = await revokedCtx.newPage();

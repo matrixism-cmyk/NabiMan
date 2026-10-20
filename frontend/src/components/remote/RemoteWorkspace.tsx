@@ -9,6 +9,7 @@ import { pruneSessionZooms } from '../terminal/terminalStorage';
 import TerminalSettingsModal from '../terminal/TerminalSettingsModal';
 import ShareDialog from '../terminal/ShareDialog';
 import ShareLinksPanel from '../terminal/ShareLinksPanel';
+import SessionNameEdit from '../terminal/SessionNameEdit';
 import { SshKeyPanel } from '../SshKeyComponents';
 import MultiServerDashboard from '../MultiServerDashboard';
 import ServerForm from './ServerForm';
@@ -79,9 +80,7 @@ export default function RemoteWorkspace() {
       : (selection.kind === 'server' || selection.kind === 'local') && serverView === 'sessions') refetchSessions();
   }, [selection, overviewView, serverView, refetchSessions]);
 
-  const selectedServer = selection.kind === 'server'
-    ? servers.find(s => s.id === selection.id)
-    : undefined;
+  const selectedServer = selection.kind === 'server' ? servers.find(s => s.id === selection.id) : undefined;
 
   // A server deleted elsewhere must not leave the pane pointing at nothing.
   useEffect(() => {
@@ -103,10 +102,7 @@ export default function RemoteWorkspace() {
     : selection.kind === 'adhoc' && adhocTarget ? `ssh:${adhocTarget.user}@${adhocTarget.host}:${adhocTarget.port}`
     : null;
 
-  const targetSessions = useMemo(
-    () => (label ? sessions.filter(s => s.label === label) : []),
-    [sessions, label],
-  );
+  const targetSessions = useMemo(() => (label ? sessions.filter(s => s.label === label) : []), [sessions, label]);
   const liveCount = targetSessions.filter(s => s.alive).length;
 
   const terminalTarget: TerminalTarget | null =
@@ -272,12 +268,14 @@ export default function RemoteWorkspace() {
                 </span>
                 <button className="btn btn-secondary btn-sm" onClick={() => viewRef.current?.newSession()}>{t('terminal.newSession')}</button>
                 <button className="btn btn-secondary btn-sm" onClick={detach} title={t('remote.detachHint')}>⧉ {t('remote.detach')}</button>
-                {currentSessionId && (
+                {currentSessionId && (<>
+                  <SessionNameEdit sessionId={currentSessionId} onRenamed={refetchSessions}
+                    name={sessions.find(s => s.id === currentSessionId)?.title || ''} />
                   <button className="btn btn-secondary btn-sm"
                     onClick={() => { setShareTarget(currentSessionId); setShowShare(true); }} title={t('share.hint')}>
                     🔗 {t('share.button')}
                   </button>
-                )}
+                </>)}
               </>
             )}
             <button className="btn btn-secondary btn-sm" onClick={() => setShowSettings(true)} title={t('terminal.settings')}>⚙</button>

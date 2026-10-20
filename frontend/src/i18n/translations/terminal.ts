@@ -65,6 +65,8 @@ const t: T = {
   'terminal.shared': { ko: '내부 사용자 공유 중', en: 'Shared with users', ja: 'ユーザーと共有中' },
   'terminal.keepaliveShort': { ko: '유지', en: 'Keep', ja: '維持' },
   'terminal.rename': { ko: '이름 바꾸기', en: 'Rename', ja: '名前を変更' },
+  'terminal.sessionName': { ko: '세션 이름', en: 'Session name', ja: 'セッション名' },
+  'terminal.unnamedSession': { ko: '이름 없는 세션', en: 'Unnamed session', ja: '名前のないセッション' },
   'terminal.namePlaceholder': {
     ko: '예: 배포용 셸 (비우면 주소로 표시)',
     en: 'e.g. deploy shell (empty = show its address)',

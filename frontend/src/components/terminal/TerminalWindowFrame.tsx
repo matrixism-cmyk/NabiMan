@@ -1,9 +1,12 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import TerminalView, { TerminalStatus, TerminalViewHandle } from './TerminalView';
 import TerminalWithFiles from '../remote/TerminalWithFiles';
 import { useTerminalSettings } from './settings';
 import { useT } from '../../i18n';
 import ShareDialog from './ShareDialog';
+import SessionNameEdit from './SessionNameEdit';
+import { apiRequest } from '../../hooks/useApi';
+import type { SessionInfo } from '../remote/SessionsView';
 import { clamp, MIN_H, MIN_W, TASKBAR_H, TermWindow } from './windowGeometry';
 
 interface FrameProps {
@@ -21,12 +24,25 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
   const [status, setStatus] = useState<TerminalStatus>('connecting');
   const [sessionId, setSessionId] = useState('');
   const [showShare, setShowShare] = useState(false);
+  const [sessionName, setSessionName] = useState('');
+
+  // The window knows its session only by id; look its name up once attached.
+  useEffect(() => {
+    setSessionName('');
+    if (!sessionId) return;
+    let live = true;
+    apiRequest<SessionInfo[]>('/api/terminal/sessions')
+      .then(res => { if (live && res.success) setSessionName(res.data?.find(s => s.id === sessionId)?.title || ''); })
+      .catch(() => { /* the name stays blank; renaming still works */ });
+    return () => { live = false; };
+  }, [sessionId]);
 
   const beginDrag = (e: React.PointerEvent) => {
     // Pointer-down on a title-bar button must not start a drag: capturing the
     // pointer on the bar would swallow the pointerup and the button would
     // never see a click.
-    if ((e.target as HTMLElement).closest('button')) return;
+    // Nor may it while the name is being typed.
+    if ((e.target as HTMLElement).closest('button, input, form')) return;
     if (e.button > 0) return; // primary button (or touch) only
     if (win.maximized) return;
     const handle = e.currentTarget as HTMLElement;
@@ -109,10 +125,13 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
       <div
         className="term-window-bar"
         onPointerDown={beginDrag}
-        onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest('button')) toggleMaximize(); }}
+        onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest('button, input, form')) toggleMaximize(); }}
       >
         <span className={`term-window-dot term-window-dot-${status}`} />
         <span className="term-window-title">{win.title}</span>
+        {sessionId && (
+          <SessionNameEdit variant="bar" sessionId={sessionId} name={sessionName} onRenamed={setSessionName} />
+        )}
         <span className="term-window-sub">{win.subtitle}</span>
         <span className="term-window-actions">
           <button
@@ -162,7 +181,7 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
         </TerminalWithFiles>
       </div>
       {showShare && sessionId && (
-        <ShareDialog sessionId={sessionId} sessionLabel={`${win.title} · ${win.subtitle}`} onClose={() => setShowShare(false)} />
+        <ShareDialog sessionId={sessionId} sessionLabel={sessionName || `${win.title} · ${win.subtitle}`} onClose={() => setShowShare(false)} />
       )}
       <div className="term-resize term-resize-e" onPointerDown={(e) => beginResize(e, 'e')} />
       <div className="term-resize term-resize-s" onPointerDown={(e) => beginResize(e, 's')} />

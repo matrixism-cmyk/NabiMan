@@ -31,7 +31,8 @@
     "smoke:paste": "node scripts/smoke-paste.js",
     "smoke:zoom": "node scripts/smoke-zoom.js",
     "smoke:rail": "node scripts/smoke-rail.js",
-    "smoke:sftp": "node scripts/smoke-sftp.js"
+    "smoke:sftp": "node scripts/smoke-sftp.js",
+    "smoke:rename": "node scripts/smoke-rename.js"
   },
   "browserslist": {
     "production": [

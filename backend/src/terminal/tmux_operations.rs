@@ -153,13 +153,13 @@ pub(crate) fn create_tmux_session(
     // native terminal — otherwise, in tmux's alternate screen, xterm.js turns
     // the wheel into arrow keys, which bash treats as command-history nav.
     let _ = tmux()
-        .args(["set-option", "-t", &exact_session(name), "mouse", "on"])
+        .args(["set-option", "-t", &exact_pane(name), "mouse", "on"])
         .output();
     let _ = tmux()
         .args([
             "set-option",
             "-t",
-            &exact_session(name),
+            &exact_pane(name),
             "history-limit",
             &scrollback.to_string(),
         ])
@@ -169,7 +169,7 @@ pub(crate) fn create_tmux_session(
         .args([
             "set-option",
             "-t",
-            &exact_session(name),
+            &exact_pane(name),
             "destroy-unattached",
             "off",
         ])
