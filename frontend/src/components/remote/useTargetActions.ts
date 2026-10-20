@@ -4,6 +4,7 @@ import { RemoteServer, RemoteServerStatus } from '../../types';
 import { useT } from '../../i18n';
 import { TerminalTarget, TerminalViewHandle } from '../terminal/TerminalView';
 import { sidKey, writeStored } from '../terminal/terminalStorage';
+import { hasFiles, hasTerminal } from './protocols';
 import { RailAction, Selection, ServerView } from './workspaceState';
 
 interface Options {
@@ -42,8 +43,8 @@ export function useTargetActions({
   const targetFor = (target: Selection): TerminalTarget | null => {
     if (target.kind === 'local') return { kind: 'local' };
     const server = target.kind === 'server' ? servers.find(s => s.id === target.id) : undefined;
-    return server
-      ? { kind: 'ssh', host: server.host, port: server.port, user: server.user, serverId: server.id }
+    return server && hasTerminal(server)
+      ? { kind: 'ssh', host: server.host, port: server.port, user: server.user, serverId: server.id, noFiles: !hasFiles(server) }
       : null;
   };
 
@@ -71,7 +72,7 @@ export function useTargetActions({
     const server = target.kind === 'server' ? servers.find(s => s.id === target.id) : undefined;
     if (action === 'connect' || action === 'newSession') { connectTo(target, action === 'newSession'); return; }
     if (action === 'sessions') { select(target, 'sessions'); refetchSessions(); return; }
-    if (action === 'status' || action === 'exec') { select(target, action); return; }
+    if (action === 'status' || action === 'exec' || action === 'files') { select(target, action); return; }
     if (action === 'edit') { select(target, 'settings'); return; }
     if (action === 'window') {
       const terminal = targetFor(target);

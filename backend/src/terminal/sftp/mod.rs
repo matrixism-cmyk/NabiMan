@@ -1,6 +1,6 @@
 //! Files next to a terminal: browse, upload, download, make folders, move,
-//! rename and delete — on a saved server over SFTP, or on this machine for
-//! the local shell.
+//! rename and delete — on a saved server over SFTP or FTP/FTPS, or on this
+//! machine for the local shell.
 //!
 //! It lives under `/api/terminal/` on purpose. Reading and writing a machine's
 //! files is the same power as a shell on it, so it is granted to exactly the
@@ -10,6 +10,7 @@
 
 mod folder;
 mod fs;
+pub(crate) mod ftp;
 mod handlers;
 pub(crate) mod links;
 mod parts;
@@ -23,6 +24,7 @@ use actix_web::{web, HttpRequest, HttpResponse};
 
 use crate::models::{ApiResponse, RemoteServer};
 use fs::{Fs, FsError};
+pub(crate) use pool::check as sftp_check;
 use sha2::Digest;
 
 /// The scope that means "this machine" rather than a saved server.
@@ -76,7 +78,7 @@ fn account_target(req: &HttpRequest, scope: &str) -> Result<Target, HttpResponse
         Ok(None) => return Err(fail(StatusCode::NOT_FOUND, "Saved server not found")),
         Err(e) => return Err(fail(StatusCode::SERVICE_UNAVAILABLE, &e)),
     };
-    super::remote_access::RemoteBinding::from_server(&server).map_err(|e| bad(&e))?;
+    files_allowed(&server).map_err(|e| bad(&e))?;
     Ok(Target { pool_user: user_id, scope: scope.into(), server: Some(server), base, share: None })
 }
 
@@ -120,7 +122,7 @@ fn share_target(req: &HttpRequest, token: &str) -> Result<(Target, bool), HttpRe
     let server = match &session.remote_binding {
         None => None,
         Some(binding) => match crate::remote_servers::find_server(binding.server_id()) {
-            Ok(Some(server)) => Some(server),
+            Ok(Some(server)) if files_allowed(&server).is_ok() => Some(server),
             _ => return Err(ended()),
         },
     };
@@ -135,14 +137,25 @@ fn share_target(req: &HttpRequest, token: &str) -> Result<(Target, bool), HttpRe
     Ok((target, link.files == ShareFiles::Write))
 }
 
+/// Whether a saved server's files can be opened at all: it has a way to
+/// reach them, and SFTP's host key has been approved.
+pub(crate) fn files_allowed(server: &RemoteServer) -> Result<(), String> {
+    match server.files.as_str() {
+        "sftp" => super::remote_access::ssh_approved(server),
+        "ftp" | "ftps" => Ok(()),
+        _ => Err("This server has no file access set up".into()),
+    }
+}
+
 impl Target {
     async fn fs(&self) -> Result<Fs, HttpResponse> {
+        let unreachable = |e: String| fail(StatusCode::BAD_GATEWAY, &e);
         match &self.server {
             None => Ok(Fs::Local),
-            Some(server) => pool::session(&self.pool_user, server)
-                .await
-                .map(Fs::Remote)
-                .map_err(|e| fail(StatusCode::BAD_GATEWAY, &e)),
+            Some(server) if server.uses_ftp() => {
+                ftp::session(&self.pool_user, server).await.map(Fs::Ftp).map_err(unreachable)
+            }
+            Some(server) => pool::session(&self.pool_user, server).await.map(Fs::Remote).map_err(unreachable),
         }
     }
     /// A failure as an answer. A broken connection is dropped, so the next
@@ -151,6 +164,7 @@ impl Target {
         if e.broken {
             if let Some(server) = &self.server {
                 pool::forget(&self.pool_user, server);
+                ftp::forget(&self.pool_user, server);
             }
         }
         fail(e.status, &e.message)

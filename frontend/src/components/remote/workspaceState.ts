@@ -1,5 +1,3 @@
-import { RemoteServer } from '../../types';
-
 /** What the work area is currently about. */
 export type Selection =
   | { kind: 'overview' }
@@ -13,11 +11,11 @@ export type Selection =
  * opens on its sessions, so you see what is already running there before you
  * start anything new.
  */
-export type ServerView = 'sessions' | 'terminal' | 'status' | 'exec' | 'settings';
+export type ServerView = 'sessions' | 'terminal' | 'files' | 'status' | 'exec' | 'settings';
 
 /** What the right-click menu on a rail entry can do with it. */
 export type RailAction =
-  | 'connect' | 'newSession' | 'sessions' | 'window'
+  | 'connect' | 'newSession' | 'sessions' | 'window' | 'files'
   | 'status' | 'exec' | 'check' | 'edit' | 'delete';
 
 /** Which view of the fleet overview is showing. */
@@ -68,6 +66,4 @@ export function rememberPaneState(state: PaneState) {
 }
 
 /** The tmux label the backend gives a session on this server. */
-export function sessionLabel(server: RemoteServer): string {
-  return `ssh:${server.user}@${server.host}:${server.port}`;
-}
+export { sessionLabel } from './protocols';

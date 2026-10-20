@@ -16,6 +16,7 @@ import mecWizard from './mec-wizard';
 import noc from './noc';
 import terminal from './terminal';
 import sftp from './sftp';
+import remoteProtocols from './remote-protocols';
 
 export type Lang = 'ko' | 'en' | 'ja';
 
@@ -44,6 +45,7 @@ const translations: Record<string, Record<Lang, string>> = {
   ...noc,
   ...terminal,
   ...sftp,
+  ...remoteProtocols,
 };
 
 export default translations;

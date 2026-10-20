@@ -29,6 +29,42 @@ pub struct RemoteServer {
     /// Approval generation survives revocation to prevent an ABA stale update.
     #[serde(default)]
     pub host_trust_version: String,
+    /// How a terminal reaches it: `ssh`, `telnet` or `none`. Records saved
+    /// before this existed are SSH servers.
+    #[serde(default = "default_terminal")]
+    pub terminal: String,
+    /// How its files are reached: `sftp`, `ftps`, `ftp` or `none`.
+    #[serde(default = "default_files")]
+    pub files: String,
+    /// The FTP control port; SSH and Telnet use `port`.
+    #[serde(default = "default_ftp_port")]
+    pub ftp_port: u16,
+    /// An FTPS certificate the operator verified by hand (`SHA256:…`), for a
+    /// server whose certificate no public authority vouches for. Empty means
+    /// the certificate must be valid for the host name.
+    #[serde(default)]
+    pub tls_fingerprint: String,
+}
+
+fn default_terminal() -> String {
+    "ssh".into()
+}
+fn default_files() -> String {
+    "sftp".into()
+}
+fn default_ftp_port() -> u16 {
+    21
+}
+
+impl RemoteServer {
+    /// Some part of it runs over SSH, so its host key has to be approved.
+    pub fn uses_ssh(&self) -> bool {
+        self.terminal == "ssh" || self.files == "sftp"
+    }
+    /// FTP or FTPS, which have a connection of their own.
+    pub fn uses_ftp(&self) -> bool {
+        self.files == "ftp" || self.files == "ftps"
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -45,6 +81,16 @@ pub struct RemoteServerStatus {
     pub disk: String,
     pub load: String,
     pub checked_at: String,
+    /// One line per way of reaching it that was tried, such as SSH and FTP.
+    #[serde(default)]
+    pub checks: Vec<ProtocolCheck>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct ProtocolCheck {
+    pub protocol: String,
+    pub ok: bool,
+    pub message: String,
 }
 
 #[derive(Deserialize)]
@@ -58,6 +104,10 @@ pub struct AddRemoteServerRequest {
     pub memo: Option<String>,
     /// Optional SSH password, stored encrypted.
     pub password: Option<String>,
+    pub terminal: Option<String>,
+    pub files: Option<String>,
+    pub ftp_port: Option<u16>,
+    pub tls_fingerprint: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -72,6 +122,10 @@ pub struct UpdateRemoteServerRequest {
     /// `Some("")` clears the stored password, `Some(pw)` replaces it,
     /// `None` leaves it untouched.
     pub password: Option<String>,
+    pub terminal: Option<String>,
+    pub files: Option<String>,
+    pub ftp_port: Option<u16>,
+    pub tls_fingerprint: Option<String>,
 }
 
 #[derive(Deserialize)]

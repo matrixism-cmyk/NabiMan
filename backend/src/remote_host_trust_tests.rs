@@ -29,6 +29,10 @@ fn server_record(public_key: String, fingerprint: String, port: u16) -> RemoteSe
             verified_at: String::new(),
             reason: "Console verification".into(),
         }),
+        terminal: "ssh".into(),
+        files: "sftp".into(),
+        ftp_port: 21,
+        tls_fingerprint: String::new(),
     }
 }
 

@@ -26,7 +26,7 @@ interface Props {
 export function filesScope(target: TerminalTarget | null): string | null {
   if (!target) return null;
   if (target.kind === 'local') return 'local';
-  return target.serverId || null;
+  return target.noFiles ? null : target.serverId || null;
 }
 const MIN_WIDTH = 240;
 const MIN_TERMINAL = 320;

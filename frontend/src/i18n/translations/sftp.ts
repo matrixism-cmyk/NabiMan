@@ -40,6 +40,7 @@ const t: T = {
   'sftp.truncated': { ko: '항목이 너무 많아 {count}개까지만 보여 줍니다.', en: 'Too many entries; showing the first {count}.', ja: '項目が多すぎるため最初の {count} 件のみ表示します。' },
   'sftp.selected': { ko: '{count}개 선택됨', en: '{count} selected', ja: '{count} 件選択' },
   'sftp.dragHint': { ko: '파일을 끌어다 놓으면 올라갑니다. 항목을 폴더로 끌면 옮겨지고, 터미널로 끌면 경로가 입력되며, 바탕화면으로 끌면 내려받습니다.', en: 'Drop files to upload. Drag items onto a folder to move them, onto the terminal to type their paths, or onto the desktop to download.', ja: 'ドロップでアップロード。フォルダーへドラッグで移動、ターミナルへでパス入力、デスクトップへでダウンロードします。' },
+  'sftp.dragHintNoTerminal': { ko: '파일을 끌어다 놓으면 올라갑니다. 항목을 폴더로 끌면 옮겨지고, 바탕화면으로 끌면 내려받습니다.', en: 'Drop files to upload. Drag items onto a folder to move them, or onto the desktop to download.', ja: 'ドロップでアップロード。フォルダーへドラッグで移動、デスクトップへでダウンロードします。' },
   'sftp.dropOnTerminal': { ko: '놓으면 경로가 입력됩니다', en: 'Drop to type the path', ja: 'ドロップでパスを入力' },
   'sftp.transfers': { ko: '전송', en: 'Transfers', ja: '転送' },
   'sftp.clearDone': { ko: '끝난 항목 지우기', en: 'Clear finished', ja: '完了分を消去' },

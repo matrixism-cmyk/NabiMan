@@ -19,6 +19,10 @@ import TargetSessionsView from './TargetSessionsView';
 import TargetRail from './TargetRail';
 import AdhocConnect from './AdhocConnect';
 import TerminalWithFiles from './TerminalWithFiles';
+import WorkspaceTabs, { viewFor } from './WorkspaceTabs';
+import FilesView from './FilesView';
+import ProtocolBadges from './ProtocolBadges';
+import { addressOf, hasFiles, hasTerminal } from './protocols';
 import { useTargetActions } from './useTargetActions';
 import {
   OverviewView, readPaneState, readSelection, rememberPaneState, rememberSelection, Selection, ServerView,
@@ -46,7 +50,7 @@ export default function RemoteWorkspace() {
 
   const [restored] = useState(readPaneState);
   const [selection, setSelection] = useState<Selection>(readSelection);
-  const [serverView, setServerView] = useState<ServerView>(restored.view);
+  const [chosenView, setServerView] = useState<ServerView>(restored.view);
   const [overviewView, setOverviewView] = useState<OverviewView>('summary');
   const [manualPassword, setManualPassword] = useState(false);
   const [joinSessionId, setJoinSessionId] = useState<string | undefined>(restored.join);
@@ -64,8 +68,8 @@ export default function RemoteWorkspace() {
 
   useEffect(() => {
     rememberSelection(selection);
-    rememberPaneState({ view: serverView, connected: Array.from(connected), join: joinSessionId });
-  }, [selection, serverView, connected, joinSessionId]);
+    rememberPaneState({ view: chosenView, connected: Array.from(connected), join: joinSessionId });
+  }, [selection, chosenView, connected, joinSessionId]);
 
   // Each session remembers the size it was zoomed to; drop the sizes of
   // sessions that have since ended.
@@ -73,14 +77,16 @@ export default function RemoteWorkspace() {
     if (sessionData) pruneSessionZooms(sessions.filter(s => s.alive).map(s => s.id));
   }, [sessionData, sessions]);
 
+  const selectedServer = selection.kind === 'server' ? servers.find(s => s.id === selection.id) : undefined;
+  // A files-only server has no sessions or terminal to open on.
+  const serverView = viewFor(selectedServer, chosenView);
+
   // Opening a session list (the fleet's or a target's), or starting a new
   // shell, should show the current state, not whatever the last poll caught.
   useEffect(() => {
     if (selection.kind === 'overview' ? overviewView === 'sessions'
       : (selection.kind === 'server' || selection.kind === 'local') && serverView === 'sessions') refetchSessions();
   }, [selection, overviewView, serverView, refetchSessions]);
-
-  const selectedServer = selection.kind === 'server' ? servers.find(s => s.id === selection.id) : undefined;
 
   // A server deleted elsewhere must not leave the pane pointing at nothing.
   useEffect(() => {
@@ -107,9 +113,9 @@ export default function RemoteWorkspace() {
 
   const terminalTarget: TerminalTarget | null =
     selection.kind === 'local' ? { kind: 'local' }
-    : selection.kind === 'server' && selectedServer
+    : selection.kind === 'server' && selectedServer && hasTerminal(selectedServer)
       ? { kind: 'ssh', host: selectedServer.host, port: selectedServer.port, user: selectedServer.user,
-          serverId: selectedServer.id, skipSavedPassword: manualPassword }
+          serverId: selectedServer.id, skipSavedPassword: manualPassword, noFiles: !hasFiles(selectedServer) }
     : selection.kind === 'adhoc' && adhocTarget
       ? { kind: 'ssh', host: adhocTarget.host, port: adhocTarget.port, user: adhocTarget.user }
     : null;
@@ -162,8 +168,8 @@ export default function RemoteWorkspace() {
     const server = servers.find(s => sessionLabel(s) === session.label);
     openTerminal(
       server
-        ? { kind: 'ssh', host: server.host, port: server.port, user: server.user, serverId: server.id }
-        : { kind: session.label.startsWith('ssh:') ? 'ssh' : 'local' },
+        ? { kind: 'ssh', host: server.host, port: server.port, user: server.user, serverId: server.id, noFiles: !hasFiles(server) }
+        : { kind: session.label === 'local' ? 'local' : 'ssh' },
       { title: server?.name || session.label, joinSessionId: session.id },
     );
   };
@@ -185,7 +191,7 @@ export default function RemoteWorkspace() {
 
   const isServerTarget = selection.kind === 'server' && Boolean(selectedServer);
   /** Targets that open on their session list: a saved server or the local shell. */
-  const hasSessionsView = isServerTarget || selection.kind === 'local';
+  const hasSessionsView = (isServerTarget && Boolean(selectedServer && hasTerminal(selectedServer))) || selection.kind === 'local';
   const showTerminalPane = attached && Boolean(terminalTarget);
   // "This pane" is the pane mounted for this target, even kept behind the list.
   const currentSessionId = showTerminalPane ? paneSessions[storageKey] || '' : '';
@@ -200,7 +206,7 @@ export default function RemoteWorkspace() {
     : selectedServer?.name || '';
 
   const headSub = selection.kind === 'server' && selectedServer
-    ? `${selectedServer.user}@${selectedServer.host}:${selectedServer.port}`
+    ? addressOf(selectedServer)
     : selection.kind === 'adhoc' && adhocTarget
       ? `${adhocTarget.user}@${adhocTarget.host}:${adhocTarget.port}`
       : selection.kind === 'local' ? t('remote.localShellHint')
@@ -226,6 +232,7 @@ export default function RemoteWorkspace() {
         <header className="rw-head">
           <div className="rw-head-title">
             <h2>{headTitle}</h2>
+            {selectedServer && <ProtocolBadges server={selectedServer} />}
             {headSub && <code>{headSub}</code>}
             {selectedServer?.has_password && (
               <span className="tag-badge" title={t('remote.passwordStoredHint')}>🔑 {t('remote.passwordStored')}</span>
@@ -233,29 +240,9 @@ export default function RemoteWorkspace() {
             {selectedServer?.tags.map(tag => <span key={tag} className="tag-badge">{tag}</span>)}
           </div>
 
-          <nav className="rw-tabs">
-            {selection.kind === 'overview' && (
-              <>
-                <button className={overviewView === 'summary' ? 'is-active' : ''} onClick={() => setOverviewView('summary')}>{t('remote.summaryTab')}</button>
-                <button className={overviewView === 'sessions' ? 'is-active' : ''} onClick={() => setOverviewView('sessions')}>{t('remote.sessionsTab')} {sessions.length > 0 && <em>{sessions.length}</em>}</button>
-                <button className={overviewView === 'links' ? 'is-active' : ''} onClick={() => setOverviewView('links')}>{t('share.panelTab')}</button>
-                <button className={overviewView === 'keys' ? 'is-active' : ''} onClick={() => setOverviewView('keys')}>{t('remote.sshKey')}</button>
-              </>
-            )}
-            {hasSessionsView && (
-              <>
-                <button className={serverView === 'sessions' ? 'is-active' : ''} onClick={() => setServerView('sessions')}>{t('remote.sessionsTab')} {liveCount > 0 && <em>{liveCount}</em>}</button>
-                <button className={serverView === 'terminal' ? 'is-active' : ''} onClick={() => setServerView('terminal')}>{t('tab.terminal')}</button>
-              </>
-            )}
-            {isServerTarget && (
-              <>
-                <button className={serverView === 'status' ? 'is-active' : ''} onClick={() => setServerView('status')}>{t('remote.statusView')}</button>
-                <button className={serverView === 'exec' ? 'is-active' : ''} onClick={() => setServerView('exec')}>{t('remote.exec')}</button>
-                <button className={serverView === 'settings' ? 'is-active' : ''} onClick={() => setServerView('settings')}>{t('common.settings')}</button>
-              </>
-            )}
-          </nav>
+          <WorkspaceTabs selection={selection} server={selectedServer} overviewView={overviewView}
+            onOverviewView={setOverviewView} serverView={serverView} onServerView={setServerView}
+            allSessions={sessions.length} liveCount={liveCount} />
 
           <div className="rw-head-actions">
             {showTerminalPane && terminalVisible && (
@@ -368,6 +355,7 @@ export default function RemoteWorkspace() {
             }} />
           )}
 
+          {isServerTarget && selectedServer && serverView === 'files' && <FilesView server={selectedServer} />}
           {isServerTarget && selectedServer && serverView === 'status' && (
             <div className="rw-view rw-view-scroll"><ServerStatusView server={selectedServer} /></div>
           )}

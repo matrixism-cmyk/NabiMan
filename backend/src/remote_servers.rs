@@ -1,6 +1,10 @@
 #[path = "remote_server_operations.rs"]
 mod operations;
 use operations::*;
+#[path = "remote_protocols.rs"]
+pub(crate) mod protocols;
+#[path = "remote_check.rs"]
+pub(crate) mod check;
 
 use crate::models::{
     AddRemoteServerRequest, ApiResponse, RemoteExecRequest, RemoteServer, RemoteServerStatus,
@@ -105,13 +109,6 @@ fn validate_host(s: &str) -> bool {
             .all(|c| c.is_alphanumeric() || c == '.' || c == '-' || c == ':')
 }
 
-fn validate_user(s: &str) -> bool {
-    !s.is_empty()
-        && s.len() < 64
-        && s.chars()
-            .all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == '.')
-}
-
 // --- Handlers ---
 
 async fn list_servers(
@@ -144,10 +141,8 @@ async fn add_server(body: web::Json<AddRemoteServerRequest>) -> HttpResponse {
         return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error("Invalid hostname"));
     }
     let user = body.user.as_deref().unwrap_or("root");
-    if !validate_user(user) {
-        return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error("Invalid username"));
-    }
-    let port = body.port.unwrap_or(22);
+    let terminal = body.terminal.as_deref().unwrap_or("ssh");
+    let port = body.port.unwrap_or_else(|| protocols::default_port(terminal));
     if port == 0 {
         return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error("Invalid port"));
     }
@@ -179,7 +174,7 @@ async fn add_server(body: web::Json<AddRemoteServerRequest>) -> HttpResponse {
         }
     });
 
-    let server = RemoteServer {
+    let mut server = RemoteServer {
         id: generate_id(),
         name: body.name.clone(),
         host: body.host.clone(),
@@ -195,7 +190,24 @@ async fn add_server(body: web::Json<AddRemoteServerRequest>) -> HttpResponse {
         has_password: !password.is_empty(),
         host_trust_version: uuid::Uuid::new_v4().to_string(),
         host_trust: None,
+        terminal: "ssh".into(),
+        files: "sftp".into(),
+        ftp_port: 21,
+        tls_fingerprint: String::new(),
     };
+    protocols::apply(&mut server, &protocols::Change {
+        terminal: body.terminal.as_deref(),
+        files: body.files.as_deref(),
+        ftp_port: body.ftp_port,
+        tls_fingerprint: body.tls_fingerprint.as_deref(),
+    });
+    if let Err(e) = protocols::check(&server) {
+        return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error(e));
+    }
+    // Keys are an SSH thing; Telnet and FTP log in with a password.
+    if !server.uses_ssh() {
+        server.auth_method = "password".into();
+    }
 
     let _guard = SERVER_WRITES.lock().unwrap_or_else(|e| e.into_inner());
     let mut servers = match load_servers() {
@@ -254,10 +266,20 @@ async fn update_server(
         srv.port = port;
     }
     if let Some(ref user) = body.user {
-        if !validate_user(user) {
-            return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error("Invalid username"));
-        }
         srv.user = user.clone();
+    }
+    let reached_differently = protocols::apply(srv, &protocols::Change {
+        terminal: body.terminal.as_deref(),
+        files: body.files.as_deref(),
+        ftp_port: body.ftp_port,
+        tls_fingerprint: body.tls_fingerprint.as_deref(),
+    });
+    if reached_differently {
+        srv.status = "unknown".into();
+        srv.last_checked.clear();
+    }
+    if let Err(e) = protocols::check(srv) {
+        return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error(e));
     }
     if let Some(ref method) = body.auth_method {
         srv.auth_method = method.clone();
@@ -330,6 +352,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
                 web::put().to(crate::remote_host_trust::update),
             )
             .route("/{id}/check", web::post().to(check_server))
+            .route("/{id}/detect", web::post().to(check::detect))
             .route("/{id}/exec", web::post().to(exec_on_server))
             .route("/{id}/deploy-key", web::post().to(ssh_keys::deploy_key))
             .route("/{id}/test-key", web::post().to(ssh_keys::test_key_handler)),

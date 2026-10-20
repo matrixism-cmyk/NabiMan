@@ -5,6 +5,8 @@ import { useT } from '../../i18n';
 import { DeployKeyDialog } from '../SshKeyComponents';
 import ServerForm from './ServerForm';
 import HostTrustForm from './HostTrustForm';
+import ProtocolDetect, { CheckList } from './ProtocolDetect';
+import { hasShell, usesSsh } from './protocols';
 
 /** Live facts about one server: probe it and show what came back. */
 export function ServerStatusView({ server }: { server: RemoteServer }) {
@@ -34,7 +36,9 @@ export function ServerStatusView({ server }: { server: RemoteServer }) {
             : t('remote.checkHint')}
         </p>
       )}
-      {status && (
+      {status?.checks && status.checks.length > 0 && <CheckList checks={status.checks} />}
+      {status && !hasShell(server) && <p className="text-secondary">{t('remote.noShellStats')}</p>}
+      {status && hasShell(server) && status.status !== 'offline' && (
         <div className="server-status-grid">
           <div className="status-item"><label>{t('remote.hostname')}</label><span>{status.hostname}</span></div>
           <div className="status-item"><label>{t('remote.os')}</label><span>{status.os}</span></div>
@@ -93,6 +97,9 @@ export function ServerSettingsView({ server, onChanged, onDeleted }: SettingsPro
   const [showDeploy, setShowDeploy] = useState(false);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
+  // Approving the host key is when SSH can first be tried.
+  const [approved, setApproved] = useState(0);
+  const ssh = usesSsh(server);
 
   const remove = async () => {
     if (!window.confirm(t('remote.deleteConfirm', { name: server.name }))) return;
@@ -108,16 +115,22 @@ export function ServerSettingsView({ server, onChanged, onDeleted }: SettingsPro
       <div className="rw-section-head">
         <h3>{t('remote.editServer')}</h3>
         <div className="btn-group">
-          <button className="btn btn-secondary btn-sm" onClick={() => setShowDeploy(v => !v)}>
-            {showDeploy ? t('remote.hideKey') : t('remote.deployKey')}
-          </button>
+          {hasShell(server) && (
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowDeploy(v => !v)}>
+              {showDeploy ? t('remote.hideKey') : t('remote.deployKey')}
+            </button>
+          )}
           <button className="btn btn-danger btn-sm" disabled={deleting} onClick={remove}>{t('common.delete')}</button>
         </div>
       </div>
       {error && <div role="alert" className="message">{error}</div>}
-      {showDeploy && <DeployKeyDialog server={server} onClose={() => setShowDeploy(false)} />}
-      <HostTrustForm key={`${server.id}:${server.host}:${server.port}:${server.host_trust?.fingerprint || ""}`} server={server} onSaved={onChanged} />
-      <ServerForm key={server.id} server={server} onSaved={onChanged} />
+      {hasShell(server) && showDeploy && <DeployKeyDialog server={server} onClose={() => setShowDeploy(false)} />}
+      {ssh && (
+        <HostTrustForm key={`${server.id}:${server.host}:${server.port}:${server.host_trust?.fingerprint || ""}`} server={server}
+          onSaved={(approvedNow) => { onChanged(); if (approvedNow) setApproved(n => n + 1); }} />
+      )}
+      <ProtocolDetect server={server} onChanged={onChanged} trigger={approved} />
+      <ServerForm key={`${server.id}:${server.terminal || 'ssh'}:${server.files || 'sftp'}`} server={server} onSaved={onChanged} />
     </div>
   );
 }

@@ -2,6 +2,10 @@ import React, { useCallback, useState } from 'react';
 import { RemoteServer } from '../../types';
 import { useT } from '../../i18n';
 import RailContextMenu, { RailMenuItem } from './RailContextMenu';
+import ProtocolBadges from './ProtocolBadges';
+import {
+  addressOf, hasFiles, hasShell, hasTerminal, matchesProtocol, PROTOCOL_FILTERS, protocolName, protocolsOf, ProtocolFilter,
+} from './protocols';
 import { RailAction, Selection } from './workspaceState';
 
 interface Props {
@@ -31,6 +35,7 @@ export default function TargetRail({
 }: Props) {
   const { t } = useT();
   const [menu, setMenu] = useState<OpenMenu | null>(null);
+  const [protocol, setProtocol] = useState<ProtocolFilter>('');
   const closeMenu = useCallback(() => setMenu(null), []);
 
   const openMenu = (e: React.MouseEvent<HTMLButtonElement>, target: MenuTarget) => {
@@ -52,7 +57,9 @@ export default function TargetRail({
       ? { kind: 'server', id: target.server.id } : { kind: 'local' };
     const run = (action: RailAction) => () => onAction(selectionOf, action);
     const count = target.kind === 'server' ? sessionsFor(target.server) : localSessions;
-    const items: RailMenuItem[] = [
+    // A server offers only what it is set up for: no terminal, no sessions.
+    const terminal = target.kind === 'local' || hasTerminal(target.server);
+    const items: RailMenuItem[] = terminal ? [
       { key: 'connect', icon: '▶', label: t('remote.menuConnect'), onSelect: run('connect') },
       { key: 'newSession', icon: '＋', label: t('remote.menuNewSession'), onSelect: run('newSession') },
       {
@@ -61,11 +68,14 @@ export default function TargetRail({
         onSelect: run('sessions'),
       },
       { key: 'window', icon: '⧉', label: t('remote.menuWindow'), onSelect: run('window') },
-    ];
+    ] : [];
     if (target.kind === 'server') {
+      if (!terminal && hasFiles(target.server)) {
+        items.push({ key: 'files', icon: '📁', label: t('remote.menuFiles'), onSelect: run('files') });
+      }
       items.push(
-        { key: 'status', icon: '◔', label: t('remote.statusView'), separated: true, onSelect: run('status') },
-        { key: 'exec', icon: '›', label: t('remote.menuExec'), onSelect: run('exec') },
+        { key: 'status', icon: '◔', label: t('remote.statusView'), separated: items.length > 0, onSelect: run('status') },
+        ...(hasShell(target.server) ? [{ key: 'exec', icon: '›', label: t('remote.menuExec'), onSelect: run('exec') }] : []),
         { key: 'check', icon: '↻', label: t('remote.menuCheck'), onSelect: run('check') },
         { key: 'edit', icon: '✎', label: t('remote.menuEdit'), separated: true, onSelect: run('edit') },
         { key: 'delete', icon: '✕', label: t('common.delete'), danger: true, onSelect: run('delete') },
@@ -74,10 +84,11 @@ export default function TargetRail({
     return items;
   };
   const query = filter.trim().toLowerCase();
-  const visible = query
-    ? servers.filter(s => s.name.toLowerCase().includes(query) || s.host.toLowerCase().includes(query)
-        || s.tags.some(tag => tag.toLowerCase().includes(query)) || s.memo.toLowerCase().includes(query))
-    : servers;
+  const visible = servers.filter(s => matchesProtocol(s, protocol) && (!query
+    || s.name.toLowerCase().includes(query) || s.host.toLowerCase().includes(query)
+    || s.tags.some(tag => tag.toLowerCase().includes(query)) || s.memo.toLowerCase().includes(query)));
+  // The protocol filter appears once the list holds more than one kind.
+  const kinds = new Set(servers.flatMap(protocolsOf).map(p => (p === 'ftps' ? 'ftp' : p)));
 
   return (
     <aside className="rw-rail">
@@ -90,9 +101,22 @@ export default function TargetRail({
           </button>
         </div>
 
-        {servers.length > 5 && (
-          <input className="filter-input rw-rail-filter" value={filter} onChange={e => onFilter(e.target.value)}
-            placeholder={t('remote.filterPlaceholder')} />
+        {(servers.length > 5 || kinds.size > 1) && (
+          <div className="rw-rail-filters">
+            {servers.length > 5 && (
+              <input className="filter-input" value={filter} onChange={e => onFilter(e.target.value)}
+                placeholder={t('remote.filterPlaceholder')} />
+            )}
+            {kinds.size > 1 && (
+              <select className="select-input" value={protocol} aria-label={t('remote.proto.filter')}
+                onChange={e => setProtocol(e.target.value as ProtocolFilter)}>
+                <option value="">{t('remote.proto.filter')}</option>
+                {PROTOCOL_FILTERS.filter(p => kinds.has(p)).map(p => (
+                  <option key={p} value={p}>{p === 'ftp' ? 'FTP/FTPS' : protocolName(p)}</option>
+                ))}
+              </select>
+            )}
+          </div>
         )}
 
         <div className="rw-rail-list">
@@ -105,7 +129,8 @@ export default function TargetRail({
           <div className="rw-rail-label">{t('remote.serversGroup')}</div>
           {visible.map(server => {
             const count = sessionsFor(server);
-            const state = server.status === 'online' ? 'up' : server.status === 'offline' ? 'down' : 'unknown';
+            const state = server.status === 'online' ? 'up' : server.status === 'offline' ? 'down'
+              : server.status === 'partial' ? 'partial' : 'unknown';
             return (
               <button key={server.id}
                 className={`rw-item ${selection.kind === 'server' && selection.id === server.id ? 'is-active' : ''}`}
@@ -116,7 +141,7 @@ export default function TargetRail({
                 <span className={`rw-lamp rw-lamp-${state}`} />
                 <span className="rw-item-name">{server.name}</span>
                 {count > 0 && <span className="rw-item-count" title={t('remote.liveSessions')}>{count}</span>}
-                <span className="rw-item-sub">{server.user}@{server.host}:{server.port}</span>
+                <span className="rw-item-sub"><ProtocolBadges server={server} />{addressOf(server)}</span>
               </button>
             );
           })}

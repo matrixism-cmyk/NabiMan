@@ -17,6 +17,10 @@ fn server(id: &str) -> RemoteServer {
         has_password: false,
         host_trust_version: uuid::Uuid::new_v4().to_string(),
         host_trust: None,
+        terminal: "ssh".into(),
+        files: "sftp".into(),
+        ftp_port: 21,
+        tls_fingerprint: String::new(),
     }
 }
 
@@ -45,6 +49,7 @@ fn result(id: &str) -> RemoteServerStatus {
         disk: String::new(),
         load: String::new(),
         checked_at: "2026-09-24T00:00:00Z".into(),
+        checks: Vec::new(),
     }
 }
 

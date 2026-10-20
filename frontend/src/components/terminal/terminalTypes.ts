@@ -10,6 +10,8 @@ export interface TerminalTarget {
   serverId?: string;
   /** Connect as if no password were stored, so it can be typed in the pane. */
   skipSavedPassword?: boolean;
+  /** The saved server has no file access set up: no file panel beside it. */
+  noFiles?: boolean;
 }
 
 export type TerminalStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'ended';

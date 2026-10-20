@@ -13,9 +13,11 @@ import {
 interface Props {
   source: SftpSource;
   serverName: string;
-  /** Types text into the terminal next to the panel. */
-  onInsert: (text: string) => void;
-  onClose: () => void;
+  /** Types text into the terminal next to the panel; absent when there is
+   *  no terminal, as on a server reached only for its files. */
+  onInsert?: (text: string) => void;
+  /** Folds the panel away; absent when the panel is the whole view. */
+  onClose?: () => void;
 }
 
 const read = (key: string) => { try { return localStorage.getItem(key) || ''; } catch { return ''; } };
@@ -235,7 +237,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
       ...(single && isFolder(entry)
         ? [{ key: 'zip', label: t('sftp.downloadFolder'), icon: '↓', onSelect: () => transfers.download(saving) }]
         : []),
-      { key: 'insert', label: t('sftp.insertPath'), icon: '⌨', onSelect: () => onInsert(`${quoted(targets)} `) },
+      ...(onInsert ? [{ key: 'insert', label: t('sftp.insertPath'), icon: '⌨', onSelect: () => onInsert(`${quoted(targets)} `) }] : []),
       { key: 'copy', label: t('sftp.copyPath'), icon: '⧉',
         onSelect: () => { navigator.clipboard?.writeText(quoted(targets)).catch(() => undefined); } },
       ...(writable ? [
@@ -274,8 +276,10 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
           )}
           <button type="button" className={showHidden ? 'is-on' : ''} onClick={toggleHidden}
             aria-pressed={showHidden} title={t('sftp.showHidden')} aria-label={t('sftp.showHidden')}>◌</button>
-          <button type="button" className="sftp-hide" onClick={onClose}
-            title={t('sftp.close')} aria-label={t('sftp.close')}>»</button>
+          {onClose && (
+            <button type="button" className="sftp-hide" onClick={onClose}
+              title={t('sftp.close')} aria-label={t('sftp.close')}>»</button>
+          )}
         </div>
       </div>
       <nav className="sftp-crumbs" aria-label={t('sftp.location')}>
@@ -325,7 +329,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
       </div>
       <SftpTransfers rows={transfers.rows} onCancel={transfers.cancel} onClear={transfers.clearFinished} />
       <p className="sftp-hint">
-        {chosen.length > 1 ? t('sftp.selected', { count: chosen.length }) : t(writable ? 'sftp.dragHint' : 'sftp.dragHintReadOnly')}
+        {chosen.length > 1 ? t('sftp.selected', { count: chosen.length }) : t(!writable ? 'sftp.dragHintReadOnly' : onInsert ? 'sftp.dragHint' : 'sftp.dragHintNoTerminal')}
       </p>
       <input ref={fileInput} type="file" multiple hidden onChange={(e) => {
         const files = Array.from(e.target.files || []);

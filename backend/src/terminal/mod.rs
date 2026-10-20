@@ -9,13 +9,14 @@ mod history;
 mod paste_file;
 mod pty;
 mod registry;
-mod remote_access;
+pub(crate) mod remote_access;
 pub(crate) mod session;
 mod settings;
 pub(crate) mod sftp;
 pub mod share;
 pub mod share_store;
 pub(crate) mod share_ticket;
+pub mod telnet_client;
 
 use actix_web::{get, web, HttpRequest, HttpResponse};
 use actix_web_actors::ws;

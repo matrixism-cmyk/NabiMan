@@ -251,6 +251,11 @@ pub async fn deploy_key(
         Some(s) => s,
         None => return HttpResponse::Ok().json(ApiResponse::<String>::error("Server not found")),
     };
+    if srv.terminal != "ssh" {
+        return HttpResponse::Ok().json(ApiResponse::<String>::error(
+            "A key is installed through an SSH shell, which this server does not offer",
+        ));
+    }
     // Fall back to the password saved on the server record, if there is one.
     let password = if body.password.is_empty() {
         match super::remote_servers::server_password(srv) {

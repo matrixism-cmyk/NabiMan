@@ -217,3 +217,29 @@
 .rw-menu-icon { width: 16px; text-align: center; color: var(--text-secondary); }
 .rw-menu-item.is-danger .rw-menu-icon { color: inherit; }
 .rw-menu-sep { height: 1px; margin: 4px 6px; background: var(--border); }
+
+/* ── How a server is reached ────────────────────────────────────────── */
+.proto-badges { display: inline-flex; gap: 3px; margin-right: 6px; vertical-align: 1px; }
+.proto-badge {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  line-height: 14px;
+  padding: 0 4px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+.proto-badge.is-plain { color: var(--warning); border-color: var(--warning); }
+.rw-lamp-partial { background: var(--warning); }
+.rw-rail-filters { display: flex; align-items: stretch; gap: 6px; margin: 10px 12px 0; }
+.rw-rail-filters .filter-input { flex: 1; min-width: 0; margin-bottom: 0; }
+.rw-rail-filters .select-input { flex: 0 1 auto; max-width: 55%; padding: 6px 8px; font-size: 12px; }
+.rw-view-files { display: flex; min-height: 0; }
+.rw-view-files > * { flex: 1; min-width: 0; }
+.proto-warning { font-size: 12px; color: var(--warning); grid-column: 1 / -1; }
+.proto-checks { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; font-size: 12.5px; }
+.proto-checks li { display: flex; gap: 8px; align-items: baseline; }
+.proto-checks .is-ok { color: var(--success); }
+.proto-checks .is-bad { color: var(--danger); }
+.proto-checks small { color: var(--text-secondary); word-break: break-word; }

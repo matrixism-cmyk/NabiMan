@@ -3,7 +3,8 @@ import { apiRequest } from '../../hooks/useApi';
 import { RemoteServer } from '../../types';
 import { useT } from '../../i18n';
 
-export default function HostTrustForm({ server, onSaved }: { server: RemoteServer; onSaved: () => void }) {
+/** `onSaved` says whether a key is now approved (false after a revoke). */
+export default function HostTrustForm({ server, onSaved }: { server: RemoteServer; onSaved: (approved: boolean) => void }) {
   const { t } = useT();
   const [key, setKey] = useState(server.host_trust?.public_key || '');
   const [fingerprint, setFingerprint] = useState(server.host_trust?.fingerprint || '');
@@ -26,7 +27,7 @@ export default function HostTrustForm({ server, onSaved }: { server: RemoteServe
         }),
       });
       if (!res.success) { setMessage(res.message); return; }
-      setMessage(t('remote.trust.success')); onSaved();
+      setMessage(t('remote.trust.success')); onSaved(!revoke);
     } catch (error) { setMessage(error instanceof Error ? error.message : t('common.error')); }
     finally { setBusy(false); }
   };

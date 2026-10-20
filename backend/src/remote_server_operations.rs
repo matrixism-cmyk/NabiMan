@@ -25,6 +25,10 @@ pub(super) fn merge_probe_results(
                     && old.user == server.user
                     && old.auth_method == server.auth_method
                     && old.password_enc == server.password_enc
+                    && old.terminal == server.terminal
+                    && old.files == server.files
+                    && old.ftp_port == server.ftp_port
+                    && old.tls_fingerprint == server.tls_fingerprint
                     && old.host_trust_version == server.host_trust_version
                     && old.host_trust.as_ref().map(|k| &k.fingerprint)
                         == server.host_trust.as_ref().map(|k| &k.fingerprint)
@@ -50,7 +54,7 @@ pub(super) async fn check_server(path: web::Path<String>) -> HttpResponse {
                 .json(ApiResponse::<RemoteServerStatus>::error("Server not found"))
         }
     };
-    let result = ssh_probe(&srv);
+    let result = super::check::probe(&srv).await;
     if let Err(error) = save_probe_results(&servers, std::slice::from_ref(&result)) {
         return storage_error(error);
     }
@@ -62,7 +66,8 @@ pub(super) async fn check_all_servers() -> HttpResponse {
         Ok(servers) => servers,
         Err(error) => return storage_error(error),
     };
-    let results: Vec<RemoteServerStatus> = servers.iter().map(|srv| ssh_probe(srv)).collect();
+    let results: Vec<RemoteServerStatus> =
+        futures::future::join_all(servers.iter().map(super::check::probe)).await;
     if let Err(error) = save_probe_results(&servers, &results) {
         return storage_error(error);
     }
@@ -82,6 +87,9 @@ pub(super) async fn exec_on_server(
         Some(s) => s,
         None => return HttpResponse::Ok().json(ApiResponse::<String>::error("Server not found")),
     };
+    if srv.terminal != "ssh" {
+        return HttpResponse::Ok().json(ApiResponse::<String>::error("Commands run over SSH, which this server does not offer"));
+    }
 
     let cmd = body.command.trim();
     if cmd.is_empty() {

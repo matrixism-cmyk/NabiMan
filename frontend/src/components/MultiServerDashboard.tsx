@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useApi, apiPost } from '../hooks/useApi';
 import { RemoteServer, RemoteServerStatus } from '../types';
+import ProtocolBadges from './remote/ProtocolBadges';
+import { addressOf, hasShell } from './remote/protocols';
 import { useT } from '../i18n';
 
 export default function MultiServerDashboard() {
@@ -59,19 +61,20 @@ export default function MultiServerDashboard() {
         <div className="server-grid">
           {list.map(srv => {
             const st = statuses[srv.id];
-            const color = srv.status === 'online' ? 'var(--success)' : srv.status === 'offline' ? 'var(--danger)' : 'var(--text-secondary)';
+            const color = srv.status === 'online' ? 'var(--success)' : srv.status === 'offline' ? 'var(--danger)'
+              : srv.status === 'partial' ? 'var(--warning)' : 'var(--text-secondary)';
             return (
               <div key={srv.id} className="kpi-card" style={{ textAlign: 'left', borderLeft: `3px solid ${color}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <strong>{srv.name}</strong>
                   <span className={`status-badge ${srv.status === 'online' ? 'up' : 'down'}`} style={{ fontSize: 11 }}>
-                    {srv.status || 'unknown'}
+                    {srv.status === 'partial' ? t('remote.status.partial') : srv.status || 'unknown'}
                   </span>
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
-                  {srv.user}@{srv.host}:{srv.port}
+                  <ProtocolBadges server={srv} />{addressOf(srv)}
                 </div>
-                {st ? (
+                {st && hasShell(srv) && st.cpu_usage ? (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, marginTop: 8 }}>
                     <span>CPU: <strong>{st.cpu_usage}</strong></span>
                     <span>MEM: <strong>{st.memory}</strong></span>

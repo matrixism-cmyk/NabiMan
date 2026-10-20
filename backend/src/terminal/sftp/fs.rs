@@ -1,6 +1,6 @@
-//! The two places a file panel can look at: a saved server over SFTP, or the
-//! machine NabiMan runs on, which is what its local shell sees. The handlers
-//! do not need to know which.
+//! The places a file panel can look at: a saved server over SFTP or over
+//! FTP/FTPS, or the machine NabiMan runs on, which is what its local shell
+//! sees. The handlers do not need to know which.
 
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::pin::Pin;
@@ -11,11 +11,13 @@ use russh_sftp::client::error::Error as SftpError;
 use russh_sftp::client::fs::Metadata as SftpMeta;
 use tokio::io::{AsyncRead, AsyncWrite};
 
+use super::ftp::{FtpConn, FtpError};
 use super::pool::Conn;
 
 #[derive(Clone)]
 pub(crate) enum Fs {
     Remote(Arc<Conn>),
+    Ftp(Arc<FtpConn>),
     Local,
 }
 
@@ -40,6 +42,23 @@ impl From<SftpError> for FsError {
             },
             other => FsError {
                 message: format!("SFTP connection lost ({other}); try again"),
+                status: StatusCode::BAD_GATEWAY,
+                broken: true,
+            },
+        }
+    }
+}
+
+impl From<FtpError> for FsError {
+    fn from(e: FtpError) -> Self {
+        match e {
+            FtpError::Refused(reply) => FsError {
+                message: if reply.text.trim().is_empty() { format!("FTP error {}", reply.code) } else { reply.text.trim().to_string() },
+                status: StatusCode::CONFLICT,
+                broken: false,
+            },
+            FtpError::Broken(message) => FsError {
+                message: format!("FTP connection lost ({message}); try again"),
                 status: StatusCode::BAD_GATEWAY,
                 broken: true,
             },
@@ -104,6 +123,7 @@ impl Fs {
     pub async fn canonicalize(&self, path: &str) -> Result<String> {
         match self {
             Fs::Remote(c) => Ok(c.sftp.canonicalize(path).await?),
+            Fs::Ftp(c) => Ok(c.canonicalize(path).await?),
             Fs::Local => {
                 let path = if path == "." { home() } else { path.to_string() };
                 Ok(tokio::fs::canonicalize(path).await?.to_string_lossy().into_owned())
@@ -119,6 +139,7 @@ impl Fs {
                 .await?
                 .map(|e| (e.file_name(), Meta::remote(&e.metadata())))
                 .collect()),
+            Fs::Ftp(c) => Ok(c.read_dir(path).await?),
             Fs::Local => {
                 let mut dir = tokio::fs::read_dir(path).await?;
                 let mut out = Vec::new();
@@ -137,6 +158,7 @@ impl Fs {
     pub async fn stat(&self, path: &str) -> Result<Meta> {
         match self {
             Fs::Remote(c) => Ok(Meta::remote(&c.sftp.metadata(path).await?)),
+            Fs::Ftp(c) => Ok(c.stat(path).await?),
             Fs::Local => Ok(Meta::local(&tokio::fs::metadata(path).await?)),
         }
     }
@@ -145,6 +167,7 @@ impl Fs {
     pub async fn lstat(&self, path: &str) -> Result<Meta> {
         match self {
             Fs::Remote(c) => Ok(Meta::remote(&c.sftp.symlink_metadata(path).await?)),
+            Fs::Ftp(c) => Ok(c.lstat(path).await?),
             Fs::Local => Ok(Meta::local(&tokio::fs::symlink_metadata(path).await?)),
         }
     }
@@ -156,6 +179,7 @@ impl Fs {
     pub async fn open(&self, path: &str) -> Result<Reader> {
         match self {
             Fs::Remote(c) => Ok(Box::pin(c.sftp.open(path).await?)),
+            Fs::Ftp(c) => Ok(Box::pin(c.open(path).await?)),
             Fs::Local => Ok(Box::pin(tokio::fs::File::open(path).await?)),
         }
     }
@@ -164,6 +188,7 @@ impl Fs {
     pub async fn create(&self, path: &str) -> Result<Writer> {
         match self {
             Fs::Remote(c) => Ok(Box::pin(c.sftp.create(path).await?)),
+            Fs::Ftp(c) => Ok(Box::pin(c.upload(path, false).await?)),
             Fs::Local => Ok(Box::pin(tokio::fs::File::create(path).await?)),
         }
     }
@@ -180,6 +205,8 @@ impl Fs {
                 file.seek(start).await?;
                 Ok(Box::pin(file))
             }
+            // The caller has checked the file ends at `offset`.
+            Fs::Ftp(c) => Ok(Box::pin(c.upload(path, offset > 0).await?)),
             Fs::Local => {
                 let mut file = tokio::fs::OpenOptions::new().write(true).open(path).await?;
                 file.seek(start).await?;
@@ -191,6 +218,7 @@ impl Fs {
     pub async fn mkdir(&self, path: &str) -> Result<()> {
         match self {
             Fs::Remote(c) => Ok(c.sftp.create_dir(path).await?),
+            Fs::Ftp(c) => Ok(c.simple(&[(format!("MKD {path}"), 257)]).await?),
             Fs::Local => Ok(tokio::fs::create_dir(path).await?),
         }
     }
@@ -198,6 +226,7 @@ impl Fs {
     pub async fn rename(&self, from: &str, to: &str) -> Result<()> {
         match self {
             Fs::Remote(c) => Ok(c.sftp.rename(from, to).await?),
+            Fs::Ftp(c) => Ok(c.simple(&[(format!("RNFR {from}"), 350), (format!("RNTO {to}"), 250)]).await?),
             Fs::Local => Ok(tokio::fs::rename(from, to).await?),
         }
     }
@@ -205,6 +234,7 @@ impl Fs {
     pub async fn remove_file(&self, path: &str) -> Result<()> {
         match self {
             Fs::Remote(c) => Ok(c.sftp.remove_file(path).await?),
+            Fs::Ftp(c) => Ok(c.simple(&[(format!("DELE {path}"), 250)]).await?),
             Fs::Local => Ok(tokio::fs::remove_file(path).await?),
         }
     }
@@ -212,6 +242,7 @@ impl Fs {
     pub async fn remove_dir(&self, path: &str) -> Result<()> {
         match self {
             Fs::Remote(c) => Ok(c.sftp.remove_dir(path).await?),
+            Fs::Ftp(c) => Ok(c.simple(&[(format!("RMD {path}"), 250)]).await?),
             Fs::Local => Ok(tokio::fs::remove_dir(path).await?),
         }
     }

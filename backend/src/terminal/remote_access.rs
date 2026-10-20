@@ -12,22 +12,41 @@ pub(crate) struct RemoteBinding {
     approval_version: String,
     public_key: String,
     fingerprint: String,
+    /// `ssh` or `telnet`; bindings saved before Telnet existed are SSH.
+    #[serde(default = "ssh")]
+    terminal: String,
 }
+fn ssh() -> String {
+    "ssh".into()
+}
+
+/// The approved host key of a server reached over SSH, checked for being
+/// current and consistent.
+fn approved_key(server: &RemoteServer) -> Result<(String, String), String> {
+    let trust = server.host_trust.as_ref().ok_or("Host key is not verified")?;
+    if server.host_trust_version.is_empty() {
+        return Err("Review and approve this server key again before opening a terminal".into());
+    }
+    let (public_key, fingerprint) = crate::remote_host_trust::parse_key(&trust.public_key)?;
+    if fingerprint != trust.fingerprint {
+        return Err("Stored host trust is inconsistent".into());
+    }
+    Ok((public_key, fingerprint))
+}
+
+/// Whether SSH to this server may be used at all (its files over SFTP).
+pub(crate) fn ssh_approved(server: &RemoteServer) -> Result<(), String> {
+    approved_key(server).map(drop)
+}
+
 impl RemoteBinding {
     pub(crate) fn from_server(server: &RemoteServer) -> Result<Self, String> {
-        let trust = server
-            .host_trust
-            .as_ref()
-            .ok_or("Host key is not verified")?;
-        if server.host_trust_version.is_empty() {
-            return Err(
-                "Review and approve this server key again before opening a terminal".into(),
-            );
-        }
-        let (public_key, fingerprint) = crate::remote_host_trust::parse_key(&trust.public_key)?;
-        if fingerprint != trust.fingerprint {
-            return Err("Stored host trust is inconsistent".into());
-        }
+        // Telnet has no host key to approve; it is bound to the address alone.
+        let (public_key, fingerprint) = match server.terminal.as_str() {
+            "ssh" => approved_key(server)?,
+            "telnet" => (String::new(), String::new()),
+            _ => return Err("This server has no terminal access set up".into()),
+        };
         Ok(Self {
             server_id: server.id.clone(),
             host: server.host.clone(),
@@ -37,6 +56,7 @@ impl RemoteBinding {
             approval_version: server.host_trust_version.clone(),
             public_key,
             fingerprint,
+            terminal: server.terminal.clone(),
         })
     }
     fn matches(&self, current: &RemoteServer) -> bool {
@@ -51,6 +71,7 @@ impl RemoteBinding {
             && self.approval_version == other.approval_version
             && self.public_key == other.public_key
             && self.fingerprint == other.fingerprint
+            && self.terminal == other.terminal
     }
     pub(crate) fn server_id(&self) -> &str {
         &self.server_id
@@ -93,11 +114,31 @@ mod tests {
         serde_json::from_value(serde_json::json!({"id":"remote","name":"remote","host":"localhost","port":22,"user":"root","auth_method":"key","tags":[],"memo":"","created_at":"now","host_trust_version":uuid::Uuid::new_v4().to_string(),"host_trust":{"public_key":public_key,"fingerprint":fingerprint,"verified_by":"admin","verified_at":"now","reason":"console"}})).unwrap()
     }
     #[test]
+    fn telnet_binds_to_the_address_without_a_key_and_none_cannot_bind() {
+        let mut telnet = server();
+        telnet.terminal = "telnet".into();
+        telnet.host_trust = None;
+        let binding = RemoteBinding::from_server(&telnet).unwrap();
+        assert!(binding.matches(&telnet));
+        let mut moved = telnet.clone();
+        moved.port = 2323;
+        assert!(!binding.matches(&moved));
+        let mut files_only = server();
+        files_only.terminal = "none".into();
+        assert!(RemoteBinding::from_server(&files_only).is_err());
+        // A binding saved before protocols existed is an SSH one.
+        let ssh = server();
+        let mut old = serde_json::to_value(RemoteBinding::from_server(&ssh).unwrap()).unwrap();
+        old.as_object_mut().unwrap().remove("terminal");
+        let old: RemoteBinding = serde_json::from_value(old).unwrap();
+        assert!(old.matches(&ssh));
+    }
+    #[test]
     fn approval_and_exact_target_changes_deny_old_binding() {
         let server = server();
         let binding = RemoteBinding::from_server(&server).unwrap();
         assert!(binding.matches(&server));
-        for change in 0..7 {
+        for change in 0..8 {
             let mut candidate = server.clone();
             match change {
                 0 => candidate.host_trust = None,
@@ -106,6 +147,7 @@ mod tests {
                 3 => candidate.port += 1,
                 4 => candidate.user = "other".into(),
                 5 => candidate.auth_method = "password".into(),
+                6 => candidate.terminal = "telnet".into(),
                 _ => candidate.host_trust.as_mut().unwrap().public_key = "invalid".into(),
             }
             assert!(!binding.matches(&candidate));

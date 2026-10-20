@@ -102,6 +102,11 @@ pub(crate) fn forget(user_id: &str, srv: &RemoteServer) {
         .remove(&key(user_id, srv));
 }
 
+/// Opens SFTP once and closes it again: whether the server offers it.
+pub(crate) async fn check(srv: &RemoteServer) -> Result<(), String> {
+    open(srv).await.map(drop)
+}
+
 async fn open(srv: &RemoteServer) -> Result<Conn, String> {
     let (command, password_file) =
         crate::remote_probe::ssh_invocation(srv, 10, &["-s"], "sftp")?;

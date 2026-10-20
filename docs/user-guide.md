@@ -81,6 +81,35 @@ Leaving the password box empty keeps the stored password; **Clear password**
 removes it. **Deploy Key** also works with an empty password box when a password
 is already saved.
 
+### How a server is reached
+A server has a **terminal** protocol (SSH, Telnet or none) and a **files**
+protocol (SFTP, FTPS, FTP or none), chosen separately, since SSH-only, SFTP-only
+and FTP-only machines are all common. Records saved before this are SSH + SFTP.
+- The list shows a badge per protocol; Telnet and FTP, which send passwords
+  unencrypted, are marked in orange. Once the list holds more than one kind,
+  a protocol filter appears beside the search box.
+- A server offers only the views it supports: no terminal means no sessions or
+  terminal tab, and its files open as a full-page **파일** view; commands
+  (**실행**) and CPU/memory figures need an SSH shell.
+- **접속 방식 확인** in the server settings tries the SSH shell and SFTP one by
+  one (and, for plain FTP, whether TLS works) and sets the protocols to what
+  works. It runs by itself once for a new server, and for an SSH server again
+  when its host key is approved. Correct the result in the form if needed.
+- **Check** tests every protocol the server is set up for and lists each result;
+  a server where some work and some do not is shown as partly reachable.
+- **Telnet** sessions run NabiMan's own client (the server binary started as
+  `nabiman-server telnet-client`, so no telnet package is needed). It reports
+  the window size and terminal type, types the saved user at the login prompt
+  and the stored password at the password prompt, once each.
+- **FTPS** is explicit TLS (`AUTH TLS`). A certificate must either be valid for
+  the host name or match the SHA-256 fingerprint saved on the server (paste it
+  as `openssl x509 -fingerprint -sha256` prints it); an untrusted certificate is
+  refused with its fingerprint in the message, to verify out of band. Data
+  connections resume the control connection's TLS session, as vsftpd requires.
+- FTP data connections always go to the address the control connection
+  reached, never to an address a PASV reply names. FTP users may contain `@`
+  (`web@example.com`); SSH users may not.
+
 ### Terminal windows
 - **⧉ Terminal window** on a server card opens a floating terminal for it. Open
   as many as you like: each window is independently draggable and resizable,

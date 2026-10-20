@@ -19,7 +19,7 @@ const t: T = {
 
   // --- Saved passwords on remote servers ---
   'remote.password': { ko: '비밀번호', en: 'Password', ja: 'パスワード' },
-  'remote.passwordPlaceholder': { ko: 'SSH 비밀번호 저장 (선택)', en: 'Save SSH password (optional)', ja: 'SSHパスワードを保存 (任意)' },
+  'remote.passwordPlaceholder': { ko: '비밀번호 저장 (선택)', en: 'Save the password (optional)', ja: 'パスワードを保存 (任意)' },
   'remote.passwordHint': {
     ko: '서버에 암호화되어 저장되며, 접속·점검·터미널에서 자동으로 사용됩니다.',
     en: 'Stored encrypted on the server and used automatically for checks, exec and terminals.',

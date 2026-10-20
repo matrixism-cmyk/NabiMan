@@ -194,6 +194,20 @@ export interface RemoteServer {
   has_password?: boolean;
   host_trust_version?: string;
   host_trust?: { public_key: string; fingerprint: string; verified_by: string; verified_at: string; reason: string } | null;
+  /** How a terminal reaches it; records from before this are SSH. */
+  terminal?: 'ssh' | 'telnet' | 'none';
+  /** How its files are reached; records from before this are SFTP. */
+  files?: 'sftp' | 'ftps' | 'ftp' | 'none';
+  ftp_port?: number;
+  /** A hand-verified FTPS certificate (SHA256:…), for one no authority signs. */
+  tls_fingerprint?: string;
+}
+
+/** One way of reaching a server, as a check found it. */
+export interface ProtocolCheck {
+  protocol: string;
+  ok: boolean;
+  message: string;
 }
 
 export interface RemoteServerStatus {
@@ -209,6 +223,8 @@ export interface RemoteServerStatus {
   disk: string;
   load: string;
   checked_at: string;
+  /** Each way of reaching it that was tried. */
+  checks?: ProtocolCheck[];
 }
 
 // --- SSH Key types ---
