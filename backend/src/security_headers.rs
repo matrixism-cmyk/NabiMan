@@ -69,7 +69,7 @@ where
             );
             headers.insert(
                 "Permissions-Policy".parse().unwrap(),
-                "camera=(), microphone=(), geolocation=()".parse().unwrap(),
+                "camera=(), microphone=(self), geolocation=()".parse().unwrap(),
             );
             // HSTS only if behind TLS proxy (controlled by env)
             if std::env::var("NABIMAN_HSTS").unwrap_or_default() == "true" {

@@ -4,6 +4,7 @@
 mod ssh_command;
 use ssh_command::build_ssh_command;
 
+mod dictation;
 mod handlers;
 mod history;
 mod paste_file;
@@ -51,6 +52,10 @@ async fn ws_terminal(
 ) -> Result<HttpResponse, actix_web::Error> {
     ws::handshake(&req)?;
     let query = req.query_string();
+    // A dictation ticket is for dictation, not for a shell.
+    if parse_query_param(query, "purpose").is_some() {
+        return Ok(HttpResponse::BadRequest().finish());
+    }
     let Some(username) = crate::auth::extract_username(&req) else {
         return Ok(HttpResponse::Unauthorized().finish());
     };
@@ -332,5 +337,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     handlers::configure(cfg);
     paste_file::config(cfg);
     sftp::config(cfg);
+    dictation::config(cfg);
     share::config(cfg);
 }

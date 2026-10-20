@@ -36,7 +36,8 @@
     "smoke:sftp": "node scripts/smoke-sftp.js",
     "smoke:rename": "node scripts/smoke-rename.js",
     "smoke:protocols": "node scripts/smoke-protocols.js",
-    "smoke:preview": "node scripts/smoke-preview.js"
+    "smoke:preview": "node scripts/smoke-preview.js",
+    "smoke:dictation": "node scripts/smoke-dictation.js"
   },
   "browserslist": {
     "production": [

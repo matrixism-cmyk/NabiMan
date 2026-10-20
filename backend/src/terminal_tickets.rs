@@ -51,9 +51,13 @@ fn valid_query(query: &str) -> bool {
     let mut keys = HashSet::new();
     query.is_empty()
         || query.split('&').all(|p| {
-            let Some((k, _)) = p.split_once('=') else {
+            let Some((k, v)) = p.split_once('=') else {
                 return false;
             };
+            // Dictation's own ticket: it opens nothing else.
+            if k == "purpose" {
+                return v == "dictation" && keys.insert(k);
+            }
             matches!(
                 k,
                 "scrollback"

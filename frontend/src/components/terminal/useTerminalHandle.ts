@@ -61,6 +61,10 @@ export function useTerminalHandle(ref: Ref<TerminalViewHandle>, {
       termRef.current?.paste(text);
       termRef.current?.focus();
     },
+    sendKeys: (keys: string) => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(keys);
+      termRef.current?.focus();
+    },
   }), [
     clearBuffer, connect, storageKey, zoom, attemptsRef, endedRef, everConnectedRef,
     joinRef, sessionIdRef, settingsRef, termRef, wsRef,

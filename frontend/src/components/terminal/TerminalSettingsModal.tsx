@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useT } from '../../i18n';
 import { DEFAULT_TERMINAL_SETTINGS, TerminalSettings, useTerminalSettings } from './settings';
+import DictationSettings from './dictation/DictationSettings';
 
 const SCROLLBACK_PRESETS = [1000, 5000, 10000, 50000, 100000];
 const TIMEOUT_PRESETS: { label: string; value: number }[] = [
@@ -132,6 +133,8 @@ export default function TerminalSettingsModal({ onClose }: { onClose: () => void
           </button>
           <button className="btn btn-secondary" onClick={onClose}>{t('common.cancel')}</button>
         </div>
+
+        <DictationSettings />
       </div>
     </div>
   );

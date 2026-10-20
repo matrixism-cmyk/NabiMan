@@ -149,6 +149,25 @@ uploading and changing too. The link is held to how the server is reached:
 changing its address, user, protocol, password, approved host key or
 certificate ends the link.
 
+### Voice dictation
+The microphone button beside a terminal (in the workspace header, a floating
+window's title bar, and a share link's page when the link lets the visitor
+type) dictates into the shell: press it, speak, press it again to stop.
+- Speech is transcribed live by the speech service at v.bebo.kr (Qwen3-ASR).
+  A phrase is typed at the prompt once you pause; the text still being worked
+  out shows under the button. When the service corrects words already typed
+  on the current line, they are erased and retyped.
+- Saying **"엔터"** (or "엔터키", "Enter") presses Enter instead of typing the
+  word — e.g. "ls -al 엔터". A line that ran is never touched again.
+- The browser streams 16 kHz audio to NabiMan, which relays it to the service
+  with the API key kept on the server (encrypted, never sent to browsers).
+  The service keeps nothing (`save: false`). Visitors are admitted by their
+  share link, read-only links have no microphone.
+- A super administrator sets it up under ⚙ (terminal settings) → **음성
+  받아쓰기**: the service address, an optional address to reach it by from
+  this server (`127.0.0.1:443` when it runs on the same machine), the API key
+  from v.bebo.kr's account page, the language; **연결 확인** tests it.
+
 ### Terminal windows
 - **⧉ Terminal window** on a server card opens a floating terminal for it. Open
   as many as you like: each window is independently draggable and resizable,

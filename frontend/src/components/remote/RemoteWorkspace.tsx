@@ -10,6 +10,7 @@ import TerminalSettingsModal from '../terminal/TerminalSettingsModal';
 import ShareDialog from '../terminal/ShareDialog';
 import ShareLinksPanel from '../terminal/ShareLinksPanel';
 import SessionNameEdit from '../terminal/SessionNameEdit';
+import AccountDictation from '../terminal/dictation/AccountDictation';
 import { SshKeyPanel } from '../SshKeyComponents';
 import MultiServerDashboard from '../MultiServerDashboard';
 import ServerForm from './ServerForm';
@@ -257,6 +258,7 @@ export default function RemoteWorkspace() {
                     : termStatus === 'ended' ? t('terminal.sessionEnded')
                     : t('terminal.disconnected')}
                 </span>
+                <AccountDictation onText={(text) => viewRef.current?.insertText(text)} onKeys={(keys) => viewRef.current?.sendKeys(keys)} />
                 <button className="btn btn-secondary btn-sm" onClick={() => viewRef.current?.newSession()}>{t('terminal.newSession')}</button>
                 <button className="btn btn-secondary btn-sm" onClick={detach} title={t('remote.detachHint')}>⧉ {t('remote.detach')}</button>
                 {currentSessionId && (<>

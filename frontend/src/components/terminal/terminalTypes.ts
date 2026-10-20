@@ -29,6 +29,9 @@ export interface TerminalViewHandle {
   sessionId: () => string;
   /** Types text at the prompt, as a paste would. */
   insertText: (text: string) => void;
+  /** Sends keys as if they were pressed: unlike a paste, a "\r" here is Enter
+   *  even in shells that take pasted line breaks as text. */
+  sendKeys: (keys: string) => void;
 }
 
 export interface TerminalViewProps {

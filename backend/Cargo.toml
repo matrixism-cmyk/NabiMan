@@ -48,6 +48,9 @@ russh-sftp = "=3.0.1"
 rustls = { version = "=0.23.45", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 tokio-rustls = { version = "=0.26.4", default-features = false, features = ["ring", "tls12", "logging"] }
 rustls-native-certs = "=0.8.3"
+# Terminal dictation: a WebSocket client to the speech service. TLS comes from
+# the rustls already above, so no TLS feature here.
+tokio-tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 async-trait = "0.1"
 futures = "0.3"

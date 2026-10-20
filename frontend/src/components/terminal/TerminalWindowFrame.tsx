@@ -9,6 +9,7 @@ import { apiRequest } from '../../hooks/useApi';
 import type { SessionInfo } from '../remote/SessionsView';
 import { clamp, MIN_H, MIN_W, TASKBAR_H, TermWindow } from './windowGeometry';
 import { confirmDialog } from '../common/ConfirmDialog';
+import AccountDictation from './dictation/AccountDictation';
 
 interface FrameProps {
   win: TermWindow;
@@ -135,6 +136,8 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
         )}
         <span className="term-window-sub">{win.subtitle}</span>
         <span className="term-window-actions">
+          <AccountDictation variant="bar" onText={(text) => viewRef.current?.insertText(text)}
+            onKeys={(keys) => viewRef.current?.sendKeys(keys)} />
           <button
             title={t('terminal.redraw')}
             aria-label={t('terminal.redraw')}

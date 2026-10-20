@@ -277,7 +277,10 @@ pub fn check_auth(
     }
 
     if let Some(decision) = api_tokens::check(req, users) { return decision; }
-    let claims = if path == "/api/terminal"
+    // The terminal and its dictation are WebSockets: a browser cannot put the
+    // account token in a header there, so a one-use ticket stands in.
+    let ticketed = path == "/api/terminal" || path == "/api/terminal/dictation";
+    let claims = if ticketed
         && req
             .query_string()
             .split('&')
@@ -303,7 +306,7 @@ pub fn check_auth(
         }
     } else {
         // Account JWTs must never be accepted from a terminal URL.
-        if path == "/api/terminal"
+        if ticketed
             && req
                 .query_string()
                 .split('&')

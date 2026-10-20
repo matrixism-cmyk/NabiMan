@@ -1,0 +1,96 @@
+import { act, renderHook } from '@testing-library/react';
+import { useDictation } from './useDictation';
+
+class FakeSocket {
+  static last: FakeSocket;
+  readyState = 0;
+  binaryType = '';
+  sent: unknown[] = [];
+  onopen: (() => void) | null = null;
+  onclose: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  onmessage: ((e: { data: unknown }) => void) | null = null;
+  constructor() { FakeSocket.last = this; setTimeout(() => { this.readyState = 1; this.onopen?.(); }); }
+  send(data: unknown) { this.sent.push(data); }
+  close() { this.readyState = 3; this.onclose?.(); }
+  hear(msg: object) { this.onmessage?.({ data: JSON.stringify(msg) }); }
+}
+
+beforeAll(() => {
+  Object.assign(window, { WebSocket: Object.assign(FakeSocket, { OPEN: 1, CONNECTING: 0 }) });
+  class FakeAudio {
+    sampleRate = 48000;
+    audioWorklet = { addModule: () => Promise.resolve() };
+    createMediaStreamSource() { return { connect: jest.fn() }; }
+    close() { return Promise.resolve(); }
+  }
+  Object.assign(window, {
+    AudioContext: FakeAudio,
+    AudioWorkletNode: class { port = { onmessage: null }; },
+  });
+});
+
+// The project's jest setup resets mocks before each test.
+beforeEach(() => {
+  jest.useFakeTimers();
+  Object.assign(navigator, { mediaDevices: { getUserMedia: jest.fn(() => Promise.resolve({ getTracks: () => [{ stop: () => undefined }] })) } });
+  URL.createObjectURL = jest.fn(() => 'blob:tap');
+  URL.revokeObjectURL = jest.fn();
+});
+afterEach(() => jest.useRealTimers());
+
+const setup = () => {
+  const onText = jest.fn();
+  const onKeys = jest.fn();
+  const view = renderHook(() => useDictation({ open: () => Promise.resolve(new FakeSocket() as unknown as WebSocket), onText, onKeys }));
+  return { ...view, onText, onKeys };
+};
+
+const begin = async (result: ReturnType<typeof setup>['result']) => {
+  await act(async () => {
+    const started = result.current.start();
+    // Let the microphone and socket promises settle, then the socket open.
+    for (let i = 0; i < 10; i += 1) await Promise.resolve();
+    jest.advanceTimersByTime(10);
+    await started;
+  });
+};
+
+test('a phrase is typed once the speaker pauses, and "엔터" presses Enter', async () => {
+  const { result, onText, onKeys } = setup();
+  await begin(result);
+  expect(result.current.state).toBe('listening');
+  expect(FakeSocket.last.sent[0]).toBe('{}');
+  act(() => FakeSocket.last.hear({ type: 'partial', committed: '', partial: 'ls -al' }));
+  expect(onText).not.toHaveBeenCalled();
+  expect(result.current.partial).toBe('ls -al');
+  // The same text again: a pause.
+  act(() => FakeSocket.last.hear({ type: 'partial', committed: '', partial: 'ls -al' }));
+  expect(onText).toHaveBeenCalledWith('ls -al');
+  act(() => FakeSocket.last.hear({ type: 'partial', committed: '', partial: 'ls -al 엔터.' }));
+  act(() => { jest.advanceTimersByTime(1300); });
+  expect(onKeys).toHaveBeenCalledWith('\r');
+  expect(onText).toHaveBeenCalledTimes(1);
+});
+
+test('a correction erases what changed; stopping types the last words', async () => {
+  const { result, onText, onKeys } = setup();
+  await begin(result);
+  act(() => { FakeSocket.last.hear({ type: 'partial', committed: '', partial: '오늘 날씨.' }); jest.advanceTimersByTime(1300); });
+  expect(onText).toHaveBeenLastCalledWith('오늘 날씨.');
+  act(() => result.current.stop());
+  expect(FakeSocket.last.sent).toContain(JSON.stringify({ type: 'stop' }));
+  act(() => FakeSocket.last.hear({ type: 'final', committed: '오늘 날씨가 좋다', partial: '' }));
+  expect(onKeys).toHaveBeenCalledWith('\x7f');
+  expect(onText).toHaveBeenLastCalledWith('가 좋다');
+  act(() => FakeSocket.last.close());
+  expect(result.current.state).toBe('idle');
+});
+
+test('a blocked microphone is said so', async () => {
+  (navigator.mediaDevices.getUserMedia as jest.Mock).mockImplementationOnce(() => Promise.reject(new DOMException('no', 'NotAllowedError')));
+  const { result } = setup();
+  await act(async () => { await result.current.start(); });
+  expect(result.current.error).toBe('denied');
+  expect(result.current.state).toBe('idle');
+});

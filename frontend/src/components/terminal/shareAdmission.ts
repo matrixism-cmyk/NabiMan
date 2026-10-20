@@ -7,6 +7,8 @@ export interface ShareInfo {
   files: ShareFilesMode;
   /** `files` for a link to a server's files alone, with no terminal. */
   kind: 'terminal' | 'files';
+  /** The visitor may dictate into the terminal (it is set up, the link is not read-only). */
+  dictation?: boolean;
 }
 /** The key a visitor's file panel signs its requests with. Memory only. */
 export interface ShareFilesGrant { key: string; mode: 'read' | 'write' }
@@ -38,7 +40,8 @@ export async function readShareInfo(token: string, signal?: AbortSignal): Promis
       || ![data.cols, data.rows].every(n => Number.isInteger(n) && n >= 0 && n <= 4096)) throw new ShareAdmissionError('share.authUnavailable');
   const files = (data as { files?: unknown }).files;
   const kind = (data as { kind?: unknown }).kind === 'files' ? 'files' : 'terminal';
-  return { ...data, kind, files: files === 'read' || files === 'write' ? files : 'none' };
+  const dictation = (data as { dictation?: unknown }).dictation === true;
+  return { ...data, kind, dictation, files: files === 'read' || files === 'write' ? files : 'none' };
 }
 export async function issueShareTicket(token: string, password: string, query: string, signal?: AbortSignal): Promise<ShareTicket> {
   const data = await publicRequest<ShareTicket>(`/api/share/${encodeURIComponent(token)}/auth`, {

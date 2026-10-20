@@ -150,6 +150,9 @@ pub(super) async fn share_ws(
     };
     // Redemption is consumed even if this is a plain HTTP request, never a shell.
     ws::handshake(&req)?;
+    if req.query_string().starts_with("purpose=") {
+        return Ok(admission_error(StatusCode::BAD_REQUEST, "A dictation ticket does not open the terminal"));
+    }
     if !shares.lock().is_ok_and(|r| r.ready()) {
         return Ok(storage_error());
     }

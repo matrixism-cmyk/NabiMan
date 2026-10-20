@@ -1,0 +1,32 @@
+/* The terminal's microphone (DictationButton.tsx). */
+.dictation { position: relative; display: inline-flex; }
+.dictation-btn { display: inline-flex; align-items: center; gap: 5px; }
+.dictation-btn.is-on { color: #fff; background: var(--danger); border-color: var(--danger); }
+.dictation-btn.is-listening svg { animation: dictation-pulse 1.2s ease-in-out infinite; }
+@keyframes dictation-pulse { 50% { opacity: 0.45; } }
+.dictation-bar .dictation-btn { padding: 2px 6px; min-width: 0; }
+.dictation-bubble {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 950;
+  max-width: min(520px, 70vw);
+  width: max-content;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  opacity: 0.95;
+  pointer-events: none;
+  white-space: normal;
+  word-break: break-word;
+}
+.dictation-bubble.is-error { color: var(--danger); border-color: var(--danger); pointer-events: auto; }
+@media (prefers-reduced-motion: reduce) { .dictation-btn.is-listening svg { animation: none; } }
+.dictation-settings { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.dictation-settings h4 { margin: 0 0 6px; font-size: 14px; }
+.dictation-settings p { font-size: 12px; margin: 0 0 10px; }

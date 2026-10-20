@@ -210,6 +210,8 @@ fn public_view(mut link: ShareLink) -> ShareLink {
 struct ShareInfo {
     /// `terminal`, or `files` for a link to a server's files alone.
     kind: &'static str,
+    /// The visitor may dictate into the terminal: it is set up, and the link lets them type.
+    dictation: bool,
     label: String,
     needs_password: bool,
     read_only: bool,
@@ -262,6 +264,7 @@ async fn share_info(
             .insert_header((actix_web::http::header::CACHE_CONTROL, "no-store"))
             .json(ApiResponse::ok(ShareInfo {
                 kind: if link.files_only() { "files" } else { "terminal" },
+                dictation: !link.read_only && !link.files_only() && super::dictation::load().key().is_some(),
                 label: link.label,
                 needs_password: link.password_hash.is_some(),
                 read_only: link.read_only,

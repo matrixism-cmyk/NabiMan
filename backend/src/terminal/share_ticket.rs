@@ -106,7 +106,7 @@ pub(super) fn valid_query(query: &str) -> bool {
     if query.len() > 128 || !query.is_ascii() || query.bytes().any(|b| b.is_ascii_control()) {
         return false;
     }
-    if query.is_empty() {
+    if query.is_empty() || query == "purpose=dictation" {
         return true;
     }
     let mut keys = HashSet::new();

@@ -4,6 +4,8 @@ import { DEFAULT_TERMINAL_SETTINGS } from './settings';
 import { issueShareTicket, readShareInfo, ShareAdmissionError, ShareFilesGrant, ShareInfo } from './shareAdmission';
 import TerminalWithFiles from '../remote/TerminalWithFiles';
 import SftpPanel from '../remote/sftp/SftpPanel';
+import DictationButton from './dictation/DictationButton';
+import { openShareDictation } from './dictation/sockets';
 import { shareSource } from '../remote/sftp/sftpApi';
 import { useT } from '../../i18n';
 import './terminal-windows.css';
@@ -64,7 +66,9 @@ function SharePageContent({ token }: { token: string }) {
 
   const acquireTicket = useCallback(async (query: string, signal?: AbortSignal) => {
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-    const ready = prepared.current; prepared.current = null;
+    // A ticket prepared for the terminal is only taken by the terminal.
+    const ready = prepared.current;
+    if (ready && ready.query === query) prepared.current = null;
     if (ready && ready.query === query && ready.expires > performance.now()) return ready.ticket;
     try {
       const admitted = await issueShareTicket(token, passwordRef.current, query, signal);
@@ -155,6 +159,10 @@ function SharePageContent({ token }: { token: string }) {
         {info.read_only && <span className="status-badge">{t('share.readOnly')}</span>}
         {!info.alive && <span className="status-badge down">{t('share.ended')}</span>}
         <span className="share-head-spacer" />
+        {info.dictation && !info.read_only && (
+          <DictationButton open={() => openShareDictation(token, (query) => acquireTicket(query))}
+            onText={(text) => viewRef.current?.insertText(text)} onKeys={(keys) => viewRef.current?.sendKeys(keys)} />
+        )}
         <button
           className="btn btn-secondary btn-sm"
           title={t('share.fitWindowHint')}
