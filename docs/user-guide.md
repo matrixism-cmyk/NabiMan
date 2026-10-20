@@ -135,6 +135,11 @@ folder's other previewable files.
   automatically — UTF-8, or EUC-KR for older Korean files — and can be chosen.
   Files over 300 KB are shown plain, as one block; a binary file asks before
   being shown as text.
+- **PDF** (up to 100 MB): drawn in the page by pdf.js (no browser plug-in, the
+  same on every browser), pages one under another and drawn as they come into
+  view; fit to width or zoom with − / + / 0, jump to a page by number, select
+  and copy text. A password-protected PDF asks for its password. Nothing in a
+  PDF is run as script, and links in it are not followed.
 
 ### Sharing a server's files
 A server reached only for its files has **🔗 파일 공유** on its file view: a link

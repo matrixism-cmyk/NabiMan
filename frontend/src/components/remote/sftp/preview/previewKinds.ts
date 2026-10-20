@@ -3,7 +3,7 @@
  * its own renderer in PreviewDialog; adding a format is adding a row here
  * and, for a new kind, a renderer.
  */
-export type PreviewKind = 'image' | 'text';
+export type PreviewKind = 'image' | 'text' | 'pdf';
 
 export interface PreviewSpec {
   kind: PreviewKind;
@@ -74,6 +74,7 @@ function configLanguage(lower: string): string | null {
 export function previewOf(name: string): PreviewSpec | null {
   const ext = extensionOf(name);
   if (IMAGES[ext]) return { kind: 'image', mime: IMAGES[ext], maxBytes: 50 * MB };
+  if (ext === 'pdf') return { kind: 'pdf', mime: 'application/pdf', maxBytes: 100 * MB };
   const lower = name.toLowerCase();
   // `.env.local`, `Dockerfile.dev`: the leading name still says what it is.
   const stem = lower.startsWith('.') ? lower : lower.split('.')[0];

@@ -4,6 +4,7 @@ import Modal from '../../../common/Modal';
 import { downloadFile, formatSize, SftpEntry, SftpSource } from '../sftpApi';
 import ImagePreview from './ImagePreview';
 import TextPreview, { TextInfo } from './TextPreview';
+import PdfPreview from './PdfPreview';
 import { previewOf } from './previewKinds';
 import { Encoding, ENCODINGS } from './textContent';
 import './preview.css';
@@ -34,7 +35,7 @@ const readWrap = () => { try { return localStorage.getItem(WRAP_KEY) === '1'; } 
 /**
  * A file shown in place, in a modal over the panel. ← and → (or the arrows on
  * screen) step through the other previewable files in the folder. Each kind
- * of file has its renderer: images, and text and source code.
+ * of file has its renderer: images, text and source code, and PDF.
  */
 export default function PreviewDialog({ source, dir, files, start, onDownload, onClose }: Props) {
   const { t } = useT();
@@ -46,6 +47,7 @@ export default function PreviewDialog({ source, dir, files, start, onDownload, o
   const [encoding, setEncoding] = useState<Encoding>('auto');
   const [text, setText] = useState<TextInfo | null>(null);
   const [copied, setCopied] = useState(false);
+  const [pages, setPages] = useState<number | null>(null);
   const entry = files[at];
   const spec = useMemo(() => (entry ? previewOf(entry.name) : null), [entry]);
 
@@ -53,6 +55,7 @@ export default function PreviewDialog({ source, dir, files, start, onDownload, o
     if (!entry || !spec) return undefined;
     setSize(null);
     setText(null);
+    setPages(null);
     setCopied(false);
     setEncoding('auto');
     if (entry.size > spec.maxBytes) { setLoad({ state: 'tooBig' }); return undefined; }
@@ -105,6 +108,7 @@ export default function PreviewDialog({ source, dir, files, start, onDownload, o
           {size && ` · ${size.width} × ${size.height}`}
           {text && ` · ${t('preview.lines', { count: text.lines.toLocaleString() })} · ${text.encoding.toUpperCase()}`}
           {text && spec.language && spec.language !== 'plaintext' && ` · ${spec.language}`}
+          {pages !== null && ` · ${t('preview.pages', { count: pages.toLocaleString() })}`}
           {many && ` · ${at + 1} / ${files.length}`}
         </span>
         <span className="preview-actions">
@@ -142,6 +146,9 @@ export default function PreviewDialog({ source, dir, files, start, onDownload, o
         {load.state === 'failed' && <p className="preview-note" role="alert">{load.message}</p>}
         {load.state === 'ready' && spec.kind === 'image' && (
           <ImagePreview blob={load.blob} name={entry.name} fit={fit} onToggleFit={() => setFit((f) => !f)} onSize={setSize} />
+        )}
+        {load.state === 'ready' && spec.kind === 'pdf' && (
+          <PdfPreview blob={load.blob} onInfo={(info) => setPages(info ? info.pages : null)} />
         )}
         {load.state === 'ready' && spec.kind === 'text' && (
           <TextPreview blob={load.blob} language={spec.language || 'plaintext'} wrap={wrap} encoding={encoding} onInfo={setText} />

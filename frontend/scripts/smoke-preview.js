@@ -7,7 +7,9 @@
 // <script> that must never run), c-blue.png (1600×1200), broken.png (not an
 // image), notes.txt, script.py (7 lines, one very long), memo-euckr.txt (EUC-KR
 // Korean), big.log (12000 lines, over 300 KB), LICENSE (binary), pack.zip,
-// del-1.txt and del-2.txt. The two del- files are deleted.
+// report.pdf (3 pages: "First page NabiMan", …), locked.pdf (the same, with
+// the password pdf-secret), fake.pdf (not a PDF), del-1.txt and del-2.txt.
+// The two del- files are deleted.
 const { chromium } = require('playwright');
 
 const BASE = process.env.SMOKE_URL || 'http://127.0.0.1:18096';
@@ -53,8 +55,8 @@ const check = (name, ok, detail = '') => {
   check('double-click opens the image', (await dialog.locator('img').getAttribute('alt')) === 'a-red.png');
   await page.waitForFunction(() => /×/.test(document.querySelector('.preview-facts')?.textContent || ''));
   check('its size is shown', (await facts()).includes('64 × 32'), await facts());
-  // Images and texts alike, by name: a-red, b-shape, big.log, broken, c-blue, …, script.py.
-  check('it counts the folder\'s previewable files', (await facts()).includes('1 / 11'), await facts());
+  // Images, texts and PDFs alike, by name: a-red, b-shape, big.log, broken, c-blue, …, script.py.
+  check('it counts the folder\'s previewable files', (await facts()).includes('1 / 14'), await facts());
 
   // 2. Arrows step through; an SVG shows without running its script.
   await page.keyboard.press('ArrowRight');
@@ -114,6 +116,58 @@ const check = (name, ok, detail = '') => {
   await row('LICENSE').dblclick();
   await dialog.getByText(/바이너리 파일/).waitFor({ timeout: 15000 }).catch(() => {});
   check('a binary file named like text says so', await dialog.getByText(/바이너리 파일/).count() === 1);
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'detached' });
+
+  // 2c. PDF.
+  await row('report.pdf').dblclick();
+  await page.waitForFunction(() => document.querySelectorAll('.sftp-preview .pdf-page').length === 3, null, { timeout: 20000 }).catch(() => {});
+  check('a PDF opens with all its pages', await dialog.locator('.pdf-page').count() === 3 && (await facts()).includes('3쪽'), await facts());
+  await page.waitForFunction(() => /First page NabiMan/.test(document.querySelector('.sftp-preview .pdf-page .textLayer')?.textContent || ''), null, { timeout: 15000 }).catch(() => {});
+  check('its text is there to select', (await dialog.locator('.pdf-page').first().locator('.textLayer').textContent()).includes('First page NabiMan'));
+  const painted = await page.evaluate(() => {
+    const c = document.querySelector('.sftp-preview .pdf-page canvas');
+    if (!c || !c.width) return false;
+    const px = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    for (let i = 0; i < px.length; i += 4) if (px[i] < 128 && px[i + 3] > 0) return true;
+    return false;
+  });
+  check('the first page is drawn', painted);
+  await page.screenshot({ path: `${OUT}/smoke-preview-pdf.png` });
+  const zoomOf = () => dialog.locator('.pdf-zoom').textContent();
+  const fitted100 = await zoomOf();
+  await dialog.locator('.pdf-scroll').focus();
+  await page.keyboard.press('+');
+  check('+ zooms in', (await zoomOf()) !== fitted100, `${fitted100} → ${await zoomOf()}`);
+  await page.keyboard.press('0');
+  check('0 fits the width again', (await zoomOf()) === fitted100);
+  await dialog.getByRole('textbox', { name: '쪽 번호' }).fill('3');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(600);
+  const third = await page.evaluate(() => {
+    const box = document.querySelector('.sftp-preview .pdf-scroll');
+    const p3 = document.querySelector('.sftp-preview .pdf-page[data-page="3"]');
+    return p3.getBoundingClientRect().top - box.getBoundingClientRect().top;
+  });
+  check('a page number jumps to it', Math.abs(third) < 60 || (await dialog.locator('.pdf-scroll').evaluate((b) => b.scrollTop + b.clientHeight >= b.scrollHeight - 2)), String(third));
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'detached' });
+  await row('locked.pdf').dblclick();
+  const pw = dialog.getByLabel('PDF 암호');
+  await pw.waitFor({ timeout: 20000 });
+  await pw.fill('wrong');
+  await page.keyboard.press('Enter');
+  await dialog.getByText('암호가 맞지 않습니다').waitFor({ timeout: 10000 }).catch(() => {});
+  check('a wrong PDF password is said so', await dialog.getByText('암호가 맞지 않습니다').count() === 1);
+  await dialog.getByLabel('PDF 암호').fill('pdf-secret');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelectorAll('.sftp-preview .pdf-page').length === 3, null, { timeout: 15000 }).catch(() => {});
+  check('the right password opens it', await dialog.locator('.pdf-page').count() === 3);
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'detached' });
+  await row('fake.pdf').dblclick();
+  await dialog.getByText(/PDF를 읽을 수 없습니다/).waitFor({ timeout: 15000 }).catch(() => {});
+  check('a broken PDF says so', await dialog.getByText(/PDF를 읽을 수 없습니다/).count() === 1);
   await page.keyboard.press('Escape');
   await dialog.waitFor({ state: 'detached' });
 
