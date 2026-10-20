@@ -6,6 +6,7 @@ import { TerminalTarget, TerminalViewHandle } from '../terminal/TerminalView';
 import { sidKey, writeStored } from '../terminal/terminalStorage';
 import { hasFiles, hasTerminal } from './protocols';
 import { RailAction, Selection, ServerView } from './workspaceState';
+import { confirmDialog } from '../common/ConfirmDialog';
 
 interface Options {
   servers: RemoteServer[];
@@ -87,7 +88,7 @@ export function useTargetActions({
       refetchServers();
       return;
     }
-    if (!window.confirm(t('remote.deleteConfirm', { name: server.name }))) return;
+    if (!(await confirmDialog({ message: t('remote.deleteConfirm', { name: server.name }), danger: true, confirmLabel: t('common.delete') }))) return;
     const res = await apiRequest(`/api/remote-servers/${server.id}`, { method: 'DELETE' });
     if (!res.success) { setError(res.message || t('common.error')); return; }
     if (selection.kind === 'server' && selection.id === server.id) select({ kind: 'overview' });

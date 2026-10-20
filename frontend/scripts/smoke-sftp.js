@@ -8,6 +8,7 @@
 // and an empty folder on it that the test may fill and empty. Everything it
 // makes is inside SMOKE_SFTP_DIR.
 const { chromium } = require('playwright');
+const { autoConfirm, answerConfirm } = require('./confirm-modal');
 
 const BASE = process.env.SMOKE_URL || 'http://127.0.0.1:18096';
 const PASSWORD = process.env.SMOKE_PASSWORD || 'smoketest123';
@@ -29,6 +30,7 @@ const check = (name, ok, detail = '') => {
   const problems = [];
   page.on('pageerror', (e) => problems.push(e.message.split('\n')[0]));
   page.on('dialog', (d) => d.accept());
+  await autoConfirm(page);
 
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.fill('input[type="text"]', 'admin');
@@ -200,6 +202,7 @@ const check = (name, ok, detail = '') => {
   const guest = await visitor.newPage();
   guest.on('pageerror', (e) => problems.push(`guest: ${e.message.split('\n')[0]}`));
   guest.on('dialog', (d) => d.accept());
+  await autoConfirm(guest);
   const openShare = async (token) => {
     await guest.evaluate((dir) => {
       Object.keys(localStorage).filter((k) => k.startsWith('nabiman_sftp_path_share_')).forEach((k) => localStorage.setItem(k, dir));

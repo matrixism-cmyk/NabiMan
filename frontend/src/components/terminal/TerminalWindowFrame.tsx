@@ -8,6 +8,7 @@ import SessionNameEdit from './SessionNameEdit';
 import { apiRequest } from '../../hooks/useApi';
 import type { SessionInfo } from '../remote/SessionsView';
 import { clamp, MIN_H, MIN_W, TASKBAR_H, TermWindow } from './windowGeometry';
+import { confirmDialog } from '../common/ConfirmDialog';
 
 interface FrameProps {
   win: TermWindow;
@@ -152,9 +153,9 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
           <button title={win.maximized ? t('terminal.restoreSize') : t('terminal.maximize')} onClick={(e) => { e.stopPropagation(); toggleMaximize(); }}>▢</button>
           <button
             title={t('terminal.endSessionHint')}
-            onClick={(e) => {
+            onClick={async (e) => {
               e.stopPropagation();
-              if (window.confirm(t('terminal.endSessionConfirm', { name: win.title }))) {
+              if ((await confirmDialog({ message: t('terminal.endSessionConfirm', { name: win.title }), danger: true }))) {
                 onEndSession(win.id);
               }
             }}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApi, apiPost } from '../hooks/useApi';
 import { useT } from '../i18n';
+import { confirmDialog } from './common/ConfirmDialog';
 
 interface Package {
   name: string;
@@ -34,7 +35,7 @@ export default function PackagesPanel() {
   };
 
   const handleInstall = async (name: string) => {
-    if (!window.confirm(`Install "${name}"?`)) return;
+    if (!(await confirmDialog(`Install "${name}"?`))) return;
     setActionLoading(true);
     setMessage('');
     const res = await apiPost<string>('/api/packages/install', { name });
@@ -44,7 +45,7 @@ export default function PackagesPanel() {
   };
 
   const handleRemove = async (name: string) => {
-    if (!window.confirm(`Remove "${name}"?`)) return;
+    if (!(await confirmDialog({ message: `Remove "${name}"?`, danger: true }))) return;
     setActionLoading(true);
     setMessage('');
     const res = await apiPost<string>('/api/packages/remove', { name });

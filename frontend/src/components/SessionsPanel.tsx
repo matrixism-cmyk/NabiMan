@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApi, apiPost } from '../hooks/useApi';
 import { useT } from '../i18n';
+import { confirmDialog } from './common/ConfirmDialog';
 
 interface LoginSession { user: string; tty: string; from: string; login_time: string; idle: string; what: string; }
 
@@ -12,7 +13,7 @@ export default function SessionsPanel() {
   const [tab, setTab] = useState<'active' | 'last'>('active');
 
   const killSession = async (tty: string) => {
-    if (!window.confirm(t('sessions.confirmKill').replace('{tty}', tty))) return;
+    if (!(await confirmDialog({ message: t('sessions.confirmKill').replace('{tty}', tty), danger: true }))) return;
     const res = await apiPost<string>('/api/sessions/kill', { tty });
     setMsg(res.data || res.message);
     refetch();

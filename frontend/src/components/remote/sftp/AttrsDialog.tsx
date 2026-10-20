@@ -1,6 +1,6 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useId, useState } from 'react';
 import { useT } from '../../../i18n';
+import Modal from '../../common/Modal';
 import { AttrsResult, changeAttrs, isFolder, modeString, SftpAttrsCaps, SftpEntry, SftpSource } from './sftpApi';
 
 interface Props {
@@ -31,9 +31,7 @@ const nameOf = (e: SftpEntry, which: 'owner' | 'group') =>
  */
 export default function AttrsDialog({ source, targets, caps, onDone, onClose }: Props) {
   const { t } = useT();
-  const titleId = useId();
   const listId = useId();
-  const dialogRef = useRef<HTMLFormElement>(null);
   const shared = common(targets.map((x) => x.entry.mode));
   const [setMode, setSetMode] = useState(shared !== undefined && shared !== null);
   const [mode, setModeValue] = useState<number>(shared ?? 0o644);
@@ -46,10 +44,6 @@ export default function AttrsDialog({ source, targets, caps, onDone, onClose }: 
   const folders = targets.some((x) => isFolder(x.entry));
   const currentOwner = common(targets.map((x) => nameOf(x.entry, 'owner')));
   const currentGroup = common(targets.map((x) => nameOf(x.entry, 'group')));
-
-  useEffect(() => {
-    dialogRef.current?.querySelector<HTMLElement>('input')?.focus();
-  }, []);
 
   const toggle = (bit: number) => {
     const next = mode ^ bit;
@@ -84,12 +78,9 @@ export default function AttrsDialog({ source, targets, caps, onDone, onClose }: 
 
   const title = targets.length === 1 ? targets[0].entry.name : t('sftp.selected', { count: targets.length });
 
-  return createPortal(
-    <div className="modal-overlay term-settings-overlay" onClick={onClose}>
-      <form ref={dialogRef} className="modal-content sftp-attrs" role="dialog" aria-modal="true" aria-labelledby={titleId}
-        onClick={(e) => e.stopPropagation()} onSubmit={submit}
-        onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose(); } }}>
-        <h3 id={titleId}>{t('sftp.attrsTitle')}</h3>
+  return (
+    <Modal title={t('sftp.attrsTitle')} className="sftp-attrs" onClose={onClose}>
+      <form className="sftp-attrs-form" onSubmit={submit}>
         <p className="text-secondary sftp-attrs-what">{title}</p>
         {error && <div role="alert" className="message">{error}</div>}
 
@@ -158,7 +149,6 @@ export default function AttrsDialog({ source, targets, caps, onDone, onClose }: 
           <button type="button" className="btn btn-secondary" onClick={onClose}>{t('common.cancel')}</button>
         </div>
       </form>
-    </div>,
-    document.body,
+    </Modal>
   );
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { I18nProvider } from '../../i18n';
 import { TerminalSettingsProvider } from './settings';
 import { TerminalWindowsProvider, useTerminalWindows } from './TerminalWindows';
@@ -103,15 +103,16 @@ describe('terminal windows', () => {
     expect((document.querySelector('.term-window') as HTMLElement).style.width).toBe(before);
   });
 
-  it('ends a session only after confirmation', () => {
+  it('ends a session only after confirmation', async () => {
     renderDesktop();
     openWindow();
     const end = screen.getByTitle('End session (also closes the remote shell)');
     (window.confirm as jest.Mock).mockReturnValueOnce(false);
     fireEvent.click(end);
+    await waitFor(() => expect(window.confirm).toHaveBeenCalledTimes(1));
     expect(document.querySelector('.term-window')).toBeTruthy();
     fireEvent.click(end);
-    expect(document.querySelector('.term-window')).toBeNull();
+    await waitFor(() => expect(document.querySelector('.term-window')).toBeNull());
   });
 
   it('tiles several windows without dropping any', () => {

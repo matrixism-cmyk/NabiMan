@@ -10,6 +10,7 @@
 // viewer's zoom stays in that viewer's window, and that a revoked link stops
 // working.
 const { chromium } = require('playwright');
+const { autoConfirm, answerConfirm } = require('./confirm-modal');
 const { execSync } = require('child_process');
 
 const BASE = process.env.SMOKE_URL || 'http://127.0.0.1:18096';
@@ -159,8 +160,8 @@ async function createLink(page, { password, readOnly }) {
   const token = url.split('/share/')[1];
   await owner.click('button:has-text("공유")');
   await owner.waitForSelector('.share-dialog');
-  owner.once('dialog', (d) => d.accept());
   await owner.locator('.share-list tr', { hasText: token.slice(0, 8) }).locator('button:has-text("삭제")').click();
+  await answerConfirm(owner, true);
   await owner.waitForTimeout(1500);
   const revokedCtx = await browser.newContext();
   const revoked = await revokedCtx.newPage();

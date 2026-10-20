@@ -6,6 +6,7 @@ import { MemberUser, ScopeOption } from './MembershipEditor';
 import { accessActive } from './MemberAccessFields';
 import ScopePolicyHistory from './ScopePolicyHistory';
 import UserManagementPanel from './UserManagementPanel';
+import { confirmDialog } from './common/ConfirmDialog';
 
 interface Settings { revision: string; contact_email: string; member_notice: string; member_limit: number | null; allow_commands: boolean; require_mfa: boolean }
 function ScopePolicy({ scope, canManage, tenant }: { scope: ScopeOption; canManage: boolean; tenant?: Tenant }) {
@@ -50,7 +51,7 @@ function ScopePolicy({ scope, canManage, tenant }: { scope: ScopeOption; canMana
     {message && <p role="status">{message}</p>}
     {conflict && <div role="alert"><p>작성한 내용은 아직 저장되지 않았습니다. 필요한 내용을 복사한 뒤 최신 설정을 불러와 다시 검토하세요.</p>
       <button className="btn btn-secondary" disabled={busy} onClick={async () => {
-        if (!window.confirm('작성한 변경 내용을 취소하고 최신 설정을 불러올까요?')) return;
+        if (!(await confirmDialog({ message: '작성한 변경 내용을 취소하고 최신 설정을 불러올까요?', danger: true }))) return;
         setBusy(true); await refetch(); setDraft(null); setConflict(false); setMessage(''); setBusy(false);
       }}>작성 내용 취소하고 최신 설정 불러오기</button></div>}
     {canManage && <ScopePolicyHistory key={`${endpoint}:${historyVersion}`} endpoint={endpoint} />}

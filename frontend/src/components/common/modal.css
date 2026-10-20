@@ -1,0 +1,5 @@
+/* The shared modal frame (Modal.tsx). Dialog sizes live with each dialog. */
+.common-modal-overlay { z-index: 1000; }
+.common-modal-overlay.is-top { z-index: 1100; }
+.common-modal { max-height: calc(100vh - 32px); overflow: auto; outline: none; }
+.common-modal-title { margin-bottom: 12px; }

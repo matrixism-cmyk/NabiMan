@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { apiPost, useApi } from '../hooks/useApi';
 import { useT } from '../i18n';
+import { confirmDialog } from './common/ConfirmDialog';
 interface LoginSession {
   session_id: string; user_id: string; username: string; created_at: string;
   last_active: string; ip: string; is_current: boolean;
@@ -11,7 +12,7 @@ export default function LoginSessionsPanel() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const revoke = async (session?: LoginSession) => {
-    if (!window.confirm(t(session ? 'loginSessions.confirmOne' : 'loginSessions.confirmOthers'))) return;
+    if (!(await confirmDialog({ message: t(session ? 'loginSessions.confirmOne' : 'loginSessions.confirmOthers'), danger: true }))) return;
     setBusy(true); setMessage('');
     try {
       const result = await apiPost<string>(session ? '/api/auth/sessions/revoke' : '/api/auth/sessions/revoke-others',

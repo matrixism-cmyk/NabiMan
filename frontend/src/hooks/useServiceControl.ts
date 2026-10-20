@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { apiRequest, useApi } from './useApi';
 import { ServiceControlResponse } from '../components/ServiceControlResult';
 import { useT } from '../i18n';
+import { confirmDialog } from '../components/common/ConfirmDialog';
 
 export function useServiceControl(refetch: () => void) {
   const { t } = useT();
@@ -33,7 +34,7 @@ export function useServiceControl(refetch: () => void) {
   };
   const act = async (name: string, action: string) => {
     if (pending.current || !me?.id) return;
-    if ((action === 'stop' || action === 'disable') && !window.confirm(`${action} "${name}"?`)) return;
+    if ((action === 'stop' || action === 'disable') && !(await confirmDialog({ message: `${action} "${name}"?`, danger: true }))) return;
     const id = crypto.randomUUID();
     const generation = accountGeneration.current;
     pending.current = true;

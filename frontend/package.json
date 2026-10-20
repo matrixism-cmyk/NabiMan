@@ -33,7 +33,8 @@
     "smoke:rail": "node scripts/smoke-rail.js",
     "smoke:sftp": "node scripts/smoke-sftp.js",
     "smoke:rename": "node scripts/smoke-rename.js",
-    "smoke:protocols": "node scripts/smoke-protocols.js"
+    "smoke:protocols": "node scripts/smoke-protocols.js",
+    "smoke:preview": "node scripts/smoke-preview.js"
   },
   "browserslist": {
     "production": [

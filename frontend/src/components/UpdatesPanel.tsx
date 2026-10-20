@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApi, apiPost } from '../hooks/useApi';
 import { UpdateCheckResult } from '../types';
 import { useT } from '../i18n';
+import { confirmDialog } from './common/ConfirmDialog';
 
 export default function UpdatesPanel() {
   const { t } = useT();
@@ -11,7 +12,7 @@ export default function UpdatesPanel() {
   const [result, setResult] = useState('');
 
   const handleUpgradeAll = async () => {
-    if (!window.confirm(t('updates.confirmUpgrade'))) return;
+    if (!(await confirmDialog(t('updates.confirmUpgrade')))) return;
     setUpgrading(true); setResult('');
     const res = await apiPost<string>('/api/updates/upgrade', {});
     setResult(res.data || res.message);

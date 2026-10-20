@@ -4,6 +4,7 @@ import './index.css';
 import App from './App';
 import { I18nProvider } from './i18n';
 import SharePage from './components/terminal/SharePage';
+import { ConfirmHost } from './components/common/ConfirmDialog';
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(
@@ -22,6 +23,7 @@ root.render(
       ) : (
         <App />
       )}
+      <ConfirmHost />
     </I18nProvider>
   </React.StrictMode>
 );

@@ -1,4 +1,5 @@
 const fs=require('fs');const {chromium}=require('playwright');
+const { autoConfirm, answerConfirm } = require('./confirm-modal');
 (async()=>{
  const f=JSON.parse(fs.readFileSync(0,'utf8'));const browser=await chromium.launch({headless:true,args:['--no-sandbox']});const context=await browser.newContext();
  const check=(value,message)=>{if(!value)throw new Error(message);};
@@ -25,7 +26,7 @@ const fs=require('fs');const {chromium}=require('playwright');
    check((await call(path,{contact_email:'first@example.test'},manager,'PUT')).status===428,'unconditional write accepted');
    check((await call(path,{expected_revision:initial.revision},manager,'PUT')).status===400,'missing reason accepted');
    check((await call(path,{expected_revision:initial.revision,change_reason:'Forged metadata test',history:[],actor:'forged'},manager,'PUT')).status===400,'caller-supplied history metadata accepted');
-   const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+   const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());await autoConfirm(page);
    await page.addInitScript(({base,token})=>{if(location.origin===base){sessionStorage.setItem('nabiman_token',token);localStorage.setItem('nabiman_lang','ko');}},{base:f.base,token:manager});
    await page.goto(f.base+'/#administration/scopeSettings');
    await page.getByLabel('소속 회원에게 표시할 공지').fill('My unsaved revision');

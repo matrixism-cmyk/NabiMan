@@ -7,6 +7,7 @@ import ServerForm from './ServerForm';
 import HostTrustForm from './HostTrustForm';
 import ProtocolDetect, { CheckList } from './ProtocolDetect';
 import { hasShell, usesSsh } from './protocols';
+import { confirmDialog } from '../common/ConfirmDialog';
 
 /** Live facts about one server: probe it and show what came back. */
 export function ServerStatusView({ server }: { server: RemoteServer }) {
@@ -102,7 +103,7 @@ export function ServerSettingsView({ server, onChanged, onDeleted }: SettingsPro
   const ssh = usesSsh(server);
 
   const remove = async () => {
-    if (!window.confirm(t('remote.deleteConfirm', { name: server.name }))) return;
+    if (!(await confirmDialog({ message: t('remote.deleteConfirm', { name: server.name }), danger: true, confirmLabel: t('common.delete') }))) return;
     setDeleting(true);
     const res = await apiRequest(`/api/remote-servers/${server.id}`, { method: 'DELETE' });
     setDeleting(false);

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { apiPost, fetchWithRefresh } from '../hooks/useApi';
 import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';
+import { confirmDialog } from './common/ConfirmDialog';
 
 interface FileEntry { name: string; path: string; is_dir: boolean; size: number; modified: string; permissions: string; }
 interface FileContent { path: string; content: string; size: number; }
@@ -94,7 +95,7 @@ export default function FileManagerPanel() {
   };
 
   const handleDelete = async (path: string) => {
-    if (!window.confirm(t('files.confirmDelete'))) return;
+    if (!(await confirmDialog({ message: t('files.confirmDelete'), danger: true, confirmLabel: t('common.delete') }))) return;
     const res = await apiPost<string>('/api/files/delete', { path });
     setMsg(res.success ? res.data || 'OK' : res.message);
     if (res.success) browse(pathInput);

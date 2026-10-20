@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useT } from '../../i18n';
+import { confirmDialog } from '../common/ConfirmDialog';
 
 interface Props {
   labels: Record<string, string>;
@@ -26,7 +27,7 @@ export default function NodeLabelsEditor({ labels, onPatch }: Props) {
   };
 
   const remove = async (k: string) => {
-    if (!window.confirm(t('mec.node.labels.confirmRemove', { key: k }))) return;
+    if (!(await confirmDialog({ message: t('mec.node.labels.confirmRemove', { key: k }), danger: true, confirmLabel: t('common.delete') }))) return;
     setBusy(true);
     try {
       await onPatch({}, [k]);

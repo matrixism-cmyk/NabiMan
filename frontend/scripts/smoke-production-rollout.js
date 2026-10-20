@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
+const { autoConfirm, answerConfirm } = require('./confirm-modal');
 
 (async () => {
   const fixture = JSON.parse(fs.readFileSync(0, 'utf8'));
@@ -109,7 +110,7 @@ const { chromium } = require('playwright');
       await member.goto(fixture.base + '/#administration/loginSessions');
       await member.getByRole('heading', { name: '로그인 세션', exact: true }).waitFor();
       await member.getByText('현재 로그인', { exact: true }).waitFor();
-      member.on('dialog', dialog => dialog.accept());
+      member.on('dialog', dialog => dialog.accept()); await autoConfirm(member);
       const row = member.locator('[data-session-id="' + fixture.probeLogin.sid + '"]');
       await row.getByRole('button', { name: '로그인 종료', exact: true }).click();
       await member.getByText('로그인 세션을 종료했습니다.', { exact: true }).waitFor();

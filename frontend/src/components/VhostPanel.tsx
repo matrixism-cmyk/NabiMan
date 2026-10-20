@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApi, apiPost } from '../hooks/useApi';
 import { useT } from '../i18n';
+import { confirmDialog } from './common/ConfirmDialog';
 
 interface VhostInfo { domain: string; vhost_type: string; target: string; ssl: boolean; enabled: boolean; config_file: string; }
 interface VhostConfig { domain: string; http_config: string; ssl_config: string | null; }
@@ -35,7 +36,7 @@ export default function VhostPanel() {
   };
 
   const handleDelete = async (d: string) => {
-    if (!window.confirm(t('vhost.confirmDelete').replace('{domain}', d))) return;
+    if (!(await confirmDialog({ message: t('vhost.confirmDelete').replace('{domain}', d), danger: true, confirmLabel: t('common.delete') }))) return;
     const res = await apiPost<string>('/api/vhost/delete', { domain: d });
     setMsg(res.data || res.message); refetch();
   };

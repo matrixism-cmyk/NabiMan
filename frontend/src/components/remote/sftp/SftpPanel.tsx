@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useT } from '../../../i18n';
 import RailContextMenu, { RailMenuItem } from '../RailContextMenu';
 import AttrsDialog from './AttrsDialog';
+import PreviewDialog from './preview/PreviewDialog';
+import { previewOf } from './preview/previewKinds';
 import SftpList, { Editing } from './SftpList';
 import SftpTransfers from './SftpTransfers';
 import { useTransfers } from './useTransfers';
@@ -10,6 +12,7 @@ import { draggingDesktopFiles, draggingOwnRows, ownRows, SFTP_MIME, takeDrop } f
 import {
   baseName, isFolder, joinPath, listDir, makeDir, movePath, removePath, SftpEntry, SftpListing, SftpSource, shellQuote,
 } from './sftpApi';
+import { confirmDialog } from '../../common/ConfirmDialog';
 
 interface Props {
   source: SftpSource;
@@ -50,6 +53,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
   const [editing, setEditing] = useState<Editing | null>(null);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [attrsFor, setAttrsFor] = useState<SftpEntry[] | null>(null);
+  const [previewing, setPreviewing] = useState<string | null>(null);
   const anchor = useRef<string | null>(null);
   const current = useRef('');
   const fileInput = useRef<HTMLInputElement>(null);
@@ -101,8 +105,12 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
     window.setTimeout(() => setNotice(''), 4000);
   };
 
+  // Files that can be shown in place, in list order, for stepping through.
+  const previewable = useMemo(() => visible.filter((e) => !isFolder(e) && previewOf(e.name)), [visible]);
+
   const open = (entry: SftpEntry) => {
     if (isFolder(entry)) load(pathOf(entry.name));
+    else if (previewOf(entry.name)) setPreviewing(entry.name);
     else transfers.download([{ path: pathOf(entry.name) }]);
   };
 
@@ -124,7 +132,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
     const question = entries.length > 1 ? t('sftp.deleteMany', { count: entries.length })
       : isFolder(entries[0]) && entries[0].kind === 'dir' ? t('sftp.deleteFolder', { name: entries[0].name })
       : t('sftp.deleteFile', { name: entries[0].name });
-    if (!window.confirm(question)) return;
+    if (!(await confirmDialog({ message: question, danger: true, confirmLabel: t('common.delete'), items: entries.map((e) => (isFolder(e) ? `${e.name}/` : e.name)) }))) return;
     const failures: string[] = [];
     for (const entry of entries) {
       const res = await removePath(source, pathOf(entry.name));
@@ -172,6 +180,10 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
       const next = names[Math.max(0, Math.min(names.length - 1, at + (e.key === 'ArrowDown' ? 1 : -1)))];
       if (next) { anchor.current = next; setSelected(new Set([next])); }
     } else if (e.key === 'Enter' && chosen.length === 1) open(chosen[0]);
+    else if (e.key === ' ' && chosen.length === 1 && !isFolder(chosen[0]) && previewOf(chosen[0].name)) {
+      e.preventDefault();
+      setPreviewing(chosen[0].name);
+    }
     else if (e.key === 'Backspace' && listing?.parent) load(listing.parent);
     else if (e.key === 'Delete' && writable) remove(chosen);
     else if (e.key === 'F2' && writable && chosen.length === 1) setEditing({ mode: 'rename', from: chosen[0].name });
@@ -233,6 +245,9 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
     const saving = targets.map((e) => ({ path: pathOf(e.name), folder: isFolder(e) }));
     const single = targets.length === 1;
     return [
+      ...(single && !isFolder(entry) && previewOf(entry.name)
+        ? [{ key: 'preview', label: t('sftp.preview'), icon: '👁', onSelect: () => setPreviewing(entry.name) }]
+        : []),
       single && isFolder(entry)
         ? { key: 'open', label: t('sftp.open'), icon: '📂', onSelect: () => open(entry) }
         : { key: 'download', label: t('sftp.download'), icon: '↓', onSelect: () => transfers.download(saving) },
@@ -343,6 +358,11 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
         <RailContextMenu x={menu.x} y={menu.y} opener={menu.opener}
           title={menu.entry ? (chosen.length > 1 ? t('sftp.selected', { count: chosen.length }) : menu.entry.name) : here}
           items={menuItems(menu.entry)} onClose={() => setMenu(null)} />
+      )}
+      {previewing && listing && (
+        <PreviewDialog source={source} dir={listing.path} files={previewable} start={previewing}
+          onDownload={(e) => transfers.download([{ path: pathOf(e.name) }])}
+          onClose={() => { setPreviewing(null); listRef.current?.focus(); }} />
       )}
       {attrsFor && listing?.attrs && (
         <AttrsDialog source={source} caps={listing.attrs} onClose={() => setAttrsFor(null)}

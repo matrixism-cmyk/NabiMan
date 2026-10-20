@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { apiPost, apiRequest, useApi } from '../hooks/useApi';
 import { useT } from '../i18n';
+import { confirmDialog } from './common/ConfirmDialog';
 interface Token { id: string; name: string; prefix: string; owner_name: string | null; scopes: string[]; status: string; expires_at: string | null; last_used: string | null }
 interface Issued { id: string; key: string; expires_at: string }
 const scopes = ['status:read', 'servers:read', 'tenants:read'];
@@ -21,7 +22,7 @@ export default function ApiTokensPanel() {
     finally { setBusy(false); }
   };
   const revoke = async (token: Token) => {
-    if (!window.confirm(`${t('tokens.confirm')}\n${token.name} · ${token.prefix}`)) return;
+    if (!(await confirmDialog({ message: `${t('tokens.confirm')}\n${token.name} · ${token.prefix}`, danger: true }))) return;
     setBusy(true); setMessage('');
     try {
       const result = await apiRequest(`/api/apikeys/${encodeURIComponent(token.id)}`, { method: 'DELETE' });

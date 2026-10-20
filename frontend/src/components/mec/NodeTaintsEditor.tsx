@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useT } from '../../i18n';
 import { Taint } from '../../types/mec';
+import { confirmDialog } from '../common/ConfirmDialog';
 
 interface Props {
   taints: Taint[];
@@ -34,11 +35,9 @@ export default function NodeTaintsEditor({ taints, onPatch }: Props) {
 
   const remove = async (taintToRemove: Taint) => {
     if (
-      !window.confirm(
-        t('mec.node.taints.confirmRemove', {
+      !(await confirmDialog({ message: t('mec.node.taints.confirmRemove', {
           taint: `${taintToRemove.key}${taintToRemove.value ? '=' + taintToRemove.value : ''}:${taintToRemove.effect}`,
-        }),
-      )
+        }), danger: true, confirmLabel: t('common.delete') }))
     )
       return;
     setBusy(true);

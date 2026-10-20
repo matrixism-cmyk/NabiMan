@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useState, useId, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useCallback, useEffect, useState, useId } from 'react';
+import Modal from '../common/Modal';
 import { apiPost, apiRequest } from '../../hooks/useApi';
 import { useT } from '../../i18n';
+import { confirmDialog } from '../common/ConfirmDialog';
 
 export interface ShareLink {
   token: string;
@@ -59,9 +60,6 @@ interface Props {
 export default function ShareDialog({ sessionId = '', serverId = '', sessionLabel, onClose }: Props) {
   const { t } = useT();
   const titleId = useId();
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const closeRef = useRef(onClose);
-  closeRef.current = onClose;
   const [expiry, setExpiry] = useState(24 * 3600);
   const [password, setPassword] = useState('');
   const [readOnly, setReadOnly] = useState(true);
@@ -101,13 +99,12 @@ export default function ShareDialog({ sessionId = '', serverId = '', sessionLabe
   };
 
   const revoke = async (token: string) => {
-    if (!window.confirm(t('share.revokeConfirm'))) return;
+    if (!(await confirmDialog({ message: t('share.revokeConfirm'), danger: true, confirmLabel: t('common.delete') }))) return;
     setBusy(true);
     const res = await apiRequest(`/api/terminal/share-links/${token}`, { method: 'DELETE' });
     setBusy(false);
     if (!res.success) { setMessage(res.message || t('common.error')); return; }
     setMessage(t('share.revoked'));
-    dialogRef.current?.focus();
     if (created?.token === token) setCreated(null);
     load();
   };
@@ -118,29 +115,8 @@ export default function ShareDialog({ sessionId = '', serverId = '', sessionLabe
       .catch(() => setMessage(shareUrl(token)));
   };
 
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    dialogRef.current?.focus();
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeRef.current(); }
-    };
-    document.addEventListener('keydown', escape, true);
-    return () => { document.removeEventListener('keydown', escape, true); previous?.focus(); };
-  }, []);
-
-  return createPortal(
-    <div className="modal-overlay term-settings-overlay" onClick={onClose}>
-      <div ref={dialogRef} className="modal-content share-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          if (e.key === 'Tab') {
-            const controls = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), [tabindex="0"]'));
-            const first = controls[0], last = controls[controls.length - 1];
-            if (e.shiftKey && (document.activeElement === first || document.activeElement === e.currentTarget)) { e.preventDefault(); last?.focus(); }
-            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
-          }
-        }}>
-        <h3 id={titleId}>{t(filesOnly ? 'share.filesTitle' : 'share.title')}</h3>
+  return (
+    <Modal className="share-dialog" onClose={onClose} title={t(filesOnly ? 'share.filesTitle' : 'share.title')}>
         <p className="text-secondary">{sessionLabel}</p>
         <p className="share-warning">{t(filesOnly ? 'share.filesWarning' : 'share.warning')}</p>
         <p className="text-secondary">{t('share.lifetimePolicy')}</p>
@@ -233,7 +209,6 @@ export default function ShareDialog({ sessionId = '', serverId = '', sessionLabe
             </table>
           </div>
         )}
-      </div>
-    </div>, document.body
+    </Modal>
   );
 }

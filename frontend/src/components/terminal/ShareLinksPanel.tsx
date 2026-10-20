@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { apiRequest } from '../../hooks/useApi';
 import { useT } from '../../i18n';
 import { ShareLink } from './ShareDialog';
+import { confirmDialog } from '../common/ConfirmDialog';
 
 const shareUrl = (token: string) => `${window.location.origin}/share/${token}`;
 
@@ -66,7 +67,7 @@ export default function ShareLinksPanel() {
   }, [load]);
 
   const revoke = async (link: ShareLink) => {
-    if (!window.confirm(t('share.revokeConfirm'))) return;
+    if (!(await confirmDialog({ message: t('share.revokeConfirm'), danger: true, confirmLabel: t('common.delete') }))) return;
     setDeleting(link.token);
     const res = await apiRequest(`/api/terminal/share-links/${link.token}`, { method: 'DELETE' });
     setDeleting(null);

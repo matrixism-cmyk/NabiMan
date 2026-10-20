@@ -3,6 +3,7 @@ import { useApi, apiPost } from '../hooks/useApi';
 import { FirewallStatus } from '../types';
 import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';
+import { confirmDialog } from './common/ConfirmDialog';
 
 export default function FirewallPanel() {
   const { t } = useT();
@@ -28,7 +29,7 @@ export default function FirewallPanel() {
   };
 
   const handleDelete = async (num: number) => {
-    if (!window.confirm(`Delete rule #${num}?`)) return;
+    if (!(await confirmDialog({ message: `Delete rule #${num}?`, danger: true }))) return;
     setActionLoading(true);
     const res = await apiPost<string>('/api/firewall/delete', { number: num });
     setMessage(res.success ? res.data || 'Rule deleted' : res.message);

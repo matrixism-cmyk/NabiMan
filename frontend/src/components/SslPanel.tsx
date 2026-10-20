@@ -3,6 +3,7 @@ import { useApi, apiPost } from '../hooks/useApi';
 import { SslCertificate } from '../types';
 import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';
+import { confirmDialog } from './common/ConfirmDialog';
 
 interface RenewStatus { domain: string; status: string; message: string; started_at: string; }
 
@@ -16,7 +17,7 @@ export default function SslPanel() {
   useEffect(() => { return () => { if (pollRef.current) clearInterval(pollRef.current); }; }, []);
 
   const handleRenew = async (domain: string) => {
-    if (!window.confirm(t('ssl.confirmRenew').replace('{domain}', domain))) return;
+    if (!(await confirmDialog(t('ssl.confirmRenew').replace('{domain}', domain)))) return;
     setRenewing(domain);
     setRenewMsg(`${domain}: ${t('ssl.renewStarted')}`);
     await apiPost<RenewStatus>('/api/ssl/renew', { domain });
@@ -48,7 +49,7 @@ export default function SslPanel() {
   if (!data) return null;
 
   const handleIssue = async (domain: string) => {
-    if (!window.confirm(t('ssl.confirmIssue').replace('{domain}', domain))) return;
+    if (!(await confirmDialog(t('ssl.confirmIssue').replace('{domain}', domain)))) return;
     setRenewing(domain);
     setRenewMsg(`${domain}: ${t('ssl.issueStarted')}`);
     await apiPost<any>('/api/ssl/issue', { domain });

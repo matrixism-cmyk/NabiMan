@@ -1,5 +1,6 @@
 const fs = require('fs');
 const { chromium } = require('playwright');
+const { autoConfirm, answerConfirm } = require('./confirm-modal');
 (async () => {
   const fixture = JSON.parse(fs.readFileSync(0, 'utf8'));
   const browser = await chromium.launch({headless:true,args:['--no-sandbox']});
@@ -25,7 +26,7 @@ const { chromium } = require('playwright');
     if (renewed.status!==200) throw new Error('Valid refresh token rejected at refresh endpoint');
     Object.assign(first,renewed.body.data);
     const page=await client.newPage(); page.setDefaultTimeout(15000);
-    page.on('pageerror',e=>errors.push(e.name)); page.on('dialog',d=>d.accept());
+    page.on('pageerror',e=>errors.push(e.name)); page.on('dialog',d=>d.accept()); await autoConfirm(page);
     await page.addInitScript(session=>{
       sessionStorage.setItem('nabiman_token',session.token); sessionStorage.setItem('nabiman_refresh',session.refresh_token);
       localStorage.setItem('nabiman_lang','en');

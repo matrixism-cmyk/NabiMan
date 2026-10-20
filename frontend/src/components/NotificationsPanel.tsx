@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApi, apiPost, apiRequest } from '../hooks/useApi';
 import { useT } from '../i18n';
+import { confirmDialog } from './common/ConfirmDialog';
 
 interface Channel { id: string; name: string; channel_type: string; target: string; enabled: boolean; }
 
@@ -21,7 +22,7 @@ export default function NotificationsPanel() {
   };
 
   const deleteChannel = async (id: string) => {
-    if (!window.confirm(t('notify.confirmDelete'))) return;
+    if (!(await confirmDialog({ message: t('notify.confirmDelete'), danger: true, confirmLabel: t('common.delete') }))) return;
     await apiRequest<string>(`/api/notifications/channels/${id}`, { method: 'DELETE' });
     refetch();
   };

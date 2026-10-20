@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApi, apiPost, apiRequest } from '../hooks/useApi';
 import { useT } from '../i18n';
+import { confirmDialog } from './common/ConfirmDialog';
 
 interface AlertRule { id: string; name: string; metric: string; threshold: number; duration_secs: number; enabled: boolean; last_triggered: string | null; service_name?: string; }
 
@@ -30,7 +31,7 @@ export default function AlertRulesPanel() {
   };
 
   const deleteRule = async (id: string) => {
-    if (!window.confirm(t('alerts.confirmDelete'))) return;
+    if (!(await confirmDialog({ message: t('alerts.confirmDelete'), danger: true, confirmLabel: t('common.delete') }))) return;
     await apiRequest<string>(`/api/alerts/rules/${id}`, { method: 'DELETE' });
     refetch();
   };

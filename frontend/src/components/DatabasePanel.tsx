@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApi, apiPost } from '../hooks/useApi';
 import { useT } from '../i18n';
+import { confirmDialog } from './common/ConfirmDialog';
 
 interface DbStatus { engine: string; running: boolean; version: string; uptime: string; connections: string; databases: string[]; slow_queries: string; }
 interface DbBackupEntry { filename: string; size: number; created: string; }
@@ -56,13 +57,13 @@ export default function DatabasePanel() {
 
   const restoreBackup = async (filename: string) => {
     if (!backupDb) return;
-    if (!window.confirm(t('db.confirmRestore'))) return;
+    if (!(await confirmDialog({ message: t('db.confirmRestore'), danger: true }))) return;
     const res = await apiPost<string>('/api/database/restore', { database: backupDb, filename });
     setBackupMsg(res.data || res.message);
   };
 
   const deleteBackup = async (filename: string) => {
-    if (!window.confirm(t('backup.confirmDelete'))) return;
+    if (!(await confirmDialog({ message: t('backup.confirmDelete'), danger: true, confirmLabel: t('common.delete') }))) return;
     const res = await apiPost<string>('/api/backup/delete', { filename });
     setBackupMsg(res.data || res.message);
     fetchBackups();

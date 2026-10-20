@@ -3,6 +3,7 @@ import { apiPost, apiRequest } from '../../hooks/useApi';
 import { RemoteServer, RemoteServerStatus } from '../../types';
 import { useT } from '../../i18n';
 import { FileProtocol, PLAINTEXT, protocolName, TerminalProtocol } from './protocols';
+import { confirmDialog } from '../common/ConfirmDialog';
 
 interface Props {
   /** Absent for a new server, present when editing an existing one. */
@@ -112,7 +113,7 @@ export default function ServerForm({ server, onSaved, onCancel }: Props) {
   };
 
   const clearPassword = async () => {
-    if (!server || !window.confirm(t('remote.clearPasswordConfirm'))) return;
+    if (!server || !(await confirmDialog({ message: t('remote.clearPasswordConfirm'), danger: true, confirmLabel: t('common.delete') }))) return;
     const res = await apiRequest<RemoteServer>(`/api/remote-servers/${server.id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password: '', auth_method: ssh ? 'key' : 'password' }),

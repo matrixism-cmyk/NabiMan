@@ -8,6 +8,7 @@
 // right-click menu has to connect, open a new session, edit and delete — from
 // the mouse and from the keyboard, and without spilling off the screen.
 const { chromium } = require('playwright');
+const { autoConfirm, answerConfirm } = require('./confirm-modal');
 
 const BASE = process.env.SMOKE_URL || 'http://127.0.0.1:18096';
 const PASSWORD = process.env.SMOKE_PASSWORD || 'smoketest123';
@@ -131,15 +132,15 @@ const check = (name, ok, detail = '') => {
   check('수정 opens the edit form', await page.isVisible('h3:has-text("서버 정보 수정")'));
 
   // 8. 삭제 asks first; cancelling keeps the server.
-  page.once('dialog', (d) => d.dismiss());
   await server.click({ button: 'right' });
   await menuItem('삭제').click();
+  await answerConfirm(page, false);
   await page.waitForTimeout(1200);
   check('cancelling a delete keeps the server', await server.count() === 1);
 
-  page.once('dialog', (d) => d.accept());
   await server.click({ button: 'right' });
   await menuItem('삭제').click();
+  await answerConfirm(page, true);
   await page.waitForTimeout(2000);
   check('삭제 removes the server', await page.locator('.rw-item', { hasText: SERVER }).count() === 0);
 

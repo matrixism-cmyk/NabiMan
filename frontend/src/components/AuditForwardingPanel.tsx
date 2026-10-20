@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { apiPost, useApi } from '../hooks/useApi';
 import { useT } from '../i18n';
+import { confirmDialog } from './common/ConfirmDialog';
 interface Destination { id: string; revision: string; name: string; url: string; enabled: boolean; has_auth: boolean; pending: number; blocked: number; last_error: string | null; acknowledged: number; last_ack_at: string | null }
 interface Status { destinations: Destination[]; counters: Record<string, number>; legacy_requires_review: boolean; delivery_paused_by_operator: boolean }
 export default function AuditForwardingPanel() {
@@ -13,7 +14,7 @@ export default function AuditForwardingPanel() {
     catch (cause) { setError(cause instanceof Error ? cause.message : t('common.error')); } finally { setBusy(false); }
   };
   const action = async (destination: Destination, kind: string) => {
-    if (['enable', 'disable', 'delete'].includes(kind) && !window.confirm(`${t('forward.confirm')}\n${destination.name}\n${destination.url}`)) return;
+    if (['enable', 'disable', 'delete'].includes(kind) && !(await confirmDialog({ message: `${t('forward.confirm')}\n${destination.name}\n${destination.url}`, danger: true }))) return;
     setBusy(true); setError(''); setInfo('');
     try { const result = await apiPost(`/api/audit/forwarding/${encodeURIComponent(destination.id)}/${kind}`, { revision: destination.revision }); if (!result.success) throw new Error(result.message); setInfo(t(kind === 'test' ? 'forward.queued' : 'forward.changed')); refetch(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : t('common.error')); } finally { setBusy(false); }

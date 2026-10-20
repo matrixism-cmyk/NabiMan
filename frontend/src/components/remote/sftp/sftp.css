@@ -119,7 +119,8 @@
 }
 
 /* Permissions and owner */
-.sftp-attrs { max-width: 440px; display: flex; flex-direction: column; gap: 10px; }
+.sftp-attrs { width: 440px; max-width: calc(100vw - 32px); min-width: 0; }
+.sftp-attrs-form { display: flex; flex-direction: column; gap: 10px; }
 .sftp-attrs-what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; }
 .sftp-attrs-mode { border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px 10px; margin: 0; }
 .sftp-attrs-mode legend { font-size: 13px; padding: 0 4px; }

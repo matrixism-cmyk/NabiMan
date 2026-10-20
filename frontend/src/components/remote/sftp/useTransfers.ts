@@ -3,6 +3,7 @@ import { useT } from '../../../i18n';
 import { Dropped } from './sftpDrop';
 import { baseName, joinPath, makeDir, saveFile, SftpSource, Transfer, uploadFile } from './sftpApi';
 import { RateState, startRate, updateRate } from './transferRate';
+import { confirmDialog } from '../../common/ConfirmDialog';
 
 export interface TransferRow {
   id: number;
@@ -81,7 +82,7 @@ export function useTransfers(source: SftpSource, onUploaded: (dir: string) => vo
         };
         let result = await run(job.id, () => uploadFile(source, target, name, job.file, false, progress));
         if (result?.exists) {
-          if (window.confirm(t('sftp.overwriteConfirm', { name: job.rel }))) {
+          if ((await confirmDialog(t('sftp.overwriteConfirm', { name: job.rel })))) {
             result = await run(job.id, () => uploadFile(source, target, name, job.file, true, progress));
           } else {
             patch(job.id, { status: 'cancelled', message: t('sftp.skipped') });

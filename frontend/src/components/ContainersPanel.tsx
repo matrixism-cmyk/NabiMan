@@ -3,6 +3,7 @@ import { useApi, apiPost } from '../hooks/useApi';
 import { Container, ContainerImage } from '../types';
 import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';
+import { confirmDialog } from './common/ConfirmDialog';
 
 export default function ContainersPanel() {
   const { t } = useT();
@@ -15,7 +16,7 @@ export default function ContainersPanel() {
   const [showImages, setShowImages] = useState(false);
 
   const action = async (endpoint: string, id: string, label: string) => {
-    if (label === 'Remove' && !window.confirm(`Remove container "${id}"?`)) return;
+    if (label === 'Remove' && !(await confirmDialog({ message: `Remove container "${id}"?`, danger: true }))) return;
     setActionLoading(true);
     setMessage('');
     const res = await apiPost<string>(`/api/containers/${endpoint}`, { id });
@@ -35,7 +36,7 @@ export default function ContainersPanel() {
   };
 
   const removeImage = async (id: string) => {
-    if (!window.confirm(`Remove image "${id}"?`)) return;
+    if (!(await confirmDialog({ message: `Remove image "${id}"?`, danger: true }))) return;
     setActionLoading(true);
     const res = await apiPost<string>('/api/containers/images/remove', { id });
     setMessage(res.success ? res.data || 'OK' : res.message);

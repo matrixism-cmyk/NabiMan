@@ -58,6 +58,16 @@ const t: T = {
   'sftp.cancel': { ko: '전송 취소', en: 'Cancel transfer', ja: '転送をキャンセル' },
 
   // Share links
+  'sftp.preview': { ko: '미리보기', en: 'Preview', ja: 'プレビュー' },
+  'preview.loading': { ko: '불러오는 중…', en: 'Loading…', ja: '読み込み中…' },
+  'preview.tooBig': { ko: '{size}보다 커서 미리보기로는 열지 않습니다. 내려받아서 보세요.', en: 'Larger than {size}, so it is not opened for preview; download it instead.', ja: '{size} より大きいためプレビューしません。ダウンロードしてご覧ください。' },
+  'preview.cannotDecode': { ko: '이 파일은 브라우저가 그림으로 열 수 없습니다. 손상되었거나 다른 형식일 수 있습니다.', en: 'The browser cannot show this file as an image; it may be damaged or another format.', ja: 'ブラウザーはこのファイルを画像として表示できません。破損しているか別の形式の可能性があります。' },
+  'preview.fit': { ko: '창에 맞추기', en: 'Fit', ja: 'ウィンドウに合わせる' },
+  'preview.actualSize': { ko: '원래 크기', en: 'Actual size', ja: '実寸' },
+  'preview.fitHint': { ko: '클릭하면 창에 맞춥니다 (F)', en: 'Click to fit the window (F)', ja: 'クリックでウィンドウに合わせる (F)' },
+  'preview.actualSizeHint': { ko: '클릭하면 원래 크기로 봅니다 (F)', en: 'Click for actual size (F)', ja: 'クリックで実寸表示 (F)' },
+  'preview.previous': { ko: '이전 파일', en: 'Previous file', ja: '前のファイル' },
+  'preview.next': { ko: '다음 파일', en: 'Next file', ja: '次のファイル' },
   'sftp.attrs': { ko: '권한·소유자 변경…', en: 'Permissions and owner…', ja: '権限・所有者の変更…' },
   'sftp.attrsTitle': { ko: '권한·소유자 변경', en: 'Permissions and owner', ja: '権限・所有者の変更' },
   'sftp.attrsChangeMode': { ko: '권한 바꾸기', en: 'Change permissions', ja: '権限を変更' },

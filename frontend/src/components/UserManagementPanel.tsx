@@ -6,6 +6,7 @@ import MembershipEditor, { Membership, MemberUser, ScopeOption, membershipRole }
 import MemberAccessFields, { accessActive } from './MemberAccessFields';
 import ExternalIdentityEditor from './ExternalIdentityEditor';
 import TenantAccessInspection from './TenantAccessInspection';
+import { confirmDialog } from './common/ConfirmDialog';
 
 const statusLabel = { active: '승인', pending: '승인 대기', rejected: '반려', suspended: '이용 정지' };
 export default function UserManagementPanel({ initialScope = '' }: { initialScope?: string }) {
@@ -91,9 +92,9 @@ export default function UserManagementPanel({ initialScope = '' }: { initialScop
       <tbody>{data?.filter(u => (filter === 'all' || u.status === filter) && (!scopeFilter || u.memberships.some(m => `${m.kind}:${m.scope_id}` === scopeFilter))).map(u => <tr key={u.id}>
         <td><strong>{u.username}</strong>{u.role === 'admin' && <span> · 최고관리자</span>}
           {superAdmin && u.status === 'active' && <select className="select-input" aria-label={`${u.username} 서비스 권한`}
-            value={u.role} disabled={busy} onChange={e => {
+            value={u.role} disabled={busy} onChange={async e => {
               const nextRole = e.target.value;
-              if (nextRole === 'admin' && !window.confirm(`${u.username}에게 서비스 전체 최고관리자 권한을 부여할까요?`)) return;
+              if (nextRole === 'admin' && !(await confirmDialog({ message: `${u.username}에게 서비스 전체 최고관리자 권한을 부여할까요?`, danger: true }))) return;
               act(() => apiRequest(`/api/users/${u.id}`, { method: 'PUT', body: JSON.stringify({ role: nextRole }) }));
             }}>
             <option value="viewer">일반 회원 (소속별 권한 적용)</option>
@@ -120,8 +121,8 @@ export default function UserManagementPanel({ initialScope = '' }: { initialScop
           <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => { setEditing(u); setDraft(u.status === 'pending' ? u.requested_memberships : u.memberships); }}>소속 설정{u.status === 'pending' ? ' / 승인' : ''}</button>
           {u.status === 'pending' && <button className="btn btn-sm btn-secondary" disabled={busy} onClick={() => review(u, 'rejected', [])}>반려</button>}
           {u.status === 'active' && u.id !== me?.id && <button className="btn btn-sm btn-secondary" disabled={busy} onClick={() => review(u, 'suspended')}>이용 정지</button>}
-          {u.id !== me?.id && <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => {
-            if (window.confirm(`${u.username} 회원을 삭제할까요?`)) act(() => apiRequest(`/api/users/${u.id}`, { method: 'DELETE' }));
+          {u.id !== me?.id && <button className="btn btn-sm btn-danger" disabled={busy} onClick={async () => {
+            if (await confirmDialog({ message: `${u.username} 회원을 삭제할까요?`, danger: true, confirmLabel: '삭제' })) act(() => apiRequest(`/api/users/${u.id}`, { method: 'DELETE' }));
           }}>삭제</button>}
         </div>}</td>
       </tr>)}</tbody>

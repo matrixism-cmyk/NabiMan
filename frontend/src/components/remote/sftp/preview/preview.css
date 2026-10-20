@@ -1,0 +1,58 @@
+/* The file preview (PreviewDialog.tsx): a large modal with the file in the middle. */
+.sftp-preview {
+  width: min(1280px, calc(100vw - 32px));
+  height: calc(100vh - 48px);
+  max-width: none;
+  min-width: 0;
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sftp-preview .common-modal-title { margin-bottom: 6px; font-size: 15px; min-width: 0; }
+.preview-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preview-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.preview-facts { font-size: 12px; color: var(--text-secondary); }
+.preview-actions { margin-left: auto; display: flex; gap: 6px; }
+.preview-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  /* A checkerboard, so a transparent image's empty parts show as empty. */
+  background-color: #2a2f38;
+  background-image: conic-gradient(#343a45 25%, transparent 0 50%, #343a45 0 75%, transparent 0);
+  background-size: 20px 20px;
+}
+.preview-note { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 13px; text-align: center; padding: 16px; }
+.preview-note progress { width: 200px; }
+.preview-image { width: 100%; height: 100%; }
+.preview-image.is-fit { display: flex; align-items: center; justify-content: center; }
+.preview-image.is-fit img { max-width: 100%; max-height: 100%; object-fit: contain; cursor: zoom-in; }
+.preview-image.is-actual { overflow: auto; }
+.preview-image.is-actual img { display: block; margin: auto; max-width: none; cursor: zoom-out; }
+.preview-image img { user-select: none; image-rendering: auto; }
+.preview-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  width: 40px;
+  height: 56px;
+  border: 0;
+  border-radius: 6px;
+  font-size: 28px;
+  line-height: 1;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  opacity: 0.6;
+}
+.preview-nav:hover, .preview-nav:focus-visible { opacity: 1; }
+.preview-nav.is-prev { left: 8px; }
+.preview-nav.is-next { right: 8px; }

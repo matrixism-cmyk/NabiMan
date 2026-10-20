@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApi, apiPost } from '../hooks/useApi';
 import { ServiceConfig, ServiceDefinition } from '../types';
 import { useT } from '../i18n';
+import { confirmDialog } from './common/ConfirmDialog';
 
 function ConfigEditor({ serviceId, displayName }: { serviceId: string; displayName: string }) {
   const { t } = useT();
@@ -30,7 +31,7 @@ function ConfigEditor({ serviceId, displayName }: { serviceId: string; displayNa
   };
 
   const handleRestart = async () => {
-    if (!window.confirm(`Restart ${displayName}?`)) return;
+    if (!(await confirmDialog({ message: `Restart ${displayName}?`, danger: true }))) return;
     setActionLoading(true);
     const res = await apiPost(`/api/config/${serviceId}/restart`, {});
     setMessage(res.message);

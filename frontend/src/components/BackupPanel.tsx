@@ -3,6 +3,7 @@ import { useApi, apiPost, apiRequest, fetchWithRefresh } from '../hooks/useApi';
 import { useT } from '../i18n';
 import EncryptedBackupPanel from './EncryptedBackupPanel';
 import { useSortable } from '../hooks/useSortable';
+import { confirmDialog } from './common/ConfirmDialog';
 
 interface BackupEntry { id: string; source: string; filename: string; size: number; created: string; }
 interface BackupSchedule { id: string; name: string; paths: string[]; cron_expr: string; compression: boolean; enabled: boolean; last_run: string | null; next_run: string | null; last_result?: { state: string; started_at: string; finished_at: string | null; filename: string | null; error: string | null } | null; }
@@ -61,7 +62,7 @@ export default function BackupPanel() {
   };
 
   const deleteBackup = async (filename: string) => {
-    if (!window.confirm(t('backup.confirmDelete'))) return;
+    if (!(await confirmDialog({ message: t('backup.confirmDelete'), danger: true, confirmLabel: t('common.delete') }))) return;
     const res = await apiPost<string>('/api/backup/delete', { filename });
     setMsg(res.data || res.message);
     refetch();
@@ -84,7 +85,7 @@ export default function BackupPanel() {
   };
 
   const scheduleAction = async (id: string, action: 'delete' | 'run') => {
-    if (action === 'delete' && !window.confirm(t('backup.confirmDelete'))) return;
+    if (action === 'delete' && !(await confirmDialog({ message: t('backup.confirmDelete'), danger: true, confirmLabel: t('common.delete') }))) return;
     setActing(true);
     try {
       const res = await apiRequest(`/api/backup/schedules/${id}${action === 'run' ? '/run' : ''}`, { method: action === 'run' ? 'POST' : 'DELETE' });

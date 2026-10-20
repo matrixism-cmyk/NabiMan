@@ -13,6 +13,7 @@ import {
   StatusBadge,
   Toolbar,
 } from './common';
+import { confirmDialog } from '../common/ConfirmDialog';
 
 interface Member {
   id: string;
@@ -81,7 +82,7 @@ export default function TenantMembersTab({ tenantId }: Props) {
   };
 
   const remove = async (id: string, user: string) => {
-    if (!window.confirm(t('mec.tenant.members.removeConfirm', { user }))) return;
+    if (!(await confirmDialog({ message: t('mec.tenant.members.removeConfirm', { user }), danger: true, confirmLabel: t('common.delete') }))) return;
     try {
       await mecDelete(
         `/api/mec/v1/tenants/${encodeURIComponent(tenantId)}/members/${encodeURIComponent(id)}`,

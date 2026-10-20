@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { apiPost, clearToken, useApi } from '../hooks/useApi';
 import { useT } from '../i18n';
+import { confirmDialog } from './common/ConfirmDialog';
 interface MfaStatus { required: boolean; verified: boolean; blocked: boolean; username: string; enabled: boolean; local_password_available: boolean; recovery_codes_remaining: number; }
 interface Enrollment { secret: string; qr_png_base64: string; recovery_codes: string[]; expires_at: number; }
 export default function MfaPanel() {
@@ -12,7 +13,7 @@ export default function MfaPanel() {
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState('');
   const relogin = () => { clearToken(); sessionStorage.setItem('nabiman_security_changed', '1'); window.location.reload(); };
   const run = async (action: 'setup' | 'verify-setup' | 'disable' | 'recovery-codes') => {
-    if ((action === 'disable' || action === 'recovery-codes') && !window.confirm(t(`mfa.confirm.${action}`))) return;
+    if ((action === 'disable' || action === 'recovery-codes') && !(await confirmDialog({ message: t(`mfa.confirm.${action}`), danger: true }))) return;
     setBusy(true); setMessage('');
     try {
       const result = await apiPost<Enrollment>(`/api/auth/2fa/${action}`,

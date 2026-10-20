@@ -1,5 +1,6 @@
 const fs = require('fs');
 const { chromium } = require('playwright');
+const { autoConfirm, answerConfirm } = require('./confirm-modal');
 (async () => {
   const f = JSON.parse(fs.readFileSync(0, 'utf8'));
   const b = await chromium.launch({ headless: true, executablePath: f.chromiumPath, args: ['--no-sandbox'] });
@@ -17,7 +18,7 @@ const { chromium } = require('playwright');
     const headers = { Authorization: 'Bearer ' + raw };
     if ((await p.request.get(f.base + '/api/server/status', { headers })).status() !== 200) throw Error('Issued token rejected');
     if ((await p.request.get(f.base + '/api/users', { headers })).status() !== 403) throw Error('Token exceeded scope');
-    p.on('dialog', dialog => dialog.accept());
+    p.on('dialog', dialog => dialog.accept()); await autoConfirm(p);
     const row = p.getByRole('row').filter({ hasText: f.name || 'Browser token fixture' });
     await row.getByRole('button', { name: '폐기', exact: true }).click();
     await row.waitFor({ state: 'detached' });

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { apiPost, apiRequest } from '../../hooks/useApi';
 import { useT } from '../../i18n';
+import { confirmDialog } from '../common/ConfirmDialog';
 
 export interface SessionInfo {
   id: string; label: string; owner: string; ws_count: number; shared: boolean;
@@ -58,7 +59,7 @@ export default function SessionsView({
   };
 
   const kill = async (session: SessionInfo) => {
-    if (!window.confirm(t('terminal.endSessionConfirm', { name: session.title || session.label }))) return;
+    if (!(await confirmDialog({ message: t('terminal.endSessionConfirm', { name: session.title || session.label }), danger: true }))) return;
     try {
       const res = await apiRequest(`/api/terminal/sessions/${session.id}`, { method: 'DELETE' });
       if (!res.success) { setMessage(res.message || t('common.error')); return; }

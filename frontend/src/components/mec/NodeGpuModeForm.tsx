@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useT } from '../../i18n';
+import { confirmDialog } from '../common/ConfirmDialog';
 
 interface Props {
   currentMode: string;
@@ -25,9 +26,7 @@ export default function NodeGpuModeForm({ currentMode, onSwitch }: Props) {
       return;
     }
     if (
-      !window.confirm(
-        t('mec.node.gpuMode.confirm', { from: currentMode, to: mode }),
-      )
+      !(await confirmDialog({ message: t('mec.node.gpuMode.confirm', { from: currentMode, to: mode }), danger: true }))
     ) {
       return;
     }
