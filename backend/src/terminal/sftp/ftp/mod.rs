@@ -135,7 +135,18 @@ impl FtpConn {
     }
 
     pub async fn open(self: &Arc<Self>, path: &str) -> Result<Download> {
+        self.open_from(path, 0).await
+    }
+
+    /// RETR from `offset` on (REST first), for a range of the file.
+    pub async fn open_from(self: &Arc<Self>, path: &str, offset: u64) -> Result<Download> {
         let mut ctl = self.take().await?;
+        if offset > 0 {
+            let rest = ctl.cmd(&format!("REST {offset}")).await.and_then(|r| control::expect(r, 350));
+            if let Err(e) = rest {
+                return self.settle(ctl, Err(e));
+            }
+        }
         match ctl.start(&format!("RETR {path}")).await {
             Ok(data) => Ok(Download::new(data, ctl, self.clone())),
             Err(e) => self.settle(ctl, Err(e)),

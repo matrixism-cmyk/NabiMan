@@ -196,6 +196,25 @@ impl Fs {
         }
     }
 
+    /// Reads from `offset` on: a range of a file, for a player or a resumed download.
+    pub async fn open_from(&self, path: &str, offset: u64) -> Result<Reader> {
+        use tokio::io::AsyncSeekExt;
+        let start = std::io::SeekFrom::Start(offset);
+        match self {
+            Fs::Remote(c) => {
+                let mut file = c.sftp.open(path).await?;
+                file.seek(start).await?;
+                Ok(Box::pin(file))
+            }
+            Fs::Ftp(c) => Ok(Box::pin(c.open_from(path, offset).await?)),
+            Fs::Local => {
+                let mut file = tokio::fs::File::open(path).await?;
+                file.seek(start).await?;
+                Ok(Box::pin(file))
+            }
+        }
+    }
+
     /// Creates or truncates.
     pub async fn create(&self, path: &str) -> Result<Writer> {
         match self {

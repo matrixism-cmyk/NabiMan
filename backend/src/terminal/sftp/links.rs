@@ -1,5 +1,5 @@
-//! Single-use download links, for dragging a file out of the panel onto the
-//! desktop.
+//! Download links, for dragging a file out of the panel onto the desktop,
+//! and stream links, for playing a video or a song in the preview.
 //!
 //! The browser saves a file dropped outside the window by fetching a URL on
 //! its own, without the page's Authorization header. So the page asks for a
@@ -7,6 +7,10 @@
 //! one exact path, good for one fetch within a few minutes. Redeeming it only
 //! stands in for the header — the session must still be live, and every
 //! permission check that follows runs as usual.
+//!
+//! A media element fetches its file many times, a range at a time, so a
+//! stream link is good for every fetch of that one file, for a couple of
+//! hours, and only on the stream route. Each kind opens only its own route.
 
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
@@ -18,6 +22,7 @@ use sha2::{Digest, Sha256};
 use crate::auth::Claims;
 
 const TTL: Duration = Duration::from_secs(5 * 60);
+const STREAM_TTL: Duration = Duration::from_secs(2 * 3600);
 const CAPACITY: usize = 4096;
 
 /// Whose link it is: a signed-in session, or a share link's visitor.
@@ -31,6 +36,8 @@ struct Link {
     scope: String,
     path: String,
     expires: Instant,
+    /// A stream link: kept after use, until it expires.
+    reusable: bool,
 }
 
 fn store() -> &'static Mutex<HashMap<String, Link>> {
@@ -47,8 +54,22 @@ pub(crate) fn ttl_secs() -> u64 {
     TTL.as_secs()
 }
 
-/// A new ticket for `scope` (a server id, `local`, or a share token) and `path`.
+/// A new single-use ticket for `scope` (a server id, `local`, or a share
+/// token) and `path`.
 pub(crate) fn issue(owner: Owner, scope: &str, path: &str) -> Result<String, String> {
+    issue_kind(owner, scope, path, false)
+}
+
+/// A ticket for playing `path`: every range of it, for a while.
+pub(crate) fn issue_stream(owner: Owner, scope: &str, path: &str) -> Result<String, String> {
+    issue_kind(owner, scope, path, true)
+}
+
+pub(crate) fn stream_ttl_secs() -> u64 {
+    STREAM_TTL.as_secs()
+}
+
+fn issue_kind(owner: Owner, scope: &str, path: &str, reusable: bool) -> Result<String, String> {
     let mut bytes = [0u8; 32];
     OsRng
         .try_fill_bytes(&mut bytes)
@@ -62,7 +83,7 @@ pub(crate) fn issue(owner: Owner, scope: &str, path: &str) -> Result<String, Str
     }
     map.insert(
         digest(&ticket),
-        Link { owner, scope: scope.into(), path: path.into(), expires: now + TTL },
+        Link { owner, scope: scope.into(), path: path.into(), expires: now + if reusable { STREAM_TTL } else { TTL }, reusable },
     );
     Ok(ticket)
 }
@@ -72,45 +93,61 @@ pub(crate) fn issue(owner: Owner, scope: &str, path: &str) -> Result<String, Str
 /// `Some(Some(claims))`: admitted, as the session that asked for the link.
 pub(crate) fn redeem(method: &str, path: &str, query: &str) -> Option<Option<Claims>> {
     let rest = path.strip_prefix("/api/terminal/sftp/")?;
-    let scope = rest
-        .strip_suffix("/download")
-        .or_else(|| rest.strip_suffix("/download-folder"))
-        .filter(|s| !s.is_empty() && !s.contains('/'))?;
+    let (scope, stream) = match (rest.strip_suffix("/stream"), rest.strip_suffix("/download"), rest.strip_suffix("/download-folder")) {
+        (Some(s), _, _) => (s, true),
+        (_, Some(s), _) | (_, _, Some(s)) => (s, false),
+        _ => return None,
+    };
+    if scope.is_empty() || scope.contains('/') {
+        return None;
+    }
     let params = web_params(query);
     let ticket = params.get("ticket")?;
     if method != "GET" {
         return Some(None);
     }
-    let Some(link) = store()
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .remove(&digest(ticket))
-    else {
-        return Some(None);
+    let mut map = store().lock().unwrap_or_else(|e| e.into_inner());
+    let key = digest(ticket);
+    // Each kind of link opens only its own route. A download link is spent
+    // whatever happens; a stream link stays for the next range.
+    let link = match map.get(&key) {
+        Some(l) if l.reusable && stream => map.get(&key)?,
+        Some(l) if !l.reusable => {
+            let spent = map.remove(&key)?;
+            if stream {
+                return Some(None);
+            }
+            return Some(admit(&spent, scope, &params));
+        }
+        _ => return Some(None),
     };
+    Some(admit(link, scope, &params))
+}
+
+fn admit(link: &Link, scope: &str, params: &HashMap<String, String>) -> Option<Claims> {
     let admitted = link.expires > Instant::now()
         && link.scope == scope
         && params.get("path").is_some_and(|p| *p == link.path);
-    match link.owner {
-        Owner::Session(claims) if admitted => Some(Some(claims)),
-        _ => Some(None),
+    match &link.owner {
+        Owner::Session(claims) if admitted => Some(claims.clone()),
+        _ => None,
     }
 }
 
-/// For a share visitor's download: whether `ticket` was issued to the share
-/// `token` for exactly `path`. Spent either way.
-pub(crate) fn redeem_share(token: &str, path: &str, ticket: &str) -> bool {
-    let Some(link) = store()
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .remove(&digest(ticket))
-    else {
-        return false;
+/// For a share visitor's download or stream: whether `ticket` was issued to
+/// the share `token` for exactly `path`, for this route. A download link is
+/// spent either way; a stream link stays for the next range.
+pub(crate) fn redeem_share(token: &str, path: &str, ticket: &str, stream: bool) -> bool {
+    let mut map = store().lock().unwrap_or_else(|e| e.into_inner());
+    let key = digest(ticket);
+    let fits = |l: &Link| {
+        l.expires > Instant::now() && l.scope == token && l.path == path && matches!(&l.owner, Owner::Share(t) if t == token)
     };
-    link.expires > Instant::now()
-        && link.scope == token
-        && link.path == path
-        && matches!(&link.owner, Owner::Share(t) if t == token)
+    match map.get(&key) {
+        Some(l) if l.reusable => stream && fits(l),
+        Some(_) => map.remove(&key).is_some_and(|l| !stream && fits(&l)),
+        None => false,
+    }
 }
 
 fn web_params(query: &str) -> HashMap<String, String> {
@@ -155,10 +192,14 @@ mod tests {
         let query = format!("path=%2Fetc%2Fhosts&ticket={ticket}");
         assert!(matches!(redeem("GET", &format!("/api/terminal/sftp/{token}/download"), &query), Some(None)));
         let ticket = issue(Owner::Share(token.clone()), &token, "/etc/hosts").unwrap();
-        assert!(!redeem_share(&token, "/etc/passwd", &ticket));
+        assert!(!redeem_share(&token, "/etc/passwd", &ticket, false));
         let ticket = issue(Owner::Share(token.clone()), &token, "/etc/hosts").unwrap();
-        assert!(redeem_share(&token, "/etc/hosts", &ticket));
-        assert!(!redeem_share(&token, "/etc/hosts", &ticket), "single use");
+        assert!(redeem_share(&token, "/etc/hosts", &ticket, false));
+        assert!(!redeem_share(&token, "/etc/hosts", &ticket, false), "single use");
+        let stream = issue_stream(Owner::Share(token.clone()), &token, "/m.mp4").unwrap();
+        assert!(redeem_share(&token, "/m.mp4", &stream, true));
+        assert!(redeem_share(&token, "/m.mp4", &stream, true), "every range");
+        assert!(!redeem_share(&token, "/m.mp4", &stream, false), "not a download");
     }
 
     #[test]
@@ -166,6 +207,23 @@ mod tests {
         let ticket = issue(Owner::Session(claims()), "srv_1", "/var/log").unwrap();
         let query = format!("path=%2Fvar%2Flog&ticket={ticket}");
         assert!(matches!(redeem("GET", "/api/terminal/sftp/srv_1/download-folder", &query), Some(Some(_))));
+    }
+
+    #[test]
+    fn a_stream_link_plays_one_file_many_times_and_only_plays() {
+        let ticket = issue_stream(Owner::Session(claims()), "srv_1", "/v/a.mp4").unwrap();
+        let query = format!("path=%2Fv%2Fa.mp4&ticket={ticket}");
+        for _ in 0..3 {
+            assert!(matches!(redeem("GET", "/api/terminal/sftp/srv_1/stream", &query), Some(Some(_))));
+        }
+        assert!(matches!(redeem("GET", "/api/terminal/sftp/srv_1/download", &query), Some(None)));
+        let other = format!("path=%2Fetc%2Fshadow&ticket={ticket}");
+        assert!(matches!(redeem("GET", "/api/terminal/sftp/srv_1/stream", &other), Some(None)));
+        // A download link does not stream, and is spent trying.
+        let once = issue(Owner::Session(claims()), "srv_1", "/v/a.mp4").unwrap();
+        let q = format!("path=%2Fv%2Fa.mp4&ticket={once}");
+        assert!(matches!(redeem("GET", "/api/terminal/sftp/srv_1/stream", &q), Some(None)));
+        assert!(matches!(redeem("GET", "/api/terminal/sftp/srv_1/download", &q), Some(None)));
     }
 
     #[test]

@@ -187,3 +187,24 @@
 .pdf-page .textLayer .markedContent { display: contents; }
 .pdf-page .textLayer ::selection { background: rgba(0, 100, 255, 0.3); }
 .pdf-page .textLayer .endOfContent { display: block; position: absolute; inset: 100% 0 0; z-index: 0; cursor: default; user-select: none; }
+
+/* Video and audio */
+.preview-stage.is-video { background: #000; }
+.preview-video { max-width: 100%; max-height: 100%; outline: none; }
+.preview-stage.is-audio { background: var(--bg); }
+.preview-audio { display: flex; flex-direction: column; align-items: center; gap: 14px; width: min(520px, 90%); }
+.preview-audio-icon { font-size: 64px; line-height: 1; color: var(--primary); }
+.preview-audio-name { font-size: 14px; color: var(--text); text-align: center; word-break: break-all; }
+.preview-audio audio { width: 100%; }
+
+/* ZIP listing and other files */
+.preview-stage.is-zip, .preview-stage.is-file { background: var(--bg); align-items: stretch; justify-content: stretch; }
+.zip-preview { flex: 1; min-width: 0; overflow: auto; outline: none; }
+.zip-preview table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.zip-preview th, .zip-preview td { padding: 4px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.zip-preview th { position: sticky; top: 0; background: var(--surface); color: var(--text-secondary); font-weight: 500; }
+.zip-preview td:first-child { max-width: 60vw; overflow: hidden; text-overflow: ellipsis; }
+.zip-preview td:nth-child(2), .zip-preview td:nth-child(3) { text-align: right; color: var(--text-secondary); }
+.zip-preview tr.is-folder td { color: var(--text-secondary); }
+.hex-preview { flex: 1; min-width: 0; overflow: auto; padding: 10px 14px; outline: none; }
+.hex-preview pre { margin: 0; font-family: 'JetBrains Mono', 'D2Coding', 'Consolas', monospace; font-size: 12.5px; line-height: 1.55; color: var(--text); background: none; border: 0; }

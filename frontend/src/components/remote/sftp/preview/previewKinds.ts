@@ -3,7 +3,10 @@
  * its own renderer in PreviewDialog; adding a format is adding a row here
  * and, for a new kind, a renderer.
  */
-export type PreviewKind = 'image' | 'text' | 'pdf';
+export type PreviewKind = 'image' | 'text' | 'pdf' | 'video' | 'audio' | 'zip' | 'file';
+
+/** Kinds read a range at a time through a stream link instead of whole. */
+export const STREAMED: ReadonlySet<PreviewKind> = new Set<PreviewKind>(['video', 'audio', 'zip', 'file']);
 
 export interface PreviewSpec {
   kind: PreviewKind;
@@ -25,6 +28,11 @@ const IMAGES: Record<string, string> = {
   // Shown through <img>, where an SVG's scripts never run.
   svg: 'image/svg+xml',
 };
+
+const VIDEO = new Set(['mp4', 'm4v', 'webm', 'ogv', 'mov', 'mkv']);
+const AUDIO = new Set(['mp3', 'wav', 'flac', 'm4a', 'm4b', 'aac', 'ogg', 'oga', 'opus', 'weba']);
+/** ZIP inside: archives, Office and OpenDocument files, Java, Android, e-books, wheels. */
+const ZIP = new Set(['zip', 'docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp', 'jar', 'war', 'ear', 'apk', 'aab', 'epub', 'whl', 'xpi', 'nupkg', 'vsix', 'ipa']);
 
 export const extensionOf = (name: string) => {
   const dot = name.lastIndexOf('.');
@@ -75,11 +83,15 @@ export function previewOf(name: string): PreviewSpec | null {
   const ext = extensionOf(name);
   if (IMAGES[ext]) return { kind: 'image', mime: IMAGES[ext], maxBytes: 50 * MB };
   if (ext === 'pdf') return { kind: 'pdf', mime: 'application/pdf', maxBytes: 100 * MB };
+  if (VIDEO.has(ext)) return { kind: 'video', mime: '', maxBytes: Infinity };
+  if (AUDIO.has(ext)) return { kind: 'audio', mime: '', maxBytes: Infinity };
+  if (ZIP.has(ext)) return { kind: 'zip', mime: '', maxBytes: Infinity };
   const lower = name.toLowerCase();
   // `.env.local`, `Dockerfile.dev`: the leading name still says what it is.
   const stem = lower.startsWith('.') ? lower : lower.split('.')[0];
   const language = configLanguage(lower) || NAMES[lower] || CODE[ext] || NAMES[stem]
     || (lower.startsWith('.env') ? 'bash' : null);
   if (language) return { kind: 'text', mime: 'text/plain', maxBytes: 5 * MB, language };
-  return null;
+  // Anything else: what it is, and a look at its first bytes.
+  return { kind: 'file', mime: '', maxBytes: Infinity };
 }

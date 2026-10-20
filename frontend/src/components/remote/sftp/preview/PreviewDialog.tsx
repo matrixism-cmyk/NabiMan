@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useT } from '../../../../i18n';
 import Modal from '../../../common/Modal';
-import { downloadFile, formatSize, SftpEntry, SftpSource } from '../sftpApi';
+import { downloadFile, formatSize, SftpEntry, SftpSource, streamLink } from '../sftpApi';
 import ImagePreview from './ImagePreview';
 import TextPreview, { TextInfo } from './TextPreview';
 import PdfPreview from './PdfPreview';
-import { previewOf } from './previewKinds';
+import MediaPreview from './MediaPreview';
+import ZipPreview from './ZipPreview';
+import FilePreview from './FilePreview';
+import { previewOf, STREAMED } from './previewKinds';
 import { Encoding, ENCODINGS } from './textContent';
 import './preview.css';
 
@@ -24,6 +27,8 @@ interface Props {
 type Load =
   | { state: 'loading'; loaded: number; total: number }
   | { state: 'ready'; blob: Blob }
+  /** Read a range at a time through this link (media, archives, other files). */
+  | { state: 'link'; url: string }
   | { state: 'tooBig' }
   | { state: 'failed'; message: string };
 
@@ -35,7 +40,8 @@ const readWrap = () => { try { return localStorage.getItem(WRAP_KEY) === '1'; } 
 /**
  * A file shown in place, in a modal over the panel. ← and → (or the arrows on
  * screen) step through the other previewable files in the folder. Each kind
- * of file has its renderer: images, text and source code, and PDF.
+ * of file has its renderer: images, text and source code, PDF, video and
+ * audio, what a ZIP holds, and for anything else what it is and its start.
  */
 export default function PreviewDialog({ source, dir, files, start, onDownload, onClose }: Props) {
   const { t } = useT();
@@ -48,6 +54,7 @@ export default function PreviewDialog({ source, dir, files, start, onDownload, o
   const [text, setText] = useState<TextInfo | null>(null);
   const [copied, setCopied] = useState(false);
   const [pages, setPages] = useState<number | null>(null);
+  const [facts, setFacts] = useState('');
   const entry = files[at];
   const spec = useMemo(() => (entry ? previewOf(entry.name) : null), [entry]);
 
@@ -56,8 +63,17 @@ export default function PreviewDialog({ source, dir, files, start, onDownload, o
     setSize(null);
     setText(null);
     setPages(null);
+    setFacts('');
     setCopied(false);
     setEncoding('auto');
+    if (STREAMED.has(spec.kind)) {
+      let live = true;
+      setLoad({ state: 'loading', loaded: 0, total: 0 });
+      streamLink(source, join(dir, entry.name))
+        .then((url) => { if (live) setLoad({ state: 'link', url }); })
+        .catch((e: unknown) => { if (live) setLoad({ state: 'failed', message: e instanceof Error ? e.message : t('common.error') }); });
+      return () => { live = false; };
+    }
     if (entry.size > spec.maxBytes) { setLoad({ state: 'tooBig' }); return undefined; }
     setLoad({ state: 'loading', loaded: 0, total: entry.size });
     const transfer = downloadFile(source, join(dir, entry.name), (loaded, total) =>
@@ -76,8 +92,9 @@ export default function PreviewDialog({ source, dir, files, start, onDownload, o
   const many = files.length > 1;
 
   const key = (e: React.KeyboardEvent) => {
-    // Space and Enter on a button press that button.
+    // Space and Enter on a button press that button; a player takes its own keys.
     if (e.target instanceof HTMLButtonElement && (e.key === ' ' || e.key === 'Enter')) return false;
+    if (e.target instanceof HTMLMediaElement && e.key !== 'Escape') return false;
     if (e.key === 'ArrowRight' && many) { step(1); return true; }
     if (e.key === 'ArrowLeft' && many) { step(-1); return true; }
     if (e.key === 'Home' && many) { setAt(0); return true; }
@@ -109,6 +126,7 @@ export default function PreviewDialog({ source, dir, files, start, onDownload, o
           {text && ` · ${t('preview.lines', { count: text.lines.toLocaleString() })} · ${text.encoding.toUpperCase()}`}
           {text && spec.language && spec.language !== 'plaintext' && ` · ${spec.language}`}
           {pages !== null && ` · ${t('preview.pages', { count: pages.toLocaleString() })}`}
+          {facts && ` · ${facts}`}
           {many && ` · ${at + 1} / ${files.length}`}
         </span>
         <span className="preview-actions">
@@ -117,7 +135,7 @@ export default function PreviewDialog({ source, dir, files, start, onDownload, o
               {fit ? t('preview.actualSize') : t('preview.fit')}
             </button>
           )}
-          {spec.kind === 'text' && load.state === 'ready' && (
+          {(text || (spec.kind === 'text' && load.state === 'ready')) && (
             <>
               <button type="button" className={`btn btn-sm btn-secondary ${wrap ? 'is-on' : ''}`} aria-pressed={wrap}
                 onClick={() => setWrap(!wrap)} title={t('preview.wrapHint')}>{t('preview.wrap')}</button>
@@ -146,6 +164,13 @@ export default function PreviewDialog({ source, dir, files, start, onDownload, o
         {load.state === 'failed' && <p className="preview-note" role="alert">{load.message}</p>}
         {load.state === 'ready' && spec.kind === 'image' && (
           <ImagePreview blob={load.blob} name={entry.name} fit={fit} onToggleFit={() => setFit((f) => !f)} onSize={setSize} />
+        )}
+        {load.state === 'link' && (spec.kind === 'video' || spec.kind === 'audio') && (
+          <MediaPreview url={load.url} kind={spec.kind} name={entry.name} onFacts={setFacts} />
+        )}
+        {load.state === 'link' && spec.kind === 'zip' && <ZipPreview url={load.url} size={entry.size} onFacts={setFacts} />}
+        {load.state === 'link' && spec.kind === 'file' && (
+          <FilePreview url={load.url} entry={entry} onFacts={setFacts} onText={setText} wrap={wrap} encoding={encoding} />
         )}
         {load.state === 'ready' && spec.kind === 'pdf' && (
           <PdfPreview blob={load.blob} onInfo={(info) => setPages(info ? info.pages : null)} />

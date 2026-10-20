@@ -1,4 +1,5 @@
 // Browser smoke test for the file panel's preview and its delete question.
+// (Video, audio and other files: smoke-media.js.)
 //
 //   SMOKE_URL=http://127.0.0.1:18096 SMOKE_PREVIEW_DIR=/tmp/preview-files npm run smoke:preview
 //
@@ -55,8 +56,8 @@ const check = (name, ok, detail = '') => {
   check('double-click opens the image', (await dialog.locator('img').getAttribute('alt')) === 'a-red.png');
   await page.waitForFunction(() => /×/.test(document.querySelector('.preview-facts')?.textContent || ''));
   check('its size is shown', (await facts()).includes('64 × 32'), await facts());
-  // Images, texts and PDFs alike, by name: a-red, b-shape, big.log, broken, c-blue, …, script.py.
-  check('it counts the folder\'s previewable files', (await facts()).includes('1 / 14'), await facts());
+  // Every file has a preview now: a-red, b-shape, big.log, broken, c-blue, …, script.py.
+  check('it counts the folder\'s files', (await facts()).includes('1 / 15'), await facts());
 
   // 2. Arrows step through; an SVG shows without running its script.
   await page.keyboard.press('ArrowRight');
@@ -182,7 +183,13 @@ const check = (name, ok, detail = '') => {
   await page.click('.sftp-preview button[aria-label="닫기"]');
   await dialog.waitFor({ state: 'detached' });
 
-  // 4. The menu offers a preview only for what can be previewed.
+  // 4. Every file's menu offers a preview, an archive's too.
+  await row('pack.zip').dblclick();
+  // pack.zip here is only a ZIP's first four bytes; smoke-media lists a real one.
+  await dialog.getByText(/ZIP의 목록을 읽을 수 없습니다/).waitFor({ timeout: 15000 }).catch(() => {});
+  check('a broken ZIP says it cannot be listed', await dialog.getByText(/ZIP의 목록을 읽을 수 없습니다/).count() === 1);
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'detached' });
   const menuFor = async (name) => {
     await row(name).click({ button: 'right' });
     await page.waitForSelector('[role="menuitem"]');
@@ -192,7 +199,7 @@ const check = (name, ok, detail = '') => {
   };
   check('an image\'s menu has 미리보기', (await menuFor('a-red.png')).some((i) => i.includes('미리보기')));
   check('a text file\'s menu has it too', (await menuFor('notes.txt')).some((i) => i.includes('미리보기')));
-  check('an archive\'s menu does not (yet)', !(await menuFor('pack.zip')).some((i) => i.includes('미리보기')));
+  check('an archive\'s menu has it as well', (await menuFor('pack.zip')).some((i) => i.includes('미리보기')));
 
   // 5. Deleting asks in the app's own modal, naming what goes.
   await row('del-1.txt').click();

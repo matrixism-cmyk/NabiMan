@@ -42,6 +42,9 @@ test('texts are known by extension and by name', () => {
   expect(previewOf('.htaccess')?.language).toBe('apache');
   expect(previewOf('README')?.language).toBe('plaintext');
   expect(previewOf('app.log')?.kind).toBe('text');
-  expect(previewOf('archive.tar.gz')).toBeNull();
+  expect(previewOf('archive.tar.gz')?.kind).toBe('file');
+  expect(previewOf('clip.MP4')?.kind).toBe('video');
+  expect(previewOf('song.flac')?.kind).toBe('audio');
+  expect(previewOf('report.docx')?.kind).toBe('zip');
   expect(previewOf('photo.png')?.kind).toBe('image');
 });

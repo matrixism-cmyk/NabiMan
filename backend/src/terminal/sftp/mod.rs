@@ -17,6 +17,7 @@ pub(crate) mod links;
 mod parts;
 mod paths;
 mod pool;
+mod stream;
 pub(crate) mod share_keys;
 mod zip;
 
@@ -103,8 +104,9 @@ fn share_target(req: &HttpRequest, token: &str) -> Result<(Target, bool), HttpRe
             let q = web::Query::<std::collections::HashMap<String, String>>::from_query(req.query_string())
                 .map(|q| q.into_inner())
                 .unwrap_or_default();
-            (req.path().ends_with("/download") || req.path().ends_with("/download-folder"))
-                && matches!((q.get("path"), q.get("ticket")), (Some(p), Some(t)) if links::redeem_share(token, p, t))
+            let stream = req.path().ends_with("/stream");
+            (stream || req.path().ends_with("/download") || req.path().ends_with("/download-folder"))
+                && matches!((q.get("path"), q.get("ticket")), (Some(p), Some(t)) if links::redeem_share(token, p, t, stream))
         }
     };
     if !admitted {
@@ -185,6 +187,7 @@ fn routes(prefix: &str) -> actix_web::Scope {
         .route("/list", web::get().to(handlers::list))
         .route("/download", web::get().to(handlers::download))
         .route("/download-folder", web::get().to(folder::download))
+        .route("/stream", web::get().to(stream::serve))
         .route("/link", web::post().to(handlers::link))
         .route("/upload", web::post().to(handlers::upload))
         .route("/upload-part", web::post().to(parts::chunk))

@@ -96,8 +96,17 @@ pub(super) struct PathBody {
     path: String,
 }
 
-/// A single-use URL for `path`, for a drag onto the desktop.
-pub(super) async fn link(req: HttpRequest, b: web::Json<PathBody>) -> HttpResponse {
+#[derive(Deserialize)]
+pub(super) struct LinkBody {
+    path: String,
+    /// For the preview's player: a link for every range of the file.
+    #[serde(default)]
+    stream: bool,
+}
+
+/// A URL for `path` that the browser can fetch on its own: single-use, for a
+/// drag onto the desktop, or with `stream`, for a player's range requests.
+pub(super) async fn link(req: HttpRequest, b: web::Json<LinkBody>) -> HttpResponse {
     let t = tryr!(resolve(&req));
     if !valid_path(&b.path) {
         return bad("Invalid path");
@@ -109,9 +118,21 @@ pub(super) async fn link(req: HttpRequest, b: web::Json<PathBody>) -> HttpRespon
             None => return fail(StatusCode::UNAUTHORIZED, "Sign in again"),
         },
     };
-    // A folder is fetched as a ZIP archive of everything in it.
     let fs = tryr!(t.fs().await);
     let folder = fs.stat(&b.path).await.is_ok_and(|m| m.is_dir());
+    if b.stream {
+        if folder {
+            return bad("A folder cannot be played");
+        }
+        return match links::issue_stream(owner, &t.scope, &b.path) {
+            Ok(ticket) => HttpResponse::Ok().json(ApiResponse::ok(serde_json::json!({
+                "url": format!("{}/stream?path={}&ticket={ticket}", t.base, paths::query_escape(&b.path)),
+                "folder": false, "expires_in_seconds": links::stream_ttl_secs(),
+            }))),
+            Err(e) => fail(StatusCode::SERVICE_UNAVAILABLE, &e),
+        };
+    }
+    // A folder is fetched as a ZIP archive of everything in it.
     let route = if folder { "download-folder" } else { "download" };
     match links::issue(owner, &t.scope, &b.path) {
         Ok(ticket) => {

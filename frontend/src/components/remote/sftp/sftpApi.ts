@@ -144,6 +144,20 @@ export function removePath(src: SftpSource, path: string) {
 }
 
 /** A single-use URL the browser can fetch on its own, for a drag onto the desktop. */
+/** A URL a player (or a ranged fetch) can read the file through, for a while. */
+export async function streamLink(src: SftpSource, path: string): Promise<string> {
+  const res = await request<{ url: string }>(src, '/link', { method: 'POST', body: JSON.stringify({ path, stream: true }) });
+  if (!res.success || !res.data?.url) throw new Error(res.message || 'No stream link');
+  return `${API_BASE}${res.data.url}`;
+}
+
+/** Bytes `start` to `end` (inclusive) of a stream link's file. */
+export async function readRange(url: string, start: number, end: number, signal?: AbortSignal): Promise<Uint8Array> {
+  const res = await fetch(url, { headers: { Range: `bytes=${start}-${end}` }, credentials: 'omit', cache: 'no-store', signal });
+  if (res.status !== 206 && res.status !== 200) throw new Error(`HTTP ${res.status}`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
 export function changeAttrs(src: SftpSource, change: AttrsChange) {
   return request<AttrsResult>(src, '/attrs', { method: 'POST', body: JSON.stringify(change) });
 }
