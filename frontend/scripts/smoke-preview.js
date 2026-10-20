@@ -5,7 +5,9 @@
 // Needs a NabiMan server serving build/ and a folder on this machine (the
 // local shell's files) holding: a-red.png (64×32), b-shape.svg (120×80, with a
 // <script> that must never run), c-blue.png (1600×1200), broken.png (not an
-// image), notes.txt, del-1.txt and del-2.txt. The two del- files are deleted.
+// image), notes.txt, script.py (7 lines, one very long), memo-euckr.txt (EUC-KR
+// Korean), big.log (12000 lines, over 300 KB), LICENSE (binary), pack.zip,
+// del-1.txt and del-2.txt. The two del- files are deleted.
 const { chromium } = require('playwright');
 
 const BASE = process.env.SMOKE_URL || 'http://127.0.0.1:18096';
@@ -51,7 +53,8 @@ const check = (name, ok, detail = '') => {
   check('double-click opens the image', (await dialog.locator('img').getAttribute('alt')) === 'a-red.png');
   await page.waitForFunction(() => /×/.test(document.querySelector('.preview-facts')?.textContent || ''));
   check('its size is shown', (await facts()).includes('64 × 32'), await facts());
-  check('it counts the folder\'s images', (await facts()).includes('1 / 4'), await facts());
+  // Images and texts alike, by name: a-red, b-shape, big.log, broken, c-blue, …, script.py.
+  check('it counts the folder\'s previewable files', (await facts()).includes('1 / 11'), await facts());
 
   // 2. Arrows step through; an SVG shows without running its script.
   await page.keyboard.press('ArrowRight');
@@ -59,6 +62,9 @@ const check = (name, ok, detail = '') => {
   await page.waitForFunction(() => /120 × 80/.test(document.querySelector('.preview-facts')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
   check('→ shows the next image, an SVG', (await facts()).includes('120 × 80'), await facts());
   check('the SVG\'s script never runs', (await page.title()) !== 'pwned');
+  await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(() => document.querySelector('.sftp-preview .preview-title')?.textContent === 'big.log');
+  check('→ goes on into the texts', true);
   await page.keyboard.press('ArrowRight');
   await page.waitForFunction(() => document.querySelector('.sftp-preview .preview-title')?.textContent === 'broken.png');
   await page.waitForFunction(() => /그림으로 열 수 없습니다/.test(document.querySelector('.preview-stage')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
@@ -73,9 +79,43 @@ const check = (name, ok, detail = '') => {
   await page.keyboard.press('f');
   const actual = await dialog.locator('img').boundingBox();
   check('F shows it at its own size', Math.round(actual.width) === 1600, String(actual.width));
+  await page.keyboard.press('End');
+  await page.waitForFunction(() => document.querySelector('.sftp-preview .preview-title')?.textContent === 'script.py');
   await page.keyboard.press('ArrowRight');
   await page.waitForFunction(() => document.querySelector('.sftp-preview img')?.alt === 'a-red.png');
-  check('→ wraps around to the first', true);
+  check('End, then → wraps around to the first', true);
+
+  // 2b. Text and code.
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'detached' });
+  await row('script.py').dblclick();
+  await page.waitForFunction(() => document.querySelectorAll('.sftp-preview .tp-row').length === 7, null, { timeout: 15000 }).catch(() => {});
+  check('source opens with a row per line', await dialog.locator('.tp-row').count() === 7);
+  await page.waitForFunction(() => document.querySelector('.sftp-preview .hljs-keyword'), null, { timeout: 10000 }).catch(() => {});
+  check('and is coloured as Python', (await dialog.locator('.hljs-keyword').first().textContent()) === 'def' && (await facts()).includes('python'), await facts());
+  const before = await dialog.locator('.tp-row').nth(4).boundingBox();
+  await page.keyboard.press('w');
+  const after = await dialog.locator('.tp-row').nth(4).boundingBox();
+  check('W wraps the long line', after.height > before.height * 2, `${before.height} → ${after.height}`);
+  await page.screenshot({ path: `${OUT}/smoke-preview-code.png` });
+  await page.keyboard.press('w');
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'detached' });
+  await row('memo-euckr.txt').dblclick();
+  await page.waitForFunction(() => /EUC-KR/.test(document.querySelector('.preview-facts')?.textContent || ''), null, { timeout: 15000 }).catch(() => {});
+  check('an EUC-KR file reads as Korean', (await dialog.locator('.text-preview').textContent()).includes('한글 메모입니다'), await facts());
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'detached' });
+  await row('big.log').dblclick();
+  await page.waitForFunction(() => document.querySelector('.sftp-preview .text-preview.is-block'), null, { timeout: 15000 }).catch(() => {});
+  check('a large text opens as one light block', await dialog.locator('.text-preview.is-block').count() === 1 && (await facts()).includes('12,000줄'), await facts());
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'detached' });
+  await row('LICENSE').dblclick();
+  await dialog.getByText(/바이너리 파일/).waitFor({ timeout: 15000 }).catch(() => {});
+  check('a binary file named like text says so', await dialog.getByText(/바이너리 파일/).count() === 1);
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'detached' });
 
   // 3. Escape closes it; Space on a selected image opens it again.
   await page.keyboard.press('Escape');
@@ -97,7 +137,8 @@ const check = (name, ok, detail = '') => {
     return items;
   };
   check('an image\'s menu has 미리보기', (await menuFor('a-red.png')).some((i) => i.includes('미리보기')));
-  check('a text file\'s menu does not (yet)', !(await menuFor('notes.txt')).some((i) => i.includes('미리보기')));
+  check('a text file\'s menu has it too', (await menuFor('notes.txt')).some((i) => i.includes('미리보기')));
+  check('an archive\'s menu does not (yet)', !(await menuFor('pack.zip')).some((i) => i.includes('미리보기')));
 
   // 5. Deleting asks in the app's own modal, naming what goes.
   await row('del-1.txt').click();

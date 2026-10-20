@@ -122,6 +122,20 @@ mode is only changed when **권한 바꾸기** is ticked. For folders, **폴더 
 be changed (`SITE CHMOD`); owner names show where the server can tell them (this
 machine, SSH servers with a shell, FTP listings), otherwise numeric ids.
 
+### Previewing files
+Double-click a file, select it and press Space, or pick **미리보기** from its
+right-click menu to see it in place; ← and → (Home/End) step through the
+folder's other previewable files.
+- **Images** (png, jpg, gif, webp, avif, bmp, ico, svg; up to 50 MB): fitted to
+  the window or at actual size (F, or click the picture). An SVG is shown as an
+  image, so any script in it never runs.
+- **Text and code** (up to 5 MB): line numbers, colouring for common languages
+  and config formats (also `Dockerfile`, `Makefile`, `.bashrc`, `nginx.conf`, …),
+  wrap long lines with W (remembered), **전체 복사**. The encoding is found
+  automatically — UTF-8, or EUC-KR for older Korean files — and can be chosen.
+  Files over 300 KB are shown plain, as one block; a binary file asks before
+  being shown as text.
+
 ### Sharing a server's files
 A server reached only for its files has **🔗 파일 공유** on its file view: a link
 like a terminal share link (expiry, optional password, revocable in **공유 링크**)

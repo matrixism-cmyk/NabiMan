@@ -21,10 +21,10 @@ beforeEach(() => {
 const ui = (files: SftpEntry[], start: string, onDownload = jest.fn()) => render(
   <I18nProvider><PreviewDialog source={source} dir="/srv/pics" files={files} start={start} onDownload={onDownload} onClose={jest.fn()} /></I18nProvider>);
 
-test('image types are recognised by name, others are not (yet)', () => {
+test('image types are recognised by name, archives are not', () => {
   expect(previewOf('Photo.JPG')).toEqual(expect.objectContaining({ kind: 'image', mime: 'image/jpeg' }));
   expect(previewOf('icon.svg')?.mime).toBe('image/svg+xml');
-  expect(previewOf('notes.txt')).toBeNull();
+  expect(previewOf('backup.zip')).toBeNull();
   expect(previewOf('.png')).toBeNull();
 });
 

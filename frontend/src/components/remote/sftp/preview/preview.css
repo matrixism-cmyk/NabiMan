@@ -56,3 +56,79 @@
 .preview-nav:hover, .preview-nav:focus-visible { opacity: 1; }
 .preview-nav.is-prev { left: 8px; }
 .preview-nav.is-next { right: 8px; }
+
+/* Text and code */
+.preview-stage.is-text { background: var(--bg); align-items: stretch; justify-content: stretch; }
+.preview-encoding { width: auto; padding: 4px 8px; font-size: 12px; }
+.text-preview {
+  --tp-gutter: 4ch;
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 8px 0;
+  font-family: 'JetBrains Mono', 'D2Coding', 'Consolas', 'Menlo', monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text);
+  background: transparent;
+  outline: none;
+  tab-size: 4;
+}
+.text-preview:focus-visible { box-shadow: inset 0 0 0 1px var(--primary); }
+.tp-row { display: grid; grid-template-columns: var(--tp-gutter) 1fr; column-gap: 14px; min-width: max-content; }
+.text-preview.is-wrap .tp-row { min-width: 0; }
+.tp-no, .tp-gutter {
+  text-align: right;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  user-select: none;
+  padding-left: 8px;
+}
+.tp-code { white-space: pre; font-family: inherit; background: none; padding: 0; color: inherit; }
+.text-preview.is-wrap .tp-code { white-space: pre-wrap; overflow-wrap: anywhere; }
+.tp-row:hover { background: rgba(127, 127, 127, 0.08); }
+.text-preview.is-block { display: grid; grid-template-columns: calc(var(--tp-gutter) + 8px) 1fr; column-gap: 14px; }
+.text-preview.is-block pre { margin: 0; font: inherit; background: none; border: 0; padding: 0; }
+.tp-text { white-space: pre; }
+
+/* Colours for highlight.js tokens, dark first; the light theme below. */
+.text-preview .hljs-comment, .text-preview .hljs-quote { color: #8b949e; font-style: italic; }
+.text-preview .hljs-keyword, .text-preview .hljs-selector-tag, .text-preview .hljs-meta .hljs-keyword,
+.text-preview .hljs-doctag, .text-preview .hljs-section { color: #ff7b72; }
+.text-preview .hljs-string, .text-preview .hljs-regexp, .text-preview .hljs-addition,
+.text-preview .hljs-meta .hljs-string { color: #a5d6ff; }
+.text-preview .hljs-number, .text-preview .hljs-literal, .text-preview .hljs-symbol,
+.text-preview .hljs-bullet, .text-preview .hljs-variable.constant_ { color: #79c0ff; }
+.text-preview .hljs-title, .text-preview .hljs-title.function_, .text-preview .hljs-title.class_ { color: #d2a8ff; }
+.text-preview .hljs-attr, .text-preview .hljs-attribute, .text-preview .hljs-property,
+.text-preview .hljs-selector-class, .text-preview .hljs-selector-id { color: #7ee787; }
+.text-preview .hljs-built_in, .text-preview .hljs-type, .text-preview .hljs-params { color: #ffa657; }
+.text-preview .hljs-variable, .text-preview .hljs-template-variable, .text-preview .hljs-name,
+.text-preview .hljs-tag { color: #79c0ff; }
+.text-preview .hljs-meta { color: #8b949e; }
+.text-preview .hljs-deletion { color: #ffa198; background: rgba(248, 81, 73, 0.12); }
+.text-preview .hljs-addition { background: rgba(46, 160, 67, 0.15); }
+.text-preview .hljs-emphasis { font-style: italic; }
+.text-preview .hljs-strong { font-weight: 700; }
+.text-preview .hljs-link { text-decoration: underline; }
+:root[data-theme-mode="light"] .text-preview .hljs-comment,
+:root[data-theme-mode="light"] .text-preview .hljs-quote,
+:root[data-theme-mode="light"] .text-preview .hljs-meta { color: #6e7781; }
+:root[data-theme-mode="light"] .text-preview .hljs-keyword,
+:root[data-theme-mode="light"] .text-preview .hljs-selector-tag,
+:root[data-theme-mode="light"] .text-preview .hljs-section { color: #cf222e; }
+:root[data-theme-mode="light"] .text-preview .hljs-string,
+:root[data-theme-mode="light"] .text-preview .hljs-regexp { color: #0a3069; }
+:root[data-theme-mode="light"] .text-preview .hljs-number,
+:root[data-theme-mode="light"] .text-preview .hljs-literal,
+:root[data-theme-mode="light"] .text-preview .hljs-variable,
+:root[data-theme-mode="light"] .text-preview .hljs-name,
+:root[data-theme-mode="light"] .text-preview .hljs-tag { color: #0550ae; }
+:root[data-theme-mode="light"] .text-preview .hljs-title { color: #8250df; }
+:root[data-theme-mode="light"] .text-preview .hljs-attr,
+:root[data-theme-mode="light"] .text-preview .hljs-attribute,
+:root[data-theme-mode="light"] .text-preview .hljs-property { color: #116329; }
+:root[data-theme-mode="light"] .text-preview .hljs-built_in,
+:root[data-theme-mode="light"] .text-preview .hljs-type,
+:root[data-theme-mode="light"] .text-preview .hljs-params { color: #953800; }
+.preview-actions .btn.is-on { border-color: var(--primary); color: var(--primary); }
