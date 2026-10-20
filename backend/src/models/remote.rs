@@ -44,6 +44,10 @@ pub struct RemoteServer {
     /// the certificate must be valid for the host name.
     #[serde(default)]
     pub tls_fingerprint: String,
+    /// FTPS that speaks TLS from the first byte (usually port 990) instead of
+    /// switching to it with AUTH TLS.
+    #[serde(default)]
+    pub ftps_implicit: bool,
 }
 
 fn default_terminal() -> String {
@@ -108,6 +112,7 @@ pub struct AddRemoteServerRequest {
     pub files: Option<String>,
     pub ftp_port: Option<u16>,
     pub tls_fingerprint: Option<String>,
+    pub ftps_implicit: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -126,6 +131,7 @@ pub struct UpdateRemoteServerRequest {
     pub files: Option<String>,
     pub ftp_port: Option<u16>,
     pub tls_fingerprint: Option<String>,
+    pub ftps_implicit: Option<bool>,
 }
 
 #[derive(Deserialize)]

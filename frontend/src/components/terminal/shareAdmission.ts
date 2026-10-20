@@ -5,6 +5,8 @@ export interface ShareInfo {
   alive: boolean; cols: number; rows: number;
   /** File panel access the link grants; older servers do not say, meaning none. */
   files: ShareFilesMode;
+  /** `files` for a link to a server's files alone, with no terminal. */
+  kind: 'terminal' | 'files';
 }
 /** The key a visitor's file panel signs its requests with. Memory only. */
 export interface ShareFilesGrant { key: string; mode: 'read' | 'write' }
@@ -35,7 +37,8 @@ export async function readShareInfo(token: string, signal?: AbortSignal): Promis
       || !Number.isSafeInteger(data.expires_unix) || data.expires_unix <= 0
       || ![data.cols, data.rows].every(n => Number.isInteger(n) && n >= 0 && n <= 4096)) throw new ShareAdmissionError('share.authUnavailable');
   const files = (data as { files?: unknown }).files;
-  return { ...data, files: files === 'read' || files === 'write' ? files : 'none' };
+  const kind = (data as { kind?: unknown }).kind === 'files' ? 'files' : 'terminal';
+  return { ...data, kind, files: files === 'read' || files === 'write' ? files : 'none' };
 }
 export async function issueShareTicket(token: string, password: string, query: string, signal?: AbortSignal): Promise<ShareTicket> {
   const data = await publicRequest<ShareTicket>(`/api/share/${encodeURIComponent(token)}/auth`, {

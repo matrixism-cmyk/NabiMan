@@ -15,6 +15,20 @@ export interface SftpEntry {
   size: number;
   mtime: number | null;
   mode: number | null;
+  /** Owner and group: numbers (SFTP, this machine) and names where known. */
+  uid?: number;
+  gid?: number;
+  owner?: string;
+  group?: string;
+}
+
+/** What can be changed here, and names to complete owners with. */
+export interface SftpAttrsCaps {
+  mode: boolean;
+  /** False over FTP, which cannot change owners. */
+  owner: boolean;
+  users: string[];
+  groups: string[];
 }
 
 export interface SftpListing {
@@ -22,6 +36,33 @@ export interface SftpListing {
   parent: string | null;
   entries: SftpEntry[];
   truncated: boolean;
+  attrs?: SftpAttrsCaps;
+}
+
+export interface AttrsChange {
+  paths: string[];
+  /** Octal digits, such as `755`. */
+  mode?: string;
+  owner?: string;
+  group?: string;
+  recursive?: boolean;
+}
+
+export interface AttrsResult {
+  changed: number;
+  failed: { path: string; message: string }[];
+  failed_count: number;
+  links_skipped: number;
+}
+
+/** `rwxr-xr-x` for the permission bits, with set-id and sticky shown as ls does. */
+export function modeString(mode: number): string {
+  const bits = 'rwxrwxrwx'.split('').map((c, i) => ((mode >> (8 - i)) & 1 ? c : '-'));
+  const special: [number, number, string][] = [[0o4000, 2, 's'], [0o2000, 5, 's'], [0o1000, 8, 't']];
+  for (const [flag, at, c] of special) {
+    if (mode & flag) bits[at] = bits[at] === 'x' ? c : c.toUpperCase();
+  }
+  return bits.join('');
 }
 
 const API_BASE = process.env.REACT_APP_API_URL || '';
@@ -103,6 +144,10 @@ export function removePath(src: SftpSource, path: string) {
 }
 
 /** A single-use URL the browser can fetch on its own, for a drag onto the desktop. */
+export function changeAttrs(src: SftpSource, change: AttrsChange) {
+  return request<AttrsResult>(src, '/attrs', { method: 'POST', body: JSON.stringify(change) });
+}
+
 export async function downloadLink(src: SftpSource, path: string): Promise<string | null> {
   const res = await request<{ url: string }>(src, '/link', { method: 'POST', body: JSON.stringify({ path }) });
   return res.success && res.data?.url ? new URL(`${API_BASE}${res.data.url}`, window.location.href).href : null;

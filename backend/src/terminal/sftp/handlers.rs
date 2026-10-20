@@ -51,8 +51,13 @@ pub(super) async fn list(req: HttpRequest, q: web::Query<PathQuery>) -> HttpResp
         entries.push(row);
     }
     sort(&mut entries);
+    let names = super::attrs::names(&t).await;
+    if let Some(names) = &names {
+        super::attrs::name_entries(&mut entries, names);
+    }
+    let attrs = super::attrs::capabilities(&fs, names.as_deref());
     HttpResponse::Ok().json(ApiResponse::ok(serde_json::json!({
-        "path": path, "parent": parent(&path), "entries": entries, "truncated": truncated,
+        "path": path, "parent": parent(&path), "entries": entries, "truncated": truncated, "attrs": attrs,
     })))
 }
 

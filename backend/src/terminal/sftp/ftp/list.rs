@@ -21,7 +21,7 @@ pub(crate) fn mlsd_line(line: &str) -> Option<Item> {
 
 /// The facts of one MLST/MLSD entry; `kind` is empty for cdir and pdir.
 pub(crate) fn facts_meta(facts: &str) -> Option<Meta> {
-    let mut meta = Meta { kind: "other", size: 0, mtime: None, mode: None };
+    let mut meta = Meta { kind: "other", ..Meta::default() };
     let mut typed = false;
     for fact in facts.split(';').filter(|f| !f.is_empty()) {
         let (key, value) = fact.split_once('=')?;
@@ -38,11 +38,24 @@ pub(crate) fn facts_meta(facts: &str) -> Option<Meta> {
             }
             "size" | "sizd" => meta.size = value.parse().unwrap_or(0),
             "modify" => meta.mtime = timestamp(value),
-            "unix.mode" => meta.mode = u32::from_str_radix(value.trim_start_matches('0'), 8).ok().or(Some(0)),
+            "unix.mode" => meta.mode = octal(value),
+            "unix.owner" | "unix.ownername" => meta.owner = Some(value.to_string()),
+            "unix.group" | "unix.groupname" => meta.group = Some(value.to_string()),
+            "unix.uid" => meta.uid = value.parse().ok(),
+            "unix.gid" => meta.gid = value.parse().ok(),
             _ => {}
         }
     }
     typed.then_some(meta)
+}
+
+/// A mode as servers write it: `0644`, `644`, or Python's `0o644`.
+fn octal(value: &str) -> Option<u32> {
+    let digits = value.strip_prefix("0o").unwrap_or(value).trim_start_matches('0');
+    if digits.is_empty() {
+        return value.chars().all(|c| c == '0').then_some(0);
+    }
+    u32::from_str_radix(digits, 8).ok().filter(|m| *m <= 0o7777)
 }
 
 /// `YYYYMMDDHHMMSS[.sss]` in UTC, as MLSD and MDTM give it.
@@ -122,7 +135,14 @@ fn unix_line(line: &str, now: chrono::NaiveDate) -> Option<Item> {
         chrono::NaiveDate::from_ymd_opt(when.parse().ok()?, month, day)?.and_hms_opt(0, 0, 0)
     };
     let mtime = mtime.and_then(|t| u32::try_from(t.and_utc().timestamp()).ok());
-    Some((name.to_string(), Meta { kind, size, mtime, mode: Some(mode_bits(perms)) }))
+    // Owner and group are the two words after the link count, when there
+    // are enough words before the size for both.
+    let (owner, group) = match at {
+        5.. => (Some(w[2].1.to_string()), Some(w[3].1.to_string())),
+        4 => (Some(w[2].1.to_string()), None),
+        _ => (None, None),
+    };
+    Some((name.to_string(), Meta { kind, size, mtime, mode: Some(mode_bits(perms)), owner, group, ..Meta::default() }))
 }
 
 fn mode_bits(perms: &str) -> u32 {
@@ -153,10 +173,10 @@ fn dos_line(line: &str) -> Option<Item> {
     let mtime = u32::try_from(date.and_time(time).and_utc().timestamp()).ok();
     let name = line[w[3].0..].to_string();
     if w[2].1.eq_ignore_ascii_case("<DIR>") {
-        Some((name, Meta { kind: "dir", size: 0, mtime, mode: None }))
+        Some((name, Meta { kind: "dir", mtime, ..Meta::default() }))
     } else {
         let size = w[2].1.replace(',', "").parse().ok()?;
-        Some((name, Meta { kind: "file", size, mtime, mode: None }))
+        Some((name, Meta { kind: "file", size, mtime, ..Meta::default() }))
     }
 }
 
@@ -174,8 +194,14 @@ mod tests {
         assert_eq!((name.as_str(), m.kind, m.size, m.mode), ("my report.pdf", "file", 1234, Some(0o644)));
         assert_eq!(m.mtime, Some(1_792_411_200));
         assert_eq!(mlsd_line("type=dir;modify=20261019120000; sub").unwrap().1.kind, "dir");
+        let (_, m) = mlsd_line("type=file;size=1;UNIX.owner=web;UNIX.group=www;UNIX.uid=1001; f").unwrap();
+        assert_eq!((m.owner.as_deref(), m.group.as_deref(), m.uid), (Some("web"), Some("www"), Some(1001)));
         assert_eq!(mlsd_line("type=OS.unix=slink:/etc;modify=20261019120000; etc").unwrap().1.kind, "link");
         assert!(mlsd_line("type=cdir;modify=20261019120000; /home/u").is_none());
+        for (written, mode) in [("0644", Some(0o644)), ("755", Some(0o755)), ("0o640", Some(0o640)), ("000", Some(0)), ("rw", None)] {
+            let line = format!("type=file;unix.mode={written}; f");
+            assert_eq!(mlsd_line(&line).unwrap().1.mode, mode, "{written}");
+        }
         assert!(mlsd_line("type=pdir;modify=20261019120000; ..").is_none());
     }
 
@@ -184,8 +210,9 @@ mod tests {
         let (name, m) = list_line("-rw-r--r--    1 1000     1000         5120 Oct 19 09:30 two  spaces.txt", today()).unwrap();
         assert_eq!((name.as_str(), m.kind, m.size, m.mode), ("two  spaces.txt", "file", 5120, Some(0o644)));
         assert_eq!(m.mtime, Some(1_792_402_200));
-        let (name, m) = list_line("drwxr-xr-x 2 ftp ftp 4096 Jan  3  2024 old", today()).unwrap();
+        let (name, m) = list_line("drwxr-xr-x 2 ftp www 4096 Jan  3  2024 old", today()).unwrap();
         assert_eq!((name.as_str(), m.kind, m.mode), ("old", "dir", Some(0o755)));
+        assert_eq!((m.owner.as_deref(), m.group.as_deref()), (Some("ftp"), Some("www")));
         // Without a group, and a link shows its own name.
         let (name, m) = list_line("lrwxrwxrwx 1 owner 7 Oct 01 10:00 latest -> releases/9", today()).unwrap();
         assert_eq!((name.as_str(), m.kind), ("latest", "link"));

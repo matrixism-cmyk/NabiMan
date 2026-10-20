@@ -17,6 +17,8 @@ export interface ShareLink {
   usable?: boolean;
   /** File panel access the link grants. Older links have none. */
   files?: ShareFiles;
+  /** Set instead of a session for a link to a saved server's files alone. */
+  server_id?: string;
 }
 
 export type ShareFiles = 'none' | 'read' | 'write';
@@ -44,13 +46,17 @@ function formatExpiry(unix: number, t: (k: string) => string): string {
 }
 
 interface Props {
-  sessionId: string;
+  /** The terminal session to share… */
+  sessionId?: string;
+  /** …or, for a server reached only for its files, that server's files. */
+  serverId?: string;
   sessionLabel: string;
   onClose: () => void;
 }
 
-/** Hand one running terminal to someone who has no NabiMan account. */
-export default function ShareDialog({ sessionId, sessionLabel, onClose }: Props) {
+/** Hand one running terminal — or one server's files — to someone who has
+ *  no NabiMan account. */
+export default function ShareDialog({ sessionId = '', serverId = '', sessionLabel, onClose }: Props) {
   const { t } = useT();
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -59,7 +65,9 @@ export default function ShareDialog({ sessionId, sessionLabel, onClose }: Props)
   const [expiry, setExpiry] = useState(24 * 3600);
   const [password, setPassword] = useState('');
   const [readOnly, setReadOnly] = useState(true);
-  const [files, setFiles] = useState<ShareFiles>('none');
+  // A files link is nothing without files: it starts on browsing.
+  const filesOnly = Boolean(serverId);
+  const [files, setFiles] = useState<ShareFiles>(filesOnly ? 'read' : 'none');
   const [links, setLinks] = useState<ShareLink[]>([]);
   const [created, setCreated] = useState<ShareLink | null>(null);
   const [message, setMessage] = useState('');
@@ -67,15 +75,18 @@ export default function ShareDialog({ sessionId, sessionLabel, onClose }: Props)
 
   const load = useCallback(async () => {
     const res = await apiRequest<ShareLink[]>('/api/terminal/share-links');
-    if (res.success && res.data) setLinks(res.data.filter((l) => l.session_id === sessionId));
-    else setMessage(res.message || t('common.error'));
-  }, [sessionId, t]);
+    if (res.success && res.data) {
+      setLinks(res.data.filter((l) => (filesOnly ? l.server_id === serverId : l.session_id === sessionId)));
+    } else setMessage(res.message || t('common.error'));
+  }, [sessionId, serverId, filesOnly, t]);
 
   useEffect(() => { load(); }, [load]);
 
   const create = async () => {
     setBusy(true);
-    const res = await apiPost<ShareLink>(`/api/terminal/sessions/${sessionId}/share-link`, {
+    const res = await apiPost<ShareLink>(filesOnly
+      ? `/api/terminal/files/${serverId}/share-link`
+      : `/api/terminal/sessions/${sessionId}/share-link`, {
       expires_in_secs: expiry,
       password: password.trim(),
       read_only: readOnly,
@@ -129,9 +140,9 @@ export default function ShareDialog({ sessionId, sessionLabel, onClose }: Props)
             else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
           }
         }}>
-        <h3 id={titleId}>{t('share.title')}</h3>
+        <h3 id={titleId}>{t(filesOnly ? 'share.filesTitle' : 'share.title')}</h3>
         <p className="text-secondary">{sessionLabel}</p>
-        <p className="share-warning">{t('share.warning')}</p>
+        <p className="share-warning">{t(filesOnly ? 'share.filesWarning' : 'share.warning')}</p>
         <p className="text-secondary">{t('share.lifetimePolicy')}</p>
         {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
 
@@ -158,18 +169,20 @@ export default function ShareDialog({ sessionId, sessionLabel, onClose }: Props)
           <small className="text-secondary">{t('share.passwordHint')}</small>
         </div>
 
-        <div className="form-group">
-          <label>
-            <input type="checkbox" checked={readOnly} onChange={(e) => setReadOnly(e.target.checked)} />{' '}
-            {t('share.readOnly')}
-          </label>
-          <small className="text-secondary">{t('share.readOnlyHint')}</small>
-        </div>
+        {!filesOnly && (
+          <div className="form-group">
+            <label>
+              <input type="checkbox" checked={readOnly} onChange={(e) => setReadOnly(e.target.checked)} />{' '}
+              {t('share.readOnly')}
+            </label>
+            <small className="text-secondary">{t('share.readOnlyHint')}</small>
+          </div>
+        )}
 
         <div className="form-group">
           <label id={`${titleId}-files`}>{t('share.files')}</label>
           <div className="filter-row" role="radiogroup" aria-labelledby={`${titleId}-files`}>
-            {FILES_CHOICES.map((choice) => (
+            {FILES_CHOICES.filter((choice) => !filesOnly || choice.value !== 'none').map((choice) => (
               <button
                 key={choice.value} type="button" role="radio" aria-checked={files === choice.value}
                 className={`btn btn-sm ${files === choice.value ? 'btn-primary' : 'btn-secondary'}`}
@@ -203,7 +216,7 @@ export default function ShareDialog({ sessionId, sessionLabel, onClose }: Props)
                     <td>{formatExpiry(link.expires_unix, t)}</td>
                     <td>
                       {link.needs_password ? t('share.withPassword') : t('share.noPassword')}
-                      {link.read_only ? ` · ${t('share.readOnly')}` : ''}
+                      {link.read_only && !link.server_id ? ` · ${t('share.readOnly')}` : ''}
                       {link.files === 'read' ? ` · ${t('share.filesTagRead')}` : link.files === 'write' ? ` · ${t('share.filesTagWrite')}` : ''}
                       {link.usable === false && <span className="status-badge down">{t('share.unusable')}</span>}
                     </td>

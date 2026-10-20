@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '../../../i18n';
 import RailContextMenu, { RailMenuItem } from '../RailContextMenu';
+import AttrsDialog from './AttrsDialog';
 import SftpList, { Editing } from './SftpList';
 import SftpTransfers from './SftpTransfers';
 import { useTransfers } from './useTransfers';
@@ -48,6 +49,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
   const [dropOn, setDropOn] = useState<string | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [menu, setMenu] = useState<Menu | null>(null);
+  const [attrsFor, setAttrsFor] = useState<SftpEntry[] | null>(null);
   const anchor = useRef<string | null>(null);
   const current = useRef('');
   const fileInput = useRef<HTMLInputElement>(null);
@@ -243,6 +245,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
       ...(writable ? [
         { key: 'rename', label: t('sftp.rename'), icon: '✎', disabled: !single,
           onSelect: () => setEditing({ mode: 'rename', from: entry.name }) },
+        ...(listing?.attrs ? [{ key: 'attrs', label: t('sftp.attrs'), icon: '🔐', onSelect: () => setAttrsFor(targets) }] : []),
         { key: 'delete', label: t('common.delete'), icon: '🗑', danger: true, separated: true,
           onSelect: () => remove(targets) },
       ] : []),
@@ -329,7 +332,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
       </div>
       <SftpTransfers rows={transfers.rows} onCancel={transfers.cancel} onClear={transfers.clearFinished} />
       <p className="sftp-hint">
-        {chosen.length > 1 ? t('sftp.selected', { count: chosen.length }) : t(!writable ? 'sftp.dragHintReadOnly' : onInsert ? 'sftp.dragHint' : 'sftp.dragHintNoTerminal')}
+        {chosen.length > 1 ? t('sftp.selected', { count: chosen.length }) : t(!writable ? (onInsert ? 'sftp.dragHintReadOnly' : 'sftp.dragHintReadOnlyNoTerminal') : onInsert ? 'sftp.dragHint' : 'sftp.dragHintNoTerminal')}
       </p>
       <input ref={fileInput} type="file" multiple hidden onChange={(e) => {
         const files = Array.from(e.target.files || []);
@@ -340,6 +343,16 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
         <RailContextMenu x={menu.x} y={menu.y} opener={menu.opener}
           title={menu.entry ? (chosen.length > 1 ? t('sftp.selected', { count: chosen.length }) : menu.entry.name) : here}
           items={menuItems(menu.entry)} onClose={() => setMenu(null)} />
+      )}
+      {attrsFor && listing?.attrs && (
+        <AttrsDialog source={source} caps={listing.attrs} onClose={() => setAttrsFor(null)}
+          targets={attrsFor.map((entry) => ({ entry, path: pathOf(entry.name) }))}
+          onDone={(r) => {
+            setAttrsFor(null);
+            report(r.failed.map((f) => `${baseName(f.path)}: ${f.message}`),
+              t('sftp.attrsDone', { count: r.changed }) + (r.links_skipped ? t('sftp.attrsLinks', { count: r.links_skipped }) : ''));
+            refresh();
+          }} />
       )}
     </aside>
   );

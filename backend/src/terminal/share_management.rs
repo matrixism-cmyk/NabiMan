@@ -36,13 +36,6 @@ pub(super) async fn create_share(
     let Some(owner) = current_owner(&req, &users) else {
         return HttpResponse::Forbidden().finish();
     };
-    let username = owner.username.clone();
-    if body.expires_in_secs == 0 || body.expires_in_secs > MAX_EXPIRY_SECS {
-        return HttpResponse::BadRequest().json(ApiResponse::<()>::error(
-            "Share expiry must be between 1 second and 30 days",
-        ));
-    }
-
     let label = {
         let map = store.lock().unwrap();
         match map.get(&session_id) {
@@ -61,7 +54,35 @@ pub(super) async fn create_share(
             }
         }
     };
+    let target = LinkTarget { session_id, label, ..LinkTarget::default() };
+    publish(&req, &body, owner, target, &users, &sessions, &shares)
+}
 
+/// What a new link opens: a terminal session, or a saved server's files.
+#[derive(Default)]
+pub(super) struct LinkTarget {
+    pub session_id: String,
+    pub server_id: String,
+    pub server_binding: String,
+    pub label: String,
+}
+
+/// Makes the link: checks the request, hashes the password, and publishes it
+/// while the owner's account generation still holds.
+pub(super) fn publish(
+    req: &HttpRequest,
+    body: &CreateShareRequest,
+    owner: NabimanUser,
+    target: LinkTarget,
+    users: &web::Data<UserStore>,
+    sessions: &web::Data<crate::jwt_sessions::SessionStore>,
+    shares: &web::Data<ShareStore>,
+) -> HttpResponse {
+    if body.expires_in_secs == 0 || body.expires_in_secs > MAX_EXPIRY_SECS {
+        return HttpResponse::BadRequest().json(ApiResponse::<()>::error(
+            "Share expiry must be between 1 second and 30 days",
+        ));
+    }
     if body
         .password
         .as_deref()
@@ -94,11 +115,11 @@ pub(super) async fn create_share(
     };
     let link = ShareLink {
         token: token.clone(),
-        session_id,
-        owner: username,
+        session_id: target.session_id,
+        owner: owner.username.clone(),
         owner_id: owner.id.clone(),
         owner_authorization_version: owner.share_authorization_version.clone(),
-        label,
+        label: target.label,
         created_unix: now_unix(),
         expires_unix: now_unix() + body.expires_in_secs,
         password_hash,
@@ -108,10 +129,12 @@ pub(super) async fn create_share(
         alive: true,
         usable: true,
         files: body.files,
+        server_id: target.server_id,
+        server_binding: target.server_binding,
     };
 
     let Some(grant) = crate::terminal_tickets::ConnectionGrant::from_request(
-        &req,
+        req,
         sessions.get_ref().clone(),
         users.get_ref().clone(),
     ) else {
@@ -174,14 +197,18 @@ pub(super) async fn list_shares(
         .into_iter()
         .filter(|l| l.owner_id == owner.id || (l.owner_id.is_empty() && l.owner == owner.username))
         .map(|l| {
-            let alive = sessions
-                .get(&l.session_id)
-                .map(|s| {
-                    s.owned_by(&l.owner_id)
-                        && super::super::remote_access::allowed(s)
-                        && tmux_session_exists(&s.tmux_name)
-                })
-                .unwrap_or(false);
+            let alive = if l.files_only() {
+                super::files_link_alive(&l)
+            } else {
+                sessions
+                    .get(&l.session_id)
+                    .map(|s| {
+                        s.owned_by(&l.owner_id)
+                            && super::super::remote_access::allowed(s)
+                            && tmux_session_exists(&s.tmux_name)
+                    })
+                    .unwrap_or(false)
+            };
             ShareLink {
                 alive,
                 usable: alive

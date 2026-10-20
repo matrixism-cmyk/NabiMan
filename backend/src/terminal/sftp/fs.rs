@@ -84,11 +84,17 @@ pub(crate) type Writer = Pin<Box<dyn AsyncWrite + Send>>;
 
 /// What a listing shows about an entry. `kind` is `dir`, `file`, `link` or
 /// `other`, and describes the entry itself, never what a link points to.
+/// Owners come as numbers (SFTP, this machine) or names (FTP listings).
+#[derive(Clone, Default)]
 pub(crate) struct Meta {
     pub kind: &'static str,
     pub size: u64,
     pub mtime: Option<u32>,
     pub mode: Option<u32>,
+    pub uid: Option<u32>,
+    pub gid: Option<u32>,
+    pub owner: Option<String>,
+    pub group: Option<String>,
 }
 
 impl Meta {
@@ -101,6 +107,9 @@ impl Meta {
             size: m.size.unwrap_or(0),
             mtime: m.mtime,
             mode: m.permissions.map(|p| p & 0o7777),
+            uid: m.uid,
+            gid: m.gid,
+            ..Meta::default()
         }
     }
     fn local(m: &std::fs::Metadata) -> Self {
@@ -110,6 +119,9 @@ impl Meta {
             size: m.len(),
             mtime: u32::try_from(m.mtime()).ok(),
             mode: Some(m.permissions().mode() & 0o7777),
+            uid: Some(m.uid()),
+            gid: Some(m.gid()),
+            ..Meta::default()
         }
     }
 }
@@ -236,6 +248,36 @@ impl Fs {
             Fs::Remote(c) => Ok(c.sftp.remove_file(path).await?),
             Fs::Ftp(c) => Ok(c.simple(&[(format!("DELE {path}"), 250)]).await?),
             Fs::Local => Ok(tokio::fs::remove_file(path).await?),
+        }
+    }
+
+    /// Sets the permission bits. Follows links, so callers leave links alone.
+    pub async fn chmod(&self, path: &str, mode: u32) -> Result<()> {
+        match self {
+            Fs::Remote(c) => {
+                let attrs = SftpMeta { permissions: Some(mode), ..SftpMeta::empty() };
+                Ok(c.sftp.set_metadata(path, attrs).await?)
+            }
+            Fs::Ftp(c) => Ok(c.simple(&[(format!("SITE CHMOD {mode:o} {path}"), 200)]).await?),
+            Fs::Local => Ok(tokio::fs::set_permissions(path, std::fs::Permissions::from_mode(mode)).await?),
+        }
+    }
+
+    /// Sets the owner and/or group by number. FTP has no way to.
+    pub async fn chown(&self, path: &str, uid: Option<u32>, gid: Option<u32>) -> Result<()> {
+        match self {
+            Fs::Remote(c) => {
+                // SFTP sets both or neither; the one not asked for stays as it is.
+                let now = c.sftp.metadata(path).await?;
+                let attrs = SftpMeta { uid: uid.or(now.uid), gid: gid.or(now.gid), ..SftpMeta::empty() };
+                Ok(c.sftp.set_metadata(path, attrs).await?)
+            }
+            Fs::Ftp(_) => Err(FsError {
+                message: "FTP cannot change owners or groups".into(),
+                status: StatusCode::BAD_REQUEST,
+                broken: false,
+            }),
+            Fs::Local => Ok(std::os::unix::fs::chown(path, uid, gid)?),
         }
     }
 

@@ -65,3 +65,17 @@ test('file access is off unless chosen, and the choice is sent with the link', a
   await waitFor(() => expect(post).toHaveBeenCalledWith('/api/terminal/sessions/session-1/share-link',
     expect.objectContaining({ files: 'write', read_only: true })));
 });
+
+test('a files link goes to the server, needs file access, and lists only its own links', async () => {
+  const files = { ...link, token: 'files-token', session_id: '', server_id: 'srv_ftp', files: 'read' };
+  request.mockResolvedValue({ success: true, data: [link, files] });
+  post.mockResolvedValue({ success: true, data: files });
+  render(<I18nProvider><ShareDialog serverId="srv_ftp" sessionLabel="FTP files" onClose={jest.fn()} /></I18nProvider>);
+  expect(await screen.findByRole('heading', { name: '파일 공유' })).toBeInTheDocument();
+  await waitFor(() => expect(screen.getAllByRole('button', { name: '삭제' })).toHaveLength(1));
+  expect(screen.queryByRole('radio', { name: '끄기' })).not.toBeInTheDocument();
+  expect(screen.queryByText('읽기 전용')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('radio', { name: '올리기·수정까지' }));
+  fireEvent.click(screen.getByRole('button', { name: '링크 만들기' }));
+  await waitFor(() => expect(post).toHaveBeenCalledWith('/api/terminal/files/srv_ftp/share-link', expect.objectContaining({ files: 'write' })));
+});

@@ -29,6 +29,7 @@ export default function ServerForm({ server, onSaved, onCancel }: Props) {
   const [port, setPort] = useState(String(server?.port || 22));
   const [ftpPort, setFtpPort] = useState(String(server?.ftp_port || 21));
   const [fingerprint, setFingerprint] = useState(server?.tls_fingerprint || '');
+  const [implicit, setImplicit] = useState(Boolean(server?.ftps_implicit));
   const [user, setUser] = useState(server?.user || 'root');
   const [auth, setAuth] = useState(server?.auth_method || 'key');
   const [password, setPassword] = useState('');
@@ -42,6 +43,15 @@ export default function ServerForm({ server, onSaved, onCancel }: Props) {
   // Keys are an SSH thing; Telnet and FTP always log in with a password.
   const method = ssh ? auth : 'password';
   const plain = [terminal, files].filter(p => PLAINTEXT.has(p)).map(protocolName);
+
+  // Implicit FTPS is FTPS with TLS from the first byte; one choice in the list.
+  const chooseFiles = (value: string) => {
+    const nextImplicit = value === 'ftps-implicit';
+    if (nextImplicit && ftpPort === '21') setFtpPort('990');
+    if (!nextImplicit && ftpPort === '990') setFtpPort('21');
+    setImplicit(nextImplicit);
+    setFiles((nextImplicit ? 'ftps' : value) as FileProtocol);
+  };
 
   const chooseTerminal = (next: TerminalProtocol) => {
     // Follow the protocol's usual port unless one was typed in.
@@ -78,6 +88,7 @@ export default function ServerForm({ server, onSaved, onCancel }: Props) {
       tags: tags.split(',').map(s => s.trim()).filter(Boolean),
       terminal, files, ftp_port: ftp ? ftpPortNum : server?.ftp_port || 21,
       tls_fingerprint: files === 'ftps' ? fingerprint.trim() : '',
+      ftps_implicit: files === 'ftps' && implicit,
     };
     // On edit an empty box keeps the stored password; on add it means none.
     if (password || !server) body.password = method === 'password' ? password : '';
@@ -124,9 +135,11 @@ export default function ServerForm({ server, onSaved, onCancel }: Props) {
             <option value="none">{t('remote.proto.none')}</option>
           </select></div>
         <div className="form-group"><label htmlFor="srv-files">{t('remote.proto.files')}</label>
-          <select id="srv-files" value={files} onChange={e => setFiles(e.target.value as FileProtocol)} className="select-input">
+          <select id="srv-files" value={files === 'ftps' && implicit ? 'ftps-implicit' : files}
+            onChange={e => chooseFiles(e.target.value)} className="select-input">
             <option value="sftp">SFTP</option>
             <option value="ftps">{t('remote.proto.ftpsOption')}</option>
+            <option value="ftps-implicit">{t('remote.proto.ftpsImplicitOption')}</option>
             <option value="ftp">{t('remote.proto.ftpOption')}</option>
             <option value="none">{t('remote.proto.none')}</option>
           </select></div>

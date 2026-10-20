@@ -13,12 +13,13 @@ pub(crate) struct Change<'a> {
     pub files: Option<&'a str>,
     pub ftp_port: Option<u16>,
     pub tls_fingerprint: Option<&'a str>,
+    pub ftps_implicit: Option<bool>,
 }
 
 /// Applies the change; true when anything about the connection changed, so
 /// the last health check no longer says anything about it.
 pub(crate) fn apply(server: &mut RemoteServer, change: &Change) -> bool {
-    let before = (server.terminal.clone(), server.files.clone(), server.ftp_port, server.tls_fingerprint.clone());
+    let before = (server.terminal.clone(), server.files.clone(), server.ftp_port, server.tls_fingerprint.clone(), server.ftps_implicit);
     if let Some(t) = change.terminal {
         server.terminal = t.to_string();
     }
@@ -31,7 +32,14 @@ pub(crate) fn apply(server: &mut RemoteServer, change: &Change) -> bool {
     if let Some(fp) = change.tls_fingerprint {
         server.tls_fingerprint = fp.trim().to_string();
     }
-    before != (server.terminal.clone(), server.files.clone(), server.ftp_port, server.tls_fingerprint.clone())
+    if let Some(implicit) = change.ftps_implicit {
+        server.ftps_implicit = implicit;
+    }
+    // Implicit TLS is a kind of FTPS; it means nothing for anything else.
+    if server.files != "ftps" {
+        server.ftps_implicit = false;
+    }
+    before != (server.terminal.clone(), server.files.clone(), server.ftp_port, server.tls_fingerprint.clone(), server.ftps_implicit)
 }
 
 /// Whether the combination makes sense and the fields are well formed.
@@ -123,10 +131,15 @@ mod tests {
     #[test]
     fn changes_report_whether_the_connection_changed() {
         let mut s = server("ssh", "sftp");
-        let same = Change { terminal: Some("ssh"), files: None, ftp_port: Some(21), tls_fingerprint: None };
+        let same = Change { terminal: Some("ssh"), files: None, ftp_port: Some(21), tls_fingerprint: None, ftps_implicit: None };
         assert!(!apply(&mut s, &same));
-        let ftp = Change { terminal: Some("none"), files: Some("ftp"), ftp_port: None, tls_fingerprint: None };
+        let ftp = Change { terminal: Some("none"), files: Some("ftp"), ftp_port: None, tls_fingerprint: None, ftps_implicit: Some(true) };
         assert!(apply(&mut s, &ftp));
         assert_eq!((s.terminal.as_str(), s.files.as_str()), ("none", "ftp"));
+        // Implicit TLS only sticks to FTPS.
+        assert!(!s.ftps_implicit);
+        let implicit = Change { terminal: None, files: Some("ftps"), ftp_port: Some(990), tls_fingerprint: None, ftps_implicit: Some(true) };
+        assert!(apply(&mut s, &implicit));
+        assert!(s.ftps_implicit);
     }
 }

@@ -194,12 +194,14 @@ async fn add_server(body: web::Json<AddRemoteServerRequest>) -> HttpResponse {
         files: "sftp".into(),
         ftp_port: 21,
         tls_fingerprint: String::new(),
+        ftps_implicit: false,
     };
     protocols::apply(&mut server, &protocols::Change {
         terminal: body.terminal.as_deref(),
         files: body.files.as_deref(),
         ftp_port: body.ftp_port,
         tls_fingerprint: body.tls_fingerprint.as_deref(),
+        ftps_implicit: body.ftps_implicit,
     });
     if let Err(e) = protocols::check(&server) {
         return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error(e));
@@ -273,6 +275,7 @@ async fn update_server(
         files: body.files.as_deref(),
         ftp_port: body.ftp_port,
         tls_fingerprint: body.tls_fingerprint.as_deref(),
+        ftps_implicit: body.ftps_implicit,
     });
     if reached_differently {
         srv.status = "unknown".into();

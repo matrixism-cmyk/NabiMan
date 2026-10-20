@@ -8,6 +8,7 @@
 //! approval. The local panel works as the NabiMan process, as the local shell
 //! does.
 
+mod attrs;
 mod folder;
 mod fs;
 pub(crate) mod ftp;
@@ -59,7 +60,7 @@ fn resolve(req: &HttpRequest) -> Result<Target, HttpResponse> {
         None => (account_target(req, req.match_info().get("id").unwrap_or(""))?, true),
     };
     let op = req.path().rsplit('/').next().unwrap_or("");
-    let writes = ["upload", "upload-part", "upload-finish", "upload-abort", "mkdir", "rename", "delete"];
+    let writes = ["upload", "upload-part", "upload-finish", "upload-abort", "mkdir", "rename", "delete", "attrs"];
     if writes.contains(&op) && !writable {
         return Err(fail(StatusCode::FORBIDDEN, "This link allows browsing and downloading only"));
     }
@@ -109,6 +110,15 @@ fn share_target(req: &HttpRequest, token: &str) -> Result<(Target, bool), HttpRe
     if !admitted {
         return Err(ended());
     }
+    let pool_user = format!("share:{}", &hex::encode(sha2::Sha256::digest(token.as_bytes()))[..16]);
+    let writable = link.files == ShareFiles::Write;
+    if link.files_only() {
+        // A link to a server's files: the server must still be reached as it was.
+        let server = super::share::files_link_server(&link).ok_or_else(ended)?;
+        let base = format!("/api/share/{token}/files");
+        let target = Target { pool_user, scope: token.into(), server: Some(server), base, share: Some(token.into()) };
+        return Ok((target, writable));
+    }
     let session = sessions
         .lock()
         .map_err(|_| unavailable())?
@@ -126,7 +136,6 @@ fn share_target(req: &HttpRequest, token: &str) -> Result<(Target, bool), HttpRe
             _ => return Err(ended()),
         },
     };
-    let pool_user = format!("share:{}", &hex::encode(sha2::Sha256::digest(token.as_bytes()))[..16]);
     let target = Target {
         pool_user,
         scope: token.into(),
@@ -134,7 +143,7 @@ fn share_target(req: &HttpRequest, token: &str) -> Result<(Target, bool), HttpRe
         base: format!("/api/share/{token}/files"),
         share: Some(token.into()),
     };
-    Ok((target, link.files == ShareFiles::Write))
+    Ok((target, writable))
 }
 
 /// Whether a saved server's files can be opened at all: it has a way to
@@ -184,6 +193,7 @@ fn routes(prefix: &str) -> actix_web::Scope {
         .route("/mkdir", web::post().to(handlers::mkdir))
         .route("/rename", web::post().to(handlers::rename))
         .route("/delete", web::post().to(handlers::delete))
+        .route("/attrs", web::post().to(attrs::change))
 }
 
 pub(crate) fn config(cfg: &mut web::ServiceConfig) {

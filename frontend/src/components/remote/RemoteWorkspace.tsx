@@ -61,6 +61,7 @@ export default function RemoteWorkspace() {
   const [showSettings, setShowSettings] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [shareTarget, setShareTarget] = useState('');
+  const [shareFiles, setShareFiles] = useState(false);
   const [filter, setFilter] = useState('');
   const [checkingAll, setCheckingAll] = useState(false);
   const [checkError, setCheckError] = useState('');
@@ -245,6 +246,9 @@ export default function RemoteWorkspace() {
             allSessions={sessions.length} liveCount={liveCount} />
 
           <div className="rw-head-actions">
+            {serverView === 'files' && selectedServer && (
+              <button className="btn btn-secondary btn-sm" onClick={() => setShareFiles(true)}>🔗 {t('share.filesButton')}</button>
+            )}
             {showTerminalPane && terminalVisible && (
               <>
                 <span className={`status-badge ${termStatus === 'connected' ? 'up' : 'down'}`}>
@@ -372,6 +376,9 @@ export default function RemoteWorkspace() {
         </div>
       </section>
 
+      {shareFiles && selectedServer && (
+        <ShareDialog serverId={selectedServer.id} sessionLabel={`${selectedServer.name} · ${headSub}`} onClose={() => setShareFiles(false)} />
+      )}
       {showSettings && <TerminalSettingsModal onClose={() => setShowSettings(false)} />}
       {showShare && (shareTarget || currentSessionId) && (
         <ShareDialog

@@ -101,7 +101,8 @@ and FTP-only machines are all common. Records saved before this are SSH + SFTP.
   `nabiman-server telnet-client`, so no telnet package is needed). It reports
   the window size and terminal type, types the saved user at the login prompt
   and the stored password at the password prompt, once each.
-- **FTPS** is explicit TLS (`AUTH TLS`). A certificate must either be valid for
+- **FTPS** is explicit TLS (`AUTH TLS`, usually port 21) or implicit TLS from the
+  first byte (usually port 990), chosen in the form. A certificate must either be valid for
   the host name or match the SHA-256 fingerprint saved on the server (paste it
   as `openssl x509 -fingerprint -sha256` prints it); an untrusted certificate is
   refused with its fingerprint in the message, to verify out of band. Data
@@ -109,6 +110,25 @@ and FTP-only machines are all common. Records saved before this are SSH + SFTP.
 - FTP data connections always go to the address the control connection
   reached, never to an address a PASV reply names. FTP users may contain `@`
   (`web@example.com`); SSH users may not.
+
+### File permissions and owners
+Right-click an entry in the file panel — or several, selected with Ctrl/Shift —
+and pick **권한·소유자 변경…**. Tick the read/write/execute boxes or type the
+octal mode (`755`), and give an owner and/or group by name or numeric id; empty
+fields are left as they are, and with several entries whose modes differ the
+mode is only changed when **권한 바꾸기** is ticked. For folders, **폴더 안의 모든
+항목에도 적용** walks everything inside (folders also get `x` wherever they get
+`r`, as `chmod -R a+X` does); links are never changed. Over FTP only the mode can
+be changed (`SITE CHMOD`); owner names show where the server can tell them (this
+machine, SSH servers with a shell, FTP listings), otherwise numeric ids.
+
+### Sharing a server's files
+A server reached only for its files has **🔗 파일 공유** on its file view: a link
+like a terminal share link (expiry, optional password, revocable in **공유 링크**)
+that opens only the file panel, for browsing and downloading or, if chosen, for
+uploading and changing too. The link is held to how the server is reached:
+changing its address, user, protocol, password, approved host key or
+certificate ends the link.
 
 ### Terminal windows
 - **⧉ Terminal window** on a server card opens a floating terminal for it. Open

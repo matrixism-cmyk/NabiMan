@@ -201,6 +201,8 @@ export interface RemoteServer {
   ftp_port?: number;
   /** A hand-verified FTPS certificate (SHA256:…), for one no authority signs. */
   tls_fingerprint?: string;
+  /** FTPS with TLS from the first byte (usually port 990), not AUTH TLS. */
+  ftps_implicit?: boolean;
 }
 
 /** One way of reaching a server, as a check found it. */

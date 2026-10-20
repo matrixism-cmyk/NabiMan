@@ -29,6 +29,7 @@ pub(super) fn merge_probe_results(
                     && old.files == server.files
                     && old.ftp_port == server.ftp_port
                     && old.tls_fingerprint == server.tls_fingerprint
+                    && old.ftps_implicit == server.ftps_implicit
                     && old.host_trust_version == server.host_trust_version
                     && old.host_trust.as_ref().map(|k| &k.fingerprint)
                         == server.host_trust.as_ref().map(|k| &k.fingerprint)

@@ -1,4 +1,5 @@
-//! Share links: a URL that opens one terminal session for someone who has no
+//! Share links: a URL that opens one terminal session — or, for a server
+//! reached only for its files, that server's files — for someone who has no
 //! NabiMan account.
 //!
 //! A link hands out shell access, so it carries an expiry, an optional
@@ -13,6 +14,11 @@ use admission::{share_auth, share_ws};
 #[path = "share_management.rs"]
 mod management;
 use management::{create_share, list_shares, revoke_share};
+
+#[path = "share_files.rs"]
+mod files;
+use files::{create_files_share, files_link_alive};
+pub(crate) use files::files_link_server;
 #[cfg(test)]
 use management::{generate_token, CreateShareRequest};
 
@@ -68,6 +74,13 @@ pub struct ShareLink {
     /// Whether the visitor also gets the file panel, and what it may do.
     #[serde(default)]
     pub files: ShareFiles,
+    /// Set instead of `session_id` for a link to a saved server's files alone.
+    #[serde(default)]
+    pub server_id: String,
+    /// How that server was reached when the link was made; any change to it
+    /// (address, user, protocol, password, approved key) ends the link.
+    #[serde(default)]
+    pub server_binding: String,
 }
 
 /// File access a link grants alongside its terminal. Links made before this
@@ -84,12 +97,18 @@ pub enum ShareFiles {
 }
 
 impl ShareLink {
+    /// A link to a server's files, with no terminal behind it.
+    pub(crate) fn files_only(&self) -> bool {
+        self.session_id.is_empty() && !self.server_id.is_empty()
+    }
     pub(crate) fn same_authorization(&self, other: &Self) -> bool {
         self.token == other.token
             && self.owner_id == other.owner_id
             && self.owner_authorization_version == other.owner_authorization_version
             && self.owner == other.owner
             && self.session_id == other.session_id
+            && self.server_id == other.server_id
+            && self.server_binding == other.server_binding
             && self.read_only == other.read_only
             && self.files == other.files
             && self.password_hash == other.password_hash
@@ -189,6 +208,8 @@ fn public_view(mut link: ShareLink) -> ShareLink {
 
 #[derive(Serialize)]
 struct ShareInfo {
+    /// `terminal`, or `files` for a link to a server's files alone.
+    kind: &'static str,
     label: String,
     needs_password: bool,
     read_only: bool,
@@ -226,10 +247,11 @@ async fn share_info(
             .filter(|s| s.owned_by(&link.owner_id) && super::remote_access::allowed(s))
             .map(|s| s.tmux_name.clone())
     };
-    let alive = tmux_name
-        .as_deref()
-        .map(tmux_session_exists)
-        .unwrap_or(false);
+    let alive = if link.files_only() {
+        files_link_alive(&link)
+    } else {
+        tmux_name.as_deref().map(tmux_session_exists).unwrap_or(false)
+    };
     let (cols, rows) = tmux_name
         .as_deref()
         .filter(|_| alive)
@@ -239,6 +261,7 @@ async fn share_info(
         HttpResponse::Ok()
             .insert_header((actix_web::http::header::CACHE_CONTROL, "no-store"))
             .json(ApiResponse::ok(ShareInfo {
+                kind: if link.files_only() { "files" } else { "terminal" },
                 label: link.label,
                 needs_password: link.password_hash.is_some(),
                 read_only: link.read_only,
@@ -269,6 +292,10 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.route(
         "/api/terminal/sessions/{id}/share-link",
         web::post().to(create_share),
+    )
+    .route(
+        "/api/terminal/files/{id}/share-link",
+        web::post().to(create_files_share),
     )
     .route("/api/terminal/share-links", web::get().to(list_shares))
     .route(

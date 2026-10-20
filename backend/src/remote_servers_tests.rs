@@ -21,6 +21,7 @@ fn server(id: &str) -> RemoteServer {
         files: "sftp".into(),
         ftp_port: 21,
         tls_fingerprint: String::new(),
+        ftps_implicit: false,
     }
 }
 

@@ -3,6 +3,7 @@ import TerminalView, { TerminalViewHandle } from './TerminalView';
 import { DEFAULT_TERMINAL_SETTINGS } from './settings';
 import { issueShareTicket, readShareInfo, ShareAdmissionError, ShareFilesGrant, ShareInfo } from './shareAdmission';
 import TerminalWithFiles from '../remote/TerminalWithFiles';
+import SftpPanel from '../remote/sftp/SftpPanel';
 import { shareSource } from '../remote/sftp/sftpApi';
 import { useT } from '../../i18n';
 import './terminal-windows.css';
@@ -123,6 +124,25 @@ function SharePageContent({ token }: { token: string }) {
             {checking ? t('common.working') : t('share.enter')}
           </button>
         </form>
+      </div>
+    );
+  }
+
+  if (info.kind === 'files') {
+    // A server's files alone: the file panel is the whole page.
+    return (
+      <div className="share-page">
+        <header className="share-head">
+          <strong>{t('share.filesHead')}</strong>
+          <code>{info.label}</code>
+          <span className="status-badge">{t(info.files === 'write' ? 'share.filesTagWrite' : 'share.filesTagRead')}</span>
+          {!info.alive && <span className="status-badge down">{t('share.filesEnded')}</span>}
+        </header>
+        <div className="share-body share-body-files">
+          {filesSource
+            ? <SftpPanel source={filesSource} serverName={info.label} />
+            : <p className="text-secondary">{t('share.filesEnded')}</p>}
+        </div>
       </div>
     );
   }

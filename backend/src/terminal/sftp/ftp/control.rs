@@ -115,7 +115,8 @@ pub(crate) struct Control {
 }
 
 impl Control {
-    /// Connects and logs in. `tls` is set for FTPS (explicit, AUTH TLS).
+    /// Connects and logs in. `tls` is set for FTPS: implicit TLS starts the
+    /// handshake at once, explicit TLS asks for it with AUTH TLS.
     pub async fn open(server: &RemoteServer, password: &str, tls: Option<Arc<Tls>>) -> Result<Control> {
         let addr = (server.host.as_str(), server.ftp_port);
         let tcp = match timeout(CONNECT, TcpStream::connect(addr)).await {
@@ -125,24 +126,39 @@ impl Control {
         };
         let peer = tcp.peer_addr().map_err(broken)?.ip();
         let mut c = Control { io: BufReader::new(Io::Plain(tcp)), peer, tls: None, epsv: true, features: Features::default(), home: "/".into() };
-        let mut hello = c.reply().await?;
+        let implicit = tls.is_some() && server.ftps_implicit;
+        if let (Some(tls), true) = (&tls, implicit) {
+            c.upgrade(tls.clone()).await?;
+        }
+        let mut hello = match timeout(CONNECT, c.read_reply()).await {
+            Ok(r) => r?,
+            Err(_) if !implicit => return Err(broken("The server sent no FTP greeting; if it uses implicit FTPS (usually port 990), choose that")),
+            Err(_) => return Err(broken("The server sent no FTP greeting")),
+        };
         while hello.code == 120 {
             hello = c.reply().await?;
         }
         expect(hello, 220)?;
         if let Some(tls) = tls {
-            let r = c.cmd("AUTH TLS").await?;
-            if r.code != 234 {
-                return Err(FtpError::Refused(Reply { code: r.code, text: format!("The server does not offer FTPS (AUTH TLS: {})", r.text) }));
+            if !implicit {
+                let r = c.cmd("AUTH TLS").await?;
+                if r.code != 234 {
+                    return Err(FtpError::Refused(Reply { code: r.code, text: format!("The server does not offer FTPS (AUTH TLS: {})", r.text) }));
+                }
+                c.upgrade(tls).await?;
             }
-            c.upgrade(tls).await?;
             expect(c.cmd("PBSZ 0").await?, 200)?;
             expect(c.cmd("PROT P").await?, 200)?;
         }
         c.login(&server.user, password).await?;
-        c.features = c.feat().await;
+        let (features, facts) = c.feat().await;
+        c.features = features;
         if c.features.utf8 {
             let _ = c.cmd("OPTS UTF8 ON").await?;
+        }
+        if !facts.is_empty() {
+            // Ask for permissions and owners too: many servers leave them off.
+            let _ = c.cmd(&format!("OPTS MLST {facts}")).await?;
         }
         expect(c.cmd("TYPE I").await?, 200)?;
         c.home = c.pwd().await?;
@@ -178,13 +194,15 @@ impl Control {
         }
     }
 
-    async fn feat(&mut self) -> Features {
-        let Ok(r) = self.cmd("FEAT").await else { return Features::default() };
+    /// What the server can do, and the MLST facts worth asking it for.
+    async fn feat(&mut self) -> (Features, String) {
+        let Ok(r) = self.cmd("FEAT").await else { return Default::default() };
         if r.code != 211 {
-            return Features::default();
+            return Default::default();
         }
         let has = |name: &str| r.text.lines().any(|l| l.trim().to_ascii_uppercase().starts_with(name));
-        Features { mlst: has("MLST"), utf8: has("UTF8") }
+        let facts = r.text.lines().map(str::trim).find(|l| l.to_ascii_uppercase().starts_with("MLST ")).map(wanted_facts);
+        (Features { mlst: has("MLST"), utf8: has("UTF8") }, facts.unwrap_or_default())
     }
 
     /// Whether the server would take TLS. Asked with AUTH TLS itself: some
@@ -305,6 +323,20 @@ impl Control {
         let r = expect(self.cmd("PASV").await?, 227)?;
         pasv_port(&r.text).ok_or_else(|| broken("The server's passive reply could not be read"))
     }
+}
+
+const FACTS: [&str; 8] = ["type", "size", "modify", "unix.mode", "unix.owner", "unix.group", "unix.uid", "unix.gid"];
+
+/// From FEAT's `MLST type*;size*;unix.mode;…`, the facts NabiMan reads, as
+/// `OPTS MLST` takes them; empty when the server offers none of them.
+pub(crate) fn wanted_facts(line: &str) -> String {
+    let offered = line.split_once(' ').map_or("", |(_, f)| f);
+    offered
+        .split(';')
+        .map(|f| f.trim().trim_end_matches('*'))
+        .filter(|f| FACTS.contains(&f.to_ascii_lowercase().as_str()))
+        .map(|f| format!("{f};"))
+        .collect()
 }
 
 /// A refusal as an error; 421 means the server is closing the connection.

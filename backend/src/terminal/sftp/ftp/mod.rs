@@ -1,5 +1,5 @@
-//! A saved server's files over FTP or FTPS (explicit TLS), for a server that
-//! offers no SFTP. The file panel sees the same operations as over SFTP.
+//! A saved server's files over FTP or FTPS (explicit AUTH TLS, or implicit
+//! TLS from the first byte), for a server that offers no SFTP. The file panel sees the same operations as over SFTP.
 //!
 //! FTP does one thing at a time per connection, so a server's entry keeps a
 //! couple of logged-in connections: one answers listings and renames while
@@ -231,10 +231,10 @@ async fn stat(ctl: &mut Control, path: &str) -> Result<Meta> {
             _ => None,
         };
         let size = size.text.trim().parse().unwrap_or(0);
-        return Ok(Meta { kind: "file", size, mtime, mode: None });
+        return Ok(Meta { kind: "file", size, mtime, ..Meta::default() });
     }
     match ctl.cmd(&format!("CWD {path}")).await? {
-        r if r.code == 250 => Ok(Meta { kind: "dir", size: 0, mtime: None, mode: None }),
+        r if r.code == 250 => Ok(Meta { kind: "dir", ..Meta::default() }),
         _ => Err(FtpError::Refused(size)),
     }
 }
@@ -246,7 +246,7 @@ fn pool() -> &'static Mutex<HashMap<String, Arc<FtpConn>>> {
 
 /// Editing anything about how the server is reached makes a new entry.
 fn key(user_id: &str, srv: &RemoteServer) -> String {
-    let port = srv.ftp_port.to_string();
+    let port = format!("{}{}", srv.ftp_port, if srv.ftps_implicit { "i" } else { "" });
     let parts = [user_id, &srv.id, &srv.host, &port, &srv.user, &srv.files, &srv.tls_fingerprint, &srv.password_enc];
     hex::encode(Sha256::digest(parts.join("\0")))
 }
@@ -288,7 +288,7 @@ pub(crate) async fn offers_tls(srv: &RemoteServer) -> std::result::Result<bool, 
 
 #[cfg(test)]
 mod tests {
-    use super::control::{epsv_port, pasv_port, quoted_path};
+    use super::control::{epsv_port, pasv_port, quoted_path, wanted_facts};
     use super::split;
 
     #[test]
@@ -297,6 +297,11 @@ mod tests {
         assert_eq!(epsv_port("Entering Extended Passive Mode (|||6446|)"), Some(6446));
         assert_eq!(pasv_port("Entering Passive Mode (10,0,0,5,19,136)."), Some(5000));
         assert_eq!(pasv_port("Entering Passive Mode (10,0,0,5,300,1)"), None);
+        assert_eq!(
+            wanted_facts("MLST type*;perm*;size*;modify*;unique*;unix.mode;unix.uid;unix.gid;"),
+            "type;size;modify;unix.mode;unix.uid;unix.gid;"
+        );
+        assert_eq!(wanted_facts("MLST perm*;unique*;"), "");
     }
 
     #[test]

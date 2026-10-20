@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useT } from '../../../i18n';
-import { formatSize, isFolder, SftpEntry } from './sftpApi';
+import { formatSize, isFolder, modeString, SftpEntry } from './sftpApi';
 
 export interface Editing {
   mode: 'new' | 'rename';
@@ -73,6 +73,15 @@ function when(mtime: number | null): string {
     : { year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
+/** The row's tooltip: name, permissions and owner, where they are known. */
+function describe(e: SftpEntry): string {
+  const parts = [e.name];
+  if (e.mode !== null) parts.push(`${modeString(e.mode)} (${e.mode.toString(8).padStart(4, '0')})`);
+  const owner = e.owner ?? e.uid, group = e.group ?? e.gid;
+  if (owner !== undefined || group !== undefined) parts.push(`${owner ?? '?'}:${group ?? '?'}`);
+  return parts.join('  ·  ');
+}
+
 export default function SftpList(props: Props) {
   const { t } = useT();
   const { entries, parent, selected, dropOn, editing, pathOf } = props;
@@ -122,7 +131,7 @@ export default function SftpList(props: Props) {
             onPointerDown={() => props.onPrefetch(entry, true)}
             onDragOver={folder ? (e) => props.onDragOverDir(e, path) : undefined}
             onDrop={folder ? (e) => props.onDropDir(e, path) : undefined}
-            title={entry.mode !== null ? `${entry.name}  (${entry.mode.toString(8).padStart(4, '0')})` : entry.name}
+            title={describe(entry)}
           >
             <span className="sftp-icon" aria-hidden="true">{entry.to_dir ? '📁' : ICONS[entry.kind]}</span>
             {renaming

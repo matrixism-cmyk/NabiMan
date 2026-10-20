@@ -41,6 +41,8 @@ mod tests {
             alive: true,
             usable: true,
             files: Default::default(),
+            server_id: String::new(),
+            server_binding: String::new(),
         }
     }
     #[test]

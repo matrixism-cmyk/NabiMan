@@ -55,7 +55,10 @@ const tabs = async (page) => (await page.$$eval('.rw-tabs button', (els) => els.
   await form.locator('input[placeholder="web-prod-01"]').fill(NAME);
   await form.locator('input[placeholder="192.168.1.100"]').fill('127.0.0.1');
   await form.locator('#srv-terminal').selectOption('none');
+  await form.locator('#srv-files').selectOption('ftps-implicit');
+  check('implicit FTPS takes port 990', await form.locator('#srv-ftp-port').inputValue() === '990');
   await form.locator('#srv-files').selectOption('ftp');
+  check('plain FTP goes back to port 21', await form.locator('#srv-ftp-port').inputValue() === '21');
   check('the SSH port gives way to the FTP port', !(await form.locator('#srv-port').count())
     && await form.locator('#srv-ftp-port').isVisible());
   await form.locator('#srv-ftp-port').fill(FTP_PORT);
@@ -96,6 +99,55 @@ const tabs = async (page) => (await page.$$eval('.rw-tabs button', (els) => els.
   const menu = await page.$$eval('[role="menuitem"]', (els) => els.map((el) => el.textContent.trim()));
   check('its menu opens files and offers no terminal', menu.some((m) => m.includes('파일 열기')) && !menu.some((m) => m.includes('접속')), menu.join(','));
   await page.keyboard.press('Escape');
+
+  // Permissions for several files at once, from the right-click menu.
+  const id = (await api(page, '/api/remote-servers')).data.find((x) => x.name === NAME).id;
+  const F = `/api/terminal/sftp/${id}`;
+  await api(page, `${F}/delete`, { method: 'POST', body: JSON.stringify({ path: '/attrs-ui' }) });
+  await api(page, `${F}/mkdir`, { method: 'POST', body: JSON.stringify({ path: '/attrs-ui' }) });
+  for (const name of ['one.txt', 'two.txt']) {
+    await page.evaluate(async ([url, n]) => fetch(`${url}/upload?dir=%2Fattrs-ui&name=${n}`, { method: 'POST', body: 'x',
+      headers: { Authorization: `Bearer ${sessionStorage.getItem('nabiman_token')}` } }), [F, name]);
+  }
+  await page.locator('.rw-view-files .sftp-crumbs button').first().click();
+  await page.locator('.rw-view-files').getByText('attrs-ui', { exact: true }).dblclick();
+  await page.locator('.rw-view-files').getByText('one.txt', { exact: true }).waitFor();
+  await page.locator('.rw-view-files').getByText('one.txt', { exact: true }).click();
+  await page.locator('.rw-view-files').getByText('two.txt', { exact: true }).click({ modifiers: ['Control'] });
+  await page.locator('.rw-view-files').getByText('two.txt', { exact: true }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '권한·소유자 변경…' }).click();
+  const dialog = page.locator('.sftp-attrs');
+  check('the dialog names how many are changed', (await dialog.locator('.sftp-attrs-what').textContent()).includes('2'));
+  check('FTP offers permissions only', (await dialog.textContent()).includes('FTP로는 소유자와 그룹을 바꿀 수 없어'));
+  await dialog.getByRole('textbox', { name: '권한 (8진수)' }).fill('600');
+  check('the octal value ticks the boxes', !(await dialog.getByRole('checkbox', { name: '그룹 읽기' }).isChecked())
+    && await dialog.getByRole('checkbox', { name: '소유자 쓰기' }).isChecked());
+  await page.screenshot({ path: `${OUT}/smoke-protocols-attrs.png` });
+  await dialog.getByRole('button', { name: '적용' }).click();
+  await page.waitForFunction(() => document.body.innerText.includes('2개 항목을 바꿨습니다'), null, { timeout: 15000 }).catch(() => {});
+  const modes = ((await api(page, `${F}/list?path=%2Fattrs-ui`)).data.entries || []).map((e) => e.mode);
+  check('both files got the new permissions', modes.length === 2 && modes.every((m) => m === 0o600), JSON.stringify(modes));
+  const title = await page.locator('.rw-view-files .sftp-row', { hasText: 'one.txt' }).getAttribute('title');
+  check('a row shows its permissions', title.includes('rw-------'), title);
+  await api(page, `${F}/delete`, { method: 'POST', body: JSON.stringify({ path: '/attrs-ui' }) });
+
+  // A share link to the files alone, and what its visitor sees.
+  await page.click('.rw-head-actions button:has-text("파일 공유")');
+  const share = page.locator('.share-dialog');
+  check('the files share dialog has no terminal options', (await share.locator('h3').textContent()) === '파일 공유'
+    && !(await share.getByRole('radio', { name: '끄기' }).count()));
+  await share.getByRole('button', { name: '링크 만들기' }).click();
+  const url = await share.getByRole('textbox', { name: '공유 링크', exact: true }).inputValue();
+  await page.keyboard.press('Escape');
+  const visitor = await browser.newPage({ viewport: { width: 1200, height: 800 } });
+  await visitor.goto(url, { waitUntil: 'networkidle' });
+  await visitor.waitForSelector('.share-body-files .sftp-row', { timeout: 20000 }).catch(() => {});
+  check('a visitor sees the shared files without a terminal', (await visitor.locator('.share-body-files').textContent()).includes('docs')
+    && !(await visitor.locator('.xterm-screen').count()));
+  await visitor.screenshot({ path: `${OUT}/smoke-protocols-share.png` });
+  await visitor.close();
+  const links = ((await api(page, '/api/terminal/share-links')).data || []).filter((l) => l.server_id === id);
+  for (const l of links) await api(page, `/api/terminal/share-links/${l.token}`, { method: 'DELETE' });
 
   await page.click('.rw-tabs button:has-text("상태")');
   await page.click('.rw-section-head button:has-text("확인")');

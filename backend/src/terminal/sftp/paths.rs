@@ -93,6 +93,15 @@ pub(crate) struct Entry {
     pub size: u64,
     pub mtime: Option<u32>,
     pub mode: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uid: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gid: Option<u32>,
+    /// Owner and group names, where they can be told.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
 }
 
 pub(crate) fn kind_of(meta: &Metadata) -> &'static str {
@@ -115,6 +124,10 @@ pub(crate) fn entry(name: String, meta: &super::fs::Meta) -> Entry {
         size: meta.size,
         mtime: meta.mtime,
         mode: meta.mode,
+        uid: meta.uid,
+        gid: meta.gid,
+        owner: meta.owner.clone(),
+        group: meta.group.clone(),
     }
 }
 
@@ -185,7 +198,7 @@ mod tests {
     #[test]
     fn folders_come_first() {
         let e = |name: &str, kind: &'static str, to_dir: bool| Entry {
-            name: name.into(), kind, to_dir, size: 0, mtime: None, mode: None,
+            name: name.into(), kind, to_dir, size: 0, mtime: None, mode: None, uid: None, gid: None, owner: None, group: None,
         };
         let mut list = vec![e("b.txt", "file", false), e("Zeta", "dir", false),
             e("alpha", "dir", false), e("link", "link", true), e("A.txt", "file", false)];

@@ -40,6 +40,8 @@ impl Fixture {
             alive: true,
             usable: true,
             files: Default::default(),
+            server_id: String::new(),
+            server_binding: String::new(),
         };
         shares
             .lock()

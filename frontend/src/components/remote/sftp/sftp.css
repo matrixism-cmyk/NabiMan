@@ -117,3 +117,21 @@
     position: absolute; inset: 0 0 0 auto; width: 100% !important; max-width: none; min-width: 0; z-index: 5;
   }
 }
+
+/* Permissions and owner */
+.sftp-attrs { max-width: 440px; display: flex; flex-direction: column; gap: 10px; }
+.sftp-attrs-what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; }
+.sftp-attrs-mode { border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px 10px; margin: 0; }
+.sftp-attrs-mode legend { font-size: 13px; padding: 0 4px; }
+.sftp-attrs-mode table { border-collapse: collapse; margin: 6px 0; font-size: 12.5px; }
+.sftp-attrs-mode th, .sftp-attrs-mode td { padding: 3px 10px; text-align: center; font-weight: 500; }
+.sftp-attrs-mode tbody th { text-align: left; color: var(--text-secondary); }
+.sftp-attrs-octal { display: flex; align-items: center; gap: 10px; }
+.sftp-attrs-octal .filter-input { width: 80px; margin: 0; font-family: monospace; }
+.sftp-attrs-owners { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; font-size: 12.5px; }
+.sftp-attrs-owners label { display: flex; flex-direction: column; gap: 4px; }
+.sftp-attrs-owners .filter-input { margin: 0; }
+.sftp-attrs-owners small { grid-column: 1 / -1; }
+.sftp-attrs-recursive { font-size: 13px; }
+.sftp-attrs input[type="checkbox"] { width: auto; margin: 0; }
+.sftp-attrs legend label, .sftp-attrs-recursive { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
