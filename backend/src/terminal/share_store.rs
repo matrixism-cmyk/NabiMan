@@ -84,6 +84,27 @@ mod tests {
         std::fs::remove_dir_all(dir).unwrap();
     }
     #[test]
+    fn files_links_survive_a_restart_and_targetless_links_do_not_load() {
+        let dir = directory();
+        let path = dir.join("terminal_shares.json");
+        let store = open(path.clone()).unwrap();
+        let mut files = link("files");
+        files.session_id.clear();
+        files.server_id = "srv_ftp".into();
+        files.server_binding = "binding".into();
+        store.lock().unwrap().update(|m| { m.insert("files".into(), files.clone()); Ok(()) }).unwrap();
+        drop(store);
+        let store = open(path.clone()).unwrap();
+        assert!(store.lock().unwrap().get("files").is_some_and(|l| l.files_only()));
+        drop(store);
+        for broken in [ShareLink { server_id: String::new(), ..files.clone() }, ShareLink { session_id: "one".into(), ..files.clone() }] {
+            let text = serde_json::to_vec(&HashMap::from([("files".to_string(), broken)])).unwrap();
+            std::fs::write(&path, text).unwrap();
+            assert!(open(path.clone()).is_err());
+        }
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
     fn failed_publication_quarantines_old_snapshot_and_never_reports_success() {
         let dir = directory();
         let path = dir.join("terminal_shares.json");
@@ -211,7 +232,10 @@ pub fn open(path: PathBuf) -> io::Result<ShareStore> {
     };
     if links.len() > MAX_LINKS
         || links.iter().any(|(key, link)| {
-            key != &link.token || link.session_id.is_empty() || link.owner.is_empty()
+            // A link opens exactly one thing: a terminal session or a server's files.
+            key != &link.token
+                || link.session_id.is_empty() == link.server_id.is_empty()
+                || link.owner.is_empty()
         })
     {
         return Err(io::Error::other("Invalid share registry records"));
