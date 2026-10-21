@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useT } from '../../i18n';
 import { getSettings, putSettings, speak, testClaude, VoiceSettings, VoiceStatus } from './claudeApi';
 import { Speaker } from './speaker';
+import PauseField from '../terminal/dictation/PauseField';
 import './claude.css';
 
 const SAMPLE = '안녕하세요. 이 목소리와 빠르기로 답변을 읽어 드릴게요.';
@@ -91,11 +92,18 @@ export default function ClaudeSettingsPanel() {
 
       <section>
         <h3>{t('claude.talkSection')}</h3>
+        <PauseField id="claude-pause" value={s.endpoint_ms} onChange={(ms) => set('endpoint_ms', ms)} />
+        {s.endpoint_ms > 0 && (
+          <label className="cv-check">
+            <input type="checkbox" checked={s.auto_send} onChange={(e) => set('auto_send', e.target.checked)} />
+            <span>{t('claude.autoSend')}</span>
+          </label>
+        )}
         <label className="cv-check">
           <input type="checkbox" checked={s.continuous} onChange={(e) => set('continuous', e.target.checked)} />
           <span>{t('claude.continuous')}</span>
         </label>
-        <p className="text-secondary">{t('claude.enterHint')}</p>
+        <p className="text-secondary">{t(s.auto_send && s.endpoint_ms > 0 ? 'claude.pauseHint' : 'claude.enterHint')}</p>
       </section>
 
       <section>

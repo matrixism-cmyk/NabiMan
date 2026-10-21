@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import DictationButton from './DictationButton';
-import { dictationAvailable, openAccountDictation } from './sockets';
+import { DictationSetup, dictationSetup, openAccountDictation } from './sockets';
 
 interface Props {
   onText: (text: string) => void;
@@ -10,11 +10,13 @@ interface Props {
 
 /** The microphone for a signed-in account's terminal, once dictation is set up. */
 export default function AccountDictation(props: Props) {
-  const [available, setAvailable] = useState(false);
+  const [setup, setSetup] = useState<DictationSetup | null>(null);
   useEffect(() => {
     let live = true;
-    dictationAvailable().then((yes) => { if (live) setAvailable(yes); });
+    dictationSetup().then((s) => { if (live) setSetup(s); });
     return () => { live = false; };
   }, []);
-  return available ? <DictationButton open={openAccountDictation} {...props} /> : null;
+  return setup?.available ? (
+    <DictationButton open={openAccountDictation} endpointMs={setup.endpoint_ms} enterOnPause={setup.auto_enter} {...props} />
+  ) : null;
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Action, finalText, Resampler, Typist } from './speech';
+import { Action, finalText, Resampler, Typist, utteranceActions } from './speech';
 import { markActivity } from '../../../hooks/useIdleLogout';
 
 export type DictationState = 'idle' | 'starting' | 'listening' | 'stopping';
@@ -14,6 +14,11 @@ interface Options {
   /** While true the microphone sends silence: nothing heard is typed (an
    *  answer being read aloud must not be taken for the next question). */
   muted?: boolean;
+  /** How long a pause ends what was said (ms), for the service's end-of-speech
+   *  detection; 0 or none for the older guess on the page. */
+  endpointMs?: number;
+  /** Press Enter (send) at each pause, not only when "엔터" is said. */
+  enterOnPause?: boolean;
 }
 
 /** Hands the microphone's samples over as they come, off the audio thread. */
@@ -34,7 +39,7 @@ const PAUSE_MS = 1200;
  * changing — or once the service makes it final; never twice. "엔터" presses
  * Enter. What is heard but not typed yet shows as `partial`.
  */
-export function useDictation({ open, onText, onKeys, muted = false }: Options) {
+export function useDictation({ open, onText, onKeys, muted = false, endpointMs = 0, enterOnPause = false }: Options) {
   const [state, setState] = useState<DictationState>('idle');
   const [partial, setPartial] = useState('');
   const [error, setError] = useState('');
@@ -46,17 +51,26 @@ export function useDictation({ open, onText, onKeys, muted = false }: Options) {
   handlers.current = { onText, onKeys };
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
+  const pauseRef = useRef({ endpointMs, enterOnPause });
+  pauseRef.current = { endpointMs, enterOnPause };
+  /** The service tells where speech ends (newer ones): its word wins over the guess. */
+  const ends = useRef(false);
+  const lineHasText = useRef(false);
 
-  /** Brings the prompt up to what has been said. */
-  const typeUpTo = useCallback((said: string) => {
+  const perform = useCallback((actions: Action[]) => {
     // Speaking is using NabiMan, though no key is pressed.
     markActivity();
-    for (const action of typist.current.to(said) as Action[]) {
-      if (action.type === 'text') handlers.current.onText(action.text);
-      else if (action.type === 'enter') handlers.current.onKeys('\r');
+    for (const action of actions) {
+      if (action.type === 'text') { handlers.current.onText(action.text); lineHasText.current = true; }
+      else if (action.type === 'enter') { handlers.current.onKeys('\r'); lineHasText.current = false; }
       else handlers.current.onKeys('\x7f'.repeat(action.count));
     }
   }, []);
+
+  /** Brings the prompt up to what has been said (the page's own guess at pauses). */
+  const typeUpTo = useCallback((said: string) => {
+    if (!ends.current) perform(typist.current.to(said));
+  }, [perform]);
 
   const release = useCallback(() => {
     window.clearTimeout(pause.current);
@@ -75,6 +89,8 @@ export function useDictation({ open, onText, onKeys, muted = false }: Options) {
     setState('starting');
     typist.current = new Typist();
     heard.current = '';
+    ends.current = false;
+    lineHasText.current = false;
     let media: MediaStream | null = null;
     try {
       media = await navigator.mediaDevices.getUserMedia({
@@ -104,8 +120,23 @@ export function useDictation({ open, onText, onKeys, muted = false }: Options) {
       live.current = { ws, media, audio };
       ws.onmessage = (e) => {
         if (typeof e.data !== 'string') return;
-        let msg: { type?: string; committed?: string; partial?: string; message?: string };
+        let msg: { type?: string; committed?: string; partial?: string; message?: string; utterance?: string; text?: string };
         try { msg = JSON.parse(e.data); } catch { return; }
+        // With end-of-speech detection the service says when something has been said:
+        // the words are shown until then, and typed when it does.
+        if (msg.type === 'endpoint') {
+          ends.current = true;
+          window.clearTimeout(pause.current);
+          setPartial('');
+          perform(utteranceActions(msg.text || '', pauseRef.current.enterOnPause, lineHasText.current));
+          return;
+        }
+        if (msg.type === 'partial' && pauseRef.current.endpointMs > 0 && typeof msg.utterance === 'string') {
+          ends.current = true;
+          setPartial(msg.utterance);
+          return;
+        }
+        if (msg.type === 'final' && ends.current) { setPartial(''); return; }
         if (msg.type === 'partial') {
           const all = finalText(msg.committed || '', msg.partial || '');
           if (all === heard.current && all) {
@@ -127,7 +158,8 @@ export function useDictation({ open, onText, onKeys, muted = false }: Options) {
       };
       ws.onclose = () => { release(); setPartial(''); setState('idle'); };
       ws.onerror = () => setError('connection');
-      ws.send(JSON.stringify({}));
+      const pauseMs = pauseRef.current.endpointMs;
+      ws.send(JSON.stringify(pauseMs > 0 ? { endpoint_ms: pauseMs } : {}));
       setState('listening');
     } catch (e) {
       media?.getTracks().forEach((t) => t.stop());
@@ -136,7 +168,7 @@ export function useDictation({ open, onText, onKeys, muted = false }: Options) {
       const name = e instanceof DOMException ? e.name : '';
       setError(name === 'NotAllowedError' ? 'denied' : name === 'NotFoundError' ? 'nomic' : e instanceof Error && e.message !== 'dictation' ? e.message : 'connection');
     }
-  }, [open, release, typeUpTo]);
+  }, [open, release, typeUpTo, perform]);
 
   /** Stops listening, and types what the last words turn out to be. */
   const stop = useCallback(() => {

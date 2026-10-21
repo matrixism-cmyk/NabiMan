@@ -44,6 +44,8 @@ export function useVoiceChat(settings: VoiceSettings | null) {
   const dictation = useDictation({
     open: openAccountDictation,
     muted: phase !== 'idle',
+    endpointMs: settings?.endpoint_ms ?? 1500,
+    enterOnPause: settings ? settings.auto_send && settings.endpoint_ms > 0 : true,
     onText: (text) => setDraft((d) => d + text),
     onKeys: (keys) => {
       for (const key of keys) {

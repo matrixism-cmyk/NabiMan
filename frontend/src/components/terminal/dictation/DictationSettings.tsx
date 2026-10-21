@@ -3,6 +3,7 @@ import './dictation.css';
 import { apiPost, apiRequest } from '../../../hooks/useApi';
 import { useT } from '../../../i18n';
 import { forgetDictationAvailability } from './sockets';
+import PauseField from './PauseField';
 
 interface Setup {
   available: boolean;
@@ -11,6 +12,8 @@ interface Setup {
   address?: string;
   key_set?: boolean;
   key_hint?: string | null;
+  endpoint_ms?: number;
+  auto_enter?: boolean;
 }
 
 const LANGUAGES = ['korean', 'english', 'japanese', 'chinese', 'auto'];
@@ -27,6 +30,8 @@ export default function DictationSettings() {
   const [url, setUrl] = useState('');
   const [address, setAddress] = useState('');
   const [language, setLanguage] = useState('korean');
+  const [pause, setPause] = useState(1500);
+  const [autoEnter, setAutoEnter] = useState(false);
   const [key, setKey] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -36,6 +41,8 @@ export default function DictationSettings() {
     setUrl(s.url || '');
     setAddress(s.address || '');
     setLanguage(s.language || 'korean');
+    setPause(s.endpoint_ms ?? 1500);
+    setAutoEnter(Boolean(s.auto_enter));
   };
 
   useEffect(() => {
@@ -47,7 +54,7 @@ export default function DictationSettings() {
   const save = async (clearKey = false) => {
     setBusy(true);
     setMessage('');
-    const body: Record<string, string> = { url, address, language };
+    const body: Record<string, string | number | boolean> = { url, address, language, endpoint_ms: pause, auto_enter: autoEnter };
     if (key.trim() || clearKey) body.key = clearKey ? '' : key.trim();
     const r = await apiRequest<Setup>('/api/terminal/dictation/settings', { method: 'PUT', body: JSON.stringify(body) });
     setBusy(false);
@@ -93,6 +100,13 @@ export default function DictationSettings() {
           {LANGUAGES.map((l) => <option key={l} value={l}>{t(`dictation.lang.${l}`)}</option>)}
         </select>
       </div>
+      <PauseField id="dictation-pause" value={pause} onChange={setPause} />
+      {pause > 0 && (
+        <div className="form-group">
+          <label><input type="checkbox" checked={autoEnter} onChange={(e) => setAutoEnter(e.target.checked)} /> {t('dictation.autoEnter')}</label>
+          <small className="text-secondary">{t('dictation.autoEnterHint')}</small>
+        </div>
+      )}
       <div className="btn-group">
         <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => save()}>{t('common.save')}</button>
         <button type="button" className="btn btn-secondary btn-sm" disabled={busy || !setup.key_set} onClick={test}>{t('dictation.test')}</button>

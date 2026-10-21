@@ -160,7 +160,7 @@ function SharePageContent({ token }: { token: string }) {
         {!info.alive && <span className="status-badge down">{t('share.ended')}</span>}
         <span className="share-head-spacer" />
         {info.dictation && !info.read_only && (
-          <DictationButton open={() => openShareDictation(token, (query) => acquireTicket(query))}
+          <DictationButton open={() => openShareDictation(token, (query) => acquireTicket(query))} endpointMs={1500}
             onText={(text) => viewRef.current?.insertText(text)} onKeys={(keys) => viewRef.current?.sendKeys(keys)} />
         )}
         <button

@@ -10,6 +10,9 @@ interface Props {
   onKeys: (keys: string) => void;
   /** `bar` is the compact form for a floating window's title bar. */
   variant?: 'head' | 'bar';
+  /** The service's end-of-speech detection: the pause that ends a sentence, and whether it presses Enter. */
+  endpointMs?: number;
+  enterOnPause?: boolean;
 }
 
 const KNOWN = ['denied', 'nomic', 'connection'];
@@ -19,9 +22,9 @@ const KNOWN = ['denied', 'nomic', 'connection'];
  * While it listens, the words still being worked out show under it; what is
  * final is typed at the prompt, and a spoken "엔터" presses Enter.
  */
-export default function DictationButton({ open, onText, onKeys, variant = 'head' }: Props) {
+export default function DictationButton({ open, onText, onKeys, variant = 'head', endpointMs, enterOnPause }: Props) {
   const { t } = useT();
-  const { state, partial, error, start, stop } = useDictation({ open, onText, onKeys });
+  const { state, partial, error, start, stop } = useDictation({ open, onText, onKeys, endpointMs, enterOnPause });
   const on = state === 'listening' || state === 'starting';
   const message = error ? (KNOWN.includes(error) ? t(`dictation.${error}`) : error) : '';
   return (

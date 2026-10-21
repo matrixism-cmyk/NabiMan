@@ -14,6 +14,10 @@ export interface VoiceSettings {
   run_as: string;
   claude_path: string;
   extra_prompt: string;
+  /** Send once the speaker pauses, not only on "엔터". */
+  auto_send: boolean;
+  /** The pause that ends what was said (ms); 0: only "엔터". */
+  endpoint_ms: number;
 }
 
 export interface VoiceStatus {

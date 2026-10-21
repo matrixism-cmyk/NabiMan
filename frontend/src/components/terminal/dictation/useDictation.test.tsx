@@ -94,3 +94,49 @@ test('a blocked microphone is said so', async () => {
   expect(result.current.error).toBe('denied');
   expect(result.current.state).toBe('idle');
 });
+
+const setupPauses = (enterOnPause: boolean) => {
+  const onText = jest.fn();
+  const onKeys = jest.fn();
+  const view = renderHook(() => useDictation({
+    open: () => Promise.resolve(new FakeSocket() as unknown as WebSocket), onText, onKeys, endpointMs: 1500, enterOnPause,
+  }));
+  return { ...view, onText, onKeys };
+};
+
+test('with end-of-speech detection, words show until the service says they are done', async () => {
+  const { result, onText, onKeys } = setupPauses(false);
+  await begin(result);
+  expect(FakeSocket.last.sent[0]).toBe('{"endpoint_ms":1500}');
+  act(() => FakeSocket.last.hear({ type: 'partial', committed: '', partial: 'git status', utterance: 'git status' }));
+  act(() => FakeSocket.last.hear({ type: 'partial', committed: '', partial: 'git status', utterance: 'git status' }));
+  act(() => { jest.advanceTimersByTime(3000); });
+  expect(onText).not.toHaveBeenCalled();
+  expect(result.current.partial).toBe('git status');
+  act(() => FakeSocket.last.hear({ type: 'endpoint', text: 'git status', reason: 'silence' }));
+  expect(onText).toHaveBeenCalledWith('git status');
+  expect(onKeys).not.toHaveBeenCalled();
+  expect(result.current.partial).toBe('');
+  act(() => FakeSocket.last.hear({ type: 'endpoint', text: '--short 엔터', reason: 'silence' }));
+  expect(onText).toHaveBeenLastCalledWith(' --short');
+  expect(onKeys).toHaveBeenCalledWith('\r');
+  // What came with the stop is in an endpoint first; the final adds nothing.
+  act(() => FakeSocket.last.hear({ type: 'final', committed: 'git status --short 엔터', partial: '' }));
+  expect(onText).toHaveBeenCalledTimes(2);
+});
+
+test('sending on a pause presses Enter after each utterance', async () => {
+  const { result, onText, onKeys } = setupPauses(true);
+  await begin(result);
+  act(() => FakeSocket.last.hear({ type: 'endpoint', text: '사과는 무슨 색이야', reason: 'silence' }));
+  expect(onText).toHaveBeenCalledWith('사과는 무슨 색이야');
+  expect(onKeys).toHaveBeenCalledWith('\r');
+});
+
+test('an older service with no end-of-speech detection keeps the old way', async () => {
+  const { result, onText } = setupPauses(false);
+  await begin(result);
+  act(() => FakeSocket.last.hear({ type: 'partial', committed: '', partial: 'uptime' }));
+  act(() => FakeSocket.last.hear({ type: 'partial', committed: '', partial: 'uptime' }));
+  expect(onText).toHaveBeenCalledWith('uptime');
+});

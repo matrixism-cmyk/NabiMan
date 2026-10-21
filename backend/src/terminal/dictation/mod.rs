@@ -35,11 +35,26 @@ pub(crate) struct Settings {
     /// The API key (`vk_…`), encrypted with the server's secret key.
     #[serde(default)]
     pub key_enc: String,
+    /// How long a pause ends what was said (ms), for the service's end-of-speech
+    /// detection; 0 turns it off. None is the default.
+    #[serde(default)]
+    pub endpoint_ms: Option<u32>,
+    /// In a terminal, press Enter at each pause too, not only when "엔터" is said.
+    #[serde(default)]
+    pub auto_enter: bool,
+}
+
+/// Where a pause of this long can end what was said; the service takes 300 to 10000 ms.
+pub(crate) fn valid_pause(ms: u64) -> bool {
+    ms == 0 || (300..=10_000).contains(&ms)
 }
 
 impl Settings {
     pub fn url(&self) -> &str {
         if self.url.is_empty() { DEFAULT_URL } else { &self.url }
+    }
+    pub fn endpoint_ms(&self) -> u32 {
+        self.endpoint_ms.unwrap_or(1500)
     }
     pub fn language(&self) -> &str {
         if self.language.is_empty() { "korean" } else { &self.language }
@@ -105,7 +120,10 @@ async fn get_settings(req: HttpRequest) -> HttpResponse {
     let s = load();
     let admin = super_admin(&req).is_ok();
     let key = s.key();
-    let mut out = serde_json::json!({ "available": key.is_some(), "language": s.language() });
+    let mut out = serde_json::json!({
+        "available": key.is_some(), "language": s.language(),
+        "endpoint_ms": s.endpoint_ms(), "auto_enter": s.auto_enter,
+    });
     if admin {
         out["url"] = s.url().into();
         out["address"] = s.address.clone().into();
@@ -122,6 +140,8 @@ struct Change {
     language: Option<String>,
     /// Empty clears it.
     key: Option<String>,
+    endpoint_ms: Option<u32>,
+    auto_enter: Option<bool>,
 }
 
 async fn put_settings(req: HttpRequest, body: web::Json<Change>) -> HttpResponse {
@@ -141,6 +161,15 @@ async fn put_settings(req: HttpRequest, body: web::Json<Change>) -> HttpResponse
             return bad("Connect to should be host:port, such as 127.0.0.1:443, or empty");
         }
         s.address = address.trim().to_string();
+    }
+    if let Some(ms) = body.endpoint_ms {
+        if !valid_pause(u64::from(ms)) {
+            return bad("A pause is 300 to 10000 ms, or 0 for off");
+        }
+        s.endpoint_ms = Some(ms);
+    }
+    if let Some(on) = body.auto_enter {
+        s.auto_enter = on;
     }
     if let Some(language) = &body.language {
         if !LANGUAGES.contains(&language.as_str()) {

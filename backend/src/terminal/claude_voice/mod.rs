@@ -61,7 +61,15 @@ pub(crate) struct Settings {
     /// Added to the instructions Claude gets for spoken answers.
     #[serde(default)]
     pub extra_prompt: String,
+    /// Send what was said once the speaker pauses, not only on "엔터".
+    #[serde(default = "default_true")]
+    pub auto_send: bool,
+    /// How long a pause ends what was said (ms); 0 leaves only "엔터".
+    #[serde(default = "default_pause")]
+    pub endpoint_ms: u32,
 }
+
+fn default_pause() -> u32 { 1500 }
 
 fn default_speaker() -> String { "sohee".into() }
 fn default_language() -> String { "korean".into() }
@@ -103,6 +111,7 @@ pub(crate) fn check(s: &Settings) -> Result<(), String> {
     if !s.run_as.is_empty() && !launch::valid_user(&s.run_as) { return Err("Not a valid account name".into()); }
     if !s.claude_path.is_empty() && !s.claude_path.starts_with('/') { return Err("The path to claude should be absolute".into()); }
     if s.extra_prompt.chars().count() > 2000 { return Err("The added instructions are limited to 2000 characters".into()); }
+    if !dictation::valid_pause(u64::from(s.endpoint_ms)) { return Err("A pause is 300 to 10000 ms, or 0 for off".into()); }
     Ok(())
 }
 

@@ -57,7 +57,7 @@ export default function ClaudeChatPanel() {
   const listening = v.dictation.state === 'listening' || v.dictation.state === 'starting';
   const stateText = v.phase === 'thinking' ? (v.tool ? t('claude.usingTool', { name: v.tool }) : t('claude.thinking'))
     : v.phase === 'speaking' ? t('claude.speaking')
-    : listening ? t('claude.listening') : t('claude.micOff');
+    : listening ? t(settings?.auto_send && settings.endpoint_ms > 0 ? 'claude.listeningPause' : 'claude.listening') : t('claude.micOff');
   const problem = status?.problem || (status && !status.voice_ready ? t('claude.noVoice') : '');
 
   const remove = async (id: string, title: string) => {

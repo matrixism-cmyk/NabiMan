@@ -17,6 +17,10 @@ beforeEach(() => {
 });
 
 const flush = () => new Promise((r) => setTimeout(r, 40));
+/** Waits (up to a second, for a busy machine) until `done` holds. */
+const until = async (done: () => boolean) => {
+  for (let i = 0; i < 100 && !done(); i += 1) await new Promise((r) => setTimeout(r, 10));
+};
 
 test('sentences play in order, the next fetched while one plays, at the chosen speed', async () => {
   const fetched: string[] = [];
@@ -27,7 +31,7 @@ test('sentences play in order, the next fetched while one plays, at the chosen s
   speaker.say('둘.');
   speaker.say('셋.');
   expect(fetched).toEqual(['하나.', '둘.']);
-  await flush();
+  await until(() => states.length === 2);
   expect(fetched).toEqual(['하나.', '둘.', '셋.']);
   expect(FakeAudio.played).toEqual(['blob:1', 'blob:2', 'blob:3']);
   expect(states).toEqual([true, false]);
@@ -51,7 +55,7 @@ test('a sentence that cannot be read is reported and skipped', async () => {
     () => undefined, (m) => errors.push(m));
   speaker.say('나쁨');
   speaker.say('좋음');
-  await flush();
+  await until(() => FakeAudio.played.length === 1);
   expect(errors).toEqual(['HTTP 502']);
   expect(FakeAudio.played).toEqual(['blob:1']);
 });

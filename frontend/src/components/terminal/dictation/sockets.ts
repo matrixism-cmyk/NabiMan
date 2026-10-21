@@ -22,17 +22,33 @@ export async function openShareDictation(
   return new WebSocket(`${wsBase()}/api/share/${encodeURIComponent(token)}/dictation?${QUERY}&ticket=${ticket}`);
 }
 
-let available: Promise<boolean> | null = null;
+export interface DictationSetup {
+  available: boolean;
+  /** How long a pause ends what was said; 0: only "엔터" does. */
+  endpoint_ms: number;
+  /** In a terminal, press Enter at each pause too. */
+  auto_enter: boolean;
+}
 
-/** Whether dictation is set up on this server; asked once per page. */
+const NONE: DictationSetup = { available: false, endpoint_ms: 0, auto_enter: false };
+let setup: Promise<DictationSetup> | null = null;
+
+/** How dictation is set up on this server; asked once per page. */
+export function dictationSetup(): Promise<DictationSetup> {
+  setup ??= apiRequest<Partial<DictationSetup>>('/api/terminal/dictation/settings')
+    .then((r) => (r.success && r.data ? {
+      available: Boolean(r.data.available), endpoint_ms: r.data.endpoint_ms ?? 1500, auto_enter: Boolean(r.data.auto_enter),
+    } : NONE))
+    .catch(() => NONE);
+  return setup;
+}
+
+/** Whether dictation is set up on this server. */
 export function dictationAvailable(): Promise<boolean> {
-  available ??= apiRequest<{ available: boolean }>('/api/terminal/dictation/settings')
-    .then((r) => Boolean(r.success && r.data?.available))
-    .catch(() => false);
-  return available;
+  return dictationSetup().then((s) => s.available);
 }
 
 /** Forget the answer, after an administrator changed the settings. */
 export function forgetDictationAvailability() {
-  available = null;
+  setup = null;
 }

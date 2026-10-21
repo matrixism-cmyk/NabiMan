@@ -23,11 +23,11 @@ export default function RemoteSettingsView() {
         <small className="text-secondary">{t('remote.settings.hideChromeHint')}</small>
       </section>
       <section className="rw-settings-section">
+        <DictationSettings />
+      </section>
+      <section className="rw-settings-section is-wide">
         <h3>{t('terminal.settings')}</h3>
         <TerminalSettingsForm />
-      </section>
-      <section className="rw-settings-section">
-        <DictationSettings />
       </section>
     </div>
   );

@@ -99,6 +99,34 @@ export class Typist {
 }
 
 /** The text a final message settles on: committed, then the last partial. */
+/**
+ * One finished utterance — the service heard the speaker stop — as
+ * keystrokes: its words, Enter wherever "엔터" was said, and with
+ * `enterAtEnd` (sending on a pause) Enter after the last words too.
+ * `lineHasText` says whether the current line already has words, so the new
+ * ones are set apart from them by a space.
+ */
+export function utteranceActions(text: string, enterAtEnd: boolean, lineHasText: boolean): Action[] {
+  const out: Action[] = [];
+  let line = lineHasText;
+  let last = 0;
+  const words = (piece: string) => {
+    const t = piece.trim();
+    if (!t) return false;
+    out.push({ type: 'text', text: line ? ` ${t}` : t });
+    line = true;
+    return true;
+  };
+  for (const m of Array.from(text.matchAll(ENTER))) {
+    words(text.slice(last, m.index));
+    out.push({ type: 'enter' });
+    line = false;
+    last = (m.index ?? 0) + m[0].length;
+  }
+  if (words(text.slice(last)) && enterAtEnd) out.push({ type: 'enter' });
+  return out;
+}
+
 export function finalText(committed: string, partial: string): string {
   if (!partial) return committed;
   if (!committed) return partial;

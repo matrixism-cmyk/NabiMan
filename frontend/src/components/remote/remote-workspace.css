@@ -245,8 +245,15 @@
 .proto-checks small { color: var(--text-secondary); word-break: break-word; }
 
 /* The remote workspace's settings. */
-.rw-settings { display: flex; flex-direction: column; gap: 14px; max-width: 760px; }
+/* The whole width: small sections side by side, the terminal's form in columns. */
+.rw-settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 14px; align-items: start; }
+.rw-settings-section.is-wide { grid-column: 1 / -1; }
+.rw-settings-section.is-wide .term-settings-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 0 28px; }
+.rw-settings-section.is-wide .term-settings-form > .message,
+.rw-settings-section.is-wide .term-settings-form > .btn-group { grid-column: 1 / -1; }
+@media (max-width: 760px) { .rw-settings { grid-template-columns: minmax(0, 1fr); } }
 .rw-settings-section { display: flex; flex-direction: column; gap: 8px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
 .rw-settings-section h3 { margin: 0; font-size: 14px; }
 .rw-settings-check { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
 .rw-settings-check input { width: auto; margin: 0; }
+.rw-settings .dictation-settings { margin-top: 0; padding-top: 0; border-top: 0; }

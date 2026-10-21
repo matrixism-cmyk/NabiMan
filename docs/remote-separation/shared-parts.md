@@ -86,7 +86,7 @@ Claude 음성 대화는 메뉴는 나비맨에 있지만 코드는 터미널 쪽
 |---|---|---|---|
 | `auth.rs` (모든 요청의 인증) | `terminal_tickets::{TicketStore, redeem}`, `terminal::sftp::links::redeem` | 인증 미들웨어가 웹소켓 티켓과 파일 다운로드 링크를 직접 안다 | "URL 한 번용 입장권" 확인을 **인증 쪽 확장 지점**(등록식)으로 바꾸고, 원격이 자기 입장권을 등록 |
 | `accounts.rs`, `cron.rs`, `processes.rs`, `stream_access.rs`, `mec/**` (SSE·스트림 9곳) | `terminal_tickets::ConnectionGrant` | 이름은 터미널이지만 **실제로는 나비맨 전체의 스트림 권한 검사** | `terminal_tickets`를 나비맨 공통(인증)으로 옮기고 이름을 `connection_tickets`로 |
-| `backup.rs`, `backup_schedule.rs` | `terminal::session::data_dir()` | 데이터 폴더 위치를 터미널 모듈에서 얻는다 | 공통 `data_dir()` 하나로 (지금 같은 코드가 여러 곳에 복사돼 있음: `auth_bootstrap`, `dictation`, `claude_voice`, `app_settings`, `main.rs`) |
+| `backup.rs`, `backup_schedule.rs` | `terminal::session::data_dir()` | 데이터 폴더 위치를 터미널 모듈에서 얻는다 | 공통 `data_dir()` 하나로 (지금 `NABIMAN_DATA_DIR`를 직접 읽는 곳이 백엔드에 23개 파일 — 원격 쪽 7개: `remote_servers`, `remote_host_trust`, `ssh_auth`, `ssh_keys`, `terminal/session`, `dictation`, `claude_voice`) |
 | `support_report*.rs` | `terminal::session::PtyStore`, `remote_servers.json` | 지원 보고서가 터미널 세션 목록과 원격 서버 파일을 직접 읽는다 | 원격이 "보고서 항목"을 제공하는 함수 하나를 내보내고, 보고서는 그것만 부름 |
 | `membership.rs` | `remote_servers::find_server` | 범위 권한에 서버가 있는지 확인 | 범위(테넌트) 모델에서 서버를 "원격이 제공하는 자원 종류"로 등록 |
 | `App.tsx` | `TerminalSettingsProvider`, `TerminalWindowsProvider`, `RemoteShell` | 앱 셸이 터미널 상태를 감싼다 (떠 있는 터미널 창이 모든 메뉴 위에 뜨기 때문) | 원격 제품에서는 원격 셸이 감싸고, 나비맨에서는 "원격 창 제공자"를 선택적으로 꽂게 |

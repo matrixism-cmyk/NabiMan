@@ -58,6 +58,9 @@ const t: T = {
   'claude.found': { ko: '{path} 를 {user} 계정으로 실행합니다.', en: 'Runs {path} as {user}.', ja: '{path} を {user} で実行します。' },
   'claude.test': { ko: 'Claude 실행 확인', en: 'Check Claude', ja: 'Claude を確認' },
   'claude.testOk': { ko: '{version} — {user} 계정으로 실행됩니다.', en: '{version} — runs as {user}.', ja: '{version} — {user} で実行されます。' },
+  'claude.listeningPause': { ko: '듣고 있어요 — 말을 멈추면 보냅니다', en: 'Listening — pause to send', ja: '聞いています — 話し終えると送信します' },
+  'claude.autoSend': { ko: '말이 멈추면 바로 보내기', en: 'Send when I pause', ja: '話し終えたらすぐ送信' },
+  'claude.pauseHint': { ko: '말을 마치고 잠깐 멈추면 보냅니다. 끝에 "엔터"라고 해도 바로 보냅니다. 답변을 읽는 동안에는 마이크가 아무것도 받아쓰지 않습니다.', en: 'Pause when you are done and it is sent; saying "엔터" sends at once too. While an answer is read, nothing is transcribed.', ja: '話し終えて少し止まると送信します。最後に「엔터」と言ってもすぐ送信します。読み上げ中は何も書き取りません。' },
 };
 
 export default t;

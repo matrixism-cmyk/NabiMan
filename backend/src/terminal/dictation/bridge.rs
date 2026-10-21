@@ -105,6 +105,19 @@ impl Actor for Dictation {
     }
 }
 
+/// The end-of-speech settings the page asked for, checked: how long a pause
+/// ends what was said, and how much speech counts. Anything else is dropped.
+fn pause_settings(asked: &serde_json::Value) -> serde_json::Value {
+    let mut out = serde_json::json!({});
+    if let Some(ms) = asked.get("endpoint_ms").and_then(|v| v.as_u64()).filter(|ms| *ms > 0 && super::valid_pause(*ms)) {
+        out["endpoint_ms"] = ms.into();
+    }
+    if let Some(ms) = asked.get("min_speech_ms").and_then(|v| v.as_u64()).filter(|ms| *ms <= 5000) {
+        out["min_speech_ms"] = ms.into();
+    }
+    out
+}
+
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Dictation {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         match msg {
@@ -112,12 +125,22 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Dictation {
                 let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) else { return };
                 if value.get("type").and_then(|t| t.as_str()) == Some("stop") {
                     self.send(WsMessage::text(r#"{"type":"stop"}"#));
+                } else if value.get("type").and_then(|t| t.as_str()) == Some("config") {
+                    // A new pause length mid-way: passed on once checked, nothing else.
+                    if self.opened {
+                        let mut config = pause_settings(&value);
+                        config["type"] = "config".into();
+                        self.send(WsMessage::text(config.to_string()));
+                    }
                 } else if !self.opened {
                     // The opening message is NabiMan's own: the language the
                     // page asks for (if known), and never kept by the service.
                     let asked = value.get("language").and_then(|l| l.as_str()).filter(|l| LANGUAGES.contains(l));
                     let language = asked.unwrap_or(self.settings.language());
-                    let open = serde_json::json!({ "language": language, "title": "NabiMan terminal", "save": false });
+                    let mut open = pause_settings(&value);
+                    open["language"] = language.into();
+                    open["title"] = "NabiMan terminal".into();
+                    open["save"] = false.into();
                     self.opened = true;
                     self.send(WsMessage::text(open.to_string()));
                 }
@@ -249,4 +272,19 @@ pub(super) async fn start_shared(
     }
     let grant = Admission::Share { link: Box::new(link), shares: shares.get_ref().clone(), users: users.get_ref().clone() };
     begin(grant, &req, stream)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_checked_pause_settings_reach_the_service() {
+        let ok = pause_settings(&serde_json::json!({ "endpoint_ms": 1500, "min_speech_ms": 300, "save": true, "title": "x" }));
+        assert_eq!(ok, serde_json::json!({ "endpoint_ms": 1500, "min_speech_ms": 300 }));
+        for bad in [serde_json::json!({ "endpoint_ms": 100 }), serde_json::json!({ "endpoint_ms": 99999 }),
+                    serde_json::json!({ "endpoint_ms": "1500" }), serde_json::json!({ "endpoint_ms": 0, "min_speech_ms": 9000 })] {
+            assert_eq!(pause_settings(&bad), serde_json::json!({}), "{bad}");
+        }
+    }
 }

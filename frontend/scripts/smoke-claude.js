@@ -5,7 +5,7 @@
 //
 // Needs a NabiMan server serving build/ that can run Claude Code, and a
 // stand-in speech service (the scratch fake_voice2.py, started with
-// FAKE_WORDS="한 단어로만 답해 사과는 무슨 색이야 엔터") that "hears" that
+// FAKE_WORDS="한 단어로만 답해 사과는 무슨 색이야", with or without a final 엔터) that "hears" that
 // sentence, reads aloud with a tone, and logs what it was sent.
 const fs = require('fs');
 const { chromium } = require('playwright');
@@ -26,7 +26,7 @@ const api = (page, path, init = {}) => page.evaluate(async ({ path, init }) => {
   const res = await fetch(path, { ...init, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionStorage.getItem('nabiman_token')}` } });
   return res.json();
 }, { path, init });
-const logged = () => (VOICE_LOG && fs.existsSync(VOICE_LOG) ? fs.readFileSync(VOICE_LOG, 'utf8').trim().split('\n').map((l) => JSON.parse(l)) : []);
+const logged = () => (VOICE_LOG && fs.existsSync(VOICE_LOG) ? fs.readFileSync(VOICE_LOG, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []);
 
 (async () => {
   const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'] });
@@ -58,7 +58,7 @@ const logged = () => (VOICE_LOG && fs.existsSync(VOICE_LOG) ? fs.readFileSync(VO
   check('새 채팅 starts listening', await page.locator('.cv-state.is-listening').count() === 1);
   await page.locator('.cv-msg.is-user').waitFor({ timeout: 30000 }).catch(() => {});
   const asked = await page.locator('.cv-msg.is-user .cv-bubble').first().textContent().catch(() => '');
-  check('saying "엔터" sends what was said, without the word', asked.includes('사과는 무슨 색이야') && !asked.includes('엔터'), asked);
+  check('what was said is sent (on "엔터" or a pause), without the word', asked.includes('사과는 무슨 색이야') && !asked.includes('엔터'), asked);
   await page.locator('.cv-state.is-thinking').waitFor({ timeout: 10000 }).catch(() => {});
   await page.waitForFunction(() => document.querySelector('.cv-state')?.classList.contains('is-speaking'), null, { timeout: 60000 }).catch(() => {});
   check('the answer is read aloud as it comes', await page.locator('.cv-state.is-speaking').count() === 1);
