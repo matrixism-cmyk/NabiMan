@@ -31,7 +31,7 @@ export default function DictationSettings() {
   const [address, setAddress] = useState('');
   const [language, setLanguage] = useState('korean');
   const [pause, setPause] = useState(1500);
-  const [autoEnter, setAutoEnter] = useState(false);
+  const [autoEnter, setAutoEnter] = useState(true);
   const [key, setKey] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -42,7 +42,7 @@ export default function DictationSettings() {
     setAddress(s.address || '');
     setLanguage(s.language || 'korean');
     setPause(s.endpoint_ms ?? 1500);
-    setAutoEnter(Boolean(s.auto_enter));
+    setAutoEnter(s.auto_enter !== false);
   };
 
   useEffect(() => {

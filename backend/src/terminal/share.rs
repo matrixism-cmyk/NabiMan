@@ -212,6 +212,9 @@ struct ShareInfo {
     kind: &'static str,
     /// The visitor may dictate into the terminal: it is set up, and the link lets them type.
     dictation: bool,
+    /// How dictation ends what was said there, as set for the whole server.
+    dictation_pause_ms: u32,
+    dictation_auto_enter: bool,
     label: String,
     needs_password: bool,
     read_only: bool,
@@ -259,12 +262,15 @@ async fn share_info(
         .filter(|_| alive)
         .and_then(client_size)
         .unwrap_or((0, 0));
+    let voice = super::dictation::load();
     no_store(
         HttpResponse::Ok()
             .insert_header((actix_web::http::header::CACHE_CONTROL, "no-store"))
             .json(ApiResponse::ok(ShareInfo {
                 kind: if link.files_only() { "files" } else { "terminal" },
-                dictation: !link.read_only && !link.files_only() && super::dictation::load().key().is_some(),
+                dictation: !link.read_only && !link.files_only() && voice.key().is_some(),
+                dictation_pause_ms: voice.endpoint_ms(),
+                dictation_auto_enter: voice.auto_enter(),
                 label: link.label,
                 needs_password: link.password_hash.is_some(),
                 read_only: link.read_only,

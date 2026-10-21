@@ -39,9 +39,10 @@ pub(crate) struct Settings {
     /// detection; 0 turns it off. None is the default.
     #[serde(default)]
     pub endpoint_ms: Option<u32>,
-    /// In a terminal, press Enter at each pause too, not only when "엔터" is said.
+    /// In a terminal, press Enter at each pause too, not only when "엔터" is
+    /// said. None is the default: on.
     #[serde(default)]
-    pub auto_enter: bool,
+    pub auto_enter: Option<bool>,
 }
 
 /// Where a pause of this long can end what was said; the service takes 300 to 10000 ms.
@@ -55,6 +56,9 @@ impl Settings {
     }
     pub fn endpoint_ms(&self) -> u32 {
         self.endpoint_ms.unwrap_or(1500)
+    }
+    pub fn auto_enter(&self) -> bool {
+        self.auto_enter.unwrap_or(true)
     }
     pub fn language(&self) -> &str {
         if self.language.is_empty() { "korean" } else { &self.language }
@@ -121,7 +125,7 @@ async fn get_settings(req: HttpRequest) -> HttpResponse {
     let key = s.key();
     let mut out = serde_json::json!({
         "available": key.is_some(), "language": s.language(),
-        "endpoint_ms": s.endpoint_ms(), "auto_enter": s.auto_enter,
+        "endpoint_ms": s.endpoint_ms(), "auto_enter": s.auto_enter(),
     });
     if admin {
         out["url"] = s.url().into();
@@ -168,7 +172,7 @@ async fn put_settings(req: HttpRequest, body: web::Json<Change>) -> HttpResponse
         s.endpoint_ms = Some(ms);
     }
     if let Some(on) = body.auto_enter {
-        s.auto_enter = on;
+        s.auto_enter = Some(on);
     }
     if let Some(language) = &body.language {
         if !LANGUAGES.contains(&language.as_str()) {
@@ -235,6 +239,14 @@ pub(crate) fn config(cfg: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn enter_at_a_pause_is_on_unless_turned_off() {
+        let unset: Settings = serde_json::from_str(r#"{"url":"https://v.bebo.kr"}"#).unwrap();
+        assert!(unset.auto_enter());
+        let off: Settings = serde_json::from_str(r#"{"auto_enter":false}"#).unwrap();
+        assert!(!off.auto_enter());
+    }
 
     #[test]
     fn addresses_and_keys_are_checked() {

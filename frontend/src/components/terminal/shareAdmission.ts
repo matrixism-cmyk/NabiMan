@@ -9,6 +9,9 @@ export interface ShareInfo {
   kind: 'terminal' | 'files';
   /** The visitor may dictate into the terminal (it is set up, the link is not read-only). */
   dictation?: boolean;
+  /** How dictation ends what was said there (the server's setting): the pause, and Enter at it. */
+  dictation_pause_ms?: number;
+  dictation_auto_enter?: boolean;
 }
 /** The key a visitor's file panel signs its requests with. Memory only. */
 export interface ShareFilesGrant { key: string; mode: 'read' | 'write' }
@@ -41,7 +44,10 @@ export async function readShareInfo(token: string, signal?: AbortSignal): Promis
   const files = (data as { files?: unknown }).files;
   const kind = (data as { kind?: unknown }).kind === 'files' ? 'files' : 'terminal';
   const dictation = (data as { dictation?: unknown }).dictation === true;
-  return { ...data, kind, dictation, files: files === 'read' || files === 'write' ? files : 'none' };
+  const pause = (data as { dictation_pause_ms?: unknown }).dictation_pause_ms;
+  const dictation_pause_ms = Number.isInteger(pause) && (pause as number) >= 0 && (pause as number) <= 10000 ? pause as number : 1500;
+  const dictation_auto_enter = (data as { dictation_auto_enter?: unknown }).dictation_auto_enter === true;
+  return { ...data, kind, dictation, dictation_pause_ms, dictation_auto_enter, files: files === 'read' || files === 'write' ? files : 'none' };
 }
 export async function issueShareTicket(token: string, password: string, query: string, signal?: AbortSignal): Promise<ShareTicket> {
   const data = await publicRequest<ShareTicket>(`/api/share/${encodeURIComponent(token)}/auth`, {

@@ -32,3 +32,10 @@ it('rejects malformed metadata and propagates cancellation', async () => {
   mockedFetch.mockResolvedValue(reply({ success: true, data: { ticket, expires_in_seconds: 30 } }));
   await expect(issueShareTicket('link', '', '', controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
 });
+it('takes how dictation ends what was said from the server, with safe defaults', async () => {
+  const info = { label: 'x', needs_password: false, read_only: false, alive: true, expires_unix: 9, cols: 80, rows: 24, dictation: true };
+  mockedFetch.mockResolvedValue(reply({ success: true, data: { ...info, dictation_pause_ms: 2000, dictation_auto_enter: true } }));
+  expect(await readShareInfo('link')).toMatchObject({ dictation_pause_ms: 2000, dictation_auto_enter: true });
+  mockedFetch.mockResolvedValue(reply({ success: true, data: { ...info, dictation_pause_ms: 'soon' } }));
+  expect(await readShareInfo('link')).toMatchObject({ dictation_pause_ms: 1500, dictation_auto_enter: false });
+});

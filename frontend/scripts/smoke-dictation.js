@@ -8,6 +8,10 @@
 // fake_voice.py does). Chromium's fake microphone supplies the audio. The
 // spoken "엔터" must press Enter (so the shell prints the echo) and never be
 // typed — in the workspace pane, a floating window, and a share link's page.
+//
+// With SMOKE_PAUSE=1 the service hears only `echo dictation-works` and ends it
+// at a pause; Enter at a pause is on unless an administrator turned it off, so
+// the echo must still run, in all three places.
 const { chromium } = require('playwright');
 
 const BASE = process.env.SMOKE_URL || 'http://127.0.0.1:18096';
@@ -15,6 +19,7 @@ const PASSWORD = process.env.SMOKE_PASSWORD || 'smoketest123';
 const OUT = process.env.SMOKE_OUT || '/tmp';
 const VOICE_URL = process.env.SMOKE_VOICE_URL || 'http://127.0.0.1:19999';
 const VOICE_KEY = process.env.SMOKE_VOICE_KEY || 'vk_test_dictation_key';
+const PAUSE = process.env.SMOKE_PAUSE === '1';
 
 const results = [];
 const check = (name, ok, detail = '') => {
@@ -39,7 +44,7 @@ async function dictate(page, scope, label) {
   await page.waitForFunction(({ sel, n }) => [...document.querySelectorAll(`${sel} .xterm-rows > div`)]
     .filter((r) => r.textContent.trim() === 'dictation-works').length > n, { sel: label.sel, n: before }, { timeout: 30000 }).catch(() => {});
   const after = (await rows(scope)).filter((r) => r.trim() === 'dictation-works').length;
-  check(`${label.name}: what is said is typed and "엔터" presses Enter`, after > before, `${before} → ${after}`);
+  check(`${label.name}: what is said is typed and ${PAUSE ? 'a pause' : '"엔터"'} presses Enter`, after > before, `${before} → ${after}`);
   check(`${label.name}: the word "엔터" is never typed`, !(await rows(scope)).some((r) => r.includes('엔터')));
   await scope.getByRole('button', { name: '음성 받아쓰기 끝내기' }).click();
   await scope.getByRole('button', { name: '음성 받아쓰기 시작' }).waitFor({ timeout: 15000 });
@@ -60,6 +65,7 @@ async function dictate(page, scope, label) {
   await page.waitForSelector('.app-header');
   const set = await api(page, '/api/terminal/dictation/settings', { method: 'PUT', body: JSON.stringify({ url: VOICE_URL, address: '', key: VOICE_KEY }) });
   check('dictation is set up', set.data?.available === true, JSON.stringify(set).slice(0, 120));
+  if (PAUSE) check('Enter at a pause is on', set.data?.auto_enter === true && set.data?.endpoint_ms > 0, JSON.stringify(set.data));
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForSelector('.app-header');
 
