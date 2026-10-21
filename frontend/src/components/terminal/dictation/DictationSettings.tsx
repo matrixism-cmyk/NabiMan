@@ -103,7 +103,10 @@ export default function DictationSettings() {
       <PauseField id="dictation-pause" value={pause} onChange={setPause} />
       {pause > 0 && (
         <div className="form-group">
-          <label><input type="checkbox" checked={autoEnter} onChange={(e) => setAutoEnter(e.target.checked)} /> {t('dictation.autoEnter')}</label>
+          <label className="dictation-check">
+            <input type="checkbox" checked={autoEnter} onChange={(e) => setAutoEnter(e.target.checked)} />
+            <span>{t('dictation.autoEnter')}</span>
+          </label>
           <small className="text-secondary">{t('dictation.autoEnterHint')}</small>
         </div>
       )}

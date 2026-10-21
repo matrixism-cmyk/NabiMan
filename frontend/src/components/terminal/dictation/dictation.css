@@ -30,3 +30,14 @@
 .dictation-settings { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
 .dictation-settings h4 { margin: 0 0 6px; font-size: 14px; }
 .dictation-settings p { font-size: 12px; margin: 0 0 10px; }
+/* A settings field: its name, the control, then what it means — stacked, with room between fields. */
+.dictation-settings .form-group, .cv-settings .form-group { display: flex; flex-direction: column; align-items: stretch; gap: 5px; margin: 0 0 14px; }
+.dictation-settings .form-group > label, .cv-settings .form-group > label { display: block; margin: 0; font-size: 12px; color: var(--text-secondary); text-transform: none; }
+.dictation-settings .form-group .filter-input, .dictation-settings .form-group .select-input,
+.cv-settings .form-group .select-input { margin: 0; }
+.dictation-settings .form-group .select-input, .cv-settings .form-group .select-input { align-self: flex-start; min-width: 200px; max-width: 100%; }
+.dictation-settings .form-group small, .cv-settings .form-group small { display: block; padding: 0; font-size: 12px; line-height: 1.55; }
+.dictation-settings .form-group > label.dictation-check { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text); cursor: pointer; }
+.dictation-check input { width: auto; margin: 0; }
+.dictation-settings > .btn-group { margin-top: 4px; flex-wrap: wrap; }
+
