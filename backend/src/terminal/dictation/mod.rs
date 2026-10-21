@@ -65,8 +65,7 @@ impl Settings {
 }
 
 fn path() -> std::path::PathBuf {
-    let dir = std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into());
-    std::path::Path::new(&dir).join("dictation.json")
+    nabiman_server::data_dir().join("dictation.json")
 }
 
 pub(crate) fn load() -> Settings {

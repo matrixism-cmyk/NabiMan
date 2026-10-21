@@ -76,7 +76,7 @@ async fn change(
     let Some(sessions) = req.app_data::<web::Data<crate::jwt_sessions::SessionStore>>() else {
         return HttpResponse::Forbidden().finish();
     };
-    let Some(grant) = crate::terminal_tickets::ConnectionGrant::from_request(
+    let Some(grant) = crate::stream_access::ConnectionGrant::from_request(
         &req,
         sessions.get_ref().clone(),
         users.get_ref().clone(),

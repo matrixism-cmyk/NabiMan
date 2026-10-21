@@ -17,7 +17,7 @@ use super::voice::{self, Live};
 use super::{load, Settings, LANGUAGES};
 use crate::terminal::share::{live_link, ShareLink};
 use crate::terminal::share_store::ShareStore;
-use crate::terminal_tickets::ConnectionGrant;
+use crate::stream_access::ConnectionGrant;
 use crate::users::UserStore;
 
 /// The speech service ends a live dictation after an hour; so does this.

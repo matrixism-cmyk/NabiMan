@@ -109,7 +109,7 @@ impl Store {
 }
 pub fn new_schedule_store() -> BackupScheduleStore {
     Arc::new(Mutex::new(Store::load(
-        std::path::PathBuf::from(crate::terminal::session::data_dir())
+        nabiman_server::data_dir()
             .join("backup_schedules.json"),
     )))
 }

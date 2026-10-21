@@ -38,7 +38,7 @@ fn enabled_factor_is_not_login_assurance_and_existing_grants_recheck_policy() {
         .insert_header(("Authorization", format!("Bearer {token}")))
         .to_srv_request();
     assert!(auth::check_auth(&req, &secret, &sessions, &users) == auth::AuthDecision::Allow);
-    let grant = crate::terminal_tickets::ConnectionGrant::from_request(
+    let grant = crate::stream_access::ConnectionGrant::from_request(
         req.request(),
         sessions.clone(),
         users.clone(),

@@ -5,7 +5,7 @@ use std::fs;
 use std::process::Command;
 
 fn data_dir_path() -> String {
-    std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".to_string())
+    nabiman_server::data_dir().to_string_lossy().into_owned()
 }
 
 fn nabiman_key_dir() -> String {

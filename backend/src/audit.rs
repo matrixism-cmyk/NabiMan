@@ -24,8 +24,7 @@ pub fn new_audit_log() -> AuditLog {
     Arc::new(Mutex::new(storage::State::load(audit_file_path())))
 }
 fn audit_file_path() -> std::path::PathBuf {
-    let dir = std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into());
-    std::path::PathBuf::from(dir).join("audit.jsonl")
+    nabiman_server::data_dir().join("audit.jsonl")
 }
 
 fn compute_hash(prev_hash: &str, entry: &AuditEntry) -> String {

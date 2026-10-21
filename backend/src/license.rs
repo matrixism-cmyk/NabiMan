@@ -75,7 +75,7 @@ pub struct ActivateRequest {
     pub key: String,
 }
 fn data_dir() -> PathBuf {
-    PathBuf::from(std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into()))
+    nabiman_server::data_dir()
 }
 fn key_path() -> PathBuf {
     PathBuf::from(

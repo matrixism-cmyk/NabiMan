@@ -17,13 +17,10 @@ use actix_web::{web, HttpResponse};
 use std::fs;
 use std::process::Command;
 
-const DATA_FILE: &str = "/var/lib/nabiman/remote_servers.json";
 pub(crate) static SERVER_WRITES: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 fn data_file_path() -> String {
-    std::env::var("NABIMAN_DATA_DIR")
-        .map(|d| format!("{}/remote_servers.json", d))
-        .unwrap_or_else(|_| DATA_FILE.to_string())
+    nabiman_server::data_dir().join("remote_servers.json").to_string_lossy().into_owned()
 }
 
 pub fn load_servers() -> Result<Vec<RemoteServer>, String> {

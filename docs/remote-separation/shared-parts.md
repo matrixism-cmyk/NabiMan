@@ -148,7 +148,7 @@ Claude 음성 대화는 메뉴는 나비맨에 있지만 코드는 터미널 쪽
 | 단계 | 할 일 | 효과 |
 |---|---|---|
 | 1 ✅ (2026-10-21) | 원격 것인데 공용 자리에 있는 것 옮기기: `types`의 서버 타입, `MultiServerDashboard`, `SshKeyComponents`, 글꼴, 나비맨 번역 파일에 섞여 있던 원격 문구 66개 | 원격 → 나비맨 의존이 공통 부품만 남음 (§7) |
-| 2 | 공통 `data_dir()` 하나로 모으기, `terminal_tickets` → 공통 `connection_tickets`로 이름·위치 변경 | 나비맨 → 원격의 거꾸로 된 의존 대부분 제거 |
+| 2 ✅ (2026-10-21) | 공통 `data_dir()` 하나로 모으기, `ConnectionGrant`를 나비맨 공통(`stream_access`)으로 (입장권 자체는 터미널 것이라 그대로) | 나비맨 → 원격의 거꾸로 된 의존 대부분 제거 (§8) |
 | 3 | 인증 미들웨어의 "한 번용 입장권" 확인을 등록식으로, 지원 보고서·멤버십은 원격이 내보내는 함수만 부르게 | 나비맨이 원격 내부를 모르게 됨 |
 | 4 | 프런트엔드 공통 부품(useApi, i18n 틀, Modal/ConfirmDialog/useLongPress, 테마·CSS)을 한 폴더(`shared/`)로 모으기 | 공통 패키지로 떼어 낼 준비 |
 | 5 | 원격만 빌드하는 진입점(`/remote` 전용 번들)과, 원격 API만 등록하는 서버 설정 | 실제로 따로 배포해 보기 |
@@ -176,3 +176,37 @@ Claude 음성 대화는 메뉴는 나비맨에 있지만 코드는 터미널 쪽
 
 1단계에서 함께 고친 것: 오른쪽 버튼 메뉴가, 항목을 보이게 하려고 막 일어난 스크롤 때문에
 열리자마자 닫히던 문제(150ms 안의 스크롤은 무시). `smoke:rail`이 가끔 실패하던 원인이었다.
+
+## 8. 2단계 결과 (2026-10-21)
+
+**데이터 폴더.** `NABIMAN_DATA_DIR`를 직접 읽던 23곳(18개 파일)이 모두
+`nabiman_server::data_dir()`(`lib.rs`, API 서버와 권한 도우미가 함께 쓰는 바탕) 하나를
+부른다. 백업·지원 보고서가 터미널 모듈에 데이터 폴더를 묻던 의존도 없어졌다.
+기본값이 혼자 달랐던 `scope_settings`(`./data`)도 `/var/lib/nabiman`으로 맞췄다 —
+모든 배포(systemd, Docker, 설치 스크립트, 운영 supervisor)가 변수를 직접 주므로 운영
+동작은 같다.
+
+**연결 권한.** 들여다보니 `terminal_tickets`에는 두 가지가 섞여 있었다:
+
+- 한 번 쓰는 입장권(`/api/terminal/tickets`) — 터미널·받아쓰기 웹소켓만 여는 **터미널 것**.
+  그대로 둔다(경로도 그대로).
+- `ConnectionGrant` — 오래 열린 연결(SSE 9곳, 터미널, 받아쓰기)마다 계정·로그인·권한을
+  다시 확인하는 **나비맨 공통 검사**. `stream_access.rs`로 옮겼다. 터미널 세션을 볼 수
+  있는지 확인하는 부분(`can_access_session`)만 `terminal/session.rs`에 남겼다.
+
+그래서 계획의 "이름 바꾸기(`connection_tickets`)" 대신 "나눠서 공통 부분만 옮기기"가 됐다.
+
+**남은 거꾸로 된 의존 (3단계 대상):**
+
+| 나비맨 쪽 | 원격의 무엇 |
+|---|---|
+| `auth.rs` | `terminal_tickets::{TicketStore, redeem}`, `terminal::sftp::links` (URL 한 번용 입장권 확인) |
+| `support_report*.rs` | `terminal::session::PtyStore` (터미널 세션 수) |
+| `membership.rs` | `remote_servers::find_server` (범위 권한의 서버) |
+
+**확인한 것:** 백엔드 테스트 전체, API e2e(66+40), 스트리밍 e2e, 브라우저 smoke
+(로그인 유지·공유·세션·받아쓰기·단독 화면·서버 목록·파일·프로토콜).
+
+**덧붙여 본 것:** 로그아웃한 뒤 열려 있던 SSE가 끊기기까지 약 5.5초 걸린다
+(`ConnectionGrant` 확인은 1초마다지만). 옮기기 전 코드에서도 5.7초로 같아서 이번
+변경과는 무관하다. 따로 살펴볼 거리.

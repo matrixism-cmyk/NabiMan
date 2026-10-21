@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 fn data_dir() -> PathBuf {
-    PathBuf::from(std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into()))
+    nabiman_server::data_dir()
 }
 
 fn oauth_config_path() -> PathBuf {

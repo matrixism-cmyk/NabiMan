@@ -135,7 +135,7 @@ fn inventory(path: &Path) -> Section<Servers> {
 }
 pub(super) fn servers() -> Section<Servers> {
     inventory(
-        &std::path::PathBuf::from(crate::terminal::session::data_dir()).join("remote_servers.json"),
+        &nabiman_server::data_dir().join("remote_servers.json"),
     )
 }
 #[derive(Serialize)]
@@ -146,7 +146,7 @@ pub(super) struct Storage {
 }
 pub(super) fn storage() -> Section<Storage> {
     use std::os::unix::fs::MetadataExt;
-    let path = std::path::PathBuf::from(crate::terminal::session::data_dir());
+    let path = nabiman_server::data_dir();
     let Ok(metadata) = std::fs::metadata(&path) else {
         return Section::missing(State::Unavailable);
     };

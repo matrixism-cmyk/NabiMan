@@ -87,9 +87,7 @@ fn client() -> Result<reqwest::Client, Error> {
 }
 impl Forwarder {
     pub fn start() -> Self {
-        let dir = std::path::PathBuf::from(
-            std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into()),
-        );
+        let dir = nabiman_server::data_dir();
         let opened = Store::open(&dir.join("audit-forwarding.sqlite3"));
         let http = client();
         let failure = opened

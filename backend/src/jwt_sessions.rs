@@ -38,8 +38,7 @@ pub fn new_session_store() -> SessionStore {
 
 /// The server's sign-ins, kept in the data directory across restarts.
 pub fn open_session_store() -> SessionStore {
-    let dir = std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into());
-    SessionStore::open(std::path::PathBuf::from(dir).join("login_sessions.json"))
+    SessionStore::open(nabiman_server::data_dir().join("login_sessions.json"))
 }
 
 #[derive(Serialize, Deserialize)]

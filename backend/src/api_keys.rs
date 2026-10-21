@@ -33,9 +33,8 @@ pub struct ApiKey {
 }
 pub const SCOPES: &[&str] = &["status:read", "servers:read", "tenants:read"];
 pub fn new_api_key_store() -> ApiKeyStore {
-    let dir = std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into());
     Arc::new(Mutex::new(
-        Store::open(std::path::Path::new(&dir).join("api_keys.json"))
+        Store::open(nabiman_server::data_dir().join("api_keys.json"))
             .expect("Cannot load API token storage; inspect private storage"),
     ))
 }

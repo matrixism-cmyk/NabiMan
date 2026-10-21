@@ -36,8 +36,7 @@ pub fn new_rule_store() -> RuleStore {
 }
 
 fn rules_file() -> std::path::PathBuf {
-    let dir = std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into());
-    std::path::PathBuf::from(dir).join("alert_rules.json")
+    nabiman_server::data_dir().join("alert_rules.json")
 }
 
 fn save_rules(rules: &[AlertRule]) -> Result<(), String> {

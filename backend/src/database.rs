@@ -43,8 +43,7 @@ fn detect_db() -> Option<&'static str> {
 }
 
 pub fn db_backup_dir() -> PathBuf {
-    let dir = std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into());
-    PathBuf::from(dir).join("db_backups")
+    nabiman_server::data_dir().join("db_backups")
 }
 
 fn mysql_status() -> DbStatus {

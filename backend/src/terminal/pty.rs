@@ -48,7 +48,7 @@ pub(crate) struct WsBridge {
     pub(crate) ended: bool,
     /// A share link may watch without typing; input is dropped on the way in.
     pub(crate) read_only: bool,
-    pub(crate) grant: Option<crate::terminal_tickets::ConnectionGrant>,
+    pub(crate) grant: Option<crate::stream_access::ConnectionGrant>,
     pub(crate) share_grant: Option<super::share::ShareGrant>,
     pub(crate) share_lease: Option<super::share_ticket::ConnectionLease>,
     /// The tty tmux knows this connection by, used to force a repaint.

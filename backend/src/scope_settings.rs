@@ -35,8 +35,7 @@ fn path() -> PathBuf {
     if let Some(path) = TEST_PATH.with(|p| p.borrow().clone()) {
         return path;
     }
-    PathBuf::from(std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "./data".into()))
-        .join("scope-settings.json")
+    nabiman_server::data_dir().join("scope-settings.json")
 }
 fn key(kind: &ScopeKind, id: &str) -> String {
     format!(

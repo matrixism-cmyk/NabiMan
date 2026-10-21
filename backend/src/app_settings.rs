@@ -27,8 +27,7 @@ pub struct AppSettings {
 }
 
 fn path() -> std::path::PathBuf {
-    let dir = std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into());
-    std::path::PathBuf::from(dir).join("app_settings.json")
+    nabiman_server::data_dir().join("app_settings.json")
 }
 
 fn idle_minutes() -> &'static AtomicU32 {

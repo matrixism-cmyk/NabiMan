@@ -84,7 +84,7 @@ impl Default for Settings {
 }
 
 pub(crate) fn data_dir() -> std::path::PathBuf {
-    std::path::PathBuf::from(std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into()))
+    nabiman_server::data_dir()
 }
 
 pub(crate) fn load() -> Settings {

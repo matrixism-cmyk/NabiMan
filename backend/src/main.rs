@@ -216,21 +216,15 @@ async fn main() -> std::io::Result<()> {
     let static_dir = std::env::var("NABIMAN_STATIC").unwrap_or_else(|_| "./static".to_string());
 
     let share_store = terminal::share_store::open(
-        std::path::PathBuf::from(
-            std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into()),
-        )
+        nabiman_server::data_dir()
         .join("terminal_shares.json"),
     )?;
     let terminal_registry = terminal::open_registry(
-        std::path::PathBuf::from(
-            std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into()),
-        )
+        nabiman_server::data_dir()
         .join("terminal_sessions.json"),
     )?;
     let terminal_preferences = terminal::open_settings_registry(
-        std::path::PathBuf::from(
-            std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into()),
-        )
+        nabiman_server::data_dir()
         .join("terminal_settings.json"),
     )?;
     let helper_client = web::Data::new(nabiman_server::privileged::client::Client::from_env());

@@ -33,8 +33,7 @@ pub(super) fn users_file_path() -> std::path::PathBuf {
     if let Some(path) = TEST_FILE.with(|slot| slot.borrow().clone()) {
         return path;
     }
-    let dir = std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into());
-    std::path::PathBuf::from(dir).join("users.json")
+    nabiman_server::data_dir().join("users.json")
 }
 
 /// Flush the observed database before accepting it after an interrupted publication.

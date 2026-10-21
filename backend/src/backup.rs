@@ -22,7 +22,7 @@ mod schedule;
 pub use schedule::{new_schedule_store, start_backup_scheduler};
 
 fn backup_dir() -> std::path::PathBuf {
-    std::path::PathBuf::from(crate::terminal::session::data_dir()).join("backups")
+    nabiman_server::data_dir().join("backups")
 }
 
 async fn list_backups() -> HttpResponse {

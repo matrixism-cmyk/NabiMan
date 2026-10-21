@@ -3,7 +3,7 @@ use crate::{
     auth,
     jwt_sessions::SessionStore,
     models::{ApiResponse, ServiceActionRequest},
-    terminal_tickets::ConnectionGrant,
+    stream_access::ConnectionGrant,
     users::UserStore,
 };
 use actix_web::{http::StatusCode, web, HttpRequest, HttpResponse};

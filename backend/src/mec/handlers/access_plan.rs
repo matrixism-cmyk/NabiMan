@@ -12,7 +12,7 @@ pub async fn inspect(
     sessions: web::Data<crate::jwt_sessions::SessionStore>,
     state: web::Data<MecState>,
 ) -> HttpResponse {
-    let Some(grant) = crate::terminal_tickets::ConnectionGrant::from_request(
+    let Some(grant) = crate::stream_access::ConnectionGrant::from_request(
         &req,
         sessions.get_ref().clone(),
         users.get_ref().clone(),

@@ -1,8 +1,6 @@
 use super::*;
-use crate::{
-    models::{NabimanUser, UserRole},
-    AuthCheck,
-};
+use crate::models::{NabimanUser, UserRole};
+use crate::{jwt_sessions::SessionStore, stream_access::ConnectionGrant, AuthCheck};
 use actix_web::{test as awtest, App};
 
 fn claims() -> auth::Claims {

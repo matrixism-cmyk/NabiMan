@@ -30,8 +30,7 @@ pub fn new_channel_store() -> ChannelStore {
 }
 
 fn channels_file() -> std::path::PathBuf {
-    let dir = std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into());
-    std::path::PathBuf::from(dir).join("notifications.json")
+    nabiman_server::data_dir().join("notifications.json")
 }
 
 fn save_channels(channels: &[NotificationChannel]) -> Result<(), String> {
@@ -57,8 +56,7 @@ pub struct NotificationEvent {
 }
 
 fn history_file() -> std::path::PathBuf {
-    let dir = std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into());
-    std::path::PathBuf::from(dir).join("notification_history.json")
+    nabiman_server::data_dir().join("notification_history.json")
 }
 
 fn append_history(event: &NotificationEvent) {
@@ -220,8 +218,7 @@ pub struct NotificationTemplate {
 }
 
 fn templates_file() -> std::path::PathBuf {
-    let dir = std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into());
-    std::path::PathBuf::from(dir).join("notification_templates.json")
+    nabiman_server::data_dir().join("notification_templates.json")
 }
 
 fn load_templates() -> Vec<NotificationTemplate> {

@@ -61,7 +61,7 @@ async fn ws_terminal(
         return Ok(HttpResponse::Unauthorized().finish());
     };
 
-    let Some(grant) = crate::terminal_tickets::ConnectionGrant::from_request(
+    let Some(grant) = crate::stream_access::ConnectionGrant::from_request(
         &req,
         sessions.get_ref().clone(),
         users.get_ref().clone(),

@@ -1,5 +1,7 @@
-//! One-use, target-bound admission for account terminal WebSockets.
-use crate::{auth, jwt_sessions::SessionStore, models::ApiResponse, users::UserStore};
+//! One-use, target-bound admission for account terminal WebSockets (and
+//! dictation's). The checks that keep a connection admitted afterwards are
+//! NabiMan's, shared with every stream: `stream_access::ConnectionGrant`.
+use crate::{auth, models::ApiResponse};
 use actix_web::{post, web, HttpRequest, HttpResponse};
 use rand::{rngs::OsRng, RngCore};
 use serde::{Deserialize, Serialize};
@@ -241,67 +243,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(issue);
 }
 
-/// Checked before each account input and periodically while attached.
-#[derive(Clone)]
-pub(crate) struct ConnectionGrant {
-    pub(crate) user_id: String,
-    username: String,
-    sid: String,
-    sessions: SessionStore,
-    users: UserStore,
-    path: String,
-}
-impl ConnectionGrant {
-    pub(crate) fn from_request(
-        req: &HttpRequest,
-        sessions: SessionStore,
-        users: UserStore,
-    ) -> Option<Self> {
-        let claims = auth::verified_claims(req)?;
-        Some(Self {
-            user_id: auth::verified_user_id(req).filter(|id| !id.is_empty())?,
-            username: claims.sub,
-            sid: claims.sid,
-            sessions,
-            users,
-            path: req.path().into(),
-        })
-    }
-    pub(crate) fn valid(&self) -> bool {
-        self.valid_for_method("GET")
-    }
-    pub(crate) fn valid_for_method(&self, method: &str) -> bool {
-        if self.user_id.is_empty() {
-            return false;
-        }
-        let session = self.sessions.lock().unwrap().get(&self.sid).cloned();
-        let Some(session) =
-            session.filter(|s| s.username == self.username && s.user_id == self.user_id)
-        else {
-            return false;
-        };
-        let Some(created) =
-            chrono::NaiveDateTime::parse_from_str(&session.created_at, "%Y-%m-%d %H:%M:%S").ok()
-        else {
-            return false;
-        };
-        let age = chrono::Utc::now().signed_duration_since(created.and_utc());
-        if age < chrono::Duration::zero() || age >= chrono::Duration::days(7) {
-            return false;
-        }
-        crate::users::find_user_by_name(&self.users, &self.username).is_some_and(|u| {
-            u.id == self.user_id
-                && crate::mfa_policy::permitted(&u, session.mfa_verified, method, &self.path)
-                && crate::scope_access::permission(&u, method, &self.path)
-        })
-    }
-    pub(crate) fn can_access_session(
-        &self,
-        session: &crate::terminal::session::TmuxSession,
-    ) -> bool {
-        crate::terminal::session::visible_to(session, &self.user_id, &self.users)
-    }
-}
 #[cfg(test)]
 #[path = "terminal_ticket_tests.rs"]
 mod tests;

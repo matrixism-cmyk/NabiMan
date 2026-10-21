@@ -51,7 +51,7 @@ pub async fn stream(
     sessions: web::Data<crate::jwt_sessions::SessionStore>,
     users: web::Data<crate::users::UserStore>,
 ) -> HttpResponse {
-    let Some(grant) = crate::terminal_tickets::ConnectionGrant::from_request(
+    let Some(grant) = crate::stream_access::ConnectionGrant::from_request(
         &req,
         sessions.get_ref().clone(),
         users.get_ref().clone(),

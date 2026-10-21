@@ -118,8 +118,7 @@ pub async fn update(
 /// retain their version; live revocation must separately bind the approval generation.
 /// New sessions use current trust. No global TOFU fallback.
 pub fn options(server: &RemoteServer) -> Result<Vec<String>, String> {
-    let directory = std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into());
-    options_at(server, std::path::Path::new(&directory))
+    options_at(server, &nabiman_server::data_dir())
 }
 
 fn options_at(server: &RemoteServer, directory: &std::path::Path) -> Result<Vec<String>, String> {

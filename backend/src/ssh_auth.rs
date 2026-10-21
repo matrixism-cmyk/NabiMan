@@ -10,7 +10,7 @@ use std::io::Write;
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 
 fn data_dir() -> String {
-    std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".to_string())
+    nabiman_server::data_dir().to_string_lossy().into_owned()
 }
 
 fn pw_dir() -> String {

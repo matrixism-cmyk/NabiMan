@@ -139,7 +139,7 @@ pub fn current_actor(
     let claims =
         crate::auth::verified_claims(req).ok_or_else(|| HttpResponse::Unauthorized().finish())?;
     if claims.exp as u128 <= chrono::Utc::now().timestamp().max(0) as u128
-        || !crate::terminal_tickets::ConnectionGrant::from_request(
+        || !crate::stream_access::ConnectionGrant::from_request(
             req,
             sessions.clone(),
             users.clone(),

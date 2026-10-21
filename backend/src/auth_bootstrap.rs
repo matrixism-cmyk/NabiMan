@@ -70,9 +70,7 @@ pub(super) fn load_or_create_jwt_secret(path: &std::path::Path) -> String {
 }
 
 pub(super) fn data_dir() -> std::path::PathBuf {
-    std::path::PathBuf::from(
-        std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into()),
-    )
+    nabiman_server::data_dir()
 }
 pub(super) fn password_file_path() -> std::path::PathBuf {
     data_dir().join("password")

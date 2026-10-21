@@ -28,7 +28,7 @@ pub(crate) fn now_unix() -> u64 {
 }
 
 pub(crate) fn data_dir() -> String {
-    std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".to_string())
+    nabiman_server::data_dir().to_string_lossy().into_owned()
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
@@ -189,4 +189,11 @@ pub fn kill_user_sessions(store: &PtyStore, user_id: &str) {
 pub(crate) fn generate_session_id() -> String {
     use rand::Rng;
     format!("pty_{:016x}", rand::thread_rng().gen::<u64>())
+}
+
+impl crate::stream_access::ConnectionGrant {
+    /// Whether this account may see `session` (its own, or one shared with it).
+    pub(crate) fn can_access_session(&self, session: &TmuxSession) -> bool {
+        visible_to(session, &self.user_id, &self.users)
+    }
 }
