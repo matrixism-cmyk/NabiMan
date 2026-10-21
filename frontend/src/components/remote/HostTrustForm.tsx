@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { apiRequest } from '../../hooks/useApi';
-import { RemoteServer } from '../../types';
+import { RemoteServer } from './remoteTypes';
 import { useT } from '../../i18n';
 
 /** `onSaved` says whether a key is now approved (false after a revoke). */

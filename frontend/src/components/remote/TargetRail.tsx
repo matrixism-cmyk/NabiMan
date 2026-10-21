@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { RemoteServer } from '../../types';
+import { RemoteServer } from './remoteTypes';
 import { useT } from '../../i18n';
 import RailContextMenu, { RailMenuItem } from './RailContextMenu';
 import { useLongPress } from '../common/useLongPress';

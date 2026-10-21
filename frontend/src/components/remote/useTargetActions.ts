@@ -1,6 +1,6 @@
 import React from 'react';
 import { apiPost, apiRequest } from '../../hooks/useApi';
-import { RemoteServer, RemoteServerStatus } from '../../types';
+import { RemoteServer, RemoteServerStatus } from './remoteTypes';
 import { useT } from '../../i18n';
 import { TerminalTarget, TerminalViewHandle } from '../terminal/TerminalView';
 import { paneEnded, startFresh } from '../terminal/terminalStorage';

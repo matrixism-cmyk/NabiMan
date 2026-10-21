@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { apiPost, apiRequest } from '../../hooks/useApi';
-import { RemoteServer, RemoteServerStatus } from '../../types';
+import { RemoteServer, RemoteServerStatus } from './remoteTypes';
 import { useT } from '../../i18n';
-import { DeployKeyDialog } from '../SshKeyComponents';
+import { DeployKeyDialog } from './SshKeyComponents';
 import ServerForm from './ServerForm';
 import HostTrustForm from './HostTrustForm';
 import ProtocolDetect, { CheckList } from './ProtocolDetect';

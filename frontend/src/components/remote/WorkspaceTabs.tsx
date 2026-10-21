@@ -1,5 +1,5 @@
 import React from 'react';
-import { RemoteServer } from '../../types';
+import { RemoteServer } from './remoteTypes';
 import { useT } from '../../i18n';
 import { hasFiles, hasShell, hasTerminal } from './protocols';
 import { OverviewView, Selection, ServerView } from './workspaceState';

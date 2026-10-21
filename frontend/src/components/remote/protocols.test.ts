@@ -1,4 +1,4 @@
-import { RemoteServer } from '../../types';
+import { RemoteServer } from './remoteTypes';
 import { addressOf, hasShell, hasTerminal, matchesProtocol, protocolsOf, sessionLabel, usesSsh } from './protocols';
 
 const base: RemoteServer = {

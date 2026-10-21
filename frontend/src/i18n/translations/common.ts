@@ -110,9 +110,6 @@ const t: T = {
   'tab.swap': { ko: 'Swap', en: 'Swap', ja: 'Swap' },
   'tab.sessions': { ko: '접속 세션', en: 'Sessions', ja: 'セッション' },
   'tab.multiServer': { ko: '멀티서버', en: 'Multi-Server', ja: 'マルチサーバー' },
-  'remote.dashboard': { ko: '멀티서버 대시보드', en: 'Multi-Server Dashboard', ja: 'マルチサーバーダッシュボード' },
-  'remote.totalServers': { ko: '전체 서버', en: 'Total Servers', ja: '全サーバー' },
-  'remote.noServers': { ko: '등록된 원격 서버가 없습니다', en: 'No remote servers registered', ja: 'リモートサーバーが登録されていません' },
 
   // --- Login ---
   'login.password': { ko: '관리자 비밀번호', en: 'Admin Password', ja: '管理者パスワード' },

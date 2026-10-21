@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { I18nProvider } from '../../i18n';
 import { apiPost, apiRequest } from '../../hooks/useApi';
-import { RemoteServer } from '../../types';
+import { RemoteServer } from './remoteTypes';
 import ProtocolDetect from './ProtocolDetect';
 
 jest.mock('../../hooks/useApi', () => ({ apiPost: jest.fn(), apiRequest: jest.fn() }));

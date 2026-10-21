@@ -35,11 +35,11 @@ Claude 음성 대화는 메뉴는 나비맨에 있지만 코드는 터미널 쪽
 | 상단 접기 | `hooks/useChromeHidden` | `/remote` 셸, 원격 설정 | 셸 UI | 원격 셸이 자기 것을 가져가고 나비맨과는 설정 키만 공유 |
 | 테마 | `theme` (`ThemeSelector`, CSS 변수) | `/remote` 셸, 전체 색 | 디자인 | 공통 디자인 토큰 (CSS 변수 목록) |
 | 언어 선택 | `components/LanguageSelector` | `/remote` 셸 | 셸 UI | 공통 |
-| 서버 타입 | `types` (`RemoteServer`, `RemoteServerStatus`, `ProtocolCheck`) | 11개 파일 | **원격 것** | 원격으로 옮김 (지금 공용 파일에 섞여 있음) |
-| 다중 서버 대시보드 | `components/MultiServerDashboard` | 전체 현황 → 요약 | **원격 것** | 원격으로 옮김 (`/api/remote-servers`만 씀) |
-| SSH 키 화면 | `components/SshKeyComponents` | 전체 현황 → SSH 키, 서버 상세 | **원격 것** | 원격으로 옮김 (`/api/remote-servers/ssh-key*`만 씀) |
+| 서버 타입 | ~~`types`~~ → `remote/remoteTypes.ts` (`RemoteServer`, `RemoteServerStatus`, `ProtocolCheck`, `SshKeyInfo`) | 원격 18개 파일 + 나비맨 `ScopeResourcesPanel` | **원격 것** | ✅ 1단계에서 옮김 |
+| 다중 서버 대시보드 | ~~`components/MultiServerDashboard`~~ → `remote/MultiServerDashboard` | 전체 현황 → 요약 | **원격 것** | ✅ 1단계에서 옮김 |
+| SSH 키 화면 | ~~`components/SshKeyComponents`~~ → `remote/SshKeyComponents` | 전체 현황 → SSH 키, 서버 상세 | **원격 것** | ✅ 1단계에서 옮김 |
 | 공통 CSS | `App.css`, `components.css`, `design.css` (`.btn`, `.panel`, `.modal-*`, `.form-group`, `.message` …) | 거의 전부 | 디자인 | 공통 디자인 패키지로 |
-| 글꼴·기호 | `assets/fonts/**`, `assets/circled-digits.woff` | 터미널 | **원격 것** | 원격으로 옮김 |
+| 글꼴·기호 | ~~`assets/fonts/**`, `assets/circled-digits.woff`~~ → `terminal/fonts/` | 터미널 | **원격 것** | ✅ 1단계에서 옮김 (라이선스 원문은 그대로 `public/fonts/`) |
 
 외부 라이브러리(원격만 씀): `xterm`, `@xterm/addon-fit`, `@xterm/addon-web-links`,
 `pdfjs-dist`, `highlight.js`. 나비맨 쪽과 겹치는 것은 `react`뿐.
@@ -63,9 +63,10 @@ Claude 음성 대화는 메뉴는 나비맨에 있지만 코드는 터미널 쪽
 
 ### 1-3. 다국어 문구
 
-원격 화면이 쓰는 문구 접두사와 사용 횟수: `remote` 152, `terminal` 99, `sftp` 88,
-`share` 73, `preview` 46, `dictation` 17 — 모두 원격 것이고, 파일도
-`translations/terminal.ts`, `sftp.ts`, `remote-protocols.ts`로 이미 나뉘어 있다.
+원격 화면이 쓰는 문구 접두사: `remote`, `terminal`, `sftp`, `share`, `preview`,
+`dictation`, `sshKey`, `deployKey` — 모두 원격 것이다. 파일은 `translations/terminal.ts`,
+`sftp.ts`, `remote-protocols.ts`, `remote-base.ts`. (1단계 전에는 원격 문구 66개가
+나비맨의 `security.ts`·`common.ts`에 섞여 있었고, 1단계에서 `remote-base.ts`로 옮겼다.)
 
 나비맨 공통 문구는 21개만 쓴다:
 
@@ -146,7 +147,7 @@ Claude 음성 대화는 메뉴는 나비맨에 있지만 코드는 터미널 쪽
 
 | 단계 | 할 일 | 효과 |
 |---|---|---|
-| 1 | 원격 것인데 공용 자리에 있는 것 옮기기: `types`의 서버 타입, `MultiServerDashboard`, `SshKeyComponents`, 글꼴 | 원격 → 나비맨 의존이 공통 부품만 남음 |
+| 1 ✅ (2026-10-21) | 원격 것인데 공용 자리에 있는 것 옮기기: `types`의 서버 타입, `MultiServerDashboard`, `SshKeyComponents`, 글꼴, 나비맨 번역 파일에 섞여 있던 원격 문구 66개 | 원격 → 나비맨 의존이 공통 부품만 남음 (§7) |
 | 2 | 공통 `data_dir()` 하나로 모으기, `terminal_tickets` → 공통 `connection_tickets`로 이름·위치 변경 | 나비맨 → 원격의 거꾸로 된 의존 대부분 제거 |
 | 3 | 인증 미들웨어의 "한 번용 입장권" 확인을 등록식으로, 지원 보고서·멤버십은 원격이 내보내는 함수만 부르게 | 나비맨이 원격 내부를 모르게 됨 |
 | 4 | 프런트엔드 공통 부품(useApi, i18n 틀, Modal/ConfirmDialog/useLongPress, 테마·CSS)을 한 폴더(`shared/`)로 모으기 | 공통 패키지로 떼어 낼 준비 |
@@ -155,3 +156,23 @@ Claude 음성 대화는 메뉴는 나비맨에 있지만 코드는 터미널 쪽
 1·2단계는 동작 변화 없이 옮기고 이름만 바꾸는 일이라 위험이 낮다. 3단계부터는
 인증 경로를 건드리므로 로그인·공유·스트림 테스트(`smoke:signin`, `smoke:share`,
 `smoke:sessions`)를 매 단계 돌린다.
+
+## 7. 1단계 결과 (2026-10-21)
+
+옮긴 뒤 다시 뽑은 프런트엔드 원격 → 나비맨 의존은 이제 **공통 부품뿐**이다:
+
+| 부품 | 원격에서 쓰는 파일 수 |
+|---|---|
+| `hooks/useApi` (API·토큰) | 20 |
+| `i18n` (다국어 틀) | 49 |
+| `common/ConfirmDialog`, `common/Modal`, `common/useLongPress` | 9, 4, 2 |
+| `hooks/useChromeHidden`, `hooks/useIdleLogout` | 2, 1 |
+| `theme`, `LanguageSelector` | 1, 1 (`/remote` 셸) |
+
+나비맨이 쓰는 공통 문구는 22개(`common.*` 17, `app.*` 3, `accounts.password`, `tab.terminal`).
+
+백엔드의 `models/remote.rs`(`RemoteServer` 등)는 이미 따로 된 파일이라 1단계에서는
+그대로 두었다. 2단계에서 `terminal_tickets`, `data_dir()`와 함께 모듈 자리를 정리한다.
+
+1단계에서 함께 고친 것: 오른쪽 버튼 메뉴가, 항목을 보이게 하려고 막 일어난 스크롤 때문에
+열리자마자 닫히던 문제(150ms 안의 스크롤은 무시). `smoke:rail`이 가끔 실패하던 원인이었다.

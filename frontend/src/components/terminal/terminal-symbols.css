@@ -2,7 +2,7 @@
    fit that cell so a browser's proportional fallback cannot cover the next. */
 @font-face {
   font-family: 'NabiMan Circled Digits';
-  src: url('../../assets/circled-digits.woff') format('woff');
+  src: url('./fonts/circled-digits.woff') format('woff');
   font-style: normal;
   font-weight: 400 700;
   font-display: block;

@@ -113,7 +113,11 @@ const check = (name, ok, detail = '') => {
   // 6. Near the bottom-right corner the menu flips to stay on screen.
   const box = await server.boundingBox();
   await page.setViewportSize({ width: 1440, height: Math.round(box.y + box.height + 20) });
-  await server.click({ button: 'right', position: { x: box.width - 4, y: box.height - 4 } });
+  // The smaller window may scroll the list; a scroll closes menus, so settle first.
+  await server.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  const near = await server.boundingBox();
+  await server.click({ button: 'right', position: { x: near.width - 4, y: near.height - 4 } });
   await page.waitForSelector('.rw-menu');
   const menuBox = await page.$eval('.rw-menu', (el) => {
     const r = el.getBoundingClientRect();

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, apiPost } from '../../hooks/useApi';
-import { RemoteServer, RemoteServerStatus } from '../../types';
+import { RemoteServer, RemoteServerStatus } from './remoteTypes';
 import { useT } from '../../i18n';
 import TerminalView, { TerminalStatus, TerminalTarget, TerminalViewHandle } from '../terminal/TerminalView';
 import { useTerminalSettings } from '../terminal/settings';
@@ -10,8 +10,8 @@ import TerminalSettingsModal from '../terminal/TerminalSettingsModal';
 import ShareDialog from '../terminal/ShareDialog';
 import ShareLinksPanel from '../terminal/ShareLinksPanel';
 import MobileKeyBar from '../terminal/MobileKeyBar';
-import { SshKeyPanel } from '../SshKeyComponents';
-import MultiServerDashboard from '../MultiServerDashboard';
+import { SshKeyPanel } from './SshKeyComponents';
+import MultiServerDashboard from './MultiServerDashboard';
 import ServerForm from './ServerForm';
 import { ServerStatusView, ServerExecView, ServerSettingsView } from './ServerDetail';
 import SessionsView, { SessionInfo } from './SessionsView';

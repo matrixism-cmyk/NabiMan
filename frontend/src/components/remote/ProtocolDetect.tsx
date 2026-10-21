@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { apiPost, apiRequest } from '../../hooks/useApi';
-import { ProtocolCheck, RemoteServer } from '../../types';
+import { ProtocolCheck, RemoteServer } from './remoteTypes';
 import { useT } from '../../i18n';
 import { describeProtocols } from './ProtocolBadges';
 import { DETECT_PENDING_KEY } from './ServerForm';

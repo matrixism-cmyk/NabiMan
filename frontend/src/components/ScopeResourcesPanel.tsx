@@ -4,7 +4,7 @@ import { useT } from '../i18n';
 import React, { useState } from 'react';
 import { apiPost, useApi } from '../hooks/useApi';
 import { useMecList, mecGet } from '../hooks/mec/useMecApi';
-import { RemoteServer, RemoteServerStatus } from '../types';
+import { RemoteServer, RemoteServerStatus } from './remote/remoteTypes';
 import { accessActive } from './MemberAccessFields';
 import { MemberUser, membershipRole } from './MembershipEditor';
 

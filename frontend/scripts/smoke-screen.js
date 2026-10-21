@@ -68,10 +68,15 @@ const api = (page, path, init = {}) => page.evaluate(async ({ path, init }) => {
   const connect = page.locator('.rw-connect button', { hasText: '접속' });
   if (await connect.count()) await connect.click();
   await page.waitForSelector('.rw-work .xterm-screen', { timeout: 20000 });
+  // Keys typed before the connection opens go nowhere.
+  await page.locator('.rw-head-actions .status-badge.up').waitFor({ timeout: 20000 });
   await page.locator('.rw-work .xterm-screen').click();
   await page.keyboard.type("printf '한글ab|\\nabcdef|\\n'");
   await page.keyboard.press('Enter');
-  await page.waitForTimeout(2500);
+  // Wait for the output itself, not a fixed time: a busy machine is slower.
+  await page.waitForFunction(() => [...document.querySelectorAll('.rw-work .xterm-rows > div')]
+    .some((r) => r.textContent.startsWith('abcdef|')), null, { timeout: 15000 }).catch(() => {});
+  await page.waitForTimeout(500);
   const font = await page.evaluate(() => ({
     family: getComputedStyle(document.querySelector('.rw-work .xterm-rows')).fontFamily,
     loaded: document.fonts.check('14px "NabiMan D2Coding"'),

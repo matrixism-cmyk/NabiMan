@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { I18nProvider } from '../../i18n';
-import { RemoteServer } from '../../types';
+import { RemoteServer } from './remoteTypes';
 import WorkspaceTabs, { viewFor } from './WorkspaceTabs';
 
 const base: RemoteServer = {

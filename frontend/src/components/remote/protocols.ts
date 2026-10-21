@@ -1,4 +1,4 @@
-import { RemoteServer } from '../../types';
+import { RemoteServer } from './remoteTypes';
 
 export type TerminalProtocol = 'ssh' | 'telnet' | 'none';
 export type FileProtocol = 'sftp' | 'ftps' | 'ftp' | 'none';

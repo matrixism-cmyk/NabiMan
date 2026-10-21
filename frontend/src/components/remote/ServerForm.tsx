@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { apiPost, apiRequest } from '../../hooks/useApi';
-import { RemoteServer, RemoteServerStatus } from '../../types';
+import { RemoteServer, RemoteServerStatus } from './remoteTypes';
 import { useT } from '../../i18n';
 import { FileProtocol, PLAINTEXT, protocolName, TerminalProtocol } from './protocols';
 import { confirmDialog } from '../common/ConfirmDialog';

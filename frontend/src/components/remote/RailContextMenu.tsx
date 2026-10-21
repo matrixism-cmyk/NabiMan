@@ -78,9 +78,13 @@ export default function RailContextMenu({ x, y, title, items, onClose, opener }:
         (e.key === 'Home' ? list[0] : list[list.length - 1])?.focus();
       }
     };
-    // A scroll anywhere but inside the menu means the entry has moved away.
+    // A scroll anywhere but inside the menu means the entry has moved away —
+    // except the scroll that brought the entry into view just before the
+    // right-click, whose event arrives a frame after the menu opened.
+    const opened = performance.now();
     const onScroll = (e: Event) => {
       if (ref.current && e.target instanceof Node && ref.current.contains(e.target)) return;
+      if (performance.now() - opened < 150) return;
       close();
     };
 

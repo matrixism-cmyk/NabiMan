@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { RemoteServer } from '../../types';
+import { RemoteServer } from './remoteTypes';
 import SftpPanel from './sftp/SftpPanel';
 import { accountSource } from './sftp/sftpApi';
 import './sftp/sftp.css';
