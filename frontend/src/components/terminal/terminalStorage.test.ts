@@ -5,8 +5,8 @@
  * fresh shell instead of re-attaching to the one still running.
  */
 import {
-  bufKey, fontKeyForTest, pruneSessionZooms, pruneTerminalStorage, readFontSize, sessionZoomKey,
-  sidKey, writeFontSize,
+  bufKey, fontKeyForTest, markEnded, paneEnded, pruneSessionZooms, pruneTerminalStorage, readFontSize,
+  sessionZoomKey, sidKey, startFresh, storedSessionId, writeFontSize,
 } from './terminalStorage';
 
 beforeEach(() => localStorage.clear());
@@ -65,5 +65,38 @@ describe('zoom per session', () => {
     expect(readFontSize(sessionZoomKey('pty_alive'))).toBe(20);
     expect(readFontSize(sessionZoomKey('pty_dead'))).toBeNull();
     expect(readFontSize('ws_local')).toBe(16);
+  });
+});
+
+// A pane whose session ended must not start a shell of its own when it is
+// restored: a few forgotten windows used to add a few shells at every sign-in.
+describe('ended panes', () => {
+  it('stay ended across a reload, and say no session to attach to', () => {
+    localStorage.setItem(bufKey('tw_a'), 'old screen');
+    markEnded('tw_a');
+    expect(paneEnded('tw_a')).toBe(true);
+    expect(storedSessionId('tw_a')).toBe('');
+  });
+
+  it('count as ended when they show an old screen but have no session (from before the marker)', () => {
+    localStorage.setItem(bufKey('tw_old'), 'old screen');
+    localStorage.setItem(sidKey('tw_old'), '');
+    expect(paneEnded('tw_old')).toBe(true);
+  });
+
+  it('a new window, or one still attached, is not ended', () => {
+    expect(paneEnded('tw_new')).toBe(false);
+    localStorage.setItem(bufKey('tw_live'), 'screen');
+    localStorage.setItem(sidKey('tw_live'), 'pty_1');
+    expect(paneEnded('tw_live')).toBe(false);
+    expect(storedSessionId('tw_live')).toBe('pty_1');
+  });
+
+  it('asking for a new shell clears the ended state and the old screen', () => {
+    localStorage.setItem(bufKey('ws_local'), 'old screen');
+    markEnded('ws_local');
+    startFresh('ws_local');
+    expect(paneEnded('ws_local')).toBe(false);
+    expect(localStorage.getItem(bufKey('ws_local'))).toBeNull();
   });
 });

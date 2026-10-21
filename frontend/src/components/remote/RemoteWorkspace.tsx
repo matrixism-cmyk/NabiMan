@@ -5,7 +5,7 @@ import { useT } from '../../i18n';
 import TerminalView, { TerminalStatus, TerminalTarget, TerminalViewHandle } from '../terminal/TerminalView';
 import { useTerminalSettings } from '../terminal/settings';
 import { useTerminalWindows } from '../terminal/TerminalWindows';
-import { pruneSessionZooms } from '../terminal/terminalStorage';
+import { paneEnded, pruneSessionZooms, startFresh } from '../terminal/terminalStorage';
 import TerminalSettingsModal from '../terminal/TerminalSettingsModal';
 import ShareDialog from '../terminal/ShareDialog';
 import ShareLinksPanel from '../terminal/ShareLinksPanel';
@@ -145,6 +145,7 @@ export default function RemoteWorkspace() {
   const connect = (skipSaved = false) => {
     setManualPassword(skipSaved);
     const key = selection.kind === 'server' ? `ws_srv_${selection.id}${skipSaved ? '_manual' : ''}` : storageKey;
+    if (paneEnded(key)) startFresh(key); // asked for: a new shell where the last one ended
     setConnected(prev => new Set(prev).add(key));
     setServerView('terminal');
   };

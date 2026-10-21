@@ -8,7 +8,7 @@ import { HistoryPosition } from './TerminalHistoryBar';
 import TerminalHistoryControls from './TerminalHistoryControls';
 import { useScreenBuffer } from './useScreenBuffer';
 import { buildTerminalUrl, ticketedTerminalUrl, ticketedShareUrl } from './terminalUrl';
-import { bufKey, readStored, sidKey, writeStored } from './terminalStorage';
+import { bufKey, markEnded, paneEnded, readStored, sidKey, storedSessionId, writeStored } from './terminalStorage';
 import { useTerminalZoom } from './useTerminalZoom';
 import { useTerminalHandle } from './useTerminalHandle';
 import { useT } from '../../i18n';
@@ -95,7 +95,9 @@ const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function 
     settings: settingsRef.current,
     target: targetRef.current,
     sessionId,
-    join: Boolean(joinRef.current),
+    // A pane going back to its session must not get a new one in its place
+    // when that session is gone: it hears that it ended instead.
+    join: true,
     cols: termRef.current?.cols ?? 0,
     rows: termRef.current?.rows ?? 0,
   }), []);
@@ -124,7 +126,7 @@ const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function 
 
     const sessionId = shareRef.current
       ? ''
-      : joinRef.current || sessionIdRef.current || readStored(sidKey(storageKey));
+      : joinRef.current || sessionIdRef.current || storedSessionId(storageKey);
 
     // Reopening a window with an empty screen: pull the history tmux kept
     // while nothing was attached, so the previous output is there again.
@@ -196,7 +198,7 @@ const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function 
           endedRef.current = true;
           sessionIdRef.current = '';
           joinRef.current = undefined;
-          writeStored(sidKey(storageKey), '');
+          markEnded(storageKey);
           term.write(`\r\n\x1b[33m[${t('terminal.sessionEnded')}]\x1b[0m\r\n`);
           report('ended');
           return;
@@ -302,7 +304,13 @@ const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function 
       },
     );
 
-    connect();
+    // A pane whose session ended stays ended until asked for a new one.
+    if (!shareRef.current && !joinRef.current && paneEnded(storageKey)) {
+      endedRef.current = true;
+      markEnded(storageKey);
+      term.write(`\r\n\x1b[33m[${t('terminal.sessionEnded')}]\x1b[0m\r\n`);
+      report('ended');
+    } else connect();
 
     const saveTimer = window.setInterval(saveBuffer, SAVE_INTERVAL_MS);
     return () => {

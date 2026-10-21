@@ -128,7 +128,36 @@ export function pruneSessionZooms(liveSessionIds: string[]) {
   } catch { /* ignore */ }
 }
 
+/**
+ * Kept instead of a session id once that session has ended (exited, or
+ * ended from the session list). The pane then stays ended across reloads and
+ * sign-ins, and opens a new shell only when asked to ("새 세션"): restoring it
+ * used to start a fresh shell every time, and a few forgotten windows added
+ * a few unwanted shells at every sign-in.
+ */
+export const ENDED_SID = '!ended';
+
 /** The session id a pane last attached to, if any. */
 export function storedSessionId(storageKey: string): string {
-  return readStored(sidKey(storageKey));
+  const sid = readStored(sidKey(storageKey));
+  return sid === ENDED_SID ? '' : sid;
+}
+
+export function markEnded(storageKey: string) {
+  writeStored(sidKey(storageKey), ENDED_SID);
+}
+
+/**
+ * Whether a pane being restored should stay ended: its session ended, or
+ * (from before the marker existed) it shows an old screen but no session.
+ */
+export function paneEnded(storageKey: string): boolean {
+  const sid = readStored(sidKey(storageKey));
+  return sid === ENDED_SID || (sid === '' && readStored(bufKey(storageKey)) !== '');
+}
+
+/** The pane's next connection starts a new shell, with a clean screen. */
+export function startFresh(storageKey: string) {
+  try { localStorage.removeItem(bufKey(storageKey)); } catch { /* ignore */ }
+  writeStored(sidKey(storageKey), '');
 }

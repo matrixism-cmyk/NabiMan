@@ -3,7 +3,7 @@ import { apiPost, apiRequest } from '../../hooks/useApi';
 import { RemoteServer, RemoteServerStatus } from '../../types';
 import { useT } from '../../i18n';
 import { TerminalTarget, TerminalViewHandle } from '../terminal/TerminalView';
-import { sidKey, writeStored } from '../terminal/terminalStorage';
+import { paneEnded, startFresh } from '../terminal/terminalStorage';
 import { hasFiles, hasTerminal } from './protocols';
 import { RailAction, Selection, ServerView } from './workspaceState';
 import { confirmDialog } from '../common/ConfirmDialog';
@@ -64,7 +64,7 @@ export function useTargetActions({
       setServerView('terminal');
       return;
     }
-    if (fresh) writeStored(sidKey(key), '');
+    if (fresh || paneEnded(key)) startFresh(key);
     select(target, 'terminal');
     setConnected(prev => new Set(prev).add(key));
   };
