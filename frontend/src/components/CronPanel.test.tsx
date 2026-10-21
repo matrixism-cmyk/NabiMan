@@ -1,9 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import { I18nProvider } from '../i18n';
-import { apiPost, apiRequest, useApi } from '../hooks/useApi';
+import { apiPost, apiRequest, useApi } from '../shared/api/useApi';
 import CronPanel from './CronPanel';
-jest.mock('../hooks/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn(), apiRequest: jest.fn() }));
+jest.mock('../shared/api/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn(), apiRequest: jest.fn() }));
 const job = { user: 'root', id: 4, revision: 'old-revision', schedule: '@reboot', command: '/bin/true', can_manage: true };
 let rows = [job]; let canWrite = true; let error: string | null = null;
 const snapshot = { user: 'root', uid: 0, revision: 'reviewed-revision', content: '# existing\nSHELL=/bin/sh\n', can_write: true };

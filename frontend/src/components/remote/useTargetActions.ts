@@ -1,12 +1,12 @@
 import React from 'react';
-import { apiPost, apiRequest } from '../../hooks/useApi';
+import { apiPost, apiRequest } from '../../shared/api/useApi';
 import { RemoteServer, RemoteServerStatus } from './remoteTypes';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 import { TerminalTarget, TerminalViewHandle } from '../terminal/TerminalView';
 import { paneEnded, startFresh } from '../terminal/terminalStorage';
 import { hasFiles, hasTerminal } from './protocols';
 import { RailAction, Selection, ServerView } from './workspaceState';
-import { confirmDialog } from '../common/ConfirmDialog';
+import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 
 interface Options {
   servers: RemoteServer[];

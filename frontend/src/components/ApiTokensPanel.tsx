@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { apiPost, apiRequest, useApi } from '../hooks/useApi';
+import { apiPost, apiRequest, useApi } from '../shared/api/useApi';
 import { useT } from '../i18n';
-import { confirmDialog } from './common/ConfirmDialog';
+import { confirmDialog } from '../shared/ui/ConfirmDialog';
 interface Token { id: string; name: string; prefix: string; owner_name: string | null; scopes: string[]; status: string; expires_at: string | null; last_used: string | null }
 interface Issued { id: string; key: string; expires_at: string }
 const scopes = ['status:read', 'servers:read', 'tenants:read'];

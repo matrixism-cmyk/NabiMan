@@ -1,10 +1,10 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { I18nProvider } from '../../i18n';
-import { apiPost, apiRequest } from '../../hooks/useApi';
+import { apiPost, apiRequest } from '../../shared/api/useApi';
 import ShareDialog from './ShareDialog';
 
-jest.mock('../../hooks/useApi', () => ({ apiRequest: jest.fn(), apiPost: jest.fn() }));
+jest.mock('../../shared/api/useApi', () => ({ apiRequest: jest.fn(), apiPost: jest.fn() }));
 const link = { token: 'test-token', session_id: 'session-1', expires_unix: 0, read_only: true, needs_password: false };
 const request = apiRequest as jest.Mock;
 const post = apiPost as jest.Mock;

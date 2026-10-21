@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchWithRefresh } from '../../hooks/useApi';
+import { fetchWithRefresh } from '../../shared/api/useApi';
 import { mecPost } from '../../hooks/mec/useMecApi';
 import { useT } from '../../i18n';
 import { ErrorBanner, Section } from './common';

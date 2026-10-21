@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import './dictation.css';
-import { apiPost, apiRequest } from '../../../hooks/useApi';
-import { useT } from '../../../i18n';
+import { apiPost, apiRequest } from '../../../shared/api/useApi';
+import { useT } from '../../../shared/i18n';
 import { forgetDictationAvailability } from './sockets';
 import PauseField from './PauseField';
 

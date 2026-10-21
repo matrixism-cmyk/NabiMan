@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState, useId } from 'react';
-import Modal from '../common/Modal';
-import { apiPost, apiRequest } from '../../hooks/useApi';
-import { useT } from '../../i18n';
-import { confirmDialog } from '../common/ConfirmDialog';
+import Modal from '../../shared/ui/Modal';
+import { apiPost, apiRequest } from '../../shared/api/useApi';
+import { useT } from '../../shared/i18n';
+import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 
 export interface ShareLink {
   token: string;

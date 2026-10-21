@@ -26,10 +26,10 @@ Claude 음성 대화는 메뉴는 나비맨에 있지만 코드는 터미널 쪽
 
 | 부품 | 위치 | 원격에서 쓰는 곳 | 성격 | 분리할 때 |
 |---|---|---|---|---|
-| API 호출·토큰 갱신 | `hooks/useApi` (`apiRequest`, `apiPost`, `useApi`, `fetchWithRefresh`) | 18개 파일 | **인증 핵심** | 공통 패키지로 (로그인 공유의 중심) |
+| API 호출·토큰 갱신 | ~~`hooks/useApi`~~ → `shared/api/useApi` (`apiRequest`, `apiPost`, `useApi`, `fetchWithRefresh`) | 18개 파일 | **인증 핵심** | 공통 패키지로 (로그인 공유의 중심) |
 | 다국어 | `i18n` (`useT`, `I18nProvider`) | 45개 파일 | 틀은 공통, 문구는 대부분 원격 것 | 틀은 공통 패키지로, 원격 문구 파일은 원격으로 (§1-3) |
-| 확인 창 | `common/ConfirmDialog` (`confirmDialog`) | 9개 파일 | 범용 UI | 공통 UI 패키지로 |
-| 모달 틀 | `common/Modal` | 4개 파일 | 범용 UI | 공통 UI 패키지로 |
+| 확인 창 | ~~`common/ConfirmDialog`~~ → `shared/ui/ConfirmDialog` (`confirmDialog`) | 9개 파일 | 범용 UI | 공통 UI 패키지로 |
+| 모달 틀 | ~~`common/Modal`~~ → `shared/ui/Modal` | 4개 파일 | 범용 UI | 공통 UI 패키지로 |
 | 길게 누르기 | `common/useLongPress` | 2개 파일 | 범용 훅 | 공통 UI 패키지로 |
 | 자동 로그아웃 | `hooks/useIdleLogout` (`markActivity`) | 받아쓰기 1곳 | 계정 정책 | 공통(인증) 패키지로 |
 | 상단 접기 | `hooks/useChromeHidden` | `/remote` 셸, 원격 설정 | 셸 UI | 원격 셸이 자기 것을 가져가고 나비맨과는 설정 키만 공유 |
@@ -150,7 +150,7 @@ Claude 음성 대화는 메뉴는 나비맨에 있지만 코드는 터미널 쪽
 | 1 ✅ (2026-10-21) | 원격 것인데 공용 자리에 있는 것 옮기기: `types`의 서버 타입, `MultiServerDashboard`, `SshKeyComponents`, 글꼴, 나비맨 번역 파일에 섞여 있던 원격 문구 66개 | 원격 → 나비맨 의존이 공통 부품만 남음 (§7) |
 | 2 ✅ (2026-10-21) | 공통 `data_dir()` 하나로 모으기, `ConnectionGrant`를 나비맨 공통(`stream_access`)으로 (입장권 자체는 터미널 것이라 그대로) | 나비맨 → 원격의 거꾸로 된 의존 대부분 제거 (§8) |
 | 3 ✅ (2026-10-21) | 인증의 공개 경로·한 번용 입장권, 지원 보고서 항목, 멤버십의 서버 확인을 등록식(`extension_points`)으로 — 원격은 `remote.rs`에서 등록 | 나비맨 코드가 원격 모듈을 부르지 않음 (§9) |
-| 4 | 프런트엔드 공통 부품(useApi, i18n 틀, Modal/ConfirmDialog/useLongPress, 테마·CSS)을 한 폴더(`shared/`)로 모으기 | 공통 패키지로 떼어 낼 준비 |
+| 4 ✅ (2026-10-21) | 프런트엔드 공통 부품(API·자동 로그아웃·다국어 틀·공통 문구 24개·모달·테마·언어 선택·기본 CSS)을 `src/shared/`로, 경계 검사(`check-boundaries.js`)를 lint에 | 원격이 나비맨에서 가져오는 것은 `shared/`뿐 (§10) |
 | 5 | 원격만 빌드하는 진입점(`/remote` 전용 번들)과, 원격 API만 등록하는 서버 설정 | 실제로 따로 배포해 보기 |
 
 1·2단계는 동작 변화 없이 옮기고 이름만 바꾸는 일이라 위험이 낮다. 3단계부터는
@@ -253,4 +253,44 @@ Claude 음성 대화는 메뉴는 나비맨에 있지만 코드는 터미널 쪽
 **확인한 것:** 백엔드 테스트 전체(새 테스트 포함), jest 321개, API e2e(66+40), 스트리밍
 e2e, 브라우저 smoke(공유 15·세션 9·받아쓰기 9·단독 화면 14·미디어 15·프로토콜 31·
 파일 23·로그인 유지 13), CI 스크립트(지원 보고서, 인증 입장 제한, 로그인 세션, API 토큰).
+
+## 10. 4단계 결과 (2026-10-21)
+
+**`frontend/src/shared/`** — 나비맨과 원격이 함께 쓰는 것만 모은 폴더. 바깥(나비맨·원격)을
+가져오지 않는다.
+
+| 폴더 | 내용 | 전에는 |
+|---|---|---|
+| `shared/api/useApi.ts` | API 호출·토큰 갱신, `ApiResponse` 타입 | `hooks/useApi.ts`, `types` |
+| `shared/auth/useIdleLogout.ts` | 무활동 자동 로그아웃 | `hooks/` |
+| `shared/i18n/` | 다국어 **틀**(`I18nProvider`가 번역표를 받음, `useT`, `Lang`)과 **공통 문구 24개**(`strings.ts`) | `i18n/context.tsx`가 나비맨 번역표를 직접 가져옴, 문구는 `common.ts`·`security.ts` |
+| `shared/ui/` | `Modal`, `ConfirmDialog`, `useLongPress`, `useChromeHidden`, `LanguageSelector` | `components/common/`, `hooks/`, `components/` |
+| `shared/theme/` | 테마 제공자·선택기·프리셋 | `theme/` |
+| `shared/styles/` | 토큰·리셋·패널·표·배지·버튼·입력·메시지·모달 CSS (`index.ts`가 순서대로 불러옴) | `index.css`, `App.css`, `components.css`, `design.css`에 섞여 있음 |
+
+**다국어.** 나비맨의 `i18n/`은 이제 "공통 틀 + 나비맨의 모든 문구(공통 문구 포함)"를
+묶는 얇은 연결이다. 원격 화면 53개 파일은 `useT`를 `shared/i18n`에서 가져온다. 원격이
+나중에 따로 서면 `<I18nProvider translations={{ ...sharedStrings, ...원격문구 }}>` 하나로 된다.
+원격 문구 파일(`terminal.ts`, `sftp.ts`, `remote-*.ts`, `claude.ts`)은 아직 `i18n/translations/`에
+있다 — 5단계에서 원격 진입점과 함께 옮긴다.
+
+**CSS.** 기준은 "원격·공통 부품이 쓰는 클래스의 규칙 + 토큰·리셋"이다. 나비맨과 함께
+쓰는 규칙은 `shared/styles`로, 원격만 쓰는 8개 규칙(서버 카드, SSH 키, 서버 폼 격자)은
+`components/remote/remote-base.css`로 옮겼고, 나머지(머리글·메뉴·사이드바·나비맨 화면)는
+그대로 `App.css` 등에 남았다. 원래 순서를 지켜서 옮겼고, **옮기기 전후로 27개 화면의
+모든 요소의 계산된 스타일(36가지 속성)을 비교해 차이 0**을 확인했다(나비맨 15개 메뉴,
+원격 전체 현황 5개 탭, 서버 하나의 모든 탭, 서버 추가 폼, `/remote`, 로그인 화면).
+
+**경계 검사.** `scripts/check-boundaries.js`가 `npm run lint`(CI)에서 돈다:
+`shared/`는 `shared/`만, 원격(`components/remote`, `terminal`, `claude`)은 원격과
+`shared/`만 가져올 수 있다. 테스트 파일은 나비맨의 전체 문구를 쓰므로 빼고 본다.
+
+| 원격 → 나비맨 의존 | 1단계 후 | 4단계 후 |
+|---|---|---|
+| 테스트가 아닌 파일 | 9개 모듈(useApi, i18n, ConfirmDialog …) | **0** (`shared/`만) |
+
+**확인한 것:** 타입 검사, lint와 경계 검사, jest 321개, 브라우저 smoke 전부(기본, 공유 15,
+세션 9, 받아쓰기 9, Claude 14, 단독 화면 14, 프로토콜 31, 서버 목록 15, 화면 13, 이름 바꾸기 12,
+확대 7, 붙여넣기 9, 모바일 27, 미리보기 36, 미디어 15, 열 18, 파일 23, 로그인 유지 13),
+CI 스크립트(지원 보고서, 로그인 시도 제한).
 

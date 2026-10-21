@@ -1,6 +1,6 @@
 import React from 'react';
 import { RemoteServer } from './remoteTypes';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 import { PLAINTEXT, protocolName, protocolsOf } from './protocols';
 
 /** "SSH · SFTP", or "SFTP 전용" when there is just one. */

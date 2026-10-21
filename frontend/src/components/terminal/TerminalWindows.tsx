@@ -6,8 +6,8 @@ import { forgetTerminalStorage, pruneTerminalStorage, storedSessionId } from './
 import TerminalSettingsModal from './TerminalSettingsModal';
 import TerminalWindowFrame from './TerminalWindowFrame';
 import { clamp, DEFAULT_H, DEFAULT_W, MIN_H, MIN_W, TASKBAR_H, TermWindow } from './windowGeometry';
-import { apiRequest } from '../../hooks/useApi';
-import { useT } from '../../i18n';
+import { apiRequest } from '../../shared/api/useApi';
+import { useT } from '../../shared/i18n';
 import './terminal-windows.css';
 
 interface OpenOptions {

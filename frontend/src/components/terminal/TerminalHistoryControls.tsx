@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import type { Terminal } from 'xterm';
 import TerminalHistoryBar, { HistoryPosition } from './TerminalHistoryBar';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 import { scrollTerminalHistory } from './touchGestures';
 
 interface Props {

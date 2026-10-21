@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { useApi, apiPost } from '../../hooks/useApi';
+import { useApi, apiPost } from '../../shared/api/useApi';
 import { RemoteServer, SshKeyInfo } from './remoteTypes';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
+import './remote-base.css';
 
 export function SshKeyPanel() {
   const { t } = useT();

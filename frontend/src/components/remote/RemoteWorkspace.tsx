@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useApi, apiPost } from '../../hooks/useApi';
+import { useApi, apiPost } from '../../shared/api/useApi';
 import { RemoteServer, RemoteServerStatus } from './remoteTypes';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 import TerminalView, { TerminalStatus, TerminalTarget, TerminalViewHandle } from '../terminal/TerminalView';
 import { useTerminalSettings } from '../terminal/settings';
 import { useTerminalWindows } from '../terminal/TerminalWindows';

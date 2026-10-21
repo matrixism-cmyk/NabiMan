@@ -1,9 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { I18nProvider } from '../i18n';
-import { apiPost, useApi } from '../hooks/useApi';
+import { apiPost, useApi } from '../shared/api/useApi';
 import AuditForwardingPanel from './AuditForwardingPanel';
-jest.mock('../hooks/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn() }));
+jest.mock('../shared/api/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn() }));
 beforeEach(() => { jest.clearAllMocks(); localStorage.setItem('nabiman_lang', 'en'); (useApi as jest.Mock).mockReturnValue({ data: { destinations: [], counters: { acknowledged: 0, cancelled: 0 }, legacy_requires_review: false }, refetch: jest.fn() }); });
 it('clears the authorization input even when saving fails and never enables implicitly', async () => {
   (apiPost as jest.Mock).mockResolvedValue({ success: false, message: 'Storage unavailable' });

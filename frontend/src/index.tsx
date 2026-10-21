@@ -1,10 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import './index.css';
+import './shared/styles';
 import App from './App';
 import { I18nProvider } from './i18n';
 import SharePage from './components/terminal/SharePage';
-import { ConfirmHost } from './components/common/ConfirmDialog';
+import { ConfirmHost } from './shared/ui/ConfirmDialog';
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(

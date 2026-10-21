@@ -1,9 +1,9 @@
 import { useCallback, useRef, useState } from 'react';
-import { useT } from '../../../i18n';
+import { useT } from '../../../shared/i18n';
 import { Dropped } from './sftpDrop';
 import { baseName, joinPath, makeDir, saveFile, SftpSource, Transfer, uploadFile } from './sftpApi';
 import { RateState, startRate, updateRate } from './transferRate';
-import { confirmDialog } from '../../common/ConfirmDialog';
+import { confirmDialog } from '../../../shared/ui/ConfirmDialog';
 
 export interface TransferRow {
   id: number;

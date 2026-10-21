@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useT } from '../i18n';
-import { apiRequest } from '../hooks/useApi';
+import { apiRequest } from '../shared/api/useApi';
 
 const CHOICES = [0, 5, 10, 15, 30, 60, 120, 240, 480, 1440];
 

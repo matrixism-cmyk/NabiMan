@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { apiRequest, apiPost, useApi } from '../hooks/useApi';
+import { apiRequest, apiPost, useApi } from '../shared/api/useApi';
 import { useT } from '../i18n';
 interface Segment { name: string; valid: boolean; entries_checked: number; malformed_lines: number; hash_mismatches: number; unhashed_entries: number; truncated: boolean; sha256: string | null; error: string | null }
 interface Verification { valid: boolean; entries_checked: number; segments: Segment[] }

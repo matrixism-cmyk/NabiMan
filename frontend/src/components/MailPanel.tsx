@@ -1,5 +1,5 @@
 import React from 'react';
-import { useApi } from '../hooks/useApi';
+import { useApi } from '../shared/api/useApi';
 import { useT } from '../i18n';
 
 interface MailStatus { running: boolean; server: string; queue_count: number; queue_entries: MailQueueEntry[]; stats: MailStats; }

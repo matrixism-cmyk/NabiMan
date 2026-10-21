@@ -1,10 +1,10 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { I18nProvider } from '../i18n';
-import { useApi } from '../hooks/useApi';
+import { useApi } from '../shared/api/useApi';
 import RuntimeIdentityPanel from './RuntimeIdentityPanel';
 jest.mock('./ReleaseInventoryPanel', () => () => null);
-jest.mock('../hooks/useApi', () => ({ useApi: jest.fn() }));
+jest.mock('../shared/api/useApi', () => ({ useApi: jest.fn() }));
 it('hides a previously observed executable when refresh fails and permits retry', () => {
   localStorage.setItem('nabiman_lang', 'ko');
   const refetch = jest.fn();

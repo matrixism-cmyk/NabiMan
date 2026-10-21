@@ -1,9 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { I18nProvider } from '../../i18n';
-import { fetchWithRefresh } from '../../hooks/useApi';
+import { fetchWithRefresh } from '../../shared/api/useApi';
 import MecUsersPanel from './MecUsersPanel';
-jest.mock('../../hooks/useApi', () => ({ fetchWithRefresh: jest.fn() }));
+jest.mock('../../shared/api/useApi', () => ({ fetchWithRefresh: jest.fn() }));
 jest.mock('../../hooks/mec/useMecApi', () => ({ useMecList: () => ({ data: [{ id: 'u-test', username: 'test-user', enabled: true }], refetch: jest.fn() }) }));
 it('does not disclose a new credential or claim success after a rejected reset', async () => {
   localStorage.setItem('nabiman_lang', 'ko');

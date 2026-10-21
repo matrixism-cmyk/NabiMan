@@ -1,10 +1,10 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import ManagedMembershipPolicies from './ManagedMembershipPolicies';
-import { useApi } from '../../hooks/useApi';
+import { useApi } from '../../shared/api/useApi';
 import { useMecList, mecPost } from '../../hooks/mec/useMecApi';
 import { I18nProvider } from '../../i18n';
-jest.mock('../../hooks/useApi', () => ({ useApi: jest.fn(), fetchWithRefresh: jest.fn() }));
+jest.mock('../../shared/api/useApi', () => ({ useApi: jest.fn(), fetchWithRefresh: jest.fn() }));
 jest.mock('../../hooks/mec/useMecApi', () => ({ useMecList: jest.fn(), mecPost: jest.fn() }));
 jest.mock('./TenantAccessDelegation', () => () => null);
 jest.mock('./PendingManagedGrants', () => () => null);

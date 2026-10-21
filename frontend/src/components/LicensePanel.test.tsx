@@ -1,9 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { I18nProvider } from '../i18n';
-import { useApi, apiPost } from '../hooks/useApi';
+import { useApi, apiPost } from '../shared/api/useApi';
 import LicensePanel from './LicensePanel';
-jest.mock('../hooks/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn() }));
+jest.mock('../shared/api/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn() }));
 const refetch = jest.fn();
 const status = { active: true, tier: 'pro', holder: 'Test holder', expires_at: '2026-10-31', days_remaining: 26, is_trial: false, trial_days_remaining: null, features: ['basic_monitoring'], max_servers: 3, validation_state: 'licensed' };
 beforeEach(() => {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 import { fontOf, TERMINAL_FONTS } from './terminalFonts';
 
 /** What shows a coding font's character: look-alikes, brackets, box lines, Korean, alignment. */

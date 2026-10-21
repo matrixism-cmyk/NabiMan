@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useApi, apiPost } from '../hooks/useApi';
+import { useApi, apiPost } from '../shared/api/useApi';
 import { useT } from '../i18n';
 
 interface LicenseStatus {

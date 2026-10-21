@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { apiRequest, useApi } from '../hooks/useApi';
+import { apiRequest, useApi } from '../shared/api/useApi';
 import { useMecList } from '../hooks/mec/useMecApi';
 import { Tenant } from '../types/mec';
 import { MemberUser, ScopeOption } from './MembershipEditor';
 import { accessActive } from './MemberAccessFields';
 import ScopePolicyHistory from './ScopePolicyHistory';
 import UserManagementPanel from './UserManagementPanel';
-import { confirmDialog } from './common/ConfirmDialog';
+import { confirmDialog } from '../shared/ui/ConfirmDialog';
 
 interface Settings { revision: string; contact_email: string; member_notice: string; member_limit: number | null; allow_commands: boolean; require_mfa: boolean }
 function ScopePolicy({ scope, canManage, tenant }: { scope: ScopeOption; canManage: boolean; tenant?: Tenant }) {

@@ -41,7 +41,7 @@ const mockApiRequest = jest.fn((..._args: unknown[]) =>
 const mockApiPost = jest.fn((..._args: unknown[]) =>
   Promise.resolve({ success: true, data: null, message: '' }));
 
-jest.mock('../../hooks/useApi', () => ({
+jest.mock('../../shared/api/useApi', () => ({
   useApi: (endpoint: string) => ({
     data: endpoint.includes('/api/terminal/sessions') ? SESSIONS
       : endpoint.includes('/api/remote-servers') && !endpoint.includes('ssh-key') ? SERVERS

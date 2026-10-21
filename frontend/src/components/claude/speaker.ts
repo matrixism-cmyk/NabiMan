@@ -5,7 +5,7 @@
  * a tap has started once (see `unlock`).
  */
 
-import { markActivity } from '../../hooks/useIdleLogout';
+import { markActivity } from '../../shared/auth/useIdleLogout';
 
 export type Fetch = (text: string, signal: AbortSignal) => Promise<Blob>;
 

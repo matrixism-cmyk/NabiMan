@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { apiPost, useApi } from '../hooks/useApi';
+import { apiPost, useApi } from '../shared/api/useApi';
 import { useT } from '../i18n';
-import { confirmDialog } from './common/ConfirmDialog';
+import { confirmDialog } from '../shared/ui/ConfirmDialog';
 interface Destination { id: string; revision: string; name: string; url: string; enabled: boolean; has_auth: boolean; pending: number; blocked: number; last_error: string | null; acknowledged: number; last_ack_at: string | null }
 interface Status { destinations: Destination[]; counters: Record<string, number>; legacy_requires_review: boolean; delivery_paused_by_operator: boolean }
 export default function AuditForwardingPanel() {

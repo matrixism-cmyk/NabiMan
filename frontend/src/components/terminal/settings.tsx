@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { apiRequest } from '../../hooks/useApi';
-import { useT } from '../../i18n';
+import { apiRequest } from '../../shared/api/useApi';
+import { useT } from '../../shared/i18n';
 
 /** Terminal preferences. Mirrors `TerminalSettings` in the Rust backend. */
 export interface TerminalSettings {

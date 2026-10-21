@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { apiPost } from '../hooks/useApi';
+import { apiPost } from '../shared/api/useApi';
 import { PortCheckResult } from '../types';
 import { useT } from '../i18n';
 import SupportReportPanel from './SupportReportPanel';

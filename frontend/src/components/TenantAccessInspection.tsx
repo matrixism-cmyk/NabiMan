@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchWithRefresh } from '../hooks/useApi';
+import { fetchWithRefresh } from '../shared/api/useApi';
 import { useT } from '../i18n';
 import './membership-management.css';
 interface Binding { id: string; user_id: string; role_template: string }

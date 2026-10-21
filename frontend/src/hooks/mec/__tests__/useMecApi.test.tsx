@@ -1,8 +1,8 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { fetchWithRefresh } from '../../useApi';
+import { fetchWithRefresh } from '../../../shared/api/useApi';
 import { mecList, useMecList } from '../useMecApi';
 
-jest.mock('../../useApi', () => ({ fetchWithRefresh: jest.fn() }));
+jest.mock('../../../shared/api/useApi', () => ({ fetchWithRefresh: jest.fn() }));
 const fetchMock = fetchWithRefresh as jest.Mock;
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 import { DEFAULT_TERMINAL_SETTINGS, TerminalSettings, useTerminalSettings } from './settings';
 import FontPicker from './FontPicker';
 

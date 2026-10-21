@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useApi, apiPost, apiRequest } from '../hooks/useApi';
+import { useApi, apiPost, apiRequest } from '../shared/api/useApi';
 import { useT } from '../i18n';
-import { confirmDialog } from './common/ConfirmDialog';
+import { confirmDialog } from '../shared/ui/ConfirmDialog';
 
 interface AlertRule { id: string; name: string; metric: string; threshold: number; duration_secs: number; enabled: boolean; last_triggered: string | null; service_name?: string; }
 

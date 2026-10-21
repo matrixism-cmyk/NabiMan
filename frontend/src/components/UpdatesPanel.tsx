@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { useApi, apiPost } from '../hooks/useApi';
+import { useApi, apiPost } from '../shared/api/useApi';
 import { UpdateCheckResult } from '../types';
 import { useT } from '../i18n';
-import { confirmDialog } from './common/ConfirmDialog';
+import { confirmDialog } from '../shared/ui/ConfirmDialog';
 
 export default function UpdatesPanel() {
   const { t } = useT();

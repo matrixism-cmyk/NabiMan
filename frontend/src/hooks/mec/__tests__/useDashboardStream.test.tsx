@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
-import { fetchWithRefresh } from '../../useApi';
+import { fetchWithRefresh } from '../../../shared/api/useApi';
 import { useDashboardStream } from '../useDashboardStream';
-jest.mock('../../useApi', () => ({ fetchWithRefresh: jest.fn() }));
+jest.mock('../../../shared/api/useApi', () => ({ fetchWithRefresh: jest.fn() }));
 it('uses the refresh-aware header client without a query credential', async () => {
   sessionStorage.setItem('nabiman_token', 'never-stream-in-url');
   (fetchWithRefresh as jest.Mock).mockResolvedValue({ ok: false, status: 503 });

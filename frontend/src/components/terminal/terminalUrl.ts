@@ -1,4 +1,4 @@
-import { apiRequest } from '../../hooks/useApi';
+import { apiRequest } from '../../shared/api/useApi';
 import { TerminalSettings } from './settings';
 import { TerminalTarget } from './TerminalView';
 

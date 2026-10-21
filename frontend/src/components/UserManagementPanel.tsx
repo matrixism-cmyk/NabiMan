@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { useApi, apiPost, apiRequest } from '../hooks/useApi';
+import { useApi, apiPost, apiRequest } from '../shared/api/useApi';
 import { useMecList } from '../hooks/mec/useMecApi';
 import MembershipEditor, { Membership, MemberUser, ScopeOption, membershipRole } from './MembershipEditor';
 
 import MemberAccessFields, { accessActive } from './MemberAccessFields';
 import ExternalIdentityEditor from './ExternalIdentityEditor';
 import TenantAccessInspection from './TenantAccessInspection';
-import { confirmDialog } from './common/ConfirmDialog';
+import { confirmDialog } from '../shared/ui/ConfirmDialog';
 
 const statusLabel = { active: '승인', pending: '승인 대기', rejected: '반려', suspended: '이용 정지' };
 export default function UserManagementPanel({ initialScope = '' }: { initialScope?: string }) {

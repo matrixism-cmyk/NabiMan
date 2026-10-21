@@ -85,7 +85,6 @@ const t: T = {
   'accounts.addUser': { ko: '사용자 추가', en: 'Add User', ja: 'ユーザー追加' },
   'accounts.createAccount': { ko: '계정 생성', en: 'Create Account', ja: 'アカウント作成' },
   'accounts.username': { ko: '사용자명', en: 'Username', ja: 'ユーザー名' },
-  'accounts.password': { ko: '비밀번호', en: 'Password', ja: 'パスワード' },
   'accounts.shell': { ko: '셸', en: 'Shell', ja: 'シェル' },
   'accounts.create': { ko: '생성', en: 'Create', ja: '作成' },
   'accounts.changePassword': { ko: '비밀번호 변경', en: 'Change Password', ja: 'パスワード変更' },

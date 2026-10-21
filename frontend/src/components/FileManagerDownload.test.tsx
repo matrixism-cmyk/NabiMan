@@ -1,9 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { apiPost, fetchWithRefresh } from '../hooks/useApi';
+import { apiPost, fetchWithRefresh } from '../shared/api/useApi';
 import { I18nProvider } from '../i18n';
 import FileManagerPanel from './FileManagerPanel';
-jest.mock('../hooks/useApi', () => ({ apiPost: jest.fn(), fetchWithRefresh: jest.fn() }));
+jest.mock('../shared/api/useApi', () => ({ apiPost: jest.fn(), fetchWithRefresh: jest.fn() }));
 beforeEach(() => {
   jest.clearAllMocks();
   localStorage.setItem('nabiman_lang', 'ko');

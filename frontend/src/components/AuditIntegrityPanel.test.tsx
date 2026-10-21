@@ -1,9 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { I18nProvider } from '../i18n';
-import { apiPost, apiRequest, useApi } from '../hooks/useApi';
+import { apiPost, apiRequest, useApi } from '../shared/api/useApi';
 import AuditIntegrityPanel from './AuditIntegrityPanel';
-jest.mock('../hooks/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn(), apiRequest: jest.fn() }));
+jest.mock('../shared/api/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn(), apiRequest: jest.fn() }));
 const segment = { name: 'audit.jsonl', valid: false, entries_checked: 2, malformed_lines: 1, hash_mismatches: 1, unhashed_entries: 0, truncated: false, sha256: 'source-digest', error: null };
 beforeEach(() => {
   jest.clearAllMocks(); localStorage.setItem('nabiman_lang', 'en');

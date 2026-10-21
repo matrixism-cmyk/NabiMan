@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { useApi, apiPost } from '../../hooks/useApi';
+import { useApi, apiPost } from '../../shared/api/useApi';
 import { RemoteServer, RemoteServerStatus } from './remoteTypes';
 import ProtocolBadges from './ProtocolBadges';
 import { addressOf, hasShell } from './protocols';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
+import './remote-base.css';
 
 export default function MultiServerDashboard() {
   const { t } = useT();

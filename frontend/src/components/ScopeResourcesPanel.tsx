@@ -2,7 +2,7 @@ import DelegatedManagedGrant from './mec/DelegatedManagedGrant';
 import HostTrustForm from './remote/HostTrustForm';
 import { useT } from '../i18n';
 import React, { useState } from 'react';
-import { apiPost, useApi } from '../hooks/useApi';
+import { apiPost, useApi } from '../shared/api/useApi';
 import { useMecList, mecGet } from '../hooks/mec/useMecApi';
 import { RemoteServer, RemoteServerStatus } from './remote/remoteTypes';
 import { accessActive } from './MemberAccessFields';

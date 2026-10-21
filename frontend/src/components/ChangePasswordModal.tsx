@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { apiPost } from '../hooks/useApi';
+import { apiPost } from '../shared/api/useApi';
 import { useT } from '../i18n';
 
 export default function ChangePasswordModal({ onClose }: { onClose: () => void }) {

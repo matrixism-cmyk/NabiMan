@@ -1,9 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { I18nProvider } from '../i18n';
-import { useApi, apiPost } from '../hooks/useApi';
+import { useApi, apiPost } from '../shared/api/useApi';
 import LoginSessionsPanel from './LoginSessionsPanel';
-jest.mock('../hooks/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn() }));
+jest.mock('../shared/api/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn() }));
 it('does not report successful revocation when the server rejects it', async () => {
   localStorage.setItem('nabiman_lang', 'en');
   const confirm = jest.spyOn(window, 'confirm').mockReturnValue(true);

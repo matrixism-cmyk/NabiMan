@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useT } from '../../../../i18n';
-import Modal from '../../../common/Modal';
+import { useT } from '../../../../shared/i18n';
+import Modal from '../../../../shared/ui/Modal';
 import { downloadFile, formatSize, SftpEntry, SftpSource, streamLink } from '../sftpApi';
 import ImagePreview from './ImagePreview';
 import TextPreview, { TextInfo } from './TextPreview';

@@ -1,9 +1,9 @@
 import React, { RefObject, useState } from 'react';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 import type { TerminalStatus, TerminalViewHandle } from '../terminal/TerminalView';
 import SessionNameEdit from '../terminal/SessionNameEdit';
 import AccountDictation from '../terminal/dictation/AccountDictation';
-import Modal from '../common/Modal';
+import Modal from '../../shared/ui/Modal';
 
 interface Props {
   compact: boolean;

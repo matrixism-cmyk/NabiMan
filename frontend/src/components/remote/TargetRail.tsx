@@ -1,8 +1,8 @@
 import React, { useCallback, useState } from 'react';
 import { RemoteServer } from './remoteTypes';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 import RailContextMenu, { RailMenuItem } from './RailContextMenu';
-import { useLongPress } from '../common/useLongPress';
+import { useLongPress } from '../../shared/ui/useLongPress';
 import ProtocolBadges from './ProtocolBadges';
 import {
   addressOf, hasFiles, hasShell, hasTerminal, matchesProtocol, PROTOCOL_FILTERS, protocolName, protocolsOf, ProtocolFilter,

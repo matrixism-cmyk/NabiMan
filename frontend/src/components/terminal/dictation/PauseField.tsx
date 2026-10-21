@@ -1,5 +1,5 @@
 import React from 'react';
-import { useT } from '../../../i18n';
+import { useT } from '../../../shared/i18n';
 
 /** Pauses the settings offer (ms); 0 is the older way: only "엔터" ends a sentence. */
 export const PAUSES = [0, 800, 1000, 1500, 2000, 3000];

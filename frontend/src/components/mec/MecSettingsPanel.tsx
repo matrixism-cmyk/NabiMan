@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useT } from '../../i18n';
 import { useMecApi } from '../../hooks/mec/useMecApi';
-import { ThemeSelector } from '../../theme';
+import { ThemeSelector } from '../../shared/theme';
 
 interface KubeSettings {
   kubeconfig_path?: string | null;

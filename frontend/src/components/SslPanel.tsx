@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useApi, apiPost } from '../hooks/useApi';
+import { useApi, apiPost } from '../shared/api/useApi';
 import { SslCertificate } from '../types';
 import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';
-import { confirmDialog } from './common/ConfirmDialog';
+import { confirmDialog } from '../shared/ui/ConfirmDialog';
 
 interface RenewStatus { domain: string; status: string; message: string; started_at: string; }
 

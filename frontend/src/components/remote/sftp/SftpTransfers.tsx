@@ -1,5 +1,5 @@
 import React from 'react';
-import { useT } from '../../../i18n';
+import { useT } from '../../../shared/i18n';
 import { formatSize } from './sftpApi';
 import { formatDuration } from './transferRate';
 import { TransferRow } from './useTransfers';

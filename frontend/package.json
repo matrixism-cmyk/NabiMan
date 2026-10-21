@@ -27,7 +27,7 @@
     "preview": "rsbuild preview",
     "test": "jest",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src",
+    "lint": "eslint src && node scripts/check-boundaries.js",
     "smoke": "node scripts/smoke-browser.js",
     "smoke:share": "node scripts/smoke-share.js",
     "smoke:paste": "node scripts/smoke-paste.js",

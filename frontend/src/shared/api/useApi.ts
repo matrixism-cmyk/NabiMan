@@ -1,5 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ApiResponse } from '../types';
+
+/** Every NabiMan API answers in this shape. */
+export interface ApiResponse<T> {
+  code?: string;
+  success: boolean;
+  data: T | null;
+  message: string;
+}
 
 const API_BASE = process.env.REACT_APP_API_URL || '';
 

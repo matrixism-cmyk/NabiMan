@@ -1,7 +1,7 @@
 import DelegatedManagedGrant from './DelegatedManagedGrant';
 import MembershipOperations from './MembershipOperations';
 import ManagedMembershipPolicies from './ManagedMembershipPolicies';
-import { useApi } from '../../hooks/useApi';
+import { useApi } from '../../shared/api/useApi';
 import InitialCredentials, { BootstrapCredentials } from './InitialCredentials';
 import React, { useState } from 'react';
 import { useT } from '../../i18n';
@@ -13,7 +13,7 @@ import {
   StatusBadge,
   Toolbar,
 } from './common';
-import { confirmDialog } from '../common/ConfirmDialog';
+import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 
 interface Member {
   id: string;

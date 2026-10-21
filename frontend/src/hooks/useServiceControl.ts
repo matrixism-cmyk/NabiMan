@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { apiRequest, useApi } from './useApi';
+import { apiRequest, useApi } from '../shared/api/useApi';
 import { ServiceControlResponse } from '../components/ServiceControlResult';
 import { useT } from '../i18n';
-import { confirmDialog } from '../components/common/ConfirmDialog';
+import { confirmDialog } from '../shared/ui/ConfirmDialog';
 
 export function useServiceControl(refetch: () => void) {
   const { t } = useT();

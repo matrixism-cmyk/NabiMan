@@ -12,15 +12,15 @@ import PanelOutlet from './components/PanelOutlet';
 import ChangePasswordModal from './components/ChangePasswordModal';
 import HeaderMenu from './components/HeaderMenu';
 import IdleWarning from './components/IdleWarning';
-import { useIdleLogout } from './hooks/useIdleLogout';
-import { useChromeHidden } from './hooks/useChromeHidden';
+import { useIdleLogout } from './shared/auth/useIdleLogout';
+import { useChromeHidden } from './shared/ui/useChromeHidden';
 import RemoteShell, { isStandaloneRemote } from './components/remote/RemoteShell';
 import CommandPalette from './components/CommandPalette';
-import LanguageSelector from './components/LanguageSelector';
+import LanguageSelector from './shared/ui/LanguageSelector';
 import { Tab, Category, CatDef, categories } from './nav';
-import { apiPost, clearToken, useApi } from './hooks/useApi';
+import { apiPost, clearToken, useApi } from './shared/api/useApi';
 import { useT } from './i18n';
-import { ThemeProvider, ThemeSelector } from './theme';
+import { ThemeProvider, ThemeSelector } from './shared/theme';
 
 /** Parse the URL hash (#category/tab) into a valid cat/tab pair, or null. */
 function parseHash(): { cat: Category; tab: Tab } | null {

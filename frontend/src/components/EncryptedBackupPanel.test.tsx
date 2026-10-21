@@ -1,9 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { I18nProvider } from '../i18n';
-import { apiPost } from '../hooks/useApi';
+import { apiPost } from '../shared/api/useApi';
 import EncryptedBackupPanel from './EncryptedBackupPanel';
-jest.mock('../hooks/useApi', () => ({ apiPost: jest.fn() }));
+jest.mock('../shared/api/useApi', () => ({ apiPost: jest.fn() }));
 beforeEach(() => { jest.clearAllMocks(); localStorage.setItem('nabiman_lang', 'en'); });
 it('requires matching passphrases and clears both when a request fails', async () => {
  (apiPost as jest.Mock).mockRejectedValue(new Error('Storage unavailable'));

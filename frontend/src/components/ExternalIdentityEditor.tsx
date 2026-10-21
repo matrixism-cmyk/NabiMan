@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchWithRefresh } from '../hooks/useApi';
+import { fetchWithRefresh } from '../shared/api/useApi';
 import { MemberUser } from './MembershipEditor';
 import './membership-management.css';
 interface Link { remote_user_id: string; remote_username: string; verified_at: string; linked_by: string; reason: string }

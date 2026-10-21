@@ -1,9 +1,9 @@
 import React from 'react';
 import { act, render } from '@testing-library/react';
-import { apiRequest } from './useApi';
+import { apiRequest } from '../api/useApi';
 import { markActivity, useIdleLogout } from './useIdleLogout';
 
-jest.mock('./useApi', () => ({ apiRequest: jest.fn() }));
+jest.mock('../api/useApi', () => ({ apiRequest: jest.fn() }));
 const request = apiRequest as jest.Mock;
 
 let state: ReturnType<typeof useIdleLogout>;

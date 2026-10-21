@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useT } from '../../i18n';
-import { confirmDialog } from '../common/ConfirmDialog';
+import { useT } from '../../shared/i18n';
+import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import { getSettings, VoiceSettings, VoiceStatus } from './claudeApi';
 import { useVoiceChat } from './useVoiceChat';
 import './claude.css';

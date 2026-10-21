@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useT } from '../../i18n';
+import { useT } from '../i18n';
 import Modal from './Modal';
 import './confirm-dialog.css';
 

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { useApi, apiPost } from '../hooks/useApi';
+import { useApi, apiPost } from '../shared/api/useApi';
 import { ServiceConfig, ServiceDefinition } from '../types';
 import { useT } from '../i18n';
-import { confirmDialog } from './common/ConfirmDialog';
+import { confirmDialog } from '../shared/ui/ConfirmDialog';
 
 function ConfigEditor({ serviceId, displayName }: { serviceId: string; displayName: string }) {
   const { t } = useT();

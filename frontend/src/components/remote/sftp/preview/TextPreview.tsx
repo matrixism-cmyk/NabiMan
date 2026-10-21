@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useT } from '../../../../i18n';
+import { useT } from '../../../../shared/i18n';
 import { decode, Encoding, linesOf, looksBinary, splitHighlighted } from './textContent';
 
 /** What the dialog shows about a text once it is read. */

@@ -1,8 +1,8 @@
 import React from 'react';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 import TerminalSettingsForm from '../terminal/TerminalSettingsForm';
 import DictationSettings from '../terminal/dictation/DictationSettings';
-import { useChromeHidden } from '../../hooks/useChromeHidden';
+import { useChromeHidden } from '../../shared/ui/useChromeHidden';
 
 /**
  * The remote workspace's own settings, in one place: the screen, terminals

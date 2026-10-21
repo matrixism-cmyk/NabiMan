@@ -1,7 +1,7 @@
 import React, { forwardRef, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Terminal } from 'xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import { apiRequest } from '../../hooks/useApi';
+import { apiRequest } from '../../shared/api/useApi';
 import { attachClipboard, attachTerminalIo, createTerminal } from './terminalChrome';
 import { applyTerminalFont } from './terminalFonts';
 import TerminalStatusPill from './TerminalStatusPill';
@@ -12,7 +12,7 @@ import { buildTerminalUrl, ticketedTerminalUrl, ticketedShareUrl } from './termi
 import { bufKey, markEnded, paneEnded, readStored, sidKey, storedSessionId, writeStored } from './terminalStorage';
 import { useTerminalZoom } from './useTerminalZoom';
 import { useTerminalHandle } from './useTerminalHandle';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 
 import type { TerminalStatus, TerminalViewHandle, TerminalViewProps } from './terminalTypes';
 export type { TerminalTarget, TerminalStatus, TerminalViewHandle } from './terminalTypes';

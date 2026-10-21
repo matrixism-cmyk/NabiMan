@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { apiPost, useApi } from '../hooks/useApi';
+import { apiPost, useApi } from '../shared/api/useApi';
 import { useT } from '../i18n';
-import { confirmDialog } from './common/ConfirmDialog';
+import { confirmDialog } from '../shared/ui/ConfirmDialog';
 interface LoginSession {
   session_id: string; user_id: string; username: string; created_at: string;
   last_active: string; ip: string; is_current: boolean;

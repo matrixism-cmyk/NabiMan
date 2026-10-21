@@ -2,12 +2,12 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { I18nProvider } from '../i18n';
-import { apiRequest } from '../hooks/useApi';
+import { apiRequest } from '../shared/api/useApi';
 import { useServiceControl } from '../hooks/useServiceControl';
 import ServiceControlResult from './ServiceControlResult';
 import ServicesPanel from './ServicesPanel';
 let mockMe = { id: 'account-one' };
-jest.mock('../hooks/useApi', () => ({ apiRequest: jest.fn(), useApi: (endpoint: string) => endpoint === '/api/users/me' ? ({ data: mockMe }) : ({ data: [], loading: false, error: 'Inventory unavailable', refetch: jest.fn() }) }));
+jest.mock('../shared/api/useApi', () => ({ apiRequest: jest.fn(), useApi: (endpoint: string) => endpoint === '/api/users/me' ? ({ data: mockMe }) : ({ data: [], loading: false, error: 'Inventory unavailable', refetch: jest.fn() }) }));
 const id = '123e4567-e89b-42d3-a456-426614174000';
 const refetch = jest.fn();
 function Probe() {

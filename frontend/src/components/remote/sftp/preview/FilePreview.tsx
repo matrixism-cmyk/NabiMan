@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useT } from '../../../../i18n';
+import { useT } from '../../../../shared/i18n';
 import { readRange, SftpEntry } from '../sftpApi';
 import { hexLines, sniff } from './fileSniff';
 import TextPreview, { TextInfo } from './TextPreview';

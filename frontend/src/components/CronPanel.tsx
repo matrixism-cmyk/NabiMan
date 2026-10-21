@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { useApi, apiPost, apiRequest } from '../hooks/useApi';
+import { useApi, apiPost, apiRequest } from '../shared/api/useApi';
 import { CronJob } from '../types';
 import { useT } from '../i18n';
 interface Snapshot { user: string; uid: number; revision: string; content: string; can_write: boolean }

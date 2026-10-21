@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { apiPost, useApi } from '../hooks/useApi';
+import { apiPost, useApi } from '../shared/api/useApi';
 import { useT } from '../i18n';
 interface Section { state: 'ready' | 'busy' | 'unavailable' | 'too_large'; data: Record<string, number | boolean> | null }
 interface Report {

@@ -1,4 +1,4 @@
-import { apiRequest } from '../../../hooks/useApi';
+import { apiRequest } from '../../../shared/api/useApi';
 
 const QUERY = 'purpose=dictation';
 const wsBase = () => `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;

@@ -1,3 +1,5 @@
+import { sharedStrings } from '../../shared/i18n';
+import type { Lang, Translations } from '../../shared/i18n';
 import common from './common';
 import cron from './cron';
 import processes from './processes';
@@ -20,15 +22,11 @@ import remoteProtocols from './remote-protocols';
 import remoteBase from './remote-base';
 import claude from './claude';
 
-export type Lang = 'ko' | 'en' | 'ja';
+export type { Lang };
+export { LANG_LABELS } from '../../shared/i18n';
 
-export const LANG_LABELS: Record<Lang, string> = {
-  ko: '한국어',
-  en: 'English',
-  ja: '日本語',
-};
-
-const translations: Record<string, Record<Lang, string>> = {
+const translations: Translations = {
+  ...sharedStrings,
   ...common,
   ...cron,
   ...processes,

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { apiPost, apiRequest } from '../../hooks/useApi';
-import { useT } from '../../i18n';
-import { confirmDialog } from '../common/ConfirmDialog';
+import { apiPost, apiRequest } from '../../shared/api/useApi';
+import { useT } from '../../shared/i18n';
+import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 
 export interface SessionInfo {
   id: string; label: string; owner: string; ws_count: number; shared: boolean;

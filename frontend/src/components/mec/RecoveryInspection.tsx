@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useT } from '../../i18n';
-import { fetchWithRefresh } from '../../hooks/useApi';
+import { fetchWithRefresh } from '../../shared/api/useApi';
 import { StatusBadge } from './common';
 
 export interface RecoveryReport {

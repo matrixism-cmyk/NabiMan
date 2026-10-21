@@ -1,5 +1,5 @@
 import React, { RefObject, useEffect, useRef, useState } from 'react';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 import type { TerminalViewHandle } from './terminalTypes';
 import { BarKey, Mods, NO_MODS } from './stickyKeys';
 import './mobile-keys.css';

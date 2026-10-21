@@ -1,10 +1,10 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { I18nProvider } from '../../i18n';
-import { apiPost } from '../../hooks/useApi';
+import { apiPost } from '../../shared/api/useApi';
 import ServerForm from './ServerForm';
 
-jest.mock('../../hooks/useApi', () => ({ apiPost: jest.fn(), apiRequest: jest.fn() }));
+jest.mock('../../shared/api/useApi', () => ({ apiPost: jest.fn(), apiRequest: jest.fn() }));
 const post = apiPost as jest.Mock;
 
 beforeEach(() => { localStorage.setItem('nabiman_lang', 'ko'); post.mockReset(); });

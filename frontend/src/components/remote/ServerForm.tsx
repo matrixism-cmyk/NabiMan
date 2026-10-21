@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { apiPost, apiRequest } from '../../hooks/useApi';
+import { apiPost, apiRequest } from '../../shared/api/useApi';
 import { RemoteServer, RemoteServerStatus } from './remoteTypes';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 import { FileProtocol, PLAINTEXT, protocolName, TerminalProtocol } from './protocols';
-import { confirmDialog } from '../common/ConfirmDialog';
+import { confirmDialog } from '../../shared/ui/ConfirmDialog';
+import './remote-base.css';
 
 interface Props {
   /** Absent for a new server, present when editing an existing one. */

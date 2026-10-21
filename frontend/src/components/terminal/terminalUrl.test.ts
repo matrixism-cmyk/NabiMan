@@ -1,7 +1,7 @@
 import { buildTerminalUrl, ticketedTerminalUrl, ticketedShareUrl } from './terminalUrl';
-import { apiRequest } from '../../hooks/useApi';
+import { apiRequest } from '../../shared/api/useApi';
 import { DEFAULT_TERMINAL_SETTINGS } from './settings';
-jest.mock('../../hooks/useApi', () => ({ apiRequest: jest.fn() }));
+jest.mock('../../shared/api/useApi', () => ({ apiRequest: jest.fn() }));
 const ticket = 'a'.repeat(64);
 beforeEach(() => { jest.clearAllMocks(); sessionStorage.setItem('nabiman_token', 'never-in-a-url'); });
 it('builds account target and session parameters without embedding the login token', () => {

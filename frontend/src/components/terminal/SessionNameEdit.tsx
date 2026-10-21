@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { apiPost } from '../../hooks/useApi';
-import { useT } from '../../i18n';
+import { apiPost } from '../../shared/api/useApi';
+import { useT } from '../../shared/i18n';
 
 interface Props {
   sessionId: string;

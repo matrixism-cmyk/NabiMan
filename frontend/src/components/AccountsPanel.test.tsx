@@ -1,9 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import { I18nProvider } from '../i18n';
-import { apiDelete, apiPost, useApi } from '../hooks/useApi';
+import { apiDelete, apiPost, useApi } from '../shared/api/useApi';
 import AccountsPanel from './AccountsPanel';
-jest.mock('../hooks/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn(), apiDelete: jest.fn() }));
+jest.mock('../shared/api/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn(), apiDelete: jest.fn() }));
 const alice = { username: 'alice', uid: 1001, gid: 1001, home: '/home/alice', shell: '/bin/bash', is_logged_in: null, can_manage: true };
 let rows = [alice]; let canWrite = true;
 const view = () => <I18nProvider><AccountsPanel /></I18nProvider>;

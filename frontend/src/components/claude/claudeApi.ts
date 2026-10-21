@@ -1,4 +1,4 @@
-import { apiRequest, fetchWithRefresh } from '../../hooks/useApi';
+import { apiRequest, fetchWithRefresh } from '../../shared/api/useApi';
 
 const BASE = '/api/terminal/claude';
 const API = process.env.REACT_APP_API_URL || '';

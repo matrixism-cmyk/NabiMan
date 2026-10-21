@@ -1,4 +1,4 @@
-import { fetchWithRefresh } from '../useApi';
+import { fetchWithRefresh } from '../../shared/api/useApi';
 import { useEffect, useState } from 'react';
 
 interface DashboardStreamResult<T> {

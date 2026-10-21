@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useT } from '../../../../i18n';
+import { useT } from '../../../../shared/i18n';
 import { formatSize, readRange } from '../sftpApi';
 import { findEnd, readDirectory, readZip64End, TAIL, ZipEntry } from './zipIndex';
 

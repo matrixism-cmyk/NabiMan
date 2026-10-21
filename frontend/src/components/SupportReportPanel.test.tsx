@@ -1,9 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { I18nProvider } from '../i18n';
-import { apiPost, useApi } from '../hooks/useApi';
+import { apiPost, useApi } from '../shared/api/useApi';
 import SupportReportPanel from './SupportReportPanel';
-jest.mock('../hooks/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn() }));
+jest.mock('../shared/api/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn() }));
 const section = { state: 'ready', data: {} };
 const report = { schema_version: 1, report_id: 'previous-report', generated_at: '2026-10-06T00:00:00Z', process: { runs_as_root: false }, accounts: section, login_sessions: section, terminal_registry: section, server_inventory: section, auth_storage: section, recent_jobs: section };
 beforeEach(() => { jest.clearAllMocks(); localStorage.setItem('nabiman_lang', 'en'); (useApi as jest.Mock).mockReturnValue({ data: { role: 'admin' } }); });

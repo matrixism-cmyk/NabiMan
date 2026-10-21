@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useT } from '../../i18n';
 import { Taint } from '../../types/mec';
-import { confirmDialog } from '../common/ConfirmDialog';
+import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 
 interface Props {
   taints: Taint[];

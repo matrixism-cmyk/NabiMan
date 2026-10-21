@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { I18nProvider } from '../../i18n';
-import { apiRequest } from '../../hooks/useApi';
+import { apiRequest } from '../../shared/api/useApi';
 import { DEFAULT_TERMINAL_SETTINGS, TerminalSettingsProvider, useTerminalSettings } from './settings';
-jest.mock('../../hooks/useApi', () => ({ apiRequest: jest.fn() }));
+jest.mock('../../shared/api/useApi', () => ({ apiRequest: jest.fn() }));
 function Probe() {
   const { settings, save, loadError } = useTerminalSettings();
   const [error, setError] = useState('');

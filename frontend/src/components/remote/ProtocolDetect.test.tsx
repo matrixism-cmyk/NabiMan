@@ -1,11 +1,11 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { I18nProvider } from '../../i18n';
-import { apiPost, apiRequest } from '../../hooks/useApi';
+import { apiPost, apiRequest } from '../../shared/api/useApi';
 import { RemoteServer } from './remoteTypes';
 import ProtocolDetect from './ProtocolDetect';
 
-jest.mock('../../hooks/useApi', () => ({ apiPost: jest.fn(), apiRequest: jest.fn() }));
+jest.mock('../../shared/api/useApi', () => ({ apiPost: jest.fn(), apiRequest: jest.fn() }));
 const post = apiPost as jest.Mock;
 const request = apiRequest as jest.Mock;
 

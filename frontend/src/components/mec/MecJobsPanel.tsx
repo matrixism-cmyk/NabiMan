@@ -3,7 +3,7 @@ import { useT } from '../../i18n';
 import { useMecList } from '../../hooks/mec/useMecApi';
 import JobProgress from './JobProgress';
 import RecoveryInspection from './RecoveryInspection';
-import { useApi } from '../../hooks/useApi';
+import { useApi } from '../../shared/api/useApi';
 import { MemberUser } from '../MembershipEditor';
 import {
   ErrorBanner,

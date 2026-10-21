@@ -1,10 +1,10 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import NewManagedGrant from './NewManagedGrant';
-import { fetchWithRefresh } from '../../hooks/useApi';
+import { fetchWithRefresh } from '../../shared/api/useApi';
 import { mecPost } from '../../hooks/mec/useMecApi';
 import { I18nProvider } from '../../i18n';
-jest.mock('../../hooks/useApi', () => ({ fetchWithRefresh: jest.fn() }));
+jest.mock('../../shared/api/useApi', () => ({ fetchWithRefresh: jest.fn() }));
 jest.mock('../../hooks/mec/useMecApi', () => ({ mecPost: jest.fn() }));
 const candidates = [{ id: 'local', username: 'alice', memberships: [{ kind: 'tenant', scope_id: 'tenant', role: 'viewer' }] }];
 const onCreated = jest.fn();

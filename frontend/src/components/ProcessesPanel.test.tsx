@@ -1,9 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { I18nProvider } from '../i18n';
-import { apiPost, useApi } from '../hooks/useApi';
+import { apiPost, useApi } from '../shared/api/useApi';
 import ProcessesPanel from './ProcessesPanel';
-jest.mock('../hooks/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn() }));
+jest.mock('../shared/api/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn() }));
 const proc = { pid: 1234, user: '1000', cpu: 1, memory: 1, vsz: 1024, rss: 1024, command: '/fixture/sleep', started: '2026-10-06T00:00:00Z', identity: 'reviewed', can_signal: true };
 let rows = [proc]; let canSignal = true;
 const view = () => <I18nProvider><ProcessesPanel /></I18nProvider>;

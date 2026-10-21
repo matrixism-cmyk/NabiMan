@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { apiRequest } from '../../hooks/useApi';
+import { apiRequest } from '../../shared/api/useApi';
 import { RemoteServer } from './remoteTypes';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 
 /** `onSaved` says whether a key is now approved (false after a revoke). */
 export default function HostTrustForm({ server, onSaved }: { server: RemoteServer; onSaved: (approved: boolean) => void }) {

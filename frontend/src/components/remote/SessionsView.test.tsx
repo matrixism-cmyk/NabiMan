@@ -2,8 +2,8 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { I18nProvider } from '../../i18n';
-import { apiRequest } from '../../hooks/useApi';
-jest.mock('../../hooks/useApi',()=>({apiRequest:jest.fn(),apiPost:jest.fn()}));
+import { apiRequest } from '../../shared/api/useApi';
+jest.mock('../../shared/api/useApi',()=>({apiRequest:jest.fn(),apiPost:jest.fn()}));
 import SessionsView, { SessionInfo } from './SessionsView';
 const session: SessionInfo = { id:'pty_one',label:'local',owner:'admin',ws_count:0,shared:false,age_secs:10,timeout_secs:300,scrollback:2000,keepalive:false,alive:true,title:'Fixture',preview:'' };
 function setup(value: SessionInfo) {

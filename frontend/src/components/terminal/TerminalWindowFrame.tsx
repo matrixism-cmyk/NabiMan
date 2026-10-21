@@ -2,13 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import TerminalView, { TerminalStatus, TerminalViewHandle } from './TerminalView';
 import TerminalWithFiles from '../remote/TerminalWithFiles';
 import { useTerminalSettings } from './settings';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 import ShareDialog from './ShareDialog';
 import SessionNameEdit from './SessionNameEdit';
-import { apiRequest } from '../../hooks/useApi';
+import { apiRequest } from '../../shared/api/useApi';
 import type { SessionInfo } from '../remote/SessionsView';
 import { clamp, MIN_H, MIN_W, TASKBAR_H, TermWindow } from './windowGeometry';
-import { confirmDialog } from '../common/ConfirmDialog';
+import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import AccountDictation from './dictation/AccountDictation';
 
 interface FrameProps {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { MecListResponse, MecResponse } from '../../types/mec';
-import { fetchWithRefresh } from '../useApi';
+import { fetchWithRefresh } from '../../shared/api/useApi';
 
 const API_BASE = process.env.REACT_APP_API_URL || '';
 

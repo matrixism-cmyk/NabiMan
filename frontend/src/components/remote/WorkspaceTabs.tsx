@@ -1,6 +1,6 @@
 import React from 'react';
 import { RemoteServer } from './remoteTypes';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 import { hasFiles, hasShell, hasTerminal } from './protocols';
 import { OverviewView, Selection, ServerView } from './workspaceState';
 

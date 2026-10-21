@@ -1,5 +1,5 @@
 import React from 'react';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 import TerminalSettingsForm from './TerminalSettingsForm';
 import DictationSettings from './dictation/DictationSettings';
 

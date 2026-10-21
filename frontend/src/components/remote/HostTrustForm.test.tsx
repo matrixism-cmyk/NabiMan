@@ -2,9 +2,9 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { I18nProvider } from '../../i18n';
 import HostTrustForm from './HostTrustForm';
-import { apiRequest } from '../../hooks/useApi';
+import { apiRequest } from '../../shared/api/useApi';
 import { RemoteServer } from './remoteTypes';
-jest.mock('../../hooks/useApi', () => ({ apiRequest: jest.fn() }));
+jest.mock('../../shared/api/useApi', () => ({ apiRequest: jest.fn() }));
 const request = apiRequest as jest.Mock;
 const server: RemoteServer = { id: 'srv_test', name: 'Test', host: 'example.test', port: 22,
   user: 'test', auth_method: 'key', tags: [], memo: '', status: '', last_checked: '', created_at: '',

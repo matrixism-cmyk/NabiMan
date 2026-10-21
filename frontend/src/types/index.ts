@@ -206,9 +206,4 @@ export interface SslCertificate {
   status: string;
 }
 
-export interface ApiResponse<T> {
-  code?: string;
-  success: boolean;
-  data: T | null;
-  message: string;
-}
+export type { ApiResponse } from '../shared/api/useApi';

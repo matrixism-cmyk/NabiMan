@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 import { getSettings, putSettings, speak, testClaude, VoiceSettings, VoiceStatus } from './claudeApi';
 import { Speaker } from './speaker';
 import PauseField from '../terminal/dictation/PauseField';

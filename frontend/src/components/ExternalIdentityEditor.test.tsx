@@ -1,9 +1,9 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ExternalIdentityEditor from './ExternalIdentityEditor';
-import { fetchWithRefresh } from '../hooks/useApi';
+import { fetchWithRefresh } from '../shared/api/useApi';
 import { MemberUser } from './MembershipEditor';
-jest.mock('../hooks/useApi', () => ({ fetchWithRefresh: jest.fn() }));
+jest.mock('../shared/api/useApi', () => ({ fetchWithRefresh: jest.fn() }));
 const fetchMock = fetchWithRefresh as jest.Mock;
 const user: MemberUser = { id: 'local-alice', username: 'alice', role: 'viewer', status: 'active', memberships: [], requested_memberships: [], scope_restricted: true, created_at: '', last_login: null };
 const response = (ok: boolean, data: unknown) => ({ ok, json: async () => ({ data, error: ok ? null : { code: 'CONFLICT' } }) });

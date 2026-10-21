@@ -3,7 +3,7 @@ import TenantAccessDelegation from './TenantAccessDelegation';
 import PendingManagedGrants from './PendingManagedGrants';
 import NewManagedGrant from './NewManagedGrant';
 import React, { useState } from 'react';
-import { useApi } from '../../hooks/useApi';
+import { useApi } from '../../shared/api/useApi';
 import { mecPost, useMecList } from '../../hooks/mec/useMecApi';
 import { useT } from '../../i18n';
 import { ErrorBanner, Section } from './common';

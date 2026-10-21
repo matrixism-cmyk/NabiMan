@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { useApi, apiPost } from '../hooks/useApi';
+import { useApi, apiPost } from '../shared/api/useApi';
 import { Container, ContainerImage } from '../types';
 import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';
-import { confirmDialog } from './common/ConfirmDialog';
+import { confirmDialog } from '../shared/ui/ConfirmDialog';
 
 export default function ContainersPanel() {
   const { t } = useT();

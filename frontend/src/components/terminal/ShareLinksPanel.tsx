@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { apiRequest } from '../../hooks/useApi';
-import { useT } from '../../i18n';
+import { apiRequest } from '../../shared/api/useApi';
+import { useT } from '../../shared/i18n';
 import { ShareLink } from './ShareDialog';
-import { confirmDialog } from '../common/ConfirmDialog';
+import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 
 const shareUrl = (token: string) => `${window.location.origin}/share/${token}`;
 

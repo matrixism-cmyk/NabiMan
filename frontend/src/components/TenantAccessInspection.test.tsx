@@ -1,9 +1,9 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import TenantAccessInspection from './TenantAccessInspection';
-import { fetchWithRefresh } from '../hooks/useApi';
+import { fetchWithRefresh } from '../shared/api/useApi';
 import { I18nProvider } from '../i18n';
-jest.mock('../hooks/useApi', () => ({ fetchWithRefresh: jest.fn() }));
+jest.mock('../shared/api/useApi', () => ({ fetchWithRefresh: jest.fn() }));
 const fetchMock = fetchWithRefresh as jest.Mock;
 const report = {
   local_username: 'alice', inspected_at: '2026-10-05T00:00:00Z', source_access_allowed: false,

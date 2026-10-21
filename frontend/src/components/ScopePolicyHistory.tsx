@@ -1,5 +1,5 @@
 import React from 'react';
-import { useApi } from '../hooks/useApi';
+import { useApi } from '../shared/api/useApi';
 interface Change { revision: string; at: string; actor: string; actor_id: string; reason: string; fields: { field: string; before: unknown; after: unknown }[] }
 const names: Record<string, string> = {contact_email: '담당자 이메일', member_notice: '회원 공지', member_limit: '회원 수 제한', allow_commands: '명령 실행 허용', require_mfa: '2단계 인증 필수'};
 function value(input: unknown): string {

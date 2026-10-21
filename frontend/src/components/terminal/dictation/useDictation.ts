@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Action, finalText, Resampler, Typist, utteranceActions } from './speech';
-import { markActivity } from '../../../hooks/useIdleLogout';
+import { markActivity } from '../../../shared/auth/useIdleLogout';
 
 export type DictationState = 'idle' | 'starting' | 'listening' | 'stopping';
 

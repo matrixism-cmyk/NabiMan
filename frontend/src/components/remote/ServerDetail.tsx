@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { apiPost, apiRequest } from '../../hooks/useApi';
+import { apiPost, apiRequest } from '../../shared/api/useApi';
 import { RemoteServer, RemoteServerStatus } from './remoteTypes';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 import { DeployKeyDialog } from './SshKeyComponents';
 import ServerForm from './ServerForm';
 import HostTrustForm from './HostTrustForm';
 import ProtocolDetect, { CheckList } from './ProtocolDetect';
 import { hasShell, usesSsh } from './protocols';
-import { confirmDialog } from '../common/ConfirmDialog';
+import { confirmDialog } from '../../shared/ui/ConfirmDialog';
+import './remote-base.css';
 
 /** Live facts about one server: probe it and show what came back. */
 export function ServerStatusView({ server }: { server: RemoteServer }) {

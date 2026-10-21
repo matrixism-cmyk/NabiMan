@@ -5,7 +5,7 @@
  * XMLHttpRequest instead of fetch because only it reports upload progress,
  * and a progress bar is most of what makes a large upload bearable.
  */
-import { apiRequest } from '../../../hooks/useApi';
+import { apiRequest } from '../../../shared/api/useApi';
 
 export interface SftpEntry {
   name: string;

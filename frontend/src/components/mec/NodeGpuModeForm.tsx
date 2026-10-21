@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useT } from '../../i18n';
-import { confirmDialog } from '../common/ConfirmDialog';
+import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 
 interface Props {
   currentMode: string;

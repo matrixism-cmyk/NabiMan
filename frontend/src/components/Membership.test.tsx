@@ -2,10 +2,10 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import RegistrationForm from './RegistrationForm';
 import UserManagementPanel from './UserManagementPanel';
-import { useApi, apiPost } from '../hooks/useApi';
+import { useApi, apiPost } from '../shared/api/useApi';
 import { useMecList } from '../hooks/mec/useMecApi';
 
-jest.mock('../hooks/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn(), apiRequest: jest.fn() }));
+jest.mock('../shared/api/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn(), apiRequest: jest.fn() }));
 jest.mock('../hooks/mec/useMecApi', () => ({ useMecList: jest.fn() }));
 const scope = { kind: 'server', scope_id: 's1', role: 'admin' };
 const admin = { id: 'root', username: 'admin', role: 'admin', status: 'active', memberships: [], requested_memberships: [] };

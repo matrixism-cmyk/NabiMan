@@ -1,5 +1,5 @@
 import React from 'react';
-import { useApi } from '../hooks/useApi';
+import { useApi } from '../shared/api/useApi';
 import { useT } from '../i18n';
 
 interface DnsStatus {

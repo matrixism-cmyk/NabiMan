@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { apiPost, clearToken, useApi } from '../hooks/useApi';
+import { apiPost, clearToken, useApi } from '../shared/api/useApi';
 import { useT } from '../i18n';
-import { confirmDialog } from './common/ConfirmDialog';
+import { confirmDialog } from '../shared/ui/ConfirmDialog';
 interface MfaStatus { required: boolean; verified: boolean; blocked: boolean; username: string; enabled: boolean; local_password_available: boolean; recovery_codes_remaining: number; }
 interface Enrollment { secret: string; qr_png_base64: string; recovery_codes: string[]; expires_at: number; }
 export default function MfaPanel() {

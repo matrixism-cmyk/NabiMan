@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useApi, apiPost } from '../hooks/useApi';
+import { useApi, apiPost } from '../shared/api/useApi';
 import { useT } from '../i18n';
-import { confirmDialog } from './common/ConfirmDialog';
+import { confirmDialog } from '../shared/ui/ConfirmDialog';
 
 interface DbStatus { engine: string; running: boolean; version: string; uptime: string; connections: string; databases: string[]; slow_queries: string; }
 interface DbBackupEntry { filename: string; size: number; created: string; }

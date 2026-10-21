@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { apiRequest } from './useApi';
+import { apiRequest } from '../api/useApi';
 
 /** When someone last did something here, shared by every tab of this browser. */
 const LAST = 'nabiman_last_activity';

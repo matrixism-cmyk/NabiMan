@@ -1,7 +1,7 @@
 import RegistrationForm from './RegistrationForm';
 import { useAuthCooldown } from '../hooks/useAuthCooldown';
 import React, { useState, useEffect } from 'react';
-import { setToken, setRefreshToken } from '../hooks/useApi';
+import { setToken, setRefreshToken } from '../shared/api/useApi';
 import { useT, LANG_LABELS, Lang } from '../i18n';
 
 interface Props {

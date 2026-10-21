@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useApi } from '../hooks/useApi';
+import { useApi } from '../shared/api/useApi';
 import { useT } from '../i18n';
 
 interface DataPoint { timestamp: number; cpu: number; memory_pct: number; rx_bytes_sec: number; tx_bytes_sec: number; disk_read_bytes_sec: number; disk_write_bytes_sec: number; }

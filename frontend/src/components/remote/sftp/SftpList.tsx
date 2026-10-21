@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useT } from '../../../i18n';
-import { useLongPress } from '../../common/useLongPress';
+import { useT } from '../../../shared/i18n';
+import { useLongPress } from '../../../shared/ui/useLongPress';
 import { formatSize, isFolder, modeString, SftpEntry } from './sftpApi';
 import SftpHeader from './SftpHeader';
 import { ColumnKey, Columns, minWidth, template } from './sftpColumns';

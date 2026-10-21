@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useApi, apiPost, apiDelete } from '../hooks/useApi';
+import { useApi, apiPost, apiDelete } from '../shared/api/useApi';
 import { UserAccount } from '../types';
 import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';

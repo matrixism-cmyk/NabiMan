@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import './encrypted-backup.css';
-import { apiPost } from '../hooks/useApi';
+import { apiPost } from '../shared/api/useApi';
 import { useT } from '../i18n';
 export default function EncryptedBackupPanel({ files, refresh }: { files: string[]; refresh: () => void }) {
   const { t } = useT();

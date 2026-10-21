@@ -1,9 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { I18nProvider } from '../i18n';
-import { apiPost, useApi } from '../hooks/useApi';
+import { apiPost, useApi } from '../shared/api/useApi';
 import ApiTokensPanel from './ApiTokensPanel';
-jest.mock('../hooks/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn(), apiRequest: jest.fn() }));
+jest.mock('../shared/api/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn(), apiRequest: jest.fn() }));
 beforeEach(() => { jest.clearAllMocks(); localStorage.setItem('nabiman_lang', 'en'); (useApi as jest.Mock).mockReturnValue({ data: [], refetch: jest.fn() }); });
 it('uses bounded expiry and explicit scopes without sending a global role', async () => {
   (apiPost as jest.Mock).mockResolvedValue({ success: true, data: { id: 'test', key: 'nbm_fixture', expires_at: 'tomorrow' } });

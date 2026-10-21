@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useT } from '../../../../i18n';
+import { useT } from '../../../../shared/i18n';
 import PdfPage from './PdfPage';
 import type { PDFDocumentProxy } from './pdf';
 

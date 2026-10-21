@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { apiPost, fetchWithRefresh } from '../hooks/useApi';
+import { apiPost, fetchWithRefresh } from '../shared/api/useApi';
 import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';
-import { confirmDialog } from './common/ConfirmDialog';
+import { confirmDialog } from '../shared/ui/ConfirmDialog';
 
 interface FileEntry { name: string; path: string; is_dir: boolean; size: number; modified: string; permissions: string; }
 interface FileContent { path: string; content: string; size: number; }

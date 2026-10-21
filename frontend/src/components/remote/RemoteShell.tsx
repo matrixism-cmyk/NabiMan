@@ -1,9 +1,9 @@
 import React, { useEffect } from 'react';
-import { useT } from '../../i18n';
-import { ThemeSelector } from '../../theme';
-import LanguageSelector from '../LanguageSelector';
+import { useT } from '../../shared/i18n';
+import { ThemeSelector } from '../../shared/theme';
+import LanguageSelector from '../../shared/ui/LanguageSelector';
 import RemoteWorkspace from './RemoteWorkspace';
-import { useChromeHidden } from '../../hooks/useChromeHidden';
+import { useChromeHidden } from '../../shared/ui/useChromeHidden';
 import './remote-shell.css';
 
 /** Whether this page was opened as the remote workspace on its own (/remote). */

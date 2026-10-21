@@ -1,5 +1,5 @@
 import React, { RefObject, useRef, useState } from 'react';
-import { useT } from '../../../i18n';
+import { useT } from '../../../shared/i18n';
 import RailContextMenu, { RailMenuItem } from '../RailContextMenu';
 import { ColumnKey, Columns, MAX_WIDTH, MIN_WIDTH, OPTIONAL } from './sftpColumns';
 

@@ -1,5 +1,5 @@
 import InitialCredentials, { BootstrapCredentials, randomPassword } from './InitialCredentials';
-import { fetchWithRefresh } from '../../hooks/useApi';
+import { fetchWithRefresh } from '../../shared/api/useApi';
 import React, { useState } from 'react';
 import { useT } from '../../i18n';
 import {

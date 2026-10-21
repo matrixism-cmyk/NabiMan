@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 import SftpPanel from './sftp/SftpPanel';
 import { draggingOwnRows } from './sftp/sftpDrop';
 import { accountSource, SftpSource } from './sftp/sftpApi';

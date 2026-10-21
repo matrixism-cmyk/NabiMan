@@ -1,6 +1,6 @@
 import React, { useId, useState } from 'react';
-import { useT } from '../../../i18n';
-import Modal from '../../common/Modal';
+import { useT } from '../../../shared/i18n';
+import Modal from '../../../shared/ui/Modal';
 import { AttrsResult, changeAttrs, isFolder, modeString, SftpAttrsCaps, SftpEntry, SftpSource } from './sftpApi';
 
 interface Props {

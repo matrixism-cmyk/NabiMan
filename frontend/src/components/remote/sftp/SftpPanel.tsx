@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useT } from '../../../i18n';
+import { useT } from '../../../shared/i18n';
 import RailContextMenu, { RailMenuItem } from '../RailContextMenu';
 import AttrsDialog from './AttrsDialog';
 import PreviewDialog from './preview/PreviewDialog';
@@ -13,7 +13,7 @@ import { draggingDesktopFiles, draggingOwnRows, ownRows, SFTP_MIME, takeDrop } f
 import {
   baseName, isFolder, joinPath, listDir, makeDir, movePath, removePath, SftpEntry, SftpListing, SftpSource, shellQuote,
 } from './sftpApi';
-import { confirmDialog } from '../../common/ConfirmDialog';
+import { confirmDialog } from '../../../shared/ui/ConfirmDialog';
 
 interface Props {
   source: SftpSource;

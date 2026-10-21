@@ -7,7 +7,7 @@ import SftpPanel from '../remote/sftp/SftpPanel';
 import DictationButton from './dictation/DictationButton';
 import { openShareDictation } from './dictation/sockets';
 import { shareSource } from '../remote/sftp/sftpApi';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 import './terminal-windows.css';
 
 /**

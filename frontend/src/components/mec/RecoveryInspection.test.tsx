@@ -1,9 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { I18nProvider } from '../../i18n';
-import { fetchWithRefresh } from '../../hooks/useApi';
+import { fetchWithRefresh } from '../../shared/api/useApi';
 import RecoveryInspection, { RecoveryReport } from './RecoveryInspection';
-jest.mock('../../hooks/useApi', () => ({ fetchWithRefresh: jest.fn() }));
+jest.mock('../../shared/api/useApi', () => ({ fetchWithRefresh: jest.fn() }));
 const request = fetchWithRefresh as jest.Mock;
 const report: RecoveryReport = { checked_at: '2026-10-05T00:00:00Z', configured_mode: 'real',
   records_conflict: false, profile: null, job_snapshot: null,

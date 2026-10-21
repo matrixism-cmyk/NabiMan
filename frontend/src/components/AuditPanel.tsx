@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import AuditIntegrityPanel from './AuditIntegrityPanel';
 import AuditForwardingPanel from './AuditForwardingPanel';
-import { useApi } from '../hooks/useApi';
+import { useApi } from '../shared/api/useApi';
 import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';
 

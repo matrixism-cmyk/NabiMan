@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { apiPost, apiRequest } from '../../hooks/useApi';
+import { apiPost, apiRequest } from '../../shared/api/useApi';
 import { ProtocolCheck, RemoteServer } from './remoteTypes';
-import { useT } from '../../i18n';
+import { useT } from '../../shared/i18n';
 import { describeProtocols } from './ProtocolBadges';
 import { DETECT_PENDING_KEY } from './ServerForm';
 import { filesOf, protocolName, terminalOf, usesSsh } from './protocols';
