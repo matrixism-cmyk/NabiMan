@@ -5,6 +5,8 @@
  * a tap has started once (see `unlock`).
  */
 
+import { markActivity } from '../../hooks/useIdleLogout';
+
 export type Fetch = (text: string, signal: AbortSignal) => Promise<Blob>;
 
 /** A tenth of a second of silence, to unlock playback during a tap. */
@@ -37,6 +39,7 @@ export class Speaker {
 
   say(text: string): void {
     if (!text.trim()) return;
+    markActivity(); // listening to an answer is using NabiMan
     this.items.push({ text });
     this.prefetch();
     if (!this.running) { this.running = true; this.onSpeaking(true); void this.loop(); }

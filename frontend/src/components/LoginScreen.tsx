@@ -21,6 +21,7 @@ export default function LoginScreen({ onLogin }: Props) {
   const [error, setError] = useState('');
   const [securityChanged] = useState(() => sessionStorage.getItem('nabiman_security_changed') === '1');
   const [reauthRequired] = useState(() => sessionStorage.getItem('nabiman_reauth_required') === '1');
+  const [idleSignedOut] = useState(() => sessionStorage.getItem('nabiman_idle_logout') === '1');
   const [loading, setLoading] = useState(false);
   const [loginMode, setLoginMode] = useState<LoginMode>('local');
   const [ldapEnabled, setLdapEnabled] = useState(false);
@@ -122,6 +123,7 @@ export default function LoginScreen({ onLogin }: Props) {
         <p className="login-subtitle">{t('app.subtitle')}</p>
         {securityChanged && <p role="status">{t('mfa.changed')}</p>}
         {reauthRequired && <p role="alert">{t('login.sessionEnded')}</p>}
+        {idleSignedOut && <p role="status">{t('idle.signedOut')}</p>}
         {error && <div className="login-error">{error}</div>}
         {cooldown.seconds > 0 && <p role="status">{t('login.retryAfter').replace('{seconds}', String(cooldown.seconds))}</p>}
 

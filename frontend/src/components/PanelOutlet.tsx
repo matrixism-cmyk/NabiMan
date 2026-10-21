@@ -1,6 +1,7 @@
 import React from 'react';
 import MfaPanel from './MfaPanel';
 import ClaudeChatPanel from './claude/ClaudeChatPanel';
+import AppSettingsPanel from './AppSettingsPanel';
 import ClaudeSettingsPanel from './claude/ClaudeSettingsPanel';
 import LoginSessionsPanel from './LoginSessionsPanel';
 import { Tab } from '../nav';
@@ -66,6 +67,7 @@ export default function PanelOutlet({ activeTab, onNavigate, onEnterFocus }: Pro
   switch (activeTab) {
     case 'mfa': return <MfaPanel />;
     case 'claudeChat': return <ClaudeChatPanel />;
+    case 'appSettings': return <AppSettingsPanel />;
     case 'claudeSettings': return <ClaudeSettingsPanel />;
     case 'loginSessions': return <LoginSessionsPanel />;
     case 'server': return <ServerStatusPanel />;

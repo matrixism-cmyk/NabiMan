@@ -238,7 +238,7 @@ async fn main() -> std::io::Result<()> {
     let jwt_secret = auth::new_jwt_secret();
     let pw_hash = password_store.lock().unwrap().clone();
     let user_store = users::new_user_store(&pw_hash);
-    let session_store = jwt_sessions::new_session_store();
+    let session_store = jwt_sessions::open_session_store();
     let login_limiter = rate_limit::RateLimiter::new();
     let channel_store = notifications::new_channel_store();
     let rule_store = alert_rules::new_rule_store();

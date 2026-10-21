@@ -64,11 +64,15 @@ pub fn check_auth_token(secret: &str, token: &str, sessions: &SessionStore) -> b
 }
 
 fn session_valid(claims: &Claims, sessions: &SessionStore) -> bool {
-    sessions
-        .lock()
-        .unwrap()
-        .get(&claims.sid)
-        .is_some_and(|session| session.username == claims.sub)
+    let now = crate::jwt_sessions::app_settings::now();
+    let idle = |s: &crate::jwt_sessions::SessionInfo| crate::jwt_sessions::app_settings::idle_expired(s.last_activity, now);
+    let mut map = sessions.lock().unwrap();
+    // A sign-in idle past the limit is over: gone for good, not just refused.
+    if map.get(&claims.sid).is_some_and(idle) {
+        map.remove(&claims.sid);
+        return false;
+    }
+    map.get(&claims.sid).is_some_and(|session| session.username == claims.sub)
 }
 
 // --- Handlers ---

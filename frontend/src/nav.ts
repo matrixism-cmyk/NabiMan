@@ -10,7 +10,7 @@ export type Tab =
   | 'mecDashboard' | 'mecNoc' | 'mecLive' | 'mecTenants' | 'mecNodes' | 'mecGpu' | 'mecFirewall'
   | 'mecStorage' | 'mecIngress' | 'mecJobs' | 'mecAudit' | 'mecHealth'
   | 'mecSettings' | 'mecDiscovery' | 'mecUsers'
-  | 'claudeChat' | 'claudeSettings';
+  | 'claudeChat' | 'claudeSettings' | 'appSettings';
 
 export type Category =
   | 'administration' | 'dashboard' | 'monitoring' | 'management' | 'security' | 'system' | 'remote' | 'mec' | 'claude';
@@ -27,6 +27,7 @@ export const categories: CatDef[] = [
     { key: 'scopeSettings', labelKey: 'tab.scopeSettings' },
     { key: 'loginSessions', labelKey: 'loginSessions.title' },
     { key: 'mfa', labelKey: 'mfa.title' },
+    { key: 'appSettings', labelKey: 'tab.appSettings' },
   ]},
   { key: 'dashboard', labelKey: 'cat.dashboard', tabs: [
     { key: 'server', labelKey: 'tab.serverStatus' },

@@ -43,6 +43,7 @@ fn is_viewer_allowed(method: &str, path: &str) -> bool {
         path,
         "/api/auth/change-password"
             | "/api/auth/logout"
+            | "/api/auth/activity"
             | "/api/auth/2fa/setup"
             | "/api/auth/2fa/verify-setup"
             | "/api/auth/2fa/disable"
@@ -74,6 +75,7 @@ fn is_operator_allowed(method: &str, path: &str) -> bool {
         path,
         "/api/auth/change-password"
             | "/api/auth/logout"
+            | "/api/auth/activity"
             | "/api/auth/2fa/setup"
             | "/api/auth/2fa/verify-setup"
             | "/api/auth/2fa/disable"

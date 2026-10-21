@@ -17,6 +17,7 @@ export function setToken(token: string) {
   currentRefresh = null;
   sessionStorage.setItem('nabiman_token', token);
   sessionStorage.removeItem('nabiman_reauth_required');
+  sessionStorage.removeItem('nabiman_idle_logout');
   sessionStorage.removeItem('nabiman_security_changed');
   window.dispatchEvent(new Event('nabiman_auth_changed'));
 }

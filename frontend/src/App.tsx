@@ -11,6 +11,8 @@ import { MemberUser } from './components/MembershipEditor';
 import PanelOutlet from './components/PanelOutlet';
 import ChangePasswordModal from './components/ChangePasswordModal';
 import HeaderMenu from './components/HeaderMenu';
+import IdleWarning from './components/IdleWarning';
+import { useIdleLogout } from './hooks/useIdleLogout';
 import CommandPalette from './components/CommandPalette';
 import LanguageSelector from './components/LanguageSelector';
 import { Tab, Category, CatDef, categories } from './nav';
@@ -124,6 +126,7 @@ function App() {
       hidden.add('vhost');
       hidden.add('remote');
       hidden.add('claudeChat');
+      hidden.add('appSettings');
       hidden.add('claudeSettings');
     }
     if (currentUser?.role === 'operator') {
@@ -164,6 +167,7 @@ function App() {
     exitFocus();
     try { await request; } catch { /* local logout completes even if offline */ }
   };
+  const idle = useIdleLogout(Boolean(loggedIn && currentUser), handleLogout);
   const handleNavigate = (tab: Tab) => { setActiveCat('mec'); setActiveTab(tab); };
   const navigateTo = (cat: Category, tab: Tab) => { setActiveCat(cat); setActiveTab(tab); };
   const handleCatClick = (cat: CatDef) => {
@@ -246,6 +250,7 @@ function App() {
         </main>
       </div>
       {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
+      {idle.secondsLeft !== null && <IdleWarning seconds={idle.secondsLeft} onStay={idle.stay} />}
       {showPalette && (
         <CommandPalette
           onClose={() => setShowPalette(false)}

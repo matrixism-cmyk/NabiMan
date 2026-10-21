@@ -3,8 +3,6 @@ use crate::models::ApiResponse;
 use crate::users::UserStore;
 use actix_web::{post, web, HttpResponse};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 
 const ACCESS_TTL: usize = 900; // 15 minutes
 const REFRESH_TTL: usize = 604800; // 7 days
@@ -21,12 +19,27 @@ pub struct SessionInfo {
     pub(crate) refresh_generation: u64,
     #[serde(skip_serializing)]
     pub(crate) mfa_verified: bool,
+    /// When the person last did something (unix seconds), for signing out when idle.
+    #[serde(skip_serializing)]
+    pub(crate) last_activity: i64,
 }
 
-pub type SessionStore = Arc<Mutex<HashMap<String, SessionInfo>>>;
+#[path = "session_store.rs"]
+mod store;
+#[path = "app_settings.rs"]
+pub mod app_settings;
+pub use store::SessionStore;
 
+/// Sign-ins in memory only (tests and fixtures).
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn new_session_store() -> SessionStore {
-    Arc::new(Mutex::new(HashMap::new()))
+    SessionStore::in_memory()
+}
+
+/// The server's sign-ins, kept in the data directory across restarts.
+pub fn open_session_store() -> SessionStore {
+    let dir = std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/var/lib/nabiman".into());
+    SessionStore::open(std::path::PathBuf::from(dir).join("login_sessions.json"))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -112,6 +125,7 @@ pub fn register_session(store: &SessionStore, sid: &str, username: &str, user_id
             ip: ip.to_string(),
             refresh_generation: 0,
             mfa_verified: false,
+            last_activity: app_settings::now(),
         },
     );
 }
@@ -203,7 +217,9 @@ async fn refresh_token(
         return HttpResponse::Unauthorized().json(ApiResponse::<()>::error("Account unavailable"));
     };
     let now = chrono::Utc::now().timestamp().max(0) as usize;
-    if claims.exp <= now || claims.iat > now || session.refresh_generation != claims.generation {
+    if claims.exp <= now || claims.iat > now || session.refresh_generation != claims.generation
+        || app_settings::idle_expired(session.last_activity, now as i64)
+    {
         sessions.remove(&claims.sid);
         return HttpResponse::Unauthorized().json(ApiResponse::<()>::error(
             "Login expired or refresh token reused; sign in again",
@@ -237,6 +253,7 @@ async fn refresh_token(
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {
+    app_settings::config(cfg);
     cfg.service(refresh_token)
         .configure(crate::session_management::config);
 }

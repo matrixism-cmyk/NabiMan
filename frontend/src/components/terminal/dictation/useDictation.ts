@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Action, finalText, Resampler, Typist } from './speech';
+import { markActivity } from '../../../hooks/useIdleLogout';
 
 export type DictationState = 'idle' | 'starting' | 'listening' | 'stopping';
 
@@ -48,6 +49,8 @@ export function useDictation({ open, onText, onKeys, muted = false }: Options) {
 
   /** Brings the prompt up to what has been said. */
   const typeUpTo = useCallback((said: string) => {
+    // Speaking is using NabiMan, though no key is pressed.
+    markActivity();
     for (const action of typist.current.to(said) as Action[]) {
       if (action.type === 'text') handlers.current.onText(action.text);
       else if (action.type === 'enter') handlers.current.onKeys('\r');
