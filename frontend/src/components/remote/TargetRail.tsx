@@ -28,6 +28,8 @@ interface Props {
 
 type MenuTarget = { kind: 'server'; server: RemoteServer } | { kind: 'local' };
 
+const FOLD_KEY = 'nabiman_rail_folded';
+
 interface OpenMenu { x: number; y: number; target: MenuTarget; opener: HTMLElement }
 
 /** Everything you can connect to, in one list: the fleet, the servers, the
@@ -39,6 +41,13 @@ export default function TargetRail({
   const { t } = useT();
   const [menu, setMenu] = useState<OpenMenu | null>(null);
   const [protocol, setProtocol] = useState<ProtocolFilter>('');
+  // Folded to a thin tab, for the most room to work; a phone shows the list on its own anyway.
+  const [foldedPref, setFoldedPref] = useState(() => { try { return localStorage.getItem(FOLD_KEY) === '1'; } catch { return false; } });
+  const folded = foldedPref && !compact;
+  const fold = (next: boolean) => {
+    setFoldedPref(next);
+    try { localStorage.setItem(FOLD_KEY, next ? '1' : '0'); } catch { /* private mode */ }
+  };
   const closeMenu = useCallback(() => setMenu(null), []);
 
   // A finger has no right button: holding it on an entry opens the same menu.
@@ -99,6 +108,17 @@ export default function TargetRail({
   // The protocol filter appears once the list holds more than one kind.
   const kinds = new Set(servers.flatMap(protocolsOf).map(p => (p === 'ftps' ? 'ftp' : p)));
 
+  if (folded) {
+    return (
+      <aside className="rw-rail is-folded">
+        <button type="button" className="rw-split-tab rw-rail-tab" onClick={() => fold(false)}
+          title={t('remote.railShow')} aria-label={t('remote.railShow')} aria-expanded={false}>
+          <span className="rw-split-tab-arrow" aria-hidden="true">»</span>{t('remote.railTab')}
+        </button>
+      </aside>
+    );
+  }
+
   return (
     <aside className="rw-rail">
         <div className="rw-rail-head">
@@ -112,6 +132,10 @@ export default function TargetRail({
           {window.location.pathname !== '/remote' && (
             <a className="btn btn-secondary btn-sm rw-standalone" href="/remote" title={t('remote.openStandalone')}
               aria-label={t('remote.openStandalone')}>↗</a>
+          )}
+          {!compact && (
+            <button type="button" className="btn btn-secondary btn-sm rw-rail-fold" onClick={() => fold(true)}
+              title={t('remote.railHide')} aria-label={t('remote.railHide')} aria-expanded>«</button>
           )}
         </div>
 

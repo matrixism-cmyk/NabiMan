@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useT } from '../../../i18n';
 import { useLongPress } from '../../common/useLongPress';
 import { formatSize, isFolder, modeString, SftpEntry } from './sftpApi';
+import SftpHeader from './SftpHeader';
+import { ColumnKey, Columns, minWidth, template } from './sftpColumns';
 
 export interface Editing {
   mode: 'new' | 'rename';
@@ -11,6 +13,8 @@ export interface Editing {
 
 interface Props {
   entries: SftpEntry[];
+  /** Which columns show, how wide, sorted how. */
+  columns: Columns;
   /** Shown as a ".." row: open it or drop onto it to go one folder up. */
   parent: string | null;
   selected: Set<string>;
@@ -90,7 +94,16 @@ const adding = (e: React.MouseEvent) => ({ ...e, ctrlKey: true, metaKey: false, 
 
 export default function SftpList(props: Props) {
   const { t } = useT();
-  const { entries, parent, selected, dropOn, editing, pathOf } = props;
+  const { entries, parent, selected, dropOn, editing, pathOf, columns } = props;
+  const tableRef = useRef<HTMLDivElement>(null);
+  const cell = (entry: SftpEntry, key: Exclude<ColumnKey, 'name'>) => {
+    const folder = isFolder(entry);
+    const value = key === 'size' ? (folder ? '' : formatSize(entry.size))
+      : key === 'mtime' ? when(entry.mtime)
+      : key === 'mode' ? (entry.mode !== null ? modeString(entry.mode) : '')
+      : key === 'owner' ? (entry.owner ?? entry.uid ?? '') : (entry.group ?? entry.gid ?? '');
+    return <span key={key} className={`sftp-col sftp-c-${key}`}>{value}</span>;
+  };
   // On a touch screen a tap opens, as phones do; a long press opens the menu
   // and starts picking, after which taps add and remove rows until none is left.
   const [picking, setPicking] = useState(false);
@@ -108,6 +121,8 @@ export default function SftpList(props: Props) {
   };
 
   return (
+    <div className="sftp-table" ref={tableRef} style={{ '--sftp-cols': template(columns.state), minWidth: `max(100%, ${minWidth(columns.state)}px)` } as React.CSSProperties}>
+    <SftpHeader columns={columns} listRef={tableRef} />
     <div className="sftp-rows" role="listbox" aria-multiselectable="true" aria-label={t('sftp.title')}>
       {parent && (
         <div
@@ -161,12 +176,12 @@ export default function SftpList(props: Props) {
             <span className="sftp-icon" aria-hidden="true">{entry.to_dir ? '📁' : ICONS[entry.kind]}</span>
             {renaming
               ? <EditRow initial={entry.name} onDone={props.onEditDone} />
-              : <span className="sftp-name">{entry.name}</span>}
-            <span className="sftp-size">{folder ? '' : formatSize(entry.size)}</span>
-            <span className="sftp-time">{when(entry.mtime)}</span>
+              : <span className="sftp-name sftp-c-name">{entry.name}</span>}
+            {columns.state.shown.map((key) => cell(entry, key))}
           </div>
         );
       })}
+    </div>
     </div>
   );
 }

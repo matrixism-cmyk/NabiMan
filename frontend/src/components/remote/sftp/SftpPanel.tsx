@@ -6,6 +6,7 @@ import PreviewDialog from './preview/PreviewDialog';
 import { previewOf } from './preview/previewKinds';
 import SftpList, { Editing } from './SftpList';
 import SftpTransfers from './SftpTransfers';
+import { sortEntries, useColumns } from './sftpColumns';
 import { useTransfers } from './useTransfers';
 import { useDragOut } from './useDragOut';
 import { draggingDesktopFiles, draggingOwnRows, ownRows, SFTP_MIME, takeDrop } from './sftpDrop';
@@ -93,9 +94,10 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
   const dragOut = useDragOut(source);
   const here = listing?.path || '';
   const pathOf = useCallback((name: string) => joinPath(current.current, name), []);
+  const columns = useColumns();
   const visible = useMemo(
-    () => (listing?.entries || []).filter((e) => showHidden || !e.name.startsWith('.')),
-    [listing, showHidden],
+    () => sortEntries((listing?.entries || []).filter((e) => showHidden || !e.name.startsWith('.')), columns.state.sort),
+    [listing, showHidden, columns.state.sort],
   );
   const chosen = visible.filter((e) => selected.has(e.name));
 
@@ -327,7 +329,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
       >
         {!listing && loading && <p className="sftp-empty">{t('sftp.connecting')}</p>}
         {listing && (
-          <SftpList entries={visible} parent={listing.parent} selected={selected} dropOn={dropOn}
+          <SftpList entries={visible} columns={columns} parent={listing.parent} selected={selected} dropOn={dropOn}
             editing={editing} pathOf={pathOf} onClick={click} onOpen={open}
             onUp={() => listing.parent && load(listing.parent)}
             onMenu={(e, entry) => {
@@ -346,9 +348,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
         {listing?.truncated && <p className="sftp-empty">{t('sftp.truncated', { count: listing.entries.length })}</p>}
       </div>
       <SftpTransfers rows={transfers.rows} onCancel={transfers.cancel} onClear={transfers.clearFinished} />
-      <p className="sftp-hint">
-        {chosen.length > 1 ? t('sftp.selected', { count: chosen.length }) : t(!writable ? (onInsert ? 'sftp.dragHintReadOnly' : 'sftp.dragHintReadOnlyNoTerminal') : onInsert ? 'sftp.dragHint' : 'sftp.dragHintNoTerminal')}
-      </p>
+      {chosen.length > 1 && <p className="sftp-hint">{t('sftp.selected', { count: chosen.length })}</p>}
       <input ref={fileInput} type="file" multiple hidden onChange={(e) => {
         const files = Array.from(e.target.files || []);
         if (files.length) transfers.upload(here, { files: files.map((file) => ({ rel: file.name, file })), dirs: [] });

@@ -257,3 +257,12 @@
 .rw-settings-check { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
 .rw-settings-check input { width: auto; margin: 0; }
 .rw-settings .dictation-settings { margin-top: 0; padding-top: 0; border-top: 0; }
+
+/* The server list folded to a thin tab. */
+.rw-rail.is-folded { width: auto; flex: 0 0 auto; background: none; border: 0; overflow: visible; }
+.rw-rail-tab { margin-left: 0; height: fit-content; }
+.rw-rail-head .btn + .btn, .rw-rail-head .btn + a { margin-left: 4px; }
+.rw-rail-head { gap: 4px; padding: 10px 8px 10px 12px; }
+.rw-rail-count { white-space: nowrap; }
+.rw-rail-head .btn { white-space: nowrap; padding: 4px 8px; }
+.rw-rail-head .rw-standalone, .rw-rail-head .rw-rail-fold { padding: 4px 7px; }

@@ -140,6 +140,17 @@ const t: T = {
   'share.filesHint': { ko: '링크를 받은 사람에게 터미널 옆 파일 패널을 열어 줍니다. 공유하는 세션이 접속한 서버(로컬 셸이면 이 서버)의 파일이며, 세션 소유자와 같은 권한으로 열립니다.', en: 'Gives the visitor the file panel beside the terminal: the files of the server the shared session is on (this server for a local shell), with the session owner\'s permissions.', ja: 'リンクの受け手にターミナル横のファイルパネルを開きます。共有セッションの接続先(ローカルシェルならこのサーバー)のファイルで、セッション所有者と同じ権限です。' },
   'share.filesTagRead': { ko: '파일 보기', en: 'files: read', ja: 'ファイル閲覧' },
   'share.filesTagWrite': { ko: '파일 수정', en: 'files: write', ja: 'ファイル変更' },
+  'sftp.col.name': { ko: '이름', en: 'Name', ja: '名前' },
+  'sftp.col.size': { ko: '크기', en: 'Size', ja: 'サイズ' },
+  'sftp.col.mtime': { ko: '수정한 때', en: 'Modified', ja: '更新日時' },
+  'sftp.col.mode': { ko: '권한', en: 'Permissions', ja: '権限' },
+  'sftp.col.owner': { ko: '소유자', en: 'Owner', ja: '所有者' },
+  'sftp.col.group': { ko: '그룹', en: 'Group', ja: 'グループ' },
+  'sftp.col.sortHint': { ko: '누르면 이 열로 정렬 (다시 누르면 반대로). 오른쪽 버튼: 보일 열 고르기', en: 'Sort by this column (again: the other way). Right-click: choose columns', ja: 'この列で並べ替え（もう一度で逆順）。右クリック: 表示する列を選ぶ' },
+  'sftp.col.resize': { ko: '{name} 열 너비', en: 'Width of {name}', ja: '{name} 列の幅' },
+  'sftp.col.resizeHint': { ko: '끌어서 너비 바꾸기, 두 번 누르면 내용에 맞추기', en: 'Drag to resize; double-click to fit the contents', ja: 'ドラッグで幅を変更、ダブルクリックで内容に合わせる' },
+  'sftp.col.choose': { ko: '보일 열', en: 'Columns', ja: '表示する列' },
+  'sftp.col.reset': { ko: '열 너비·구성 처음대로', en: 'Reset columns', ja: '列を元に戻す' },
 };
 
 export default t;

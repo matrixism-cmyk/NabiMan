@@ -389,6 +389,9 @@ const t: T = {
   'dictation.pauseHint': { ko: '음성 서비스가 말이 멈춘 곳을 알려 주면, 그때까지 한 말을 한 번에 입력합니다. 한국어는 문장 중간에도 0.5~1초 쉬는 일이 많아 1.5초를 권합니다.', en: 'The speech service says where speech stops, and what was said is typed at once. Korean often pauses 0.5–1 s mid-sentence: 1.5 s is a good start.', ja: '音声サービスが話の切れ目を知らせると、そこまでの言葉をまとめて入力します。韓国語は文の途中でも0.5〜1秒止まることが多いので1.5秒がおすすめです。' },
   'dictation.autoEnter': { ko: '터미널에서도 말이 멈추면 엔터 누르기', en: 'In terminals, press Enter at each pause too', ja: 'ターミナルでも止まったら Enter を押す' },
   'dictation.autoEnterHint': { ko: '끄면 터미널에서는 "엔터"라고 말할 때만 실행합니다. 말하다 멈춘 반쪽 명령이 실행되지 않도록 꺼 두는 것을 권합니다.', en: 'Off, a terminal runs a line only when "엔터" is said, so half a command never runs on a pause. Recommended.', ja: 'オフにすると、ターミナルでは「엔터」と言ったときだけ実行します。途中で止まった半分のコマンドが実行されないよう、オフを推奨します。' },
+  'remote.railHide': { ko: '서버 목록 접기', en: 'Fold the server list away', ja: 'サーバー一覧をたたむ' },
+  'remote.railShow': { ko: '서버 목록 펼치기', en: 'Show the server list', ja: 'サーバー一覧を表示' },
+  'remote.railTab': { ko: '서버 목록', en: 'Servers', ja: 'サーバー' },
 };
 
 export default t;
