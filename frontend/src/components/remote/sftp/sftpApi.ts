@@ -82,10 +82,12 @@ export interface SftpSource {
   writable: boolean;
   /** A share visitor's file key; absent for an account. */
   shareKey?: string;
+  /** An account's saved server id or `local`: what copies between panels name. */
+  scope?: string;
 }
 
 export const accountSource = (scope: string): SftpSource =>
-  ({ base: `/api/terminal/sftp/${encodeURIComponent(scope)}`, key: scope, writable: true });
+  ({ base: `/api/terminal/sftp/${encodeURIComponent(scope)}`, key: scope, writable: true, scope });
 
 export const shareSource = (shareToken: string, shareKey: string, writable: boolean): SftpSource =>
   ({ base: `/api/share/${encodeURIComponent(shareToken)}/files`, key: `share_${shareToken.slice(0, 16)}`, writable, shareKey });

@@ -6,9 +6,11 @@ import { RateState, startRate, updateRate } from './transferRate';
 import { confirmDialog } from '../../../shared/ui/ConfirmDialog';
 
 export interface TransferRow {
-  id: number;
+  /** A number for this panel's own transfers, a string for a copy between servers. */
+  id: number | string;
   name: string;
-  direction: 'up' | 'down';
+  /** `copy`: from another server's panel, relayed by NabiMan. */
+  direction: 'up' | 'down' | 'copy';
   loaded: number;
   total: number;
   status: 'waiting' | 'running' | 'done' | 'failed' | 'cancelled';
@@ -17,6 +19,8 @@ export interface TransferRow {
   rate?: number | null;
   /** Seconds left, once there is enough to tell. */
   eta?: number | null;
+  /** More to say on hover: the file being copied, what was left out. */
+  detail?: string;
 }
 
 /**

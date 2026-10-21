@@ -6,7 +6,7 @@ import { TransferRow } from './useTransfers';
 
 interface Props {
   rows: TransferRow[];
-  onCancel: (id: number) => void;
+  onCancel: (id: number | string) => void;
   onClear: () => void;
 }
 
@@ -26,8 +26,8 @@ export default function SftpTransfers({ rows, onCancel, onClear }: Props) {
         const percent = row.total > 0 ? Math.min(100, Math.round((row.loaded / row.total) * 100)) : null;
         const active = row.status === 'waiting' || row.status === 'running';
         return (
-          <div key={row.id} className={`sftp-transfer is-${row.status}`} title={row.message || row.name}>
-            <span className="sftp-transfer-dir" aria-hidden="true">{row.direction === 'up' ? '↑' : '↓'}</span>
+          <div key={row.id} className={`sftp-transfer is-${row.status}`} title={[row.name, row.message, row.detail].filter(Boolean).join('\n')}>
+            <span className="sftp-transfer-dir" aria-hidden="true">{row.direction === 'up' ? '↑' : row.direction === 'copy' ? '⇄' : '↓'}</span>
             <span className="sftp-transfer-name">{row.name}</span>
             <span className="sftp-transfer-state">
               {row.status === 'running' && (percent !== null ? `${percent}%` : formatSize(row.loaded))}

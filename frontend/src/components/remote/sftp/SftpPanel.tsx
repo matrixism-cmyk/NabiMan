@@ -9,7 +9,8 @@ import SftpTransfers from './SftpTransfers';
 import { sortEntries, useColumns } from './sftpColumns';
 import { useTransfers } from './useTransfers';
 import { useDragOut } from './useDragOut';
-import { draggingDesktopFiles, draggingOwnRows, ownRows, SFTP_MIME, takeDrop } from './sftpDrop';
+import { draggingDesktopFiles, draggingFrom, draggingOwnRows, droppedRows, startDragging, stopDragging, takeDrop } from './sftpDrop';
+import { askAndCopy, useCopies } from './sftpCopy';
 import {
   baseName, isFolder, joinPath, listDir, makeDir, movePath, removePath, SftpEntry, SftpListing, SftpSource, shellQuote,
 } from './sftpApi';
@@ -88,6 +89,12 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
 
   const refresh = useCallback(() => load(current.current), [load]);
   const transfers = useTransfers(source, useCallback((dir: string) => {
+    if (dir === current.current) refresh();
+  }, [refresh]));
+
+  // Copies from other servers' panels landing here; an account's panel only.
+  const copyScope = source.shareKey ? undefined : source.scope;
+  const copies = useCopies(copyScope, useCallback((dir: string) => {
     if (dir === current.current) refresh();
   }, [refresh]));
 
@@ -199,10 +206,9 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
     const names = selected.has(entry.name) ? chosen.map((c) => c.name) : [entry.name];
     if (!selected.has(entry.name)) setSelected(new Set([entry.name]));
     const paths = names.map(pathOf);
-    e.dataTransfer.setData(SFTP_MIME, JSON.stringify(paths));
+    startDragging(e.dataTransfer, { base: source.base, scope: copyScope, name: serverName, paths });
     e.dataTransfer.setData('text/plain', paths.map(shellQuote).join(' '));
     e.dataTransfer.effectAllowed = 'copyMove';
-    // A single file can also be dropped onto the desktop to save it.
     // A single file — or folder, as a ZIP — can also be dropped onto the desktop to save it.
     if (names.length === 1) dragOut.attach(e.dataTransfer, paths[0], isFolder(entry) ? `${entry.name}.zip` : entry.name);
   };
@@ -212,9 +218,13 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
     if (!writable) return;
     const own = draggingOwnRows(e.dataTransfer);
     if (!own && !draggingDesktopFiles(e.dataTransfer)) return;
+    // Rows from another place are copied here, when both sides are an account's.
+    const from = own ? draggingFrom() : null;
+    const across = Boolean(from?.base && from.base !== source.base);
+    if (across && !(from?.scope && copyScope)) return;
     e.preventDefault();
     e.stopPropagation();
-    e.dataTransfer.dropEffect = own ? 'move' : 'copy';
+    e.dataTransfer.dropEffect = own && !across ? 'move' : 'copy';
     if (dropOn !== dir) setDropOn(dir);
   };
 
@@ -224,7 +234,15 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
     e.stopPropagation();
     setDropOn(null);
     if (draggingOwnRows(e.dataTransfer)) {
-      moveInto(ownRows(e.dataTransfer), dir);
+      const rows = droppedRows(e.dataTransfer);
+      stopDragging();
+      if (!rows.base || rows.base === source.base) moveInto(rows.paths, dir);
+      else if (rows.scope && copyScope) {
+        askAndCopy(rows, { scope: copyScope, name: serverName }, dir, t).then((r) => {
+          if (r.copy) copies.track(r.copy);
+          else if (r.error) setError(r.error);
+        });
+      }
     } else if (e.dataTransfer.types.includes('Files')) {
       const taken = takeDrop(e.dataTransfer);
       taken().then((dropped) => { if (dropped.files.length || dropped.dirs.length) transfers.upload(dir, dropped); });
@@ -339,7 +357,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
               setMenu({ x: e.clientX, y: e.clientY, entry, opener: e.currentTarget as HTMLElement });
             }}
             onDragStart={dragStart} onDragOverDir={dragOver} onDropDir={drop} onEditDone={finishEdit}
-            onDragEnd={(entry) => dragOut.spent(pathOf(entry.name))}
+            onDragEnd={(entry) => { stopDragging(); dragOut.spent(pathOf(entry.name)); }}
             onPrefetch={(entry, now) => dragOut.prefetch(pathOf(entry.name), now)} />
         )}
         {listing && !visible.length && !editing && (
@@ -347,7 +365,9 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
         )}
         {listing?.truncated && <p className="sftp-empty">{t('sftp.truncated', { count: listing.entries.length })}</p>}
       </div>
-      <SftpTransfers rows={transfers.rows} onCancel={transfers.cancel} onClear={transfers.clearFinished} />
+      <SftpTransfers rows={[...transfers.rows, ...copies.rows]}
+        onCancel={(id) => (typeof id === 'string' ? copies.cancel(id) : transfers.cancel(id))}
+        onClear={() => { transfers.clearFinished(); copies.clearFinished(); }} />
       {chosen.length > 1 && <p className="sftp-hint">{t('sftp.selected', { count: chosen.length })}</p>}
       <input ref={fileInput} type="file" multiple hidden onChange={(e) => {
         const files = Array.from(e.target.files || []);

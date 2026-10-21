@@ -45,7 +45,8 @@
     "smoke:screen": "node scripts/smoke-screen.js",
     "smoke:standalone": "node scripts/smoke-standalone.js",
     "smoke:columns": "node scripts/smoke-columns.js",
-    "smoke:dictation": "node scripts/smoke-dictation.js"
+    "smoke:dictation": "node scripts/smoke-dictation.js",
+    "smoke:copy": "node scripts/smoke-copy.js"
   },
   "browserslist": {
     "production": [

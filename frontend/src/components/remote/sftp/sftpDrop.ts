@@ -3,8 +3,35 @@
  * included, walked into), or entries dragged within the panel itself.
  */
 
-/** Set on rows dragged inside the panel; the value lists their full paths. */
+/**
+ * Set on rows dragged from a panel: where they are (the panel's route and,
+ * for an account's panel, its server) and their full paths.
+ */
 export const SFTP_MIME = 'application/x-nabiman-sftp';
+
+export interface DraggedRows {
+  /** The panel's route prefix, telling one place from another. */
+  base?: string;
+  /** A saved server id or `local`; absent for a share link's panel. */
+  scope?: string;
+  /** The panel's name for its place, for questions and progress. */
+  name?: string;
+  paths: string[];
+}
+
+/**
+ * The rows being dragged right now in this page. A drop target can only read
+ * the data on drop; while hovering it looks here to say copy or move.
+ */
+let dragging: Omit<DraggedRows, 'paths'> | null = null;
+export const draggingFrom = () => dragging;
+export function startDragging(dt: DataTransfer, rows: DraggedRows) {
+  dt.setData(SFTP_MIME, JSON.stringify(rows));
+  dragging = { base: rows.base, scope: rows.scope, name: rows.name };
+}
+export function stopDragging() {
+  dragging = null;
+}
 
 export interface DroppedFile {
   /** Path relative to the drop target, using `/`, ending in the file name. */
@@ -22,13 +49,18 @@ export const draggingOwnRows = (dt: DataTransfer | null) => Boolean(dt?.types.in
 export const draggingDesktopFiles = (dt: DataTransfer | null) =>
   Boolean(dt?.types.includes('Files')) && !draggingOwnRows(dt);
 
-/** Paths of rows dragged inside the panel, or an empty list. */
-export function ownRows(dt: DataTransfer): string[] {
+/** The rows dropped, and where they came from; no paths if it was not rows. */
+export function droppedRows(dt: DataTransfer): DraggedRows {
   try {
     const value = JSON.parse(dt.getData(SFTP_MIME));
-    return Array.isArray(value) ? value.filter((p): p is string => typeof p === 'string') : [];
+    const list: unknown = Array.isArray(value) ? value : value?.paths;
+    const text = (v: unknown) => (typeof v === 'string' ? v : undefined);
+    return {
+      base: text(value?.base), scope: text(value?.scope), name: text(value?.name),
+      paths: Array.isArray(list) ? list.filter((p): p is string => typeof p === 'string') : [],
+    };
   } catch {
-    return [];
+    return { paths: [] };
   }
 }
 
