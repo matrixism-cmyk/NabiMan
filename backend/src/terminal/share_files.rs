@@ -67,6 +67,7 @@ pub(super) async fn create_files_share(
     // There is no terminal: "read only" is simply what the file access says.
     let request = CreateShareRequest {
         expires_in_secs: body.expires_in_secs,
+        permanent: body.permanent,
         password: body.password.clone(),
         read_only: body.files == ShareFiles::Read,
         files: body.files,

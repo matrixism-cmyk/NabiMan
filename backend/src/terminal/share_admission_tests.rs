@@ -40,6 +40,19 @@ pub(super) async fn authenticated_api_enforces_finite_defaults_upgrade_guard_and
             .to_request();
         assert_eq!(awtest::call_service(&app, req).await.status(), 400);
     }
+    // A permanent link lasts until revoked, and lets its visitor in.
+    let req = awtest::TestRequest::post()
+        .uri("/api/terminal/sessions/terminal-one/share-link")
+        .insert_header(("Authorization", format!("Bearer {token}")))
+        .set_json(serde_json::json!({"permanent":true}))
+        .to_request();
+    let forever: serde_json::Value = awtest::read_body_json(awtest::call_service(&app, req).await).await;
+    assert_eq!(forever["data"]["expires_unix"], super::PERMANENT_UNIX);
+    let req = awtest::TestRequest::post()
+        .uri(&format!("/api/share/{}/auth", forever["data"]["token"].as_str().unwrap()))
+        .set_json(serde_json::json!({"password":"", "query":""}))
+        .to_request();
+    assert_eq!(awtest::call_service(&app, req).await.status(), 200);
     let req = awtest::TestRequest::post()
         .uri("/api/terminal/sessions/terminal-one/share-link")
         .insert_header(("Authorization", format!("Bearer {token}")))

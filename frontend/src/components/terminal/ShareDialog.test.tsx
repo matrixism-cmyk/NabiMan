@@ -45,11 +45,11 @@ test('Escape closes the dialog even after focus leaves a removed control', async
   expect(screen.getByRole('dialog').closest('.term-window')).toBeNull();
 });
 
-test('defaults to read-only, offers finite expiry and identifies links requiring reissue', async () => {
+test('defaults to read-only for 24 hours and identifies links requiring reissue', async () => {
   request.mockResolvedValue({ success: true, data: [{ ...link, usable: false }] });
   setup();
   expect(screen.getByRole('checkbox')).toBeChecked();
-  expect(screen.queryByRole('button', { name: '영구' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '24시간' })).toHaveClass('btn-primary');
   expect(await screen.findByText('사용 불가 · 필요 시 재발급')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '복사' })).toBeDisabled();
 });
@@ -78,4 +78,16 @@ test('a files link goes to the server, needs file access, and lists only its own
   fireEvent.click(screen.getByRole('radio', { name: '올리기·수정까지' }));
   fireEvent.click(screen.getByRole('button', { name: '링크 만들기' }));
   await waitFor(() => expect(post).toHaveBeenCalledWith('/api/terminal/files/srv_ftp/share-link', expect.objectContaining({ files: 'write' })));
+});
+
+test('a permanent link is offered with a warning, and asked for as permanent', async () => {
+  request.mockResolvedValueOnce({ success: true, data: [] });
+  post.mockResolvedValue({ success: true, data: { ...link, expires_unix: 253402300799 } });
+  setup();
+  await waitFor(() => expect(request).toHaveBeenCalled());
+  expect(screen.queryByText(/영구 링크는 직접 해지할 때까지/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '영구' }));
+  expect(screen.getByText(/영구 링크는 직접 해지할 때까지/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '링크 만들기' }));
+  await waitFor(() => expect(post).toHaveBeenCalledWith('/api/terminal/sessions/session-1/share-link', expect.objectContaining({ permanent: true })));
 });

@@ -1,0 +1,47 @@
+type Lang = 'ko' | 'en' | 'ja';
+type T = Record<string, Record<Lang, string>>;
+
+// Speaking into a terminal: the microphone, its hints, and its settings.
+const t: T = {
+  'dictation.label': { ko: '받아쓰기', en: 'Dictate', ja: '音声入力' },
+  'dictation.listening': { ko: '듣는 중', en: 'Listening', ja: '聞き取り中' },
+  'dictation.start': { ko: '음성 받아쓰기 시작', en: 'Start dictation', ja: '音声入力を開始' },
+  'dictation.stop': { ko: '음성 받아쓰기 끝내기', en: 'Stop dictation', ja: '音声入力を終了' },
+  'dictation.startHint': { ko: '말하면 프롬프트에 입력됩니다. 말끝에 "엔터"라고 하면 Enter를 누릅니다.', en: 'Speak to type at the prompt; say "엔터" (Enter) to press Enter.', ja: '話すとプロンプトに入力されます。「エンター」で Enter を押します。' },
+  'dictation.startHintPauseEnter': { ko: '말하면 프롬프트에 입력되고, {seconds}초 멈추면 그 끝에 Enter를 눌러 실행합니다. 말끝에 "엔터"라고 해도 바로 Enter를 누릅니다.', en: 'Speak to type at the prompt; a {seconds} s pause presses Enter after it. Saying "엔터" presses Enter at once.', ja: '話すとプロンプトに入力され、{seconds}秒止まるとその後に Enter を押して実行します。「엔터」と言ってもすぐ Enter を押します。' },
+  'dictation.startHintPause': { ko: '말하면 {seconds}초 멈출 때마다 프롬프트에 입력됩니다. Enter는 말끝에 "엔터"라고 할 때만 누릅니다.', en: 'Speak to type at the prompt, a sentence at each {seconds} s pause. Enter is pressed only when you say "엔터".', ja: '話すと{seconds}秒止まるごとにプロンプトに入力されます。Enter は「엔터」と言ったときだけ押します。' },
+  'dictation.stopHint': { ko: '눌러서 받아쓰기를 끝냅니다', en: 'Press to stop dictating', ja: '押すと音声入力を終了します' },
+  'dictation.starting': { ko: '마이크를 켜는 중…', en: 'Turning the microphone on…', ja: 'マイクを準備中…' },
+  'dictation.finishing': { ko: '마지막 말을 받아쓰는 중…', en: 'Writing down the last words…', ja: '最後の言葉を書き起こし中…' },
+  'dictation.denied': { ko: '마이크 사용이 막혀 있습니다. 주소창 왼쪽의 사이트 설정에서 마이크를 허용하세요.', en: 'The microphone is blocked; allow it in the site settings by the address bar.', ja: 'マイクがブロックされています。アドレスバーのサイト設定で許可してください。' },
+  'dictation.nomic': { ko: '쓸 수 있는 마이크가 없습니다.', en: 'No microphone was found.', ja: '使えるマイクがありません。' },
+  'dictation.connection': { ko: '받아쓰기 서비스에 연결하지 못했습니다.', en: 'Could not reach the dictation service.', ja: '音声入力サービスに接続できませんでした。' },
+  'dictation.settingsTitle': { ko: '음성 받아쓰기', en: 'Voice dictation', ja: '音声入力' },
+  'dictation.settingsHint': { ko: '터미널의 마이크 버튼이 쓸 음성 서비스입니다. v.bebo.kr의 계정 화면에서 API 키를 만들어 넣으세요. 키는 이 서버에 암호화되어 저장되고 브라우저로는 보내지 않습니다. 받아쓴 내용은 음성 서비스의 기록에 남기지 않습니다.', en: 'The speech service behind the terminal\'s microphone. Create an API key on v.bebo.kr\'s account page and paste it here; it is stored encrypted on this server and never sent to browsers. Nothing dictated is kept by the service.', ja: 'ターミナルのマイクボタンが使う音声サービスです。v.bebo.kr のアカウント画面で API キーを作って入力してください。キーはこのサーバーに暗号化して保存され、ブラウザーには送られません。書き起こした内容はサービスの記録に残しません。' },
+  'dictation.url': { ko: '서비스 주소', en: 'Service address', ja: 'サービスのアドレス' },
+  'dictation.address': { ko: '접속 주소 (선택)', en: 'Connect to (optional)', ja: '接続先 (任意)' },
+  'dictation.addressHint': { ko: '이 서버에서 서비스의 공개 주소로 닿지 않을 때만 host:port로 넣습니다 (같은 서버면 127.0.0.1:443). 인증서는 서비스 주소의 이름으로 확인합니다.', en: 'Only when this server cannot reach the public address: host:port (127.0.0.1:443 on the same machine). TLS still checks the service address\'s name.', ja: 'このサーバーから公開アドレスに届かない場合のみ host:port で入力 (同じサーバーなら 127.0.0.1:443)。証明書はサービスのアドレス名で確認します。' },
+  'dictation.key': { ko: 'API 키', en: 'API key', ja: 'API キー' },
+  'dictation.keyKeep': { ko: '저장됨, 비우면 그대로', en: 'stored; leave empty to keep', ja: '保存済み、空欄ならそのまま' },
+  'dictation.keyHint': { ko: 'vk_로 시작합니다. 한 번 저장하면 다시 보이지 않습니다.', en: 'Starts with vk_. Once saved it is never shown again.', ja: 'vk_ で始まります。保存後は再表示されません。' },
+  'dictation.language': { ko: '기본 언어', en: 'Language', ja: '言語' },
+  'dictation.lang.korean': { ko: '한국어', en: 'Korean', ja: '韓国語' },
+  'dictation.lang.english': { ko: '영어', en: 'English', ja: '英語' },
+  'dictation.lang.japanese': { ko: '일본어', en: 'Japanese', ja: '日本語' },
+  'dictation.lang.chinese': { ko: '중국어', en: 'Chinese', ja: '中国語' },
+  'dictation.lang.auto': { ko: '자동 감지', en: 'Detect', ja: '自動検出' },
+  'dictation.test': { ko: '연결 확인', en: 'Test', ja: '接続確認' },
+  'dictation.testing': { ko: '음성 서비스에 연결해 보는 중…', en: 'Trying the speech service…', ja: '音声サービスに接続中…' },
+  'dictation.testOk': { ko: '연결되었습니다. 터미널의 마이크 버튼을 쓸 수 있습니다.', en: 'Connected: the terminal\'s microphone is ready.', ja: '接続できました。ターミナルのマイクボタンが使えます。' },
+  'dictation.testNotReady': { ko: '연결은 되었지만 음성 서비스가 아직 준비 중입니다.', en: 'Connected, but the speech service is still starting.', ja: '接続できましたが、音声サービスはまだ準備中です。' },
+  'dictation.clearKey': { ko: 'API 키 지우기', en: 'Remove API key', ja: 'API キーを削除' },
+  'dictation.saved': { ko: '저장했습니다.', en: 'Saved.', ja: '保存しました。' },
+  'dictation.pause': { ko: '말 끝 감지 (잠깐 멈추면 한 문장으로)', en: 'End of speech (a pause ends a sentence)', ja: '話し終わりの検出（少し止まると一文）' },
+  'dictation.pauseOff': { ko: '끄기 — "엔터"라고 말할 때만', en: 'Off — only when "엔터" is said', ja: 'オフ —「엔터」と言ったときだけ' },
+  'dictation.pauseSeconds': { ko: '{seconds}초 멈추면', en: 'after a {seconds} s pause', ja: '{seconds}秒止まったら' },
+  'dictation.pauseHint': { ko: '음성 서비스가 말이 멈춘 곳을 알려 주면, 그때까지 한 말을 한 번에 입력합니다. 한국어는 문장 중간에도 0.5~1초 쉬는 일이 많아 1.5초를 권합니다.', en: 'The speech service says where speech stops, and what was said is typed at once. Korean often pauses 0.5–1 s mid-sentence: 1.5 s is a good start.', ja: '音声サービスが話の切れ目を知らせると、そこまでの言葉をまとめて入力します。韓国語は文の途中でも0.5〜1秒止まることが多いので1.5秒がおすすめです。' },
+  'dictation.autoEnter': { ko: '말이 멈추면 자동으로 엔터 누르기', en: 'Press Enter automatically at each pause', ja: '話が止まったら自動で Enter を押す' },
+  'dictation.autoEnterHint': { ko: '말이 멈추면 그때까지 말한 내용 끝에 엔터를 눌러 바로 실행합니다. 모든 터미널(떠 있는 창, 공유 링크 포함)에 적용됩니다. 끄면 "엔터"라고 말할 때만 실행합니다.', en: 'When you pause, Enter is pressed after what you said, so it runs at once. Applies to every terminal, floating windows and share links included. Off, a line runs only when "엔터" is said.', ja: '話が止まると、そこまでの内容の後に Enter を押してすぐ実行します。すべてのターミナル（浮動ウィンドウ・共有リンクを含む）に適用されます。オフにすると「엔터」と言ったときだけ実行します。' },
+};
+
+export default t;

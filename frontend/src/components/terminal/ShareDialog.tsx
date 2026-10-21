@@ -37,12 +37,20 @@ const EXPIRY_CHOICES: { labelKey: string; secs: number }[] = [
   { labelKey: 'share.5d', secs: 5 * 86400 },
   { labelKey: 'share.10d', secs: 10 * 86400 },
   { labelKey: 'share.30d', secs: 30 * 86400 },
+  { labelKey: 'share.60d', secs: 60 * 86400 },
+  { labelKey: 'share.90d', secs: 90 * 86400 },
+  // Lasts until revoked.
+  { labelKey: 'share.forever', secs: 0 },
 ];
+
+/** The end the server gives a permanent link: the last second of year 9999. */
+export const PERMANENT_UNIX = 253402300799;
+export const isPermanent = (unix: number) => unix >= PERMANENT_UNIX;
 
 const shareUrl = (token: string) => `${window.location.origin}/share/${token}`;
 
 function formatExpiry(unix: number, t: (k: string) => string): string {
-  if (unix === 0) return t('share.forever');
+  if (unix === 0 || isPermanent(unix)) return t('share.forever');
   return new Date(unix * 1000).toLocaleString();
 }
 
@@ -86,6 +94,7 @@ export default function ShareDialog({ sessionId = '', serverId = '', sessionLabe
       ? `/api/terminal/files/${serverId}/share-link`
       : `/api/terminal/sessions/${sessionId}/share-link`, {
       expires_in_secs: expiry,
+      permanent: expiry === 0,
       password: password.trim(),
       read_only: readOnly,
       files,
@@ -133,6 +142,7 @@ export default function ShareDialog({ sessionId = '', serverId = '', sessionLabe
               >{t(choice.labelKey)}</button>
             ))}
           </div>
+          {expiry === 0 && <small className="share-warning">{t('share.foreverHint')}</small>}
         </div>
 
         <div className="form-group">

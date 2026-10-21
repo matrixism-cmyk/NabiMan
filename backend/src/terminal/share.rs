@@ -37,7 +37,10 @@ use super::pty::{attach_tmux, parse_size, WsBridge};
 use super::session::{client_size, now_unix, tmux_session_exists, PtyStore};
 use super::share_ticket;
 
-const MAX_EXPIRY_SECS: u64 = 30 * 24 * 3600;
+const MAX_EXPIRY_SECS: u64 = 90 * 24 * 3600;
+/// The end of a link made to last until it is revoked: the last second of
+/// year 9999. Not 0, which marks a legacy link and is refused.
+pub(crate) const PERMANENT_UNIX: u64 = 253_402_300_799;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ShareLink {
@@ -122,7 +125,8 @@ fn expired(link: &ShareLink) -> bool {
     link.expires_unix == 0
         || now < link.created_unix
         || now >= link.expires_unix
-        || link.expires_unix.saturating_sub(link.created_unix) > MAX_EXPIRY_SECS
+        || (link.expires_unix != PERMANENT_UNIX
+            && link.expires_unix.saturating_sub(link.created_unix) > MAX_EXPIRY_SECS)
 }
 
 pub(crate) fn live_link(shares: &ShareStore, users: &UserStore, token: &str) -> Option<ShareLink> {

@@ -27,10 +27,14 @@ export default function DictationButton({ open, onText, onKeys, variant = 'head'
   const { state, partial, error, start, stop } = useDictation({ open, onText, onKeys, endpointMs, enterOnPause });
   const on = state === 'listening' || state === 'starting';
   const message = error ? (KNOWN.includes(error) ? t(`dictation.${error}`) : error) : '';
+  // What a press will do, as this server is set up: Enter at a pause, a pause only, or "엔터" alone.
+  const seconds = String((endpointMs || 0) / 1000);
+  const startHint = !endpointMs ? t('dictation.startHint')
+    : enterOnPause ? t('dictation.startHintPauseEnter', { seconds }) : t('dictation.startHintPause', { seconds });
   return (
     <span className={`dictation dictation-${variant}`}>
       <button type="button" className={`btn btn-secondary btn-sm dictation-btn ${on ? 'is-on' : ''} is-${state}`}
-        aria-pressed={on} title={t(on ? 'dictation.stopHint' : 'dictation.startHint')}
+        aria-pressed={on} title={on ? t('dictation.stopHint') : startHint}
         aria-label={t(on ? 'dictation.stop' : 'dictation.start')}
         onMouseDown={(e) => e.preventDefault()}
         onClick={(e) => { e.stopPropagation(); if (on) stop(); else if (state === 'idle') start(); }}>

@@ -2,7 +2,7 @@ import React from 'react';
 import { useT } from '../../../shared/i18n';
 
 /** Pauses the settings offer (ms); 0 is the older way: only "엔터" ends a sentence. */
-export const PAUSES = [0, 800, 1000, 1500, 2000, 3000];
+export const PAUSES = [0, 800, 1000, 1500, 2000, 3000, 4000, 5000];
 
 /** How long a pause ends what was said, for the speech service's end-of-speech detection. */
 export default function PauseField({ id, value, onChange }: { id: string; value: number; onChange: (ms: number) => void }) {

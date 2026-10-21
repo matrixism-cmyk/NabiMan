@@ -2,8 +2,12 @@ use super::*;
 
 #[derive(Deserialize)]
 pub struct CreateShareRequest {
-    /// Finite lifetime, at most 30 days.
+    /// Lifetime, at most 90 days; ignored for a permanent link.
+    #[serde(default)]
     pub expires_in_secs: u64,
+    /// Lasts until revoked.
+    #[serde(default)]
+    pub permanent: bool,
     /// Empty or absent means anyone with the link gets straight in.
     #[serde(default)]
     pub password: Option<String>,
@@ -78,9 +82,9 @@ pub(super) fn publish(
     sessions: &web::Data<crate::jwt_sessions::SessionStore>,
     shares: &web::Data<ShareStore>,
 ) -> HttpResponse {
-    if body.expires_in_secs == 0 || body.expires_in_secs > MAX_EXPIRY_SECS {
+    if !body.permanent && (body.expires_in_secs == 0 || body.expires_in_secs > MAX_EXPIRY_SECS) {
         return HttpResponse::BadRequest().json(ApiResponse::<()>::error(
-            "Share expiry must be between 1 second and 30 days",
+            "Share expiry must be between 1 second and 90 days, or permanent",
         ));
     }
     if body
@@ -121,7 +125,7 @@ pub(super) fn publish(
         owner_authorization_version: owner.share_authorization_version.clone(),
         label: target.label,
         created_unix: now_unix(),
-        expires_unix: now_unix() + body.expires_in_secs,
+        expires_unix: if body.permanent { PERMANENT_UNIX } else { now_unix() + body.expires_in_secs },
         password_hash,
         read_only: body.read_only,
         last_used_unix: 0,

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { apiRequest } from '../../shared/api/useApi';
 import { useT } from '../../shared/i18n';
-import { ShareLink } from './ShareDialog';
+import { isPermanent, ShareLink } from './ShareDialog';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 
 const shareUrl = (token: string) => `${window.location.origin}/share/${token}`;
@@ -13,7 +13,7 @@ const SOON_SECS = 6 * 3600;
 type Urgency = 'critical' | 'soon' | 'ok';
 
 function urgencyOf(expires: number): Urgency {
-  if (expires === 0) return 'ok';
+  if (expires === 0 || isPermanent(expires)) return 'ok';
   const left = expires - Math.floor(Date.now() / 1000);
   if (left <= CRITICAL_SECS) return 'critical';
   if (left <= SOON_SECS) return 'soon';
@@ -22,7 +22,7 @@ function urgencyOf(expires: number): Urgency {
 
 /** "in 3 days", "in 20 minutes" — how long this link has left. */
 function remaining(expires: number, t: (k: string) => string): string {
-  if (expires === 0) return t('share.forever');
+  if (expires === 0 || isPermanent(expires)) return t('share.forever');
   const secs = expires - Math.floor(Date.now() / 1000);
   if (secs <= 0) return t('share.expiredNow');
   // Round up: a link made for 3 days should read "3일", not "2일".
@@ -38,7 +38,7 @@ function used(unix: number, t: (k: string) => string): string {
 }
 
 function exactExpiry(expires: number, t: (k: string) => string): string {
-  return expires === 0 ? t('share.forever') : new Date(expires * 1000).toLocaleString();
+  return expires === 0 || isPermanent(expires) ? t('share.forever') : new Date(expires * 1000).toLocaleString();
 }
 
 /** Every link this account has handed out, wherever it was created. */
