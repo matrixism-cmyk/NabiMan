@@ -108,6 +108,11 @@ export default function TargetRail({
           <button className="btn btn-secondary btn-sm" onClick={onCheckAll} disabled={checkingAll || servers.length === 0}>
             {checkingAll ? t('remote.checking') : t('remote.checkAll')}
           </button>
+          {/* The remote workspace alone, at /remote (this tab keeps its sign-in). */}
+          {window.location.pathname !== '/remote' && (
+            <a className="btn btn-secondary btn-sm rw-standalone" href="/remote" title={t('remote.openStandalone')}
+              aria-label={t('remote.openStandalone')}>↗</a>
+          )}
         </div>
 
         {(servers.length > 5 || kinds.size > 1) && (

@@ -14,6 +14,7 @@ import HeaderMenu from './components/HeaderMenu';
 import IdleWarning from './components/IdleWarning';
 import { useIdleLogout } from './hooks/useIdleLogout';
 import { useChromeHidden } from './hooks/useChromeHidden';
+import RemoteShell, { isStandaloneRemote } from './components/remote/RemoteShell';
 import CommandPalette from './components/CommandPalette';
 import LanguageSelector from './components/LanguageSelector';
 import { Tab, Category, CatDef, categories } from './nav';
@@ -80,8 +81,11 @@ function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [focusMode, exitFocus]);
 
+  // /remote is the remote workspace on its own: no menus, so no view in the hash.
+  const [standalone] = useState(isStandaloneRemote);
   // Deep-linking: restore view from the URL hash on load and on back/forward.
   useEffect(() => {
+    if (standalone) return undefined;
     const apply = () => {
       const p = parseHash();
       if (p) { setActiveCat(p.cat); setActiveTab(p.tab); }
@@ -89,12 +93,13 @@ function App() {
     apply();
     window.addEventListener('hashchange', apply);
     return () => window.removeEventListener('hashchange', apply);
-  }, []);
+  }, [standalone]);
   // Keep the URL hash in sync so a refresh or shared link reopens the same view.
   useEffect(() => {
+    if (standalone) return;
     const next = `#${activeCat}/${activeTab}`;
     if (window.location.hash !== next) window.history.replaceState(null, '', next);
-  }, [activeCat, activeTab]);
+  }, [activeCat, activeTab, standalone]);
 
   // Ctrl/Cmd+K opens the command palette from anywhere.
   useEffect(() => {
@@ -194,6 +199,15 @@ function App() {
       <button className="btn btn-secondary" onClick={handleLogout}>{t('app.logout')}</button>
     </div>
   </main>;
+
+  if (standalone) return (
+    <TerminalSettingsProvider key={currentUser.username} enabled={currentUser.role === 'admin'}>
+    <TerminalWindowsProvider key={currentUser.username} owner={currentUser.username} active={currentUser.role === 'admin'}>
+      <RemoteShell username={currentUser.username} allowed={currentUser.role === 'admin' && !scoped} onLogout={handleLogout} />
+      {idle.secondsLeft !== null && <IdleWarning seconds={idle.secondsLeft} onStay={idle.stay} />}
+    </TerminalWindowsProvider>
+    </TerminalSettingsProvider>
+  );
 
   const currentCat = visibleCategories.find(c => c.key === activeCat) || visibleCategories[0];
 

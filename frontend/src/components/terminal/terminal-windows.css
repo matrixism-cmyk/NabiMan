@@ -182,7 +182,12 @@
 .term-taskbar-spacer { flex: 1 1 auto; }
 
 .term-settings-overlay { z-index: 1000; }
-.term-settings { max-width: 560px; }
+/* Wide enough for the settings in two columns, and never taller than the
+   window: what does not fit scrolls inside instead of being cut off. */
+.term-settings { width: min(920px, 94vw); max-width: 94vw; max-height: 92vh; overflow-y: auto; }
+.term-settings .term-settings-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 0 28px; }
+.term-settings .term-settings-form > .message,
+.term-settings .term-settings-form > .btn-group { grid-column: 1 / -1; }
 .term-settings .form-group { margin-bottom: 14px; }
 .term-settings small { display: block; margin-top: 4px; font-size: 11px; }
 .term-settings label { display: block; margin-bottom: 6px; font-size: 13px; color: var(--text); }

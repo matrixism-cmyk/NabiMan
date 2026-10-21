@@ -1,0 +1,18 @@
+/* The remote workspace on its own (/remote): a slim bar, then the work. */
+.remote-shell { height: 100vh; height: 100dvh; display: flex; flex-direction: column; background: var(--bg); overflow: hidden; }
+.remote-shell-bar {
+  flex: none; display: flex; align-items: center; gap: 12px; min-height: 40px; padding: 4px 10px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.remote-shell-brand { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); text-decoration: none; font-size: 13px; }
+.remote-shell-brand strong { color: var(--primary); font-size: 14px; }
+.remote-shell-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.remote-shell-actions select { padding: 3px 6px; font-size: 12px; }
+.remote-shell-user { font-size: 12px; color: var(--text-secondary); margin-right: 4px; }
+.remote-shell-main { flex: 1; min-height: 0; padding: 6px; display: flex; flex-direction: column; }
+.remote-shell-main > .rw { flex: 1; min-height: 0; height: auto; }
+.remote-shell.is-folded .remote-shell-main { padding: 4px; }
+@media (max-width: 640px) {
+  .remote-shell-user, .remote-shell-actions select { display: none; }
+  .remote-shell-main { overflow-y: auto; display: block; }
+}

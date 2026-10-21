@@ -378,6 +378,11 @@ const t: T = {
   'terminal.fontSample': { ko: '글꼴 미리보기', en: 'Font sample', ja: 'フォントのプレビュー' },
   'terminal.fontHint': { ko: '나비맨에 포함된 코딩 글꼴입니다. D2Coding은 한글이 영문 두 칸 폭이라 터미널에서 줄이 어긋나지 않습니다. 다른 글꼴도 한글은 D2Coding으로 표시합니다.', en: 'Coding fonts bundled with NabiMan. D2Coding\'s Korean is exactly two cells wide, so lines stay aligned; the other fonts use it for Korean too.', ja: 'NabiMan 同梱のコーディングフォント。D2Coding はハングルが英字のちょうど2倍幅で、行がずれません。他のフォントもハングルは D2Coding で表示します。' },
   'terminal.settingsSaved': { ko: '저장했습니다. 열린 터미널에 바로 적용됩니다.', en: 'Saved; open terminals use it at once.', ja: '保存しました。開いているターミナルにすぐ反映されます。' },
+  'remote.shell.title': { ko: 'NabiMan 원격', en: 'NabiMan Remote', ja: 'NabiMan リモート' },
+  'remote.shell.name': { ko: '원격', en: 'Remote', ja: 'リモート' },
+  'remote.shell.back': { ko: '나비맨으로', en: 'Back to NabiMan', ja: 'NabiMan に戻る' },
+  'remote.shell.notAllowed': { ko: '원격은 관리자만 쓸 수 있습니다.', en: 'Only administrators can use Remote.', ja: 'リモートは管理者のみ使用できます。' },
+  'remote.openStandalone': { ko: '원격만 보기 (/remote)', en: 'Remote on its own (/remote)', ja: 'リモートだけを表示 (/remote)' },
 };
 
 export default t;
