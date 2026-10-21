@@ -43,6 +43,8 @@ const t: T = {
   'app.changePassword': { ko: '비밀번호 변경', en: 'Change Password', ja: 'パスワード変更' },
   'app.logout': { ko: '로그아웃', en: 'Logout', ja: 'ログアウト' },
   'app.menu': { ko: '메뉴', en: 'Menu', ja: 'メニュー' },
+  'app.hideChrome': { ko: '상단 접기 (로고·메뉴 숨기기)', en: 'Fold away the top (logo and menu)', ja: '上部をたたむ（ロゴ・メニューを隠す）' },
+  'app.showChrome': { ko: '로고·메뉴 다시 보이기', en: 'Show the logo and menu', ja: 'ロゴ・メニューを表示' },
   'tab.appSettings': { ko: '환경설정', en: 'Settings', ja: '環境設定' },
   'idle.title': { ko: '무활동 자동 로그아웃', en: 'Sign out when idle', ja: '無操作時の自動ログアウト' },
   'idle.explain': { ko: '정한 시간 동안 클릭·키 입력·터치·음성 입력이 없으면 자동으로 로그아웃합니다. 화면이 스스로 정보를 새로 고치는 것은 사용으로 치지 않습니다. 로그아웃 1분 전에 알려 드립니다.', en: 'Sign out after this long with no click, key, touch or speech. The page refreshing itself does not count. You are warned a minute before.', ja: '指定時間クリック・キー入力・タッチ・音声入力がなければ自動でログアウトします。画面の自動更新は操作に含みません。1分前にお知らせします。' },

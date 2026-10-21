@@ -4,6 +4,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import 'xterm/css/xterm.css';
 import './terminal-symbols.css';
 import { TerminalSettings } from './settings';
+import { fontOf } from './terminalFonts';
 import { applyArmed } from './stickyKeys';
 import { blobsFromClipboardItems, pathsForClipboardFiles } from './pasteFile';
 
@@ -20,7 +21,7 @@ const THEME = {
 export function createTerminal(settings: TerminalSettings): { term: Terminal; fit: FitAddon } {
   const term = new Terminal({
     cursorBlink: true, cursorStyle: 'block', fontSize: settings.font_size,
-    fontFamily: "'NabiMan Circled Digits', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Menlo', monospace",
+    fontFamily: fontOf(settings.font_family).family,
     fontWeight: '400', fontWeightBold: '700', lineHeight: 1.15, theme: THEME,
     allowProposedApi: true, scrollback: settings.scrollback_lines,
     // A real PTY supplies CR/LF itself. Converting LF to CRLF corrupts

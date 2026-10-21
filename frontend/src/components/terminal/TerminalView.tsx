@@ -3,6 +3,7 @@ import { Terminal } from 'xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { apiRequest } from '../../hooks/useApi';
 import { attachClipboard, attachTerminalIo, createTerminal } from './terminalChrome';
+import { applyTerminalFont } from './terminalFonts';
 import TerminalStatusPill from './TerminalStatusPill';
 import { HistoryPosition } from './TerminalHistoryBar';
 import TerminalHistoryControls from './TerminalHistoryControls';
@@ -57,6 +58,7 @@ const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function 
   const settingsRef = useRef(settings);
   /** The settings size this pane last applied, so a zoom is not undone by it. */
   const appliedFontRef = useRef(settings.font_size);
+  const appliedFamilyRef = useRef(settings.font_family);
   const targetRef = useRef(target);
   const joinRef = useRef(joinSessionId);
   const shareRef = useRef(share);
@@ -270,16 +272,9 @@ const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function 
     if (containerRef.current) {
       term.open(containerRef.current);
       zoomRef.current.applyInitialLayout(term, fitAddon);
-      // Canvas may render before the bundled symbols font finishes loading.
-      // Refresh the atlas so early output uses the one-cell glyphs too.
-      if (document.fonts) {
-        void document.fonts.load(`${term.options.fontSize}px "NabiMan Circled Digits"`, '①').then(() => {
-          if (!closedRef.current && termRef.current === term) {
-            term.clearTextureAtlas();
-            term.refresh(0, term.rows - 1);
-          }
-        }).catch(() => {});
-      }
+      // Text drawn before the bundled fonts arrive is measured and drawn again once they have.
+      appliedFamilyRef.current = settingsRef.current.font_family;
+      applyTerminalFont(term, settingsRef.current.font_family, () => zoomRef.current.relayout(), () => !closedRef.current && termRef.current === term);
     }
 
     const saved = readStored(bufKey(storageKey));
@@ -350,6 +345,10 @@ const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function 
     const term = termRef.current;
     if (!term) return;
     term.options.scrollback = settings.scrollback_lines;
+    if (settings.font_family !== appliedFamilyRef.current) {
+      appliedFamilyRef.current = settings.font_family;
+      applyTerminalFont(term, settings.font_family, zoom.relayout, () => termRef.current === term);
+    }
     // Changing the size in settings is deliberate, so it clears a pane's zoom.
     if (settings.font_size !== appliedFontRef.current) {
       appliedFontRef.current = settings.font_size;
@@ -357,7 +356,7 @@ const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function 
       return;
     }
     zoom.relayout();
-  }, [settings.font_size, settings.scrollback_lines, zoom]);
+  }, [settings.font_family, settings.font_size, settings.scrollback_lines, zoom]);
 
   useEffect(() => {
     if (!active) return;

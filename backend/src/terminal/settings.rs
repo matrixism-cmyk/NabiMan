@@ -41,6 +41,16 @@ pub struct TerminalSettings {
     /// Replay the server-side history when a window reopens with an empty buffer.
     #[serde(default = "default_true")]
     pub restore_scrollback: bool,
+    /// The coding font terminals use: one of FONTS.
+    #[serde(default = "default_font_family")]
+    pub font_family: String,
+}
+
+/// The terminal fonts the page bundles (see the frontend's terminalFonts).
+pub const FONTS: [&str; 6] = ["d2coding", "jetbrains", "fira", "cascadia", "nanum", "system"];
+
+fn default_font_family() -> String {
+    "d2coding".into()
 }
 
 impl Default for TerminalSettings {
@@ -52,6 +62,7 @@ impl Default for TerminalSettings {
             idle_timeout_secs: 0,
             font_size: default_font_size(),
             restore_scrollback: true,
+            font_family: default_font_family(),
         }
     }
 }
@@ -101,6 +112,7 @@ fn encode(entries: &HashMap<String, TerminalSettings>) -> io::Result<Vec<u8>> {
                 || !(100..=super::session::MAX_SCROLLBACK).contains(&s.scrollback_lines)
                 || !(5..=3600).contains(&s.keepalive_interval_secs)
                 || !(8..=28).contains(&s.font_size)
+                || !FONTS.contains(&s.font_family.as_str())
                 || s.idle_timeout_secs > super::MAX_TIMEOUT_SECS
                 || (s.keepalive && s.idle_timeout_secs != 0)
         })

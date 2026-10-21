@@ -42,6 +42,7 @@
     "smoke:claude": "node scripts/smoke-claude.js",
     "smoke:sessions": "node scripts/smoke-sessions.js",
     "smoke:signin": "node scripts/smoke-signin.js",
+    "smoke:screen": "node scripts/smoke-screen.js",
     "smoke:dictation": "node scripts/smoke-dictation.js"
   },
   "browserslist": {

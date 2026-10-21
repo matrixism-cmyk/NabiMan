@@ -376,3 +376,17 @@ body {
 .app-settings-section h3 { margin: 0; font-size: 14px; }
 .app-settings-field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
 .app-settings-field .select-input { max-width: 240px; margin: 0; }
+
+/* The top folded away (▴): the logo and the menu bar go, and so does most of
+   the margin around the page, for the most room below. */
+.app.chrome-hidden .app-header,
+.app.chrome-hidden .cat-nav { display: none; }
+.app.chrome-hidden .main-content { padding: 4px; }
+.app.chrome-hidden .sidebar { padding-top: 4px; }
+.chrome-handle {
+  position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 400;
+  width: 56px; height: 14px; padding: 0; line-height: 12px; font-size: 11px;
+  color: var(--text-secondary); background: var(--surface); border: 1px solid var(--border); border-top: 0;
+  border-radius: 0 0 8px 8px; cursor: pointer; opacity: .55; transition: height .12s, opacity .12s;
+}
+.chrome-handle:hover, .chrome-handle:focus-visible { opacity: 1; height: 20px; color: var(--text); }

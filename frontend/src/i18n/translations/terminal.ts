@@ -246,9 +246,9 @@ const t: T = {
   'tab.remoteWorkspace': { ko: '원격 접속', en: 'Remote Access', ja: 'リモート接続' },
   'remote.overview': { ko: '전체 현황', en: 'Fleet overview', ja: '全体状況' },
   'remote.overviewHint': {
-    ko: '요약 · 세션 · 링크 · SSH 키',
-    en: 'Summary, sessions, links, SSH key',
-    ja: '要約・セッション・リンク・SSH鍵',
+    ko: '요약 · 세션 · 링크 · SSH 키 · 설정',
+    en: 'Summary, sessions, links, SSH key, settings',
+    ja: '要約・セッション・リンク・SSH鍵・設定',
   },
   'remote.serversGroup': { ko: '서버', en: 'Servers', ja: 'サーバー' },
   'remote.otherGroup': { ko: '기타', en: 'Other', ja: 'その他' },
@@ -370,6 +370,14 @@ const t: T = {
   'terminal.paste': { ko: '붙여넣기', en: 'Paste', ja: '貼り付け' },
   'terminal.zoomIn': { ko: '글자 크게', en: 'Larger text', ja: '文字を大きく' },
   'terminal.zoomOut': { ko: '글자 작게', en: 'Smaller text', ja: '文字を小さく' },
+  'remote.settings.screen': { ko: '화면', en: 'Screen', ja: '画面' },
+  'remote.settings.hideChrome': { ko: '나비맨 상단(로고·메뉴) 접기', en: 'Fold away NabiMan\'s top (logo and menu)', ja: 'NabiMan の上部（ロゴ・メニュー）をたたむ' },
+  'remote.settings.hideChromeHint': { ko: '화면을 최대한 넓게 씁니다. 화면 맨 위 가운데의 작은 ▾ 손잡이나 헤더의 ▴ 버튼으로 언제든 바꿀 수 있습니다.', en: 'For the most room. The small ▾ tab at the top centre, or ▴ in the header, switches it any time.', ja: '画面を最大限広く使います。上端中央の小さな ▾ やヘッダーの ▴ でいつでも切り替えられます。' },
+  'terminal.font': { ko: '글꼴', en: 'Font', ja: 'フォント' },
+  'terminal.fontSystem': { ko: '시스템 기본 (PC에 설치된 글꼴)', en: 'System (fonts on this computer)', ja: 'システム既定（PC のフォント）' },
+  'terminal.fontSample': { ko: '글꼴 미리보기', en: 'Font sample', ja: 'フォントのプレビュー' },
+  'terminal.fontHint': { ko: '나비맨에 포함된 코딩 글꼴입니다. D2Coding은 한글이 영문 두 칸 폭이라 터미널에서 줄이 어긋나지 않습니다. 다른 글꼴도 한글은 D2Coding으로 표시합니다.', en: 'Coding fonts bundled with NabiMan. D2Coding\'s Korean is exactly two cells wide, so lines stay aligned; the other fonts use it for Korean too.', ja: 'NabiMan 同梱のコーディングフォント。D2Coding はハングルが英字のちょうど2倍幅で、行がずれません。他のフォントもハングルは D2Coding で表示します。' },
+  'terminal.settingsSaved': { ko: '저장했습니다. 열린 터미널에 바로 적용됩니다.', en: 'Saved; open terminals use it at once.', ja: '保存しました。開いているターミナルにすぐ反映されます。' },
 };
 
 export default t;

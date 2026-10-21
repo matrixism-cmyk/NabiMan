@@ -15,6 +15,8 @@ export interface TerminalSettings {
   font_size: number;
   /** Replay server-side history when a window reopens with an empty screen. */
   restore_scrollback: boolean;
+  /** Which coding font terminals use (see terminalFonts). */
+  font_family: string;
 }
 
 export const DEFAULT_TERMINAL_SETTINGS: TerminalSettings = {
@@ -24,6 +26,7 @@ export const DEFAULT_TERMINAL_SETTINGS: TerminalSettings = {
   idle_timeout_secs: 0,
   font_size: 14,
   restore_scrollback: true,
+  font_family: 'd2coding',
 };
 
 const STORAGE_KEY = 'nabiman_terminal_settings';

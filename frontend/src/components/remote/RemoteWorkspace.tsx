@@ -19,6 +19,7 @@ import TargetSessionsView from './TargetSessionsView';
 import TargetRail from './TargetRail';
 import AdhocConnect from './AdhocConnect';
 import TerminalWithFiles, { filesScope } from './TerminalWithFiles';
+import RemoteSettingsView from './RemoteSettingsView';
 import WorkspaceActions from './WorkspaceActions';
 import { useCompact, useFullScreenPane, useMobilePane } from './useCompact';
 import WorkspaceTabs, { viewFor } from './WorkspaceTabs';
@@ -333,6 +334,7 @@ export default function RemoteWorkspace() {
               )}
               {overviewView === 'links' && <ShareLinksPanel />}
               {overviewView === 'keys' && <SshKeyPanel />}
+              {overviewView === 'settings' && <RemoteSettingsView />}
             </div>
           )}
 

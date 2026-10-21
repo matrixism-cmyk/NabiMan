@@ -13,6 +13,7 @@ import ChangePasswordModal from './components/ChangePasswordModal';
 import HeaderMenu from './components/HeaderMenu';
 import IdleWarning from './components/IdleWarning';
 import { useIdleLogout } from './hooks/useIdleLogout';
+import { useChromeHidden } from './hooks/useChromeHidden';
 import CommandPalette from './components/CommandPalette';
 import LanguageSelector from './components/LanguageSelector';
 import { Tab, Category, CatDef, categories } from './nav';
@@ -45,11 +46,15 @@ function App() {
   // Focus mode: hide the top bars + left sidebar so only the content frame shows.
   // Also drives the browser Fullscreen API for a true edge-to-edge view.
   const [focusMode, setFocusMode] = useState(false);
+  const [chromeHidden, setChromeHidden] = useChromeHidden();
 
   const enterFocus = useCallback(() => {
     setFocusMode(true);
     const el = document.documentElement;
-    if (el.requestFullscreen) el.requestFullscreen().catch(() => { /* denied/unsupported */ });
+    // Esc belongs to the terminal (vim, less): in fullscreen, hold Esc to leave.
+    const lockEscape = () => (navigator as Navigator & { keyboard?: { lock?: (keys: string[]) => Promise<void> } })
+      .keyboard?.lock?.(['Escape']).catch(() => undefined);
+    if (el.requestFullscreen) el.requestFullscreen().then(lockEscape).catch(() => { /* denied/unsupported */ });
   }, []);
   const exitFocus = useCallback(() => {
     setFocusMode(false);
@@ -68,7 +73,9 @@ function App() {
   // Esc also exits when focus mode is on without browser fullscreen (denied).
   useEffect(() => {
     if (!focusMode) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') exitFocus(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !(e.target instanceof Element && e.target.closest('.xterm'))) exitFocus();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [focusMode, exitFocus]);
@@ -195,7 +202,11 @@ function App() {
   return (
     <TerminalSettingsProvider key={currentUser.username} enabled={currentUser.role === 'admin'}>
     <TerminalWindowsProvider key={currentUser.username} owner={currentUser.username} active={currentUser.role === 'admin'}>
-    <div className={`app ${focusMode ? 'focus-mode' : ''}`}>
+    <div className={`app ${focusMode ? 'focus-mode' : ''} ${chromeHidden ? 'chrome-hidden' : ''}`}>
+      {chromeHidden && !focusMode && (
+        <button type="button" className="chrome-handle" onClick={() => setChromeHidden(false)}
+          title={t('app.showChrome')} aria-label={t('app.showChrome')}>▾</button>
+      )}
       <header className="app-header">
         <h1><button className="logo-link" onClick={() => navigateTo(scoped ? 'administration' : 'dashboard', scoped ? 'usermgmt' : 'server')}>
           <img src={`${process.env.PUBLIC_URL}/favicon.svg`} alt="" width="32" height="32" />
@@ -206,6 +217,7 @@ function App() {
           <ThemeSelector compact />
           <LanguageSelector />
           <button className="btn btn-secondary" title={t('app.commandPalette')} onClick={() => setShowPalette(true)}>⌘K</button>
+          <button className="btn btn-secondary" title={t('app.hideChrome')} aria-label={t('app.hideChrome')} onClick={() => setChromeHidden(true)}>▴</button>
           <button className="btn btn-secondary" title={t('app.focusMode')} onClick={enterFocus}>⛶</button>
           <button className="btn btn-secondary" onClick={() => setShowChangePw(true)}>{t('app.changePassword')}</button>
           <button className="btn btn-secondary logout-btn" onClick={handleLogout}>{t('app.logout')}</button>
