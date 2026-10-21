@@ -9,6 +9,8 @@
 //! does.
 
 mod attrs;
+mod copy;
+mod copy_run;
 mod folder;
 mod fs;
 pub(crate) mod ftp;
@@ -200,6 +202,7 @@ fn routes(prefix: &str) -> actix_web::Scope {
 }
 
 pub(crate) fn config(cfg: &mut web::ServiceConfig) {
+    copy::config(cfg);
     cfg.service(routes("/api/terminal/sftp/{id}"))
         // Public: a share link's visitor, checked in `share_target`.
         .service(routes("/api/share/{token}/files"));

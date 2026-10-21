@@ -40,6 +40,8 @@ const SKIP_PATHS: &[&str] = &[
     "/api/database/available",
     "/api/mail/available",
     "/api/dns/available",
+    // A file panel asking how its server-to-server copies are going.
+    "/api/terminal/copies",
 ];
 
 pub struct AuditMiddleware {
