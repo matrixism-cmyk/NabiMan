@@ -149,7 +149,7 @@ Claude 음성 대화는 메뉴는 나비맨에 있지만 코드는 터미널 쪽
 |---|---|---|
 | 1 ✅ (2026-10-21) | 원격 것인데 공용 자리에 있는 것 옮기기: `types`의 서버 타입, `MultiServerDashboard`, `SshKeyComponents`, 글꼴, 나비맨 번역 파일에 섞여 있던 원격 문구 66개 | 원격 → 나비맨 의존이 공통 부품만 남음 (§7) |
 | 2 ✅ (2026-10-21) | 공통 `data_dir()` 하나로 모으기, `ConnectionGrant`를 나비맨 공통(`stream_access`)으로 (입장권 자체는 터미널 것이라 그대로) | 나비맨 → 원격의 거꾸로 된 의존 대부분 제거 (§8) |
-| 3 | 인증 미들웨어의 "한 번용 입장권" 확인을 등록식으로, 지원 보고서·멤버십은 원격이 내보내는 함수만 부르게 | 나비맨이 원격 내부를 모르게 됨 |
+| 3 ✅ (2026-10-21) | 인증의 공개 경로·한 번용 입장권, 지원 보고서 항목, 멤버십의 서버 확인을 등록식(`extension_points`)으로 — 원격은 `remote.rs`에서 등록 | 나비맨 코드가 원격 모듈을 부르지 않음 (§9) |
 | 4 | 프런트엔드 공통 부품(useApi, i18n 틀, Modal/ConfirmDialog/useLongPress, 테마·CSS)을 한 폴더(`shared/`)로 모으기 | 공통 패키지로 떼어 낼 준비 |
 | 5 | 원격만 빌드하는 진입점(`/remote` 전용 번들)과, 원격 API만 등록하는 서버 설정 | 실제로 따로 배포해 보기 |
 
@@ -210,3 +210,47 @@ Claude 음성 대화는 메뉴는 나비맨에 있지만 코드는 터미널 쪽
 **덧붙여 본 것:** 로그아웃한 뒤 열려 있던 SSE가 끊기기까지 약 5.5초 걸린다
 (`ConnectionGrant` 확인은 1초마다지만). 옮기기 전 코드에서도 5.7초로 같아서 이번
 변경과는 무관하다. 따로 살펴볼 거리.
+
+## 9. 3단계 결과 (2026-10-21)
+
+**끼워 넣는 자리 하나.** 공통 쪽에 `extension_points.rs`를 두었다. 나비맨 위에 얹히는
+제품이 등록할 수 있는 것은 네 가지다.
+
+| 자리 | 쓰는 곳 | 원격이 등록하는 것 |
+|---|---|---|
+| `public_prefixes` | `auth.rs` — 로그인 없이 통과시킬 API 경로 | `/api/share/` (공유 링크는 자기 비밀로 확인) |
+| `url_passes` | `auth.rs` — Authorization 헤더 없이 브라우저가 직접 여는 URL | 터미널·받아쓰기 웹소켓 입장권(`terminal_tickets::url_pass`), 다운로드·재생 링크(`sftp::links::url_pass`) |
+| `report_parts` | `support_report.rs` — 보고서에 덧붙일 항목 | `terminal_registry`, `server_inventory` (수집 코드는 `remote/report.rs`로 이동) |
+| `server_exists` | `membership.rs` — 서버 범위 멤버십의 서버 확인 | `remote_servers::find_server` |
+
+원격 쪽 등록은 `remote.rs`의 `extension_points()` 한 곳에 있고, `main.rs`가 앱 데이터로
+붙인다. **아무것도 등록하지 않은 나비맨도 그대로 돈다:** 공개 경로 없음, 입장권으로는
+아무도 못 들어옴, 보고서에서 그 항목이 빠짐, 서버 범위 멤버십은 거부. 이 동작은
+`extension_points` 테스트가 확인한다. 보고서 화면도 항목 이름을 고정해 두지 않고
+받은 항목 전체를 보고 "일부 수집 실패"를 판단하게 바꿨다.
+
+입장권 확인을 옮기면서 규칙 하나를 테스트로 더 단단히 했다: 터미널 URL에 계정 토큰
+(`token=`)이 있으면 **올바른 Authorization 헤더가 함께 와도** 거부한다(전과 같은 동작,
+전에는 헤더 없는 경우만 시험했음).
+
+**이제 나비맨 코드에서 원격 모듈(`terminal`, `remote_*`, `ssh_*`, `terminal_tickets`)을
+부르는 곳은 `remote.rs`와 `main.rs`(모듈 등록)뿐이다.**
+
+**남은 것 — 경로 문자열로 된 정책표 (5단계에서 다룰 것):** 코드 의존은 아니지만 나비맨의
+권한표가 원격 API 경로를 글자로 안다.
+
+| 파일 | 내용 |
+|---|---|
+| `rbac.rs` | 역할별 허용: `/api/terminal/**`, `/api/remote-servers` |
+| `scope_access.rs` | 범위 계정이 볼 수 있는 `/api/remote-servers/**` |
+| `api_keys.rs` | API 토큰 범위 `servers:read` ↔ `/api/remote-servers` |
+| `audit_middleware.rs` | 감사 기록에서 `/api/share/`, `/api/terminal/share-links/` 비밀 가리기 |
+| `user_profile.rs` | 2단계 인증 정책 확인에 `/api/remote-servers` |
+
+원격만 따로 띄울 때(5단계) 이 표들도 "원격이 자기 경로 규칙을 등록"하는 식으로 옮기면
+된다. 같은 서버에서 함께 도는 지금은 동작에 문제가 없다.
+
+**확인한 것:** 백엔드 테스트 전체(새 테스트 포함), jest 321개, API e2e(66+40), 스트리밍
+e2e, 브라우저 smoke(공유 15·세션 9·받아쓰기 9·단독 화면 14·미디어 15·프로토콜 31·
+파일 23·로그인 유지 13), CI 스크립트(지원 보고서, 인증 입장 제한, 로그인 세션, API 토큰).
+

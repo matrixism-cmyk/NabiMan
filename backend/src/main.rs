@@ -15,6 +15,7 @@ mod database;
 mod diagnostics;
 mod disks;
 mod dns;
+mod extension_points;
 mod file_manager;
 mod firewall;
 mod ip_block;
@@ -36,6 +37,7 @@ mod private_storage;
 mod processes;
 mod rate_limit;
 mod rbac;
+mod remote;
 mod remote_host_trust;
 mod remote_probe;
 mod remote_servers;
@@ -307,6 +309,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(share_store.clone()))
             .app_data(web::Data::new(terminal_tickets.clone()))
             .app_data(web::Data::new(share_tickets.clone()))
+            .app_data(web::Data::new(remote::extension_points()))
             .app_data(helper_client.clone())
             .app_data(runtime_identity.clone())
             .app_data(mec_state.clone())

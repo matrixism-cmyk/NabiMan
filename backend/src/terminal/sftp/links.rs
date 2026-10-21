@@ -88,6 +88,11 @@ fn issue_kind(owner: Owner, scope: &str, path: &str, reusable: bool) -> Result<S
     Ok(ticket)
 }
 
+/// Downloads' and streams' way in (registered in `remote.rs`).
+pub(crate) fn url_pass(req: &actix_web::dev::ServiceRequest) -> Option<Option<Claims>> {
+    redeem(req.method().as_str(), req.path(), req.query_string())
+}
+
 /// For the auth middleware. `None`: not a ticketed download, carry on as
 /// usual. `Some(None)`: a ticket that does not admit this request.
 /// `Some(Some(claims))`: admitted, as the session that asked for the link.

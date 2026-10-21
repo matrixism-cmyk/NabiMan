@@ -24,3 +24,14 @@ it('does not expose the collector to ordinary members or collect automatically',
   const view = render(<I18nProvider><SupportReportPanel /></I18nProvider>);
   expect(view.container).toBeEmptyDOMElement(); expect(apiPost).not.toHaveBeenCalled();
 });
+it('takes a report without Remote parts, and notices any part that is missing', async () => {
+  const { terminal_registry: _t, server_inventory: _s, ...plain } = report;
+  (apiPost as jest.Mock).mockResolvedValueOnce({ success: true, data: plain })
+    .mockResolvedValueOnce({ success: true, data: { ...report, terminal_registry: { state: 'busy', data: null } } });
+  render(<I18nProvider><SupportReportPanel /></I18nProvider>);
+  fireEvent.click(screen.getByRole('button', { name: 'Generate diagnostic report' }));
+  await screen.findByLabelText('Diagnostic download preview');
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Generate diagnostic report' }));
+  await screen.findByRole('alert');
+});

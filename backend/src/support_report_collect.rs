@@ -1,7 +1,8 @@
 use super::{Section, State};
 use serde::Serialize;
 use std::{io::Read, path::Path};
-fn bounded(path: &Path, limit: u64) -> Result<Vec<u8>, State> {
+/// A file's bytes, up to `limit`; never a raw error.
+pub(crate) fn bounded(path: &Path, limit: u64) -> Result<Vec<u8>, State> {
     let file = std::fs::File::open(path).map_err(|_| State::Unavailable)?;
     let mut bytes = Vec::new();
     file.take(limit + 1)
@@ -87,56 +88,6 @@ pub(super) fn logins(store: &crate::jwt_sessions::SessionStore) -> Section<Login
         registered: sessions.len(),
         mfa_verified: sessions.values().filter(|s| s.mfa_verified).count(),
     })
-}
-#[derive(Serialize)]
-pub(super) struct Terminals {
-    registered: usize,
-    local: usize,
-    remote: usize,
-    attached_websockets: u64,
-}
-pub(super) fn terminals(store: &crate::terminal::session::PtyStore) -> Section<Terminals> {
-    let Ok(terminals) = store.try_lock() else {
-        return Section::missing(State::Busy);
-    };
-    let remote = terminals.values().filter(|t| t.ssh_cmd.is_some()).count();
-    Section::ready(Terminals {
-        registered: terminals.len(),
-        local: terminals.len() - remote,
-        remote,
-        attached_websockets: terminals
-            .values()
-            .fold(0u64, |sum, t| sum.saturating_add(t.ws_count as u64)),
-    })
-}
-#[derive(Serialize)]
-pub(super) struct Servers {
-    registered: usize,
-    host_trust_configured: usize,
-    password_configured: usize,
-}
-fn inventory(path: &Path) -> Section<Servers> {
-    let bytes = match bounded(path, 8 * 1024 * 1024) {
-        Ok(b) => b,
-        Err(state) => return Section::missing(state),
-    };
-    let servers: Vec<crate::models::RemoteServer> = match serde_json::from_slice(&bytes) {
-        Ok(rows) => rows,
-        Err(_) => return Section::missing(State::Unavailable),
-    };
-    Section::ready(Servers {
-        registered: servers.len(),
-        host_trust_configured: servers.iter().filter(|s| s.host_trust.is_some()).count(),
-        password_configured: servers
-            .iter()
-            .filter(|s| !s.password_enc.is_empty())
-            .count(),
-    })
-}
-pub(super) fn servers() -> Section<Servers> {
-    inventory(
-        &nabiman_server::data_dir().join("remote_servers.json"),
-    )
 }
 #[derive(Serialize)]
 pub(super) struct Storage {

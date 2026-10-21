@@ -5,8 +5,11 @@ interface Section { state: 'ready' | 'busy' | 'unavailable' | 'too_large'; data:
 interface Report {
   schema_version: number; report_id: string; generated_at: string;
   process: { runs_as_root: boolean };
-  accounts: Section; login_sessions: Section; terminal_registry: Section; server_inventory: Section; auth_storage: Section; recent_jobs: Section;
+  accounts: Section; login_sessions: Section; auth_storage: Section; recent_jobs: Section;
+  // Parts a product built on NabiMan adds (Remote: terminal_registry, server_inventory).
+  [part: string]: unknown;
 }
+const isSection = (v: unknown): v is Section => typeof v === 'object' && v !== null && 'state' in v && 'data' in v;
 export default function SupportReportPanel() {
   const { t } = useT();
   const { data: me } = useApi<{ role: string }>('/api/users/me');
@@ -29,7 +32,7 @@ export default function SupportReportPanel() {
     const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
     const link = document.createElement('a'); link.href = url; link.download = `nabiman-support-${report.report_id}.json`; link.click(); URL.revokeObjectURL(url);
   };
-  const partial = report && [report.accounts, report.login_sessions, report.terminal_registry, report.server_inventory, report.auth_storage, report.recent_jobs].some(s => s.state !== 'ready');
+  const partial = report && Object.values(report).filter(isSection).some(s => s.state !== 'ready');
   return <section aria-label={t('support.title')}>
     <h3>{t('support.title')}</h3>
     <p>{t('support.description')}</p><p>{t('support.localOnly')}</p>

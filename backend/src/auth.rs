@@ -6,6 +6,7 @@ mod bootstrap;
 pub(crate) use bootstrap::validate_bootstrap_password;
 pub use bootstrap::{new_jwt_secret, new_password_store};
 
+use crate::extension_points::ExtensionPoints;
 use crate::jwt_sessions::SessionStore;
 use crate::models::ApiResponse;
 use crate::users::UserStore;
@@ -260,7 +261,7 @@ pub fn check_auth(
 ) -> AuthDecision {
     req.extensions_mut().remove::<VerifiedPrincipal>();
     let path = req.path();
-    // Share links carry their own secret and are checked in terminal::share.
+    let points = ExtensionPoints::of(req.app_data::<web::Data<ExtensionPoints>>());
     if path == "/api/auth/login"
         || path == "/api/auth/register"
         || path == "/api/auth/refresh"
@@ -274,56 +275,26 @@ pub fn check_auth(
                     | "/api/auth/oauth/provider"
                     | "/api/auth/ldap/provider"
             ))
-        || path.starts_with("/api/share/")
+        || points.public_prefixes.iter().any(|p| path.starts_with(p))
         || !path.starts_with("/api/")
     {
         return AuthDecision::Allow;
     }
 
     if let Some(decision) = api_tokens::check(req, users) { return decision; }
-    // The terminal and its dictation are WebSockets: a browser cannot put the
-    // account token in a header there, so a one-use ticket stands in.
-    let ticketed = path == "/api/terminal" || path == "/api/terminal/dictation";
-    let claims = if ticketed
-        && req
-            .query_string()
-            .split('&')
-            .any(|p| p.starts_with("ticket="))
-    {
-        let Some(store) = req.app_data::<web::Data<crate::terminal_tickets::TicketStore>>() else {
-            return AuthDecision::Unauthorized;
-        };
-        match crate::terminal_tickets::redeem(req.request(), store) {
-            Some(c) => c,
-            None => return AuthDecision::Unauthorized,
-        }
-    } else if let Some(admitted) = crate::terminal::sftp::links::redeem(
-        req.method().as_str(),
-        path,
-        req.query_string(),
-    ) {
-        // A file dragged onto the desktop is fetched by the browser itself,
-        // without the Authorization header; a single-use link stands in.
-        match admitted {
-            Some(c) => c,
-            None => return AuthDecision::Unauthorized,
-        }
-    } else {
-        // Account JWTs must never be accepted from a terminal URL.
-        if ticketed
-            && req
-                .query_string()
-                .split('&')
-                .any(|p| p.starts_with("token="))
-        {
-            return AuthDecision::Unauthorized;
-        }
-        let Some(token) = extract_token(req) else {
-            return AuthDecision::Unauthorized;
-        };
-        match verify_jwt(secret, &token) {
-            Some(c) => c,
-            None => return AuthDecision::Unauthorized,
+    // A URL the browser opens itself carries no Authorization header; a
+    // product built on NabiMan may admit it with a one-use ticket of its own.
+    let claims = match points.url_passes.iter().find_map(|pass| pass(req)) {
+        Some(Some(c)) => c,
+        Some(None) => return AuthDecision::Unauthorized,
+        None => {
+            let Some(token) = extract_token(req) else {
+                return AuthDecision::Unauthorized;
+            };
+            match verify_jwt(secret, &token) {
+                Some(c) => c,
+                None => return AuthDecision::Unauthorized,
+            }
         }
     };
     if !session_valid(&claims, sessions) {

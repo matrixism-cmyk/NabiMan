@@ -22,6 +22,7 @@ pub(super) async fn authenticated_api_enforces_finite_defaults_upgrade_guard_and
             .app_data(web::Data::new(fixture.sessions.clone()))
             .app_data(web::Data::new(fixture.users.clone()))
             .app_data(web::Data::new(sessions.clone()))
+            .app_data(web::Data::new(crate::remote::extension_points()))
             .app_data(web::Data::new(secret.clone()))
             .wrap(crate::AuthCheck::new(
                 secret,
@@ -117,6 +118,7 @@ pub(super) async fn share_proof_binds_origin_query_current_policy_and_rejects_ol
             .app_data(web::Data::new(fixture.shares.clone()))
             .app_data(web::Data::new(admission.clone()))
             .app_data(web::Data::new(fixture.users.clone()))
+            .app_data(web::Data::new(crate::remote::extension_points()))
             .app_data(web::Data::new(fixture.sessions.clone()))
             .wrap(crate::AuthCheck::new(
                 secret,

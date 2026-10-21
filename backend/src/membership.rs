@@ -1,4 +1,5 @@
 //! Local approval and membership administration. External roles never grant these rights.
+use crate::extension_points::ExtensionPoints;
 use crate::models::{AccountStatus, ApiResponse, Membership, NabimanUser, ScopeKind, UserRole};
 use crate::users::{commit_users, generate_id, UserStore};
 use actix_web::{web, HttpRequest, HttpResponse};
@@ -54,9 +55,13 @@ pub(crate) fn validate_scope(req: &HttpRequest, m: &Membership) -> Result<(), Ht
         return Err(error("소속 ID가 올바르지 않습니다"));
     }
     let exists = match m.kind {
-        ScopeKind::Server => crate::remote_servers::find_server(&m.scope_id)
-            .map_err(|_| error("서버 목록을 읽을 수 없습니다"))?
-            .is_some(),
+        ScopeKind::Server => {
+            let points = ExtensionPoints::of(req.app_data::<web::Data<ExtensionPoints>>());
+            match points.server_exists {
+                Some(exists) => exists(&m.scope_id).map_err(|_| error("서버 목록을 읽을 수 없습니다"))?,
+                None => false,
+            }
+        }
         ScopeKind::Tenant => req
             .app_data::<web::Data<crate::mec::MecState>>()
             .and_then(|s| s.tenants.get(&m.scope_id).ok().flatten())

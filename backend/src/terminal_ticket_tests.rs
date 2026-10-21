@@ -212,6 +212,7 @@ async fn real_auth_ticket_admission_rejects_replay_revoked_session_and_forged_ro
     let app = awtest::init_service(
         App::new()
             .wrap(AuthCheck::new(secret, sessions.clone(), users.clone()))
+            .app_data(web::Data::new(crate::remote::extension_points()))
             .app_data(web::Data::new(tickets))
             .configure(config)
             .route("/api/terminal", web::get().to(actor)),
@@ -296,11 +297,13 @@ async fn query_jwt_is_rejected_and_header_identity_remains_supported() {
     let app = awtest::init_service(
         App::new()
             .wrap(AuthCheck::new(secret, sessions, users))
+            .app_data(web::Data::new(crate::remote::extension_points()))
             .route("/api/terminal", web::get().to(actor)),
     )
     .await;
     let request = awtest::TestRequest::get()
         .uri(&format!("/api/terminal?token={token}"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     assert_eq!(awtest::call_service(&app, request).await.status(), 401);
     let request = awtest::TestRequest::get()
@@ -388,11 +391,5 @@ fn stream_grant_uses_its_endpoint_policy_instead_of_terminal_privileges() {
 }
 
 fn register(sessions: &SessionStore) {
-    crate::jwt_sessions::register_session(
-        sessions,
-        "test-session",
-        "root-test",
-        "root-test-id",
-        "127.0.0.1",
-    );
+    crate::jwt_sessions::register_session(sessions, "test-session", "root-test", "root-test-id", "127.0.0.1");
 }

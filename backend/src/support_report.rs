@@ -1,6 +1,8 @@
 //! Explicitly selected diagnostics only: no raw logs, credentials, names, addresses or paths.
 #[path = "support_report_collect.rs"]
 mod collect;
+pub(crate) use collect::bounded;
+use crate::extension_points::ExtensionPoints;
 use crate::{auth, jwt_sessions::SessionStore, models::ApiResponse, users::UserStore};
 use actix_web::{web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
@@ -12,25 +14,25 @@ use std::time::{Duration, Instant};
 
 #[derive(Serialize)]
 #[serde(rename_all = "snake_case")]
-pub(super) enum State {
+pub(crate) enum State {
     Ready,
     Busy,
     Unavailable,
     TooLarge,
 }
 #[derive(Serialize)]
-pub(super) struct Section<T: Serialize> {
+pub(crate) struct Section<T: Serialize> {
     state: State,
     data: Option<T>,
 }
 impl<T: Serialize> Section<T> {
-    fn ready(data: T) -> Self {
+    pub(crate) fn ready(data: T) -> Self {
         Self {
             state: State::Ready,
             data: Some(data),
         }
     }
-    fn missing(state: State) -> Self {
+    pub(crate) fn missing(state: State) -> Self {
         Self { state, data: None }
     }
 }
@@ -44,8 +46,9 @@ struct Report {
     process: collect::Process,
     accounts: Section<collect::Accounts>,
     login_sessions: Section<collect::Logins>,
-    terminal_registry: Section<collect::Terminals>,
-    server_inventory: Section<collect::Servers>,
+    /// What a product built on NabiMan adds (Remote: terminals and servers).
+    #[serde(flatten)]
+    parts: serde_json::Map<String, serde_json::Value>,
     auth_storage: Section<collect::Storage>,
     recent_jobs: Section<collect::Jobs>,
     limitations: [&'static str; 4],
@@ -116,7 +119,6 @@ async fn report(
     req: HttpRequest,
     users: web::Data<UserStore>,
     sessions: web::Data<SessionStore>,
-    terminals: web::Data<crate::terminal::session::PtyStore>,
     state: web::Data<crate::mec::MecState>,
     identity: web::Data<crate::runtime_identity::RuntimeIdentity>,
 ) -> HttpResponse {
@@ -132,6 +134,8 @@ async fn report(
             ));
     };
     let (account_store, session_store) = (users.clone(), sessions.clone());
+    let points = ExtensionPoints::of(req.app_data::<web::Data<ExtensionPoints>>());
+    let parts: Vec<_> = points.report_parts.iter().map(|(name, part)| (*name, part(&req))).collect();
     let result = web::block(move || {
         let _permit = permit;
         let started = Instant::now();
@@ -144,8 +148,7 @@ async fn report(
             process: collect::process(),
             accounts: collect::accounts(&account_store),
             login_sessions: collect::logins(&session_store),
-            terminal_registry: collect::terminals(&terminals),
-            server_inventory: collect::servers(),
+            parts: parts.into_iter().map(|(name, collect)| (name.to_string(), collect())).collect(),
             auth_storage: collect::storage(),
             recent_jobs: collect::jobs(&state.db),
             limitations: [

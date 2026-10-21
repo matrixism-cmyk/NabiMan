@@ -2,7 +2,7 @@
 //! dictation's). The checks that keep a connection admitted afterwards are
 //! NabiMan's, shared with every stream: `stream_access::ConnectionGrant`.
 use crate::{auth, models::ApiResponse};
-use actix_web::{post, web, HttpRequest, HttpResponse};
+use actix_web::{dev::ServiceRequest, post, web, HttpRequest, HttpResponse};
 use rand::{rngs::OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -212,6 +212,19 @@ async fn issue(
             ticket,
             expires_in_seconds: lifetime.as_secs(),
         }))
+}
+/// The terminal's way in (registered in `remote.rs`): its WebSockets, and
+/// dictation's, open with a ticket — never with an account token in the URL.
+pub(crate) fn url_pass(req: &ServiceRequest) -> Option<Option<auth::Claims>> {
+    if req.path() != "/api/terminal" && req.path() != "/api/terminal/dictation" {
+        return None;
+    }
+    let has = |key: &str| req.query_string().split('&').any(|p| p.starts_with(key));
+    if has("ticket=") {
+        let Some(store) = req.app_data::<web::Data<TicketStore>>() else { return Some(None) };
+        return Some(redeem(req.request(), store));
+    }
+    has("token=").then_some(None)
 }
 /// Remove exactly one ticket field. All other bytes stay bound to the issuance.
 pub(crate) fn redeem(req: &HttpRequest, store: &TicketStore) -> Option<auth::Claims> {
