@@ -91,6 +91,8 @@
 }
 .term-window-actions button:hover { background: rgba(255, 255, 255, 0.08); color: var(--text); }
 .term-window-actions .term-window-close:hover { background: var(--danger); color: #fff; }
+/* Listening shows as everywhere else: red, with the waveform in it. */
+.term-window-actions .dictation-btn.is-on { background: var(--danger); color: #fff; }
 
 .term-window-body {
   flex: 1;

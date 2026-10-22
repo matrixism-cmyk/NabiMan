@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Action, finalText, Resampler, Typist, utteranceActions } from './speech';
 import { opusUplink, pcmUplink, Uplink } from './uplink';
+import { LevelMeter } from './meter';
 import { markActivity } from '../../../shared/auth/useIdleLogout';
 
 export type DictationState = 'idle' | 'starting' | 'listening' | 'stopping';
@@ -49,6 +50,8 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
   const live = useRef<{ ws: WebSocket; media: MediaStream; audio: AudioContext; uplink: Uplink } | null>(null);
   /** Seconds of other voices "내 목소리만" kept out, as the service reports at the end. */
   const [blocked, setBlocked] = useState(0);
+  /** How loud the microphone has been lately: drawn, never rendered by React. */
+  const meter = useRef(new LevelMeter()).current;
   const typist = useRef(new Typist());
   const heard = useRef('');
   const pause = useRef<number | undefined>(undefined);
@@ -118,9 +121,11 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
       ws.send(JSON.stringify({ ...uplink.config, ...(pauseMs > 0 ? { endpoint_ms: pauseMs } : {}), ...(onlyMe ? { voice_lock: true } : {}) }));
       const audio = new AudioContext();
       const resampler = new Resampler(audio.sampleRate);
+      meter.reset(audio.sampleRate);
       const source = audio.createMediaStreamSource(media);
       const feed = (samples: Float32Array) => {
         if (ws.readyState !== WebSocket.OPEN) return;
+        meter.push(samples);
         // Muted, the stream goes on (the service keeps listening) but hears silence.
         for (const frame of resampler.push(samples)) uplink.push(frame, mutedRef.current);
       };
@@ -184,7 +189,7 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
       const name = e instanceof DOMException ? e.name : '';
       setError(name === 'NotAllowedError' ? 'denied' : name === 'NotFoundError' ? 'nomic' : e instanceof Error && e.message !== 'dictation' ? e.message : 'connection');
     }
-  }, [open, release, typeUpTo, perform]);
+  }, [open, release, typeUpTo, perform, meter]);
 
   /** Stops listening, and types what the last words turn out to be. */
   const stop = useCallback(() => {
@@ -202,5 +207,5 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
 
   useEffect(() => release, [release]);
 
-  return { state, partial, error, blocked, start, stop };
+  return { state, partial, error, blocked, meter, start, stop };
 }

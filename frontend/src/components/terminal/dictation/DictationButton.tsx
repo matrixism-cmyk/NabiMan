@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useT } from '../../../shared/i18n';
 import { useDictation } from './useDictation';
+import Waveform from './Waveform';
 import './dictation.css';
 
 interface Props {
@@ -21,12 +22,13 @@ const KNOWN = ['denied', 'nomic', 'connection'];
 
 /**
  * The microphone beside a terminal: press to dictate, press again to stop.
- * While it listens, the words still being worked out show under it; what is
- * final is typed at the prompt, and a spoken "엔터" presses Enter.
+ * While it listens, the microphone's loudness runs through it as a waveform
+ * and the words still being worked out show under it; what is final is typed
+ * at the prompt, and a spoken "엔터" presses Enter.
  */
 export default function DictationButton({ open, onText, onKeys, variant = 'head', endpointMs, enterOnPause, voiceLock }: Props) {
   const { t } = useT();
-  const { state, partial, error, blocked, start, stop } = useDictation({ open, onText, onKeys, endpointMs, enterOnPause, voiceLock });
+  const { state, partial, error, blocked, meter, start, stop } = useDictation({ open, onText, onKeys, endpointMs, enterOnPause, voiceLock });
   // "내 목소리만" says at the end how much of other voices it kept out; shown for a moment.
   const [keptOut, setKeptOut] = useState(0);
   useEffect(() => {
@@ -54,6 +56,7 @@ export default function DictationButton({ open, onText, onKeys, variant = 'head'
           <path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6" />
         </svg>
         {variant === 'head' && <span>{t(on ? 'dictation.listening' : 'dictation.label')}</span>}
+        {state === 'listening' && <Waveform meter={meter} />}
       </button>
       {(on || state === 'stopping') && (partial || state !== 'listening') && (
         <span className="dictation-bubble" role="status" aria-live="polite">
