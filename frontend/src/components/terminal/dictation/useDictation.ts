@@ -135,6 +135,7 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
         if (typeof e.data !== 'string') return;
         let msg: { type?: string; committed?: string; partial?: string; message?: string; utterance?: string; text?: string };
         try { msg = JSON.parse(e.data); } catch { return; }
+        if (msg.type === 'stats') { uplink.stats(msg as { received_ms?: unknown }); return; }
         // With end-of-speech detection the service says when something has been said:
         // the words are shown until then, and typed when it does.
         if (msg.type === 'endpoint') {

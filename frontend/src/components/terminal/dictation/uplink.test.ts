@@ -4,6 +4,10 @@
  */
 import { MakeEncoder, opusFrame, opusUplink, pcmUplink } from './uplink';
 
+/** The rates the fake encoder was set to, in order. */
+let rates: number[] = [];
+beforeEach(() => { rates = []; });
+
 /** An encoder that makes one 3-byte packet per 20 ms (320 samples) at once. */
 const fakeEncoder: MakeEncoder = async (onPacket) => {
   let k = 0;
@@ -13,6 +17,7 @@ const fakeEncoder: MakeEncoder = async (onPacket) => {
       held += samples.length;
       while (held >= 320) { onPacket(k, Uint8Array.of(k & 255, 0xaa, 0xbb)); k += 1; held -= 320; }
     },
+    setBitrate(bitrate) { rates.push(bitrate); },
     async flush() { if (held) { onPacket(k, Uint8Array.of(k & 255)); k += 1; held = 0; } },
     close() {},
   };
@@ -39,7 +44,7 @@ test('a bundle is version 1, flags, the first packet\'s time and the packets wit
 test('100 ms of sound goes as one bundle of five 20 ms packets, the opening says Opus', async () => {
   const sent: ArrayBuffer[] = [];
   const up = await opusUplink((d) => sent.push(d), fakeEncoder);
-  expect(up?.config).toEqual({ codec: 'opus', bitrate: 32000, sample_rate: 16000 });
+  expect(up?.config).toEqual({ codec: 'opus', bitrate: 32000, sample_rate: 16000, stats: true });
   up!.push(frame(), false);
   up!.push(frame(), false);
   expect(sent.map(read)).toEqual([
@@ -73,6 +78,40 @@ test('finishing sends what is still in the encoder, before "stop" can go', async
   expect(sent).toHaveLength(0);
   await up.finish();
   expect(sent.map(read)).toEqual([{ version: 1, flags: 0, t: 0, packets: [[0, 0xaa, 0xbb], [1, 0xaa, 0xbb], [2, 0xaa, 0xbb], [3]] }]);
+});
+
+test('a slow line steps the rate down while the backlog grows, and back up once it keeps up for 8 s', async () => {
+  let now = 0;
+  const up = (await opusUplink(() => undefined, fakeEncoder, () => now))!;
+  const at = (ms: number, sentFrames: number, received: number) => {
+    now = ms;
+    for (let i = 0; i < sentFrames; i += 1) up.push(frame(), false);
+    up.stats({ received_ms: received });
+  };
+  at(2000, 20, 1900);     // sent to 2.0 s, 0.1 s on the way: fine
+  at(4000, 20, 3000);     // 1.0 s behind
+  expect(rates).toEqual([24000]);
+  at(6000, 20, 4500);     // 1.5 s, growing, but only 2 s since the last step
+  at(8000, 20, 6000);     // 2.0 s and growing, 4 s on
+  expect(rates).toEqual([24000, 16000]);
+  at(10000, 20, 8500);    // 1.5 s: shrinking, left alone
+  at(12000, 20, 11900);   // caught up
+  at(18000, 0, 12000);
+  expect(rates).toEqual([24000, 16000]);   // kept up only since 10 s
+  at(20500, 0, 12000);    // kept up 8 s+, 8 s+ since the last step
+  expect(rates).toEqual([24000, 16000, 24000]);
+  at(22000, 0, 12000);
+  up.stats({});           // a stats message without the figure changes nothing
+  expect(rates).toEqual([24000, 16000, 24000]);
+});
+
+test('never below 12 kbps nor above 32 kbps', async () => {
+  let now = 0;
+  const up = (await opusUplink(() => undefined, fakeEncoder, () => now))!;
+  for (let i = 1; i <= 8; i += 1) { now = i * 4000; for (let f = 0; f < 40; f += 1) up.push(frame(), false); up.stats({ received_ms: 0 }); }
+  expect(rates).toEqual([24000, 16000, 12000]);
+  for (let i = 1; i <= 8; i += 1) { now += 9000; up.stats({ received_ms: 32000 }); }
+  expect(rates).toEqual([24000, 16000, 12000, 16000, 24000, 32000]);
 });
 
 test('without an encoder it is PCM, as before: said by nothing, silence while muted', async () => {

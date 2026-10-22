@@ -8,6 +8,11 @@
  * Muted (Claude reading an answer aloud), packets are dropped and a 7-byte
  * "silent until here" bundle goes every 200 ms instead, so the service's
  * end-of-speech timing runs on; the first bundle after it is marked SILENCE.
+ *
+ * On a slow line the rate steps down (32 → 24 → 16 → 12 kbps) and back up once
+ * it keeps up again. Slow is told by the service: every 2 s it says how far
+ * into the sound it has got, and what was sent beyond that is still on the way
+ * (a WebSocket's bufferedAmount stays 0 until the OS's buffer is full).
  */
 
 const SR = 16000;
@@ -17,6 +22,14 @@ const BUNDLE = 5;
 const KEEP_EVERY = 10;
 const FLAG_SILENCE = 1;
 export const OPUS_BITRATE = 32000;
+/** The rates stepped through on a slow line (v.bebo.kr's /docs: 12k still recognises well). */
+export const OPUS_LADDER = [12000, 16000, 24000, 32000];
+/** Sound still on the way, in ms, that counts as a slow line, or as one that keeps up. */
+const SLOW_MS = 800;
+const KEPT_UP_MS = 300;
+/** No step sooner than this after the last one; up only after this long kept up. */
+const STEP_GAP_MS = 3000;
+const STEP_UP_MS = 8000;
 
 /** A VSP/1 bundle: [version 1][flags][first packet's ms, u32 LE][count] + (u16 LE length + packet)×n. */
 export function opusFrame(tMs: number, packets: Uint8Array[], flags = 0): ArrayBuffer {
@@ -29,10 +42,12 @@ export function opusFrame(tMs: number, packets: Uint8Array[], flags = 0): ArrayB
 }
 
 export interface Uplink {
-  /** What the opening message adds: the codec, and for Opus its rate. */
-  config: Record<string, string | number>;
+  /** What the opening message adds: the codec, and for Opus its rate and the asking for stats. */
+  config: Record<string, string | number | boolean>;
   /** One 100 ms frame of 16 kHz PCM, as the resampler makes them. */
   push(frame: ArrayBuffer, muted: boolean): void;
+  /** The service's "stats" message: how far into the sound it has got. */
+  stats(message: { received_ms?: unknown }): void;
   /** Sends what is still in the encoder: before "stop", or the last words are lost. */
   finish(): Promise<void>;
   close(): void;
@@ -44,6 +59,7 @@ export function pcmUplink(send: (data: ArrayBuffer) => void): Uplink {
     // Nothing to say: PCM is what the service takes by default.
     config: {},
     push: (frame, muted) => send(muted ? new ArrayBuffer(frame.byteLength) : frame),
+    stats: () => undefined,
     finish: async () => undefined,
     close: () => undefined,
   };
@@ -52,13 +68,14 @@ export function pcmUplink(send: (data: ArrayBuffer) => void): Uplink {
 /** Turns 16 kHz samples into numbered 20 ms Opus packets (frame k covers k×20 ms). */
 export interface PacketEncoder {
   encode(samples: Float32Array): void;
+  setBitrate(bitrate: number): void;
   flush(): Promise<void>;
   close(): void;
 }
 export type MakeEncoder = (onPacket: (k: number, packet: Uint8Array) => void) => Promise<PacketEncoder | null>;
 
-const opusConfig = () => ({
-  codec: 'opus', sampleRate: SR, numberOfChannels: 1, bitrate: OPUS_BITRATE,
+const opusConfig = (bitrate = OPUS_BITRATE) => ({
+  codec: 'opus', sampleRate: SR, numberOfChannels: 1, bitrate,
   opus: { format: 'opus', frameDuration: FRAME_MS * 1000, application: 'voip', signal: 'voice',
     complexity: typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches ? 5 : 9 },
 });
@@ -100,13 +117,21 @@ export const webCodecsEncoder: MakeEncoder = async (onPacket) => {
       data.close();
       fed += samples.length;
     },
+    setBitrate(bitrate) {
+      // Packets keep their times: they are numbered by the samples fed, not by the encoder.
+      try { if (enc.state === 'configured') enc.configure(opusConfig(bitrate)); } catch { /* the old rate goes on */ }
+    },
     async flush() { try { await enc.flush(); } catch { /* closed meanwhile */ } },
     close() { try { enc.close(); } catch { /* already closed */ } },
   };
 };
 
 /** Opus over VSP/1 bundles, or null when the browser cannot encode it. */
-export async function opusUplink(send: (data: ArrayBuffer) => void, make: MakeEncoder = webCodecsEncoder): Promise<Uplink | null> {
+export async function opusUplink(
+  send: (data: ArrayBuffer) => void,
+  make: MakeEncoder = webCodecsEncoder,
+  clock: () => number = () => performance.now(),
+): Promise<Uplink | null> {
   let batch: Uint8Array[] = [];
   let batchStart = 0;
   let batchFlags = 0;
@@ -115,10 +140,13 @@ export async function opusUplink(send: (data: ArrayBuffer) => void, make: MakeEn
   let fedFrames = 0;
   let quiet = false;
   let lastKeep = -KEEP_EVERY;
+  /** Where the sound sent so far ends, in ms. */
+  let sentEnd = 0;
 
   const flushBatch = () => {
     if (!batch.length) return;
     send(opusFrame(batchStart * FRAME_MS, batch, batchFlags));
+    sentEnd = (batchStart + batch.length) * FRAME_MS;
     batch = [];
     batchFlags = 0;
   };
@@ -127,7 +155,7 @@ export async function opusUplink(send: (data: ArrayBuffer) => void, make: MakeEn
       // Silent until the end of this frame: said every 200 ms, nothing more.
       flushBatch();
       quiet = true;
-      if (k - lastKeep >= KEEP_EVERY) { lastKeep = k; send(opusFrame((k + 1) * FRAME_MS, [])); }
+      if (k - lastKeep >= KEEP_EVERY) { lastKeep = k; sentEnd = (k + 1) * FRAME_MS; send(opusFrame(sentEnd, [])); }
       return;
     }
     const flags = quiet ? FLAG_SILENCE : 0;
@@ -139,8 +167,30 @@ export async function opusUplink(send: (data: ArrayBuffer) => void, make: MakeEn
   };
   const encoder = await make(onPacket);
   if (!encoder) return null;
+
+  let rate = OPUS_BITRATE;
+  let lastStep = -Infinity;
+  let keptUpSince = clock();
+  let lastBehind = 0;
+  const step = (by: number) => {
+    const next = OPUS_LADDER[OPUS_LADDER.indexOf(rate) + by];
+    if (!next) return;
+    rate = next;
+    lastStep = clock();
+    encoder.setBitrate(rate);
+  };
   return {
-    config: { codec: 'opus', bitrate: OPUS_BITRATE, sample_rate: SR },
+    config: { codec: 'opus', bitrate: OPUS_BITRATE, sample_rate: SR, stats: true },
+    stats({ received_ms: received }) {
+      if (typeof received !== 'number') return;
+      const now = clock();
+      const behind = sentEnd - received;
+      // Down only while it keeps growing: a backlog already shrinking needs no help.
+      if (behind > SLOW_MS && behind > lastBehind && now - lastStep > STEP_GAP_MS) { step(-1); keptUpSince = now; }
+      else if (behind > KEPT_UP_MS) keptUpSince = now;
+      else if (now - keptUpSince > STEP_UP_MS && now - lastStep > STEP_UP_MS) { step(1); keptUpSince = now; }
+      lastBehind = behind;
+    },
     push(frame, isMuted) {
       const pcm = new Int16Array(frame);
       const samples = new Float32Array(pcm.length);

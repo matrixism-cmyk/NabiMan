@@ -142,6 +142,11 @@ fn opening(asked: &serde_json::Value, language: &str, account: bool) -> serde_js
         if asked.get("sample_rate").and_then(|v| v.as_u64()) == Some(16_000) {
             open["sample_rate"] = 16_000.into();
         }
+        // Every 2 s how far the service has got: the page lowers its rate on
+        // a slow line by it.
+        if asked.get("stats").and_then(|v| v.as_bool()) == Some(true) {
+            open["stats"] = true.into();
+        }
     }
     open["language"] = language.into();
     open["title"] = "NabiMan terminal".into();
@@ -328,10 +333,12 @@ mod tests {
 
     #[test]
     fn opus_is_passed_on_checked_and_anything_else_stays_pcm() {
-        let opus = opening(&serde_json::json!({ "codec": "opus", "bitrate": 32000, "sample_rate": 16000 }), "korean", false);
+        let opus = opening(&serde_json::json!({ "codec": "opus", "bitrate": 32000, "sample_rate": 16000, "stats": true }), "korean", false);
         assert_eq!((opus["codec"].as_str(), opus["bitrate"].as_u64(), opus["sample_rate"].as_u64()), (Some("opus"), Some(32000), Some(16000)));
-        let odd = opening(&serde_json::json!({ "codec": "opus", "bitrate": 999_999, "sample_rate": 48000 }), "korean", true);
-        assert!(odd.get("bitrate").is_none() && odd.get("sample_rate").is_none() && odd["codec"] == "opus");
+        assert_eq!(opus["stats"], true);
+        let odd = opening(&serde_json::json!({ "codec": "opus", "bitrate": 999_999, "sample_rate": 48000, "stats": "yes" }), "korean", true);
+        assert!(odd.get("bitrate").is_none() && odd.get("sample_rate").is_none() && odd.get("stats").is_none() && odd["codec"] == "opus");
+        assert!(opening(&serde_json::json!({ "stats": true }), "korean", true).get("stats").is_none(), "only with Opus");
         for other in [serde_json::json!({ "codec": "flac" }), serde_json::json!({ "codec": "pcm16" }), serde_json::json!({})] {
             assert!(opening(&other, "korean", true).get("codec").is_none(), "{other}");
         }
