@@ -40,11 +40,19 @@ pub(super) async fn create_share(
     let Some(owner) = current_owner(&req, &users) else {
         return HttpResponse::Forbidden().finish();
     };
-    let label = {
+    if let Some(refused) = not_granted(&owner, true, body.files != ShareFiles::None) {
+        return refused;
+    }
+    let (label, via_server) = {
         let map = store.lock().unwrap();
         match map.get(&session_id) {
-            Some(s) if s.owned_by(&owner.id) && super::super::remote_access::allowed(s) => {
-                s.label.clone()
+            Some(s)
+                if s.owned_by(&owner.id)
+                    && super::super::remote_access::allowed(s)
+                    && super::super::remote_access::member_may_use(&owner, s) =>
+            {
+                let via = s.remote_binding.as_ref().map(|b| b.server_id().to_string()).unwrap_or_default();
+                (s.label.clone(), via)
             }
             Some(_) => {
                 return HttpResponse::Ok()
@@ -58,8 +66,19 @@ pub(super) async fn create_share(
             }
         }
     };
-    let target = LinkTarget { session_id, label, ..LinkTarget::default() };
+    let target = LinkTarget { session_id, label, via_server, ..LinkTarget::default() };
     publish(&req, &body, owner, target, &users, &sessions, &shares)
+}
+
+/// Why a member may not make this link, in their words; `None` when they may.
+pub(super) fn not_granted(owner: &NabimanUser, session: bool, files: bool) -> Option<HttpResponse> {
+    if crate::member_servers::may_share(owner, session, files) {
+        return None;
+    }
+    let what = if session && !owner.remote_permissions.share_sessions { "세션 공유" } else { "파일 공유" };
+    Some(no_store(HttpResponse::Forbidden().json(ApiResponse::<()>::error(&format!(
+        "{what} 권한이 없습니다. 관리자에게 권한을 요청하세요."
+    )))))
 }
 
 /// What a new link opens: a terminal session, or a saved server's files.
@@ -68,6 +87,7 @@ pub(super) struct LinkTarget {
     pub session_id: String,
     pub server_id: String,
     pub server_binding: String,
+    pub via_server: String,
     pub label: String,
 }
 
@@ -135,6 +155,7 @@ pub(super) fn publish(
         files: body.files,
         server_id: target.server_id,
         server_binding: target.server_binding,
+        via_server: target.via_server,
     };
 
     let Some(grant) = crate::stream_access::ConnectionGrant::from_request(
@@ -157,7 +178,7 @@ pub(super) fn publish(
     };
     if !current_users.iter().any(|u| {
         u.id == owner.id
-            && u.super_admin()
+            && super::owner_may_share(u, &link)
             && !u.share_authorization_version.is_empty()
             && u.share_authorization_version == owner.share_authorization_version
     }) {
@@ -216,6 +237,7 @@ pub(super) async fn list_shares(
             ShareLink {
                 alive,
                 usable: alive
+                    && super::owner_may_share(&owner, &l)
                     && l.owner == owner.username
                     && !expired(&l)
                     && !l.owner_id.is_empty()

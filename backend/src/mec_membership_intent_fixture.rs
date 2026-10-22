@@ -29,6 +29,7 @@ pub(super) fn setup(mode: &'static str) -> Fixture {
         totp_enabled: false,
         totp_secret: None,
         mfa: Default::default(),
+        remote_permissions: Default::default(),
     }]));
     let db = mec::db::open_in_memory().unwrap();
     if mode.starts_with("managed_") {

@@ -4,7 +4,7 @@ import { I18nProvider } from '../../i18n';
 import { TerminalSettingsProvider } from '../terminal/settings';
 import { TerminalWindowsProvider } from '../terminal/TerminalWindows';
 import RemoteWorkspace from './RemoteWorkspace';
-import { MemberContext } from './member';
+import { MemberContext, Sharing, SharingContext } from './member';
 
 const SERVERS = [
   { id: 'srv_1', name: 'web-prod-01', host: '192.168.1.100', port: 22, user: 'root',
@@ -56,12 +56,15 @@ jest.mock('../../shared/api/useApi', () => ({
   apiDelete: () => Promise.resolve({ success: true, data: null, message: '' }),
 }));
 
-function renderWorkspace(member = false) {
+const NONE: Sharing = { sessions: false, files: false };
+function renderWorkspace(member = false, sharing: Sharing = member ? NONE : { sessions: true, files: true }) {
   return render(
     <I18nProvider>
       <TerminalSettingsProvider>
         <TerminalWindowsProvider>
-          <MemberContext.Provider value={member}><RemoteWorkspace /></MemberContext.Provider>
+          <MemberContext.Provider value={member}>
+            <SharingContext.Provider value={sharing}><RemoteWorkspace /></SharingContext.Provider>
+          </MemberContext.Provider>
         </TerminalWindowsProvider>
       </TerminalSettingsProvider>
     </I18nProvider>,
@@ -308,5 +311,15 @@ describe('remote workspace', () => {
     expect(menu.queryByText('원격 실행')).toBeNull();
     expect(menu.queryByRole('menuitem', { name: '삭제' })).toBeNull();
     expect(menu.getByRole('menuitem', { name: '연결' })).toBeInTheDocument();
+  });
+
+  // 세션 공유 granted by an administrator: the member's sessions get the link.
+  it('offers a member session links only once granted', () => {
+    renderWorkspace(true, { sessions: true, files: false });
+    expect(tabs().getByRole('button', { name: '공유 링크' })).toBeInTheDocument();
+    fireEvent.click(tabs().getByRole('button', { name: /세션/ }));
+    const links = () => Array.from(document.querySelectorAll('.session-actions button')).filter(b => b.textContent === '🔗');
+    expect(links()).toHaveLength(1);
+    expect(screen.queryByText('내부 사용자 공유')).toBeNull();
   });
 });

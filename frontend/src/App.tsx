@@ -210,7 +210,9 @@ function App() {
     <TerminalSettingsProvider key={currentUser.username} enabled={currentUser.role === 'admin' || member}>
     <TerminalWindowsProvider key={currentUser.username} owner={currentUser.username} active={currentUser.role === 'admin' || member}>
       <RemoteShell username={currentUser.username} allowed={(currentUser.role === 'admin' && !scoped) || member}
-        member={member} onChangePassword={member ? () => setShowChangePw(true) : undefined} onLogout={handleLogout} />
+        member={member} onChangePassword={member ? () => setShowChangePw(true) : undefined} onLogout={handleLogout}
+        sharing={member ? { sessions: Boolean(currentUser.remote_permissions?.share_sessions),
+          files: Boolean(currentUser.remote_permissions?.share_files) } : undefined} />
       {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
       {idle.secondsLeft !== null && <IdleWarning seconds={idle.secondsLeft} onStay={idle.stay} />}
     </TerminalWindowsProvider>

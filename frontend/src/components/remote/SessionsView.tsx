@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { apiPost, apiRequest } from '../../shared/api/useApi';
 import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
-import { useMember } from './member';
+import { useMember, useSharing } from './member';
 
 export interface SessionInfo {
   id: string; label: string; owner: string; ws_count: number; shared: boolean;
@@ -41,6 +41,7 @@ export default function SessionsView({
 }: Props) {
   const { t } = useT();
   const member = useMember();
+  const sharing = useSharing();
   const [renaming, setRenaming] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [message, setMessage] = useState('');
@@ -151,7 +152,7 @@ export default function SessionsView({
                 {session.id === currentSessionId ? t('terminal.showPane') : t('terminal.join')}
               </button>
               <button className="btn btn-secondary btn-sm rw-wide-only" title={t('remote.detachHint')} disabled={!attachable} onClick={() => onPopOut(session)}>⧉</button>
-              {onShare && !member && (
+              {onShare && sharing.sessions && (
                 <button className="btn btn-secondary btn-sm" title={t('share.hint')} disabled={!attachable} onClick={() => onShare(session)}>🔗</button>
               )}
               <button className={`btn btn-sm ${session.keepalive ? 'btn-primary' : 'btn-secondary'}`}

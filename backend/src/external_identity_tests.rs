@@ -21,6 +21,7 @@ fn member(id: &str, role: UserRole, status: AccountStatus) -> NabimanUser {
         totp_enabled: false,
         totp_secret: None,
         mfa: Default::default(),
+        remote_permissions: Default::default(),
     }
 }
 #[actix_web::test]

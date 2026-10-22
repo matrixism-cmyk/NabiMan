@@ -3,9 +3,11 @@ import { useT } from '../../shared/i18n';
 import { ThemeSelector } from '../../shared/theme';
 import LanguageSelector from '../../shared/ui/LanguageSelector';
 import RemoteWorkspace from './RemoteWorkspace';
-import { MemberContext } from './member';
+import { MemberContext, Sharing, SharingContext } from './member';
 import { useChromeHidden } from '../../shared/ui/useChromeHidden';
 import './remote-shell.css';
+
+const ALL: Sharing = { sessions: true, files: true };
 
 /** Whether this page was opened as the remote workspace on its own (/remote). */
 export const isStandaloneRemote = () => /^\/remote\/?$/.test(window.location.pathname);
@@ -16,6 +18,8 @@ interface Props {
   allowed: boolean;
   /** A remote-only member: this is all of NabiMan they get, so no way back to it. */
   member?: boolean;
+  /** The share links a member was granted; an administrator has them all. */
+  sharing?: Sharing;
   onChangePassword?: () => void;
   onLogout: () => void;
 }
@@ -26,7 +30,7 @@ interface Props {
  * out, and the whole rest of the window for the work. Signing in, idle
  * sign-out and settings are NabiMan's, shared.
  */
-export default function RemoteShell({ username, allowed, member = false, onChangePassword, onLogout }: Props) {
+export default function RemoteShell({ username, allowed, member = false, sharing = ALL, onChangePassword, onLogout }: Props) {
   const { t } = useT();
   const [folded, setFolded] = useChromeHidden();
   useEffect(() => {
@@ -61,7 +65,11 @@ export default function RemoteShell({ username, allowed, member = false, onChang
         </header>
       )}
       <main className="remote-shell-main">
-        {allowed ? <MemberContext.Provider value={member}><RemoteWorkspace /></MemberContext.Provider> : (
+        {allowed ? (
+          <MemberContext.Provider value={member}>
+            <SharingContext.Provider value={sharing}><RemoteWorkspace /></SharingContext.Provider>
+          </MemberContext.Provider>
+        ) : (
           <div className="panel">
             <p role="alert">{t('remote.shell.notAllowed')}</p>
             <a className="btn btn-secondary" href="/">{t('remote.shell.back')}</a>

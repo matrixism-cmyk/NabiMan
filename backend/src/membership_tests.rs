@@ -15,6 +15,7 @@ fn user(name: &str, role: UserRole, memberships: Vec<Membership>) -> NabimanUser
         totp_enabled: false,
         totp_secret: None,
         mfa: Default::default(),
+        remote_permissions: Default::default(),
     }
 }
 fn scope(id: &str, role: UserRole) -> Membership {

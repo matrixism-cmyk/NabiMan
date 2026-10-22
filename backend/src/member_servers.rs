@@ -71,6 +71,23 @@ fn server(id: &str) -> Option<RemoteServer> {
     crate::remote_servers::find_server(id).ok().flatten()
 }
 
+/// Whether `user` may hold a share link: one that opens a terminal session
+/// (`session`), grants files (`files`), or both. The administrators always
+/// may; a member when an administrator granted it.
+pub fn may_share(user: &NabimanUser, session: bool, files: bool) -> bool {
+    user.super_admin()
+        || (is_member(user)
+            && user.active()
+            && (!session || user.remote_permissions.share_sessions)
+            && (!files || user.remote_permissions.share_files))
+}
+
+/// Whether `user` has share links to look after: the administrators, and any
+/// member (who may still revoke links once the permission is gone).
+pub fn keeps_shares(user: &NabimanUser) -> bool {
+    user.super_admin() || (is_member(user) && user.active())
+}
+
 /// What a member may call: their account, the terminal and its files, and
 /// their own servers. Everything else stays closed.
 pub fn permitted(user: &NabimanUser, method: &str, path: &str) -> bool {
@@ -78,6 +95,7 @@ pub fn permitted(user: &NabimanUser, method: &str, path: &str) -> bool {
         "GET" => matches!(
             path,
             "/api/users/me"
+                | "/api/terminal/share-links"
                 | "/api/app-settings"
                 | "/api/terminal"
                 | "/api/terminal/sessions"
@@ -107,10 +125,22 @@ pub fn permitted(user: &NabimanUser, method: &str, path: &str) -> bool {
         return true;
     }
     if let Some(rest) = path.strip_prefix("/api/terminal/sessions/") {
-        // Their own sessions (the handlers check whose); sharing stays with
-        // the administrators.
+        // Their own sessions (the handlers check whose). A share link is
+        // theirs to make when granted (checked where it is made); showing a
+        // session to the other accounts is not.
         let action = rest.split('/').nth(1).unwrap_or("");
-        return !rest.is_empty() && !matches!(action, "share" | "share-link");
+        return !rest.is_empty() && action != "share";
+    }
+    if let Some(token) = path.strip_prefix("/api/terminal/share-links/") {
+        return method == "DELETE" && !token.contains('/');
+    }
+    if let Some(rest) = path.strip_prefix("/api/terminal/files/") {
+        let mut parts = rest.split('/');
+        let id = parts.next().unwrap_or("");
+        return method == "POST"
+            && parts.next() == Some("share-link")
+            && parts.next().is_none()
+            && server(id).is_some_and(|s| usable(user, &s));
     }
     if let Some(rest) = path.strip_prefix("/api/terminal/copies/") {
         return method == "POST" && rest.ends_with("/cancel");
@@ -292,6 +322,10 @@ mod tests {
             ("POST", "/api/remote-servers"),
             ("POST", "/api/auth/change-password"),
             ("GET", "/api/users/me"),
+            // Their share links: whether they may make one is checked where it is made.
+            ("GET", "/api/terminal/share-links"),
+            ("POST", "/api/terminal/sessions/pty_1/share-link"),
+            ("DELETE", "/api/terminal/share-links/abc"),
         ] {
             assert!(permitted(&m, method, path), "{method} {path}");
         }
@@ -302,9 +336,8 @@ mod tests {
             ("PUT", "/api/terminal/dictation/settings"),
             ("POST", "/api/terminal/dictation/test"),
             ("POST", "/api/terminal/paste-file"),
-            ("GET", "/api/terminal/share-links"),
-            ("POST", "/api/terminal/sessions/pty_1/share-link"),
-            ("PUT", "/api/terminal/sessions/pty_1/share"),
+            ("POST", "/api/terminal/sessions/pty_1/share"),
+            ("POST", "/api/terminal/files/srv_x/share-link"),
             ("GET", "/api/terminal/sftp/local/list"),
             ("POST", "/api/remote-servers/check-all"),
             ("GET", "/api/remote-servers/ssh-key"),
@@ -314,6 +347,23 @@ mod tests {
         ] {
             assert!(!permitted(&m, method, path), "{method} {path}");
         }
+    }
+
+    #[test]
+    fn a_member_shares_only_what_an_administrator_granted() {
+        let mut m = member();
+        assert!(!may_share(&m, true, false) && !may_share(&m, false, true));
+        m.remote_permissions.share_sessions = true;
+        assert!(may_share(&m, true, false));
+        // A session's link with its files needs the files permission too.
+        assert!(!may_share(&m, true, true) && !may_share(&m, false, true));
+        m.remote_permissions.share_files = true;
+        assert!(may_share(&m, true, true) && may_share(&m, false, true));
+        m.status = crate::models::AccountStatus::Suspended;
+        assert!(!may_share(&m, true, false));
+        let before = m.remote_permissions.clone();
+        m.remote_permissions.share_files = false;
+        assert!(m.remote_permissions.narrowed_from(&before) && !before.narrowed_from(&m.remote_permissions));
     }
 
     #[test]

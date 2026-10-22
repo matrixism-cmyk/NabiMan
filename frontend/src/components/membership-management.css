@@ -29,3 +29,6 @@
   .scope-policy-form .form-row { flex-direction: column; }
   .scope-policy-form .form-row label, .scope-policy-form input:not([type="checkbox"]) { width: 100%; }
 }
+.member-permissions { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; }
+.member-permissions .membership-check { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.member-permissions input[type="checkbox"] { width: 16px; height: 16px; margin: 0; }

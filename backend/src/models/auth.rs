@@ -38,6 +38,25 @@ pub struct MfaState {
     pub revision: String,
 }
 
+/// What a remote-only member may do beyond working on their servers, each
+/// granted by an administrator. The administrators may always do all of it.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+pub struct RemotePermissions {
+    /// Share links to their terminal sessions (세션 공유).
+    #[serde(default)]
+    pub share_sessions: bool,
+    /// Share links to a server's files, and the file panel in a session's link.
+    #[serde(default)]
+    pub share_files: bool,
+}
+
+impl RemotePermissions {
+    /// Whether anything granted before is no longer granted.
+    pub fn narrowed_from(&self, before: &Self) -> bool {
+        (before.share_sessions && !self.share_sessions) || (before.share_files && !self.share_files)
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct NabimanUser {
     pub id: String,
@@ -65,6 +84,8 @@ pub struct NabimanUser {
     pub totp_secret: Option<String>,
     #[serde(default, skip_serializing)]
     pub mfa: MfaState,
+    #[serde(default)]
+    pub remote_permissions: RemotePermissions,
 }
 
 #[derive(Deserialize)]
@@ -78,6 +99,7 @@ pub struct CreateUserRequest {
 pub struct UpdateUserRequest {
     pub password: Option<String>,
     pub role: Option<UserRole>,
+    pub remote_permissions: Option<RemotePermissions>,
 }
 
 #[derive(Deserialize)]

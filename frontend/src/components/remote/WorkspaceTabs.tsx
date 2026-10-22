@@ -3,7 +3,7 @@ import { RemoteServer } from './remoteTypes';
 import { useT } from '../../shared/i18n';
 import { hasFiles, hasShell, hasTerminal } from './protocols';
 import { OverviewView, Selection, ServerView } from './workspaceState';
-import { assignedTo, useMember } from './member';
+import { assignedTo, useMember, useSharing } from './member';
 
 interface Props {
   selection: Selection;
@@ -27,6 +27,7 @@ export default function WorkspaceTabs({
 }: Props) {
   const { t } = useT();
   const member = useMember();
+  const sharing = useSharing();
   const tab = (view: ServerView, label: React.ReactNode) => (
     <button className={serverView === view ? 'is-active' : ''} onClick={() => onServerView(view)}>{label}</button>
   );
@@ -40,7 +41,7 @@ export default function WorkspaceTabs({
         <>
           {overview('summary', t('remote.summaryTab'))}
           {overview('sessions', <>{t('remote.sessionsTab')} {allSessions > 0 && <em>{allSessions}</em>}</>)}
-          {!member && overview('links', t('share.panelTab'))}
+          {(sharing.sessions || sharing.files) && overview('links', t('share.panelTab'))}
           {!member && overview('keys', t('remote.sshKey'))}
           {overview('settings', t('common.settings'))}
         </>

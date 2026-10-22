@@ -26,6 +26,7 @@ struct StoredUser<'a> {
     totp_enabled: bool,
     totp_secret: &'a Option<String>,
     mfa: &'a crate::models::MfaState,
+    remote_permissions: &'a crate::models::RemotePermissions,
 }
 
 pub type UserStore = Arc<Mutex<Vec<NabimanUser>>>;
@@ -77,6 +78,7 @@ pub fn new_user_store(pw_hash: &str) -> UserStore {
         totp_enabled: false,
         totp_secret: None,
         mfa: Default::default(),
+        remote_permissions: Default::default(),
         status: Default::default(),
         memberships: vec![],
         requested_memberships: vec![],
@@ -162,6 +164,7 @@ pub fn ensure_oauth_user(store: &UserStore, username: &str, _role: &str) -> Resu
             totp_enabled: false,
             totp_secret: None,
             mfa: Default::default(),
+            remote_permissions: Default::default(),
         });
         commit_users(&mut users, previous)?;
         return Err("최고관리자의 가입 승인이 필요합니다".into());
@@ -248,6 +251,7 @@ async fn create_user(
         totp_enabled: false,
         totp_secret: None,
         mfa: Default::default(),
+        remote_permissions: Default::default(),
         status: Default::default(),
         memberships: vec![],
         requested_memberships: vec![],
@@ -311,6 +315,9 @@ async fn update_user(
         if *role != UserRole::Admin {
             user.scope_restricted = true;
         }
+    }
+    if let Some(ref permissions) = body.remote_permissions {
+        user.remote_permissions = permissions.clone();
     }
     match commit_users(&mut users, previous) {
         Ok(()) => {

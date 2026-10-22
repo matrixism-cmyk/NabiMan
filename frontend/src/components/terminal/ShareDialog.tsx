@@ -3,6 +3,7 @@ import Modal from '../../shared/ui/Modal';
 import { apiPost, apiRequest } from '../../shared/api/useApi';
 import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
+import { useSharing } from '../remote/member';
 
 export interface ShareLink {
   token: string;
@@ -67,6 +68,8 @@ interface Props {
  *  no NabiMan account. */
 export default function ShareDialog({ sessionId = '', serverId = '', sessionLabel, onClose }: Props) {
   const { t } = useT();
+  // A member's session link carries files only when files were granted too.
+  const filesGranted = useSharing().files;
   const titleId = useId();
   const [expiry, setExpiry] = useState(24 * 3600);
   const [password, setPassword] = useState('');
@@ -165,7 +168,7 @@ export default function ShareDialog({ sessionId = '', serverId = '', sessionLabe
           </div>
         )}
 
-        <div className="form-group">
+        {filesGranted && <div className="form-group">
           <label id={`${titleId}-files`}>{t('share.files')}</label>
           <div className="filter-row" role="radiogroup" aria-labelledby={`${titleId}-files`}>
             {FILES_CHOICES.filter((choice) => !filesOnly || choice.value !== 'none').map((choice) => (
@@ -177,7 +180,7 @@ export default function ShareDialog({ sessionId = '', serverId = '', sessionLabe
             ))}
           </div>
           <small className="text-secondary">{t('share.filesHint')}</small>
-        </div>
+        </div>}
 
         <div className="btn-group">
           <button className="btn btn-primary" onClick={create} disabled={busy}>

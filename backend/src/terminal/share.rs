@@ -84,6 +84,10 @@ pub struct ShareLink {
     /// (address, user, protocol, password, approved key) ends the link.
     #[serde(default)]
     pub server_binding: String,
+    /// For a remote-only member's session link, the saved server the session
+    /// runs on: the member must still be allowed it whenever the link is used.
+    #[serde(default)]
+    pub via_server: String,
 }
 
 /// File access a link grants alongside its terminal. Links made before this
@@ -112,6 +116,7 @@ impl ShareLink {
             && self.session_id == other.session_id
             && self.server_id == other.server_id
             && self.server_binding == other.server_binding
+            && self.via_server == other.via_server
             && self.read_only == other.read_only
             && self.files == other.files
             && self.password_hash == other.password_hash
@@ -136,7 +141,7 @@ pub(crate) fn live_link(shares: &ShareStore, users: &UserStore, token: &str) -> 
         && users.lock().ok()?.iter().any(|u| {
             u.id == link.owner_id
                 && u.username == link.owner
-                && u.super_admin()
+                && owner_may_share(u, &link)
                 && crate::scope_access::permission(u, "GET", "/api/terminal")
                 && !link.owner_authorization_version.is_empty()
                 && u.share_authorization_version == link.owner_authorization_version
@@ -144,13 +149,31 @@ pub(crate) fn live_link(shares: &ShareStore, users: &UserStore, token: &str) -> 
     .then_some(link)
 }
 
+/// Whether the link's owner may (still) hand out what it opens. A member
+/// needs the permission for it, and the server behind it must still be one
+/// they may use.
+pub(crate) fn owner_may_share(owner: &NabimanUser, link: &ShareLink) -> bool {
+    if !crate::member_servers::may_share(owner, !link.files_only(), link.files != ShareFiles::None) {
+        return false;
+    }
+    if !crate::member_servers::is_member(owner) {
+        return true;
+    }
+    let server = if link.files_only() { &link.server_id } else { &link.via_server };
+    crate::remote_servers::find_server(server)
+        .ok()
+        .flatten()
+        .is_some_and(|s| crate::member_servers::usable(owner, &s))
+}
+
+/// The signed-in account, when it has share links to make or look after.
 fn current_owner(req: &HttpRequest, users: &UserStore) -> Option<NabimanUser> {
     let username = crate::auth::extract_username(req)?;
     users
         .lock()
         .ok()?
         .iter()
-        .find(|u| u.username == username && u.super_admin())
+        .find(|u| u.username == username && crate::member_servers::keeps_shares(u))
         .cloned()
 }
 fn no_store(mut response: HttpResponse) -> HttpResponse {

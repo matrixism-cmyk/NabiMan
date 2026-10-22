@@ -154,6 +154,7 @@ pub(super) fn serialize_users(users: &[NabimanUser]) -> Result<String, String> {
             totp_enabled: user.totp_enabled,
             totp_secret: &user.totp_secret,
             mfa: &user.mfa,
+            remote_permissions: &user.remote_permissions,
         })
         .collect();
     serde_json::to_string_pretty(&stored).map_err(|e| e.to_string())
@@ -173,6 +174,8 @@ pub(super) fn refresh_share_versions(users: &mut [NabimanUser], previous: &[Nabi
                     || old.totp_enabled != user.totp_enabled
                     || old.totp_secret != user.totp_secret
                     || old.mfa.revision != user.mfa.revision
+                    // Taking a permission away ends the links it allowed.
+                    || user.remote_permissions.narrowed_from(&old.remote_permissions)
             })
             .unwrap_or(true);
         if changed || user.share_authorization_version.is_empty() {

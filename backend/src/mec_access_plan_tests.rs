@@ -29,6 +29,7 @@ fn user(name: &str, role: UserRole, scope: Option<(&str, UserRole)>) -> NabimanU
         totp_enabled: false,
         totp_secret: None,
         mfa: Default::default(),
+        remote_permissions: Default::default(),
     }
 }
 #[actix_web::test]

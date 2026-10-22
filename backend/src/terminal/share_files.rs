@@ -44,14 +44,17 @@ pub(super) async fn create_files_share(
     let Some(owner) = current_owner(&req, &users) else {
         return HttpResponse::Forbidden().finish();
     };
+    if let Some(refused) = super::management::not_granted(&owner, false, true) {
+        return refused;
+    }
     if body.files == ShareFiles::None {
         return no_store(HttpResponse::BadRequest().json(ApiResponse::<()>::error(
             "A files link needs read or write access",
         )));
     }
     let server = match crate::remote_servers::find_server(&path) {
-        Ok(Some(server)) => server,
-        Ok(None) => return no_store(HttpResponse::Ok().json(ApiResponse::<()>::error("Saved server not found"))),
+        Ok(Some(server)) if crate::member_servers::usable(&owner, &server) => server,
+        Ok(_) => return no_store(HttpResponse::Ok().json(ApiResponse::<()>::error("Saved server not found"))),
         Err(_) => return storage_error(),
     };
     if let Err(e) = super::super::sftp::files_allowed(&server) {

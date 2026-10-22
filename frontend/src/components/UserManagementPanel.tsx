@@ -1,13 +1,18 @@
 import React, { useMemo, useState } from 'react';
 import { useApi, apiPost, apiRequest } from '../shared/api/useApi';
 import { useMecList } from '../hooks/mec/useMecApi';
-import MembershipEditor, { Membership, MemberUser, ScopeOption, membershipRole } from './MembershipEditor';
+import MembershipEditor, { Membership, MemberUser, RemotePermissions, ScopeOption, membershipRole } from './MembershipEditor';
 
 import MemberAccessFields, { accessActive } from './MemberAccessFields';
 import ExternalIdentityEditor from './ExternalIdentityEditor';
 import TenantAccessInspection from './TenantAccessInspection';
 import { confirmDialog } from '../shared/ui/ConfirmDialog';
 
+/** What an administrator may grant a remote-only member, one checkbox each. */
+const REMOTE_PERMISSIONS: { key: keyof RemotePermissions; label: string; hint: string }[] = [
+  { key: 'share_sessions', label: '세션 공유', hint: '터미널 세션을 계정 없는 사람에게 링크로 공유합니다' },
+  { key: 'share_files', label: '파일 공유', hint: '서버 파일을 링크로 공유하고, 세션 링크에 파일 패널을 붙입니다' },
+];
 const statusLabel = { active: '승인', pending: '승인 대기', rejected: '반려', suspended: '이용 정지' };
 export default function UserManagementPanel({ initialScope = '' }: { initialScope?: string }) {
   const { data: me } = useApi<MemberUser>('/api/users/me');
@@ -103,6 +108,14 @@ export default function UserManagementPanel({ initialScope = '' }: { initialScop
             {u.role === 'operator' && <option value="operator">기존 운영자</option>}
             <option value="admin">최고관리자</option>
           </select>}
+          {superAdmin && u.role === 'remote' && u.status === 'active' && <div className="member-permissions" aria-label={`${u.username} 원격 권한`}>
+            {REMOTE_PERMISSIONS.map(p => <label key={p.key} className="membership-check" title={p.hint}>
+              <input type="checkbox" checked={Boolean(u.remote_permissions?.[p.key])} disabled={busy}
+                onChange={e => act(() => apiRequest(`/api/users/${u.id}`, { method: 'PUT', body: JSON.stringify({
+                  remote_permissions: { share_sessions: false, share_files: false, ...u.remote_permissions, [p.key]: e.target.checked },
+                }) }))} /> {p.label}
+            </label>)}
+          </div>}
         </td>
         <td>{statusLabel[u.status]}</td>
         <td>{u.memberships.map(m => <div key={`${m.kind}:${m.scope_id}`}>

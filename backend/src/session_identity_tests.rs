@@ -32,6 +32,7 @@ fn user(name: &str, role: UserRole, restricted: bool) -> NabimanUser {
         totp_enabled: false,
         totp_secret: None,
         mfa: Default::default(),
+        remote_permissions: Default::default(),
         share_authorization_version: "fixture".into(),
     }
 }

@@ -43,6 +43,7 @@ mod tests {
             files: Default::default(),
             server_id: String::new(),
             server_binding: String::new(),
+            via_server: String::new(),
         }
     }
     #[test]

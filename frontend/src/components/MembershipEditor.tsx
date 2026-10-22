@@ -5,8 +5,11 @@ export interface MemberUser {
   mfa_blocked?: boolean;
   id: string; username: string; role: string; status: 'active' | 'pending' | 'rejected' | 'suspended';
   memberships: Membership[]; requested_memberships: Membership[]; scope_restricted: boolean;
+  /** What a remote-only member may do beyond working on their servers. */
+  remote_permissions?: RemotePermissions;
   created_at: string; last_login: string | null;
 }
+export interface RemotePermissions { share_sessions: boolean; share_files: boolean }
 export interface ScopeOption { kind: Membership['kind']; id: string; label: string }
 export const membershipRole = { admin: '소속 관리자', operator: '운영자', viewer: '조회자' };
 /** `remote`: a remote-only member's assigned servers — servers only, no role to pick. */

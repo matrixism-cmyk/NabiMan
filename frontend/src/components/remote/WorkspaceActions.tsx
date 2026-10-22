@@ -4,7 +4,7 @@ import type { TerminalStatus, TerminalViewHandle } from '../terminal/TerminalVie
 import SessionNameEdit from '../terminal/SessionNameEdit';
 import AccountDictation from '../terminal/dictation/AccountDictation';
 import Modal from '../../shared/ui/Modal';
-import { useMember } from './member';
+import { useSharing } from './member';
 
 interface Props {
   compact: boolean;
@@ -30,9 +30,10 @@ interface Props {
 export default function WorkspaceActions(props: Props) {
   const { t } = useT();
   const { compact, viewRef, terminal } = props;
-  // Sharing is the administrators'; a member's links would not open.
-  const sharing = !useMember();
-  const shareFiles = sharing ? props.onShareFiles : undefined;
+  // A member shares only what an administrator granted them.
+  const granted = useSharing();
+  const sharing = granted.sessions;
+  const shareFiles = granted.files ? props.onShareFiles : undefined;
   const [sheet, setSheet] = useState(false);
   const statusText = (s: TerminalStatus) => (s === 'connected' ? t('terminal.connected')
     : s === 'reconnecting' ? t('terminal.reconnecting')

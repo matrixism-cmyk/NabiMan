@@ -25,6 +25,7 @@ async fn member_delete_is_bound_to_the_url_tenant_project() {
         totp_enabled: false,
         totp_secret: None,
         mfa: Default::default(),
+        remote_permissions: Default::default(),
     }]));
     let state = web::Data::new(mec::MecState::mocks());
     let rancher = &state.services.rancher;

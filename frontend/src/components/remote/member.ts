@@ -11,5 +11,14 @@ export const MemberContext = createContext(false);
 
 export const useMember = () => useContext(MemberContext);
 
+/**
+ * The share links this account may make: an administrator always both, a
+ * member what an administrator granted (세션 공유, 파일 공유).
+ */
+export interface Sharing { sessions: boolean; files: boolean }
+export const SharingContext = createContext<Sharing>({ sessions: true, files: true });
+
+export const useSharing = () => useContext(SharingContext);
+
 /** For a member, a server an administrator assigned them: theirs to work on, not to edit. */
 export const assignedTo = (member: boolean, server?: { owner_id?: string }) => member && Boolean(server) && !server?.owner_id;
