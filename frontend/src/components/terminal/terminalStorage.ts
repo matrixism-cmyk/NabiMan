@@ -180,13 +180,18 @@ function signedIn(): string | null {
   } catch { return null; }
 }
 
-/** Every pane's stored screen and session, of whoever used this browser. */
+/**
+ * Every pane's stored screen, of whoever used this browser. Only the screens:
+ * a pane's session id (and the mark that its session ended) stays. An id is
+ * no secret — the server lets no one else attach — and without it a pane
+ * that would have rejoined its shell, or stayed ended, starts a new empty one.
+ */
 export function forgetAllScreens() {
   try {
     const gone: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k && (k.startsWith(bufKey('')) || k.startsWith(sidKey('')))) gone.push(k);
+      if (k && k.startsWith(bufKey(''))) gone.push(k);
     }
     gone.forEach((k) => localStorage.removeItem(k));
   } catch { /* storage blocked: nothing was kept either */ }

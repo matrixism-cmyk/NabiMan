@@ -2,7 +2,7 @@
  * A terminal's stored screen belongs to the account that printed it: gone at
  * sign-out and when someone else signs in at the same browser.
  */
-import { bufKey, guardScreens, sidKey, writeStored } from './terminalStorage';
+import { bufKey, ENDED_SID, guardScreens, sidKey, storedSessionId, writeStored } from './terminalStorage';
 
 const token = (sub: string) => `x.${btoa(JSON.stringify({ sub })).replace(/=+$/, '')}.y`;
 const signIn = (sub: string) => {
@@ -24,7 +24,19 @@ it('keeps an account\'s screens across its own sign-ins, and drops them for anyo
   expect(localStorage.getItem(bufKey('ws_local'))).toBe('alice typed a password');
   signIn('bob');
   expect(localStorage.getItem(bufKey('ws_local'))).toBeNull();
-  expect(localStorage.getItem(sidKey('ws_local'))).toBeNull();
+});
+
+it('never forgets which session a pane was on, or that it ended: that would open new empty shells', () => {
+  localStorage.setItem(sidKey('ws_local'), 'pty_live');
+  localStorage.setItem(sidKey('tw_old'), ENDED_SID);
+  writeStored(bufKey('ws_local'), 'screen');
+  // The first page load of this code: nobody recorded yet.
+  sessionStorage.setItem('nabiman_token', token('alice'));
+  guardScreens();
+  signIn('bob');
+  signOut();
+  expect(storedSessionId('ws_local')).toBe('pty_live');
+  expect(localStorage.getItem(sidKey('tw_old'))).toBe(ENDED_SID);
 });
 
 it('drops them at sign-out, and a pane closing afterwards cannot write them back', () => {
