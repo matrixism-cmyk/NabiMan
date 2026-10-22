@@ -155,3 +155,11 @@ fn old_memberships_keep_access_without_new_fields() {
     assert_eq!(m.allow_exec, None);
     assert_eq!(m.expires_at, None);
 }
+
+#[test]
+fn a_sign_up_password_needs_eight_characters_and_fits_bcrypt() {
+    assert!(super::valid_signup_password("abcd1234"));
+    assert!(!super::valid_signup_password("abcd123"));
+    assert!(super::valid_signup_password("비밀번호여덟자다"), "eight Korean letters are eight characters");
+    assert!(!super::valid_signup_password(&"a".repeat(73)), "bcrypt reads only 72 bytes");
+}

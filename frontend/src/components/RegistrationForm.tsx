@@ -35,7 +35,7 @@ export default function RegistrationForm({ onBack }: { onBack: () => void }) {
     {!submitted && <>
       <label>아이디<input aria-label="가입 아이디" autoComplete="username" required minLength={2} maxLength={32}
         value={username} onChange={e => setUsername(e.target.value)} pattern="[A-Za-z0-9_-]+" /></label>
-      <label>비밀번호 (12자 이상)<input aria-label="가입 비밀번호" type="password" autoComplete="new-password" required minLength={12}
+      <label>비밀번호 (8자 이상)<input aria-label="가입 비밀번호" type="password" autoComplete="new-password" required minLength={8}
         value={password} onChange={e => setPassword(e.target.value)} /></label>
       <label>비밀번호 확인<input aria-label="비밀번호 확인" type="password" autoComplete="new-password" required
         value={confirm} onChange={e => setConfirm(e.target.value)} /></label>

@@ -74,6 +74,12 @@ pub(crate) fn validate_scope(req: &HttpRequest, m: &Membership) -> Result<(), Ht
     }
 }
 
+/// A sign-up's password: eight characters or more (Korean counts a letter
+/// each), and at most the 72 bytes bcrypt reads.
+fn valid_signup_password(password: &str) -> bool {
+    password.chars().count() >= 8 && password.len() <= 72
+}
+
 #[derive(serde::Deserialize)]
 struct RegisterRequest {
     username: String,
@@ -94,8 +100,8 @@ async fn register(
     {
         return error("아이디는 영문·숫자·밑줄·하이픈 2~32자로 입력하세요");
     }
-    if !(12..=72).contains(&body.password.len()) {
-        return error("비밀번호는 12~72바이트로 입력하세요");
+    if !valid_signup_password(&body.password) {
+        return error("비밀번호는 8자 이상으로 입력하세요 (최대 72바이트)");
     }
     if body.requested_memberships.len() > 32 {
         return error("소속 신청이 너무 많습니다");
