@@ -75,11 +75,14 @@ fn account_target(req: &HttpRequest, scope: &str) -> Result<Target, HttpResponse
         .ok_or_else(|| fail(StatusCode::UNAUTHORIZED, "Sign in again"))?;
     let base = format!("/api/terminal/sftp/{scope}");
     if scope == LOCAL {
+        if !crate::member_servers::request_may_use(req, None) {
+            return Err(fail(StatusCode::FORBIDDEN, "This machine's files are not open to this account"));
+        }
         return Ok(Target { pool_user: user_id, scope: scope.into(), server: None, base, share: None });
     }
     let server = match crate::remote_servers::find_server(scope) {
-        Ok(Some(server)) => server,
-        Ok(None) => return Err(fail(StatusCode::NOT_FOUND, "Saved server not found")),
+        Ok(Some(server)) if crate::member_servers::request_may_use(req, Some(&server)) => server,
+        Ok(_) => return Err(fail(StatusCode::NOT_FOUND, "Saved server not found")),
         Err(e) => return Err(fail(StatusCode::SERVICE_UNAVAILABLE, &e)),
     };
     files_allowed(&server).map_err(|e| bad(&e))?;

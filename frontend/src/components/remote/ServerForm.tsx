@@ -4,6 +4,7 @@ import { RemoteServer, RemoteServerStatus } from './remoteTypes';
 import { useT } from '../../shared/i18n';
 import { FileProtocol, PLAINTEXT, protocolName, TerminalProtocol } from './protocols';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
+import { useMember } from './member';
 import './remote-base.css';
 
 interface Props {
@@ -33,7 +34,9 @@ export default function ServerForm({ server, onSaved, onCancel }: Props) {
   const [fingerprint, setFingerprint] = useState(server?.tls_fingerprint || '');
   const [implicit, setImplicit] = useState(Boolean(server?.ftps_implicit));
   const [user, setUser] = useState(server?.user || 'root');
-  const [auth, setAuth] = useState(server?.auth_method || 'key');
+  // A member logs in with a password only: NabiMan's SSH key is not theirs to use.
+  const member = useMember();
+  const [auth, setAuth] = useState(member ? 'password' : server?.auth_method || 'key');
   const [password, setPassword] = useState('');
   const [tags, setTags] = useState(server?.tags.join(', ') || '');
   const [memo, setMemo] = useState(server?.memo || '');
@@ -43,7 +46,7 @@ export default function ServerForm({ server, onSaved, onCancel }: Props) {
   const ssh = terminal === 'ssh' || files === 'sftp';
   const ftp = files === 'ftp' || files === 'ftps';
   // Keys are an SSH thing; Telnet and FTP always log in with a password.
-  const method = ssh ? auth : 'password';
+  const method = ssh && !member ? auth : 'password';
   const plain = [terminal, files].filter(p => PLAINTEXT.has(p)).map(protocolName);
 
   // Implicit FTPS is FTPS with TLS from the first byte; one choice in the list.
@@ -117,9 +120,9 @@ export default function ServerForm({ server, onSaved, onCancel }: Props) {
     if (!server || !(await confirmDialog({ message: t('remote.clearPasswordConfirm'), danger: true, confirmLabel: t('common.delete') }))) return;
     const res = await apiRequest<RemoteServer>(`/api/remote-servers/${server.id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: '', auth_method: ssh ? 'key' : 'password' }),
+      body: JSON.stringify({ password: '', auth_method: ssh && !member ? 'key' : 'password' }),
     });
-    if (res.success && res.data) { if (ssh) setAuth('key'); onSaved(res.data); }
+    if (res.success && res.data) { if (ssh && !member) setAuth('key'); onSaved(res.data); }
   };
 
   return (
@@ -158,7 +161,7 @@ export default function ServerForm({ server, onSaved, onCancel }: Props) {
         )}
         <div className="form-group"><label>{t('remote.user')} *</label>
           <input value={user} onChange={e => setUser(e.target.value)} placeholder="root" className="filter-input" /></div>
-        {ssh && (
+        {ssh && !member && (
           <div className="form-group"><label>{t('remote.auth')}</label>
             <select value={auth} onChange={e => setAuth(e.target.value)} className="select-input">
               <option value="key">{t('remote.sshKey')}</option>

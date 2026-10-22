@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { apiPost, apiRequest } from '../../shared/api/useApi';
 import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
+import { useMember } from './member';
 
 export interface SessionInfo {
   id: string; label: string; owner: string; ws_count: number; shared: boolean;
@@ -39,6 +40,7 @@ export default function SessionsView({
   sessions, currentSessionId, onRefresh, onAttach, onPopOut, onShare, title, actions, empty,
 }: Props) {
   const { t } = useT();
+  const member = useMember();
   const [renaming, setRenaming] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [message, setMessage] = useState('');
@@ -149,17 +151,19 @@ export default function SessionsView({
                 {session.id === currentSessionId ? t('terminal.showPane') : t('terminal.join')}
               </button>
               <button className="btn btn-secondary btn-sm rw-wide-only" title={t('remote.detachHint')} disabled={!attachable} onClick={() => onPopOut(session)}>⧉</button>
-              {onShare && (
+              {onShare && !member && (
                 <button className="btn btn-secondary btn-sm" title={t('share.hint')} disabled={!attachable} onClick={() => onShare(session)}>🔗</button>
               )}
               <button className={`btn btn-sm ${session.keepalive ? 'btn-primary' : 'btn-secondary'}`}
                 title={t('terminal.keepaliveHint')} onClick={() => toggle(session, 'keepalive')}>
                 {t('terminal.keepaliveShort')} {session.keepalive ? 'ON' : 'OFF'}
               </button>
-              <button className={`btn btn-sm ${session.shared ? 'btn-warning' : 'btn-secondary'}`}
-                disabled={!attachable && !session.shared} onClick={() => toggle(session, 'share')}>
-                {session.shared ? t('terminal.shared') : t('terminal.share')}
-              </button>
+              {!member && (
+                <button className={`btn btn-sm ${session.shared ? 'btn-warning' : 'btn-secondary'}`}
+                  disabled={!attachable && !session.shared} onClick={() => toggle(session, 'share')}>
+                  {session.shared ? t('terminal.shared') : t('terminal.share')}
+                </button>
+              )}
               <button className="btn btn-danger btn-sm" onClick={() => kill(session)}>{t('terminal.endSession')}</button>
             </div>
           </div>

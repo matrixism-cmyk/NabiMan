@@ -96,7 +96,7 @@ function App() {
   }, [standalone]);
   // Keep the URL hash in sync so a refresh or shared link reopens the same view.
   useEffect(() => {
-    if (standalone) return;
+    if (standalone || isStandaloneRemote()) return;
     const next = `#${activeCat}/${activeTab}`;
     if (window.location.hash !== next) window.history.replaceState(null, '', next);
   }, [activeCat, activeTab, standalone]);
@@ -119,11 +119,17 @@ function App() {
     window.addEventListener('nabiman_mfa_required', changed);
     return () => window.removeEventListener('nabiman_mfa_required', changed);
   }, [refetchCurrentUser]);
-  const scoped = !!currentUser && currentUser.role !== 'admin' && (currentUser.scope_restricted || currentUser.memberships.length > 0);
-  const { data: dockerAvailable } = useApi<boolean>(loggedIn && currentUser && !scoped ? '/api/containers/available' : '');
-  const { data: dbAvailable } = useApi<boolean>(loggedIn && currentUser && !scoped ? '/api/database/available' : '');
-  const { data: mailAvailable } = useApi<boolean>(loggedIn && currentUser && !scoped ? '/api/mail/available' : '');
-  const { data: dnsAvailable } = useApi<boolean>(loggedIn && currentUser && !scoped ? '/api/dns/available' : '');
+  // A remote-only member gets the remote workspace and nothing else, at /remote.
+  const member = currentUser?.role === 'remote';
+  const scoped = !!currentUser && currentUser.role !== 'admin' && !member && (currentUser.scope_restricted || currentUser.memberships.length > 0);
+  const full = loggedIn && currentUser && !scoped && !member;
+  const { data: dockerAvailable } = useApi<boolean>(full ? '/api/containers/available' : '');
+  const { data: dbAvailable } = useApi<boolean>(full ? '/api/database/available' : '');
+  const { data: mailAvailable } = useApi<boolean>(full ? '/api/mail/available' : '');
+  const { data: dnsAvailable } = useApi<boolean>(full ? '/api/dns/available' : '');
+  useEffect(() => {
+    if (member && !isStandaloneRemote()) window.history.replaceState(null, '', '/remote');
+  }, [member]);
   useEffect(() => {
     const hidden = new Set<Tab>();
     if (dockerAvailable === false) hidden.add('containers');
@@ -200,10 +206,12 @@ function App() {
     </div>
   </main>;
 
-  if (standalone) return (
-    <TerminalSettingsProvider key={currentUser.username} enabled={currentUser.role === 'admin'}>
-    <TerminalWindowsProvider key={currentUser.username} owner={currentUser.username} active={currentUser.role === 'admin'}>
-      <RemoteShell username={currentUser.username} allowed={currentUser.role === 'admin' && !scoped} onLogout={handleLogout} />
+  if (standalone || member) return (
+    <TerminalSettingsProvider key={currentUser.username} enabled={currentUser.role === 'admin' || member}>
+    <TerminalWindowsProvider key={currentUser.username} owner={currentUser.username} active={currentUser.role === 'admin' || member}>
+      <RemoteShell username={currentUser.username} allowed={(currentUser.role === 'admin' && !scoped) || member}
+        member={member} onChangePassword={member ? () => setShowChangePw(true) : undefined} onLogout={handleLogout} />
+      {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
       {idle.secondsLeft !== null && <IdleWarning seconds={idle.secondsLeft} onStay={idle.stay} />}
     </TerminalWindowsProvider>
     </TerminalSettingsProvider>

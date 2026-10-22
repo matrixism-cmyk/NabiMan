@@ -4,10 +4,13 @@ import { RemoteServer, RemoteServerStatus } from './remoteTypes';
 import ProtocolBadges from './ProtocolBadges';
 import { addressOf, hasShell } from './protocols';
 import { useT } from '../../shared/i18n';
+import { useMember } from './member';
 import './remote-base.css';
 
 export default function MultiServerDashboard() {
   const { t } = useT();
+  // Checking everything at once is the administrators' fleet check.
+  const member = useMember();
   const { data: servers, refetch } = useApi<RemoteServer[]>('/api/remote-servers', 30000);
   const [statuses, setStatuses] = useState<Record<string, RemoteServerStatus>>({});
   const [checking, setChecking] = useState(false);
@@ -32,9 +35,11 @@ export default function MultiServerDashboard() {
     <div className="panel">
       <div className="panel-header">
         <h2>{t('remote.dashboard')}</h2>
-        <button className="btn btn-primary btn-sm" onClick={checkAll} disabled={checking}>
-          {checking ? t('common.working') : t('remote.checkAll')}
-        </button>
+        {!member && (
+          <button className="btn btn-primary btn-sm" onClick={checkAll} disabled={checking}>
+            {checking ? t('common.working') : t('remote.checkAll')}
+          </button>
+        )}
       </div>
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>

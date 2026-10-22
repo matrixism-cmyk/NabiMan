@@ -25,6 +25,7 @@ mod license;
 mod logs;
 mod mail;
 mod mec;
+mod member_servers;
 mod membership;
 mod mfa_policy;
 mod models;

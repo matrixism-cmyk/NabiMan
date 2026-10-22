@@ -237,7 +237,6 @@ pub fn extract_username(req: &actix_web::HttpRequest) -> Option<String> {
         .map(|p| p.username.clone())
 }
 
-#[cfg(test)]
 pub(crate) fn verified_role(req: &actix_web::HttpRequest) -> Option<crate::models::UserRole> {
     req.extensions()
         .get::<VerifiedPrincipal>()

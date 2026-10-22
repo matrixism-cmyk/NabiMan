@@ -3,6 +3,7 @@ import { useT } from '../../shared/i18n';
 import TerminalSettingsForm from './TerminalSettingsForm';
 import SessionSettingsForm from './SessionSettingsForm';
 import DictationSettings from './dictation/DictationSettings';
+import { useMember } from '../remote/member';
 
 interface Props {
   onClose: () => void;
@@ -18,6 +19,7 @@ interface Props {
  */
 export default function TerminalSettingsModal({ onClose, sessionId, sessionName }: Props) {
   const { t } = useT();
+  const member = useMember();
   const [side, setSide] = useState<'session' | 'all'>(sessionId ? 'session' : 'all');
   return (
     <div className="modal-overlay term-settings-overlay" onClick={onClose}>
@@ -35,7 +37,7 @@ export default function TerminalSettingsModal({ onClose, sessionId, sessionName 
           ? <SessionSettingsForm sessionId={sessionId} onDone={onClose} />
           : (<>
             <TerminalSettingsForm onDone={onClose} />
-            <DictationSettings />
+            {!member && <DictationSettings />}
           </>)}
       </div>
     </div>

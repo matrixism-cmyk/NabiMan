@@ -80,7 +80,9 @@ pub(crate) fn visible_to(
         && !session.owner_id.is_empty()
         && (session.owned_by(user_id) || session.shared)
         && users.lock().ok().is_some_and(|m| {
-            m.iter().any(|u| {
+            !m.iter().any(|u| {
+                u.id == user_id && !super::remote_access::member_may_use(u, session)
+            }) && m.iter().any(|u| {
                 u.id == session.owner_id
                     && crate::scope_access::permission(u, "GET", "/api/terminal")
             })

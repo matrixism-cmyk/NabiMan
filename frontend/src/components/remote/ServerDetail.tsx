@@ -3,6 +3,7 @@ import { apiPost, apiRequest } from '../../shared/api/useApi';
 import { RemoteServer, RemoteServerStatus } from './remoteTypes';
 import { useT } from '../../shared/i18n';
 import { DeployKeyDialog } from './SshKeyComponents';
+import { useMember } from './member';
 import ServerForm from './ServerForm';
 import HostTrustForm from './HostTrustForm';
 import ProtocolDetect, { CheckList } from './ProtocolDetect';
@@ -99,6 +100,9 @@ export function ServerSettingsView({ server, onChanged, onDeleted }: SettingsPro
   const [showDeploy, setShowDeploy] = useState(false);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
+  // A member's server logs in with its password; NabiMan's key is not theirs.
+  const member = useMember();
+  const keys = hasShell(server) && !member;
   // Approving the host key is when SSH can first be tried.
   const [approved, setApproved] = useState(0);
   const ssh = usesSsh(server);
@@ -117,7 +121,7 @@ export function ServerSettingsView({ server, onChanged, onDeleted }: SettingsPro
       <div className="rw-section-head">
         <h3>{t('remote.editServer')}</h3>
         <div className="btn-group">
-          {hasShell(server) && (
+          {keys && (
             <button className="btn btn-secondary btn-sm" onClick={() => setShowDeploy(v => !v)}>
               {showDeploy ? t('remote.hideKey') : t('remote.deployKey')}
             </button>
@@ -126,7 +130,7 @@ export function ServerSettingsView({ server, onChanged, onDeleted }: SettingsPro
         </div>
       </div>
       {error && <div role="alert" className="message">{error}</div>}
-      {hasShell(server) && showDeploy && <DeployKeyDialog server={server} onClose={() => setShowDeploy(false)} />}
+      {keys && showDeploy && <DeployKeyDialog server={server} onClose={() => setShowDeploy(false)} />}
       {ssh && (
         <HostTrustForm key={`${server.id}:${server.host}:${server.port}:${server.host_trust?.fingerprint || ""}`} server={server}
           onSaved={(approvedNow) => { onChanged(); if (approvedNow) setApproved(n => n + 1); }} />

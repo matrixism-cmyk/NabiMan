@@ -61,10 +61,11 @@ pub async fn inspect(
     };
     let source_allowed = target.active() && membership.as_ref().is_some_and(|m| m.accessible());
     let reference_role = if source_allowed {
-        membership.as_ref().map(|m| match m.role {
-            UserRole::Viewer => "read-only",
-            UserRole::Operator => "project-member",
-            UserRole::Admin => "project-owner",
+        membership.as_ref().and_then(|m| match m.role {
+            UserRole::Viewer => Some("read-only"),
+            UserRole::Operator => Some("project-member"),
+            UserRole::Admin => Some("project-owner"),
+            UserRole::Remote => None,
         })
     } else {
         None

@@ -4,6 +4,7 @@ import { I18nProvider } from '../../i18n';
 import { TerminalSettingsProvider } from '../terminal/settings';
 import { TerminalWindowsProvider } from '../terminal/TerminalWindows';
 import RemoteWorkspace from './RemoteWorkspace';
+import { MemberContext } from './member';
 
 const SERVERS = [
   { id: 'srv_1', name: 'web-prod-01', host: '192.168.1.100', port: 22, user: 'root',
@@ -55,12 +56,12 @@ jest.mock('../../shared/api/useApi', () => ({
   apiDelete: () => Promise.resolve({ success: true, data: null, message: '' }),
 }));
 
-function renderWorkspace() {
+function renderWorkspace(member = false) {
   return render(
     <I18nProvider>
       <TerminalSettingsProvider>
         <TerminalWindowsProvider>
-          <RemoteWorkspace />
+          <MemberContext.Provider value={member}><RemoteWorkspace /></MemberContext.Provider>
         </TerminalWindowsProvider>
       </TerminalSettingsProvider>
     </I18nProvider>,
@@ -280,5 +281,26 @@ describe('remote workspace', () => {
     first.unmount();
     renderWorkspace();
     expect(document.querySelector('.rw-head-title')?.textContent).toContain('db-replica-02');
+  });
+
+  // A remote-only member: their servers, and nothing of this machine's or
+  // the administrators' — not even offered.
+  it('offers a member only their own servers', () => {
+    localStorage.setItem('nabiman_remote_selection', JSON.stringify({ kind: 'local' }));
+    renderWorkspace(true);
+    expect(itemByName('web-prod-01')).toBeTruthy();
+    expect(rail().textContent).not.toContain('로컬 셸');
+    expect(rail().textContent).not.toContain('임시 접속');
+    expect(rail().textContent).not.toContain('전체 확인');
+    // A target of this machine's remembered from before falls back to the overview.
+    expect(screen.queryByText('로컬 셸 세션')).toBeNull();
+    expect(tabs().getByRole('button', { name: '요약' })).toBeInTheDocument();
+    expect(tabs().queryByRole('button', { name: 'SSH 키' })).toBeNull();
+    expect(tabs().queryByRole('button', { name: '공유 링크' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '전체 확인' })).toBeNull();
+
+    fireEvent.click(itemByName('web-prod-01'));
+    expect(tabs().queryByRole('button', { name: '실행' })).toBeNull();
+    expect(openMenuOn('web-prod-01').queryByText('원격 실행')).toBeNull();
   });
 });

@@ -3,6 +3,7 @@ import { RemoteServer } from './remoteTypes';
 import { useT } from '../../shared/i18n';
 import { hasFiles, hasShell, hasTerminal } from './protocols';
 import { OverviewView, Selection, ServerView } from './workspaceState';
+import { useMember } from './member';
 
 interface Props {
   selection: Selection;
@@ -25,6 +26,7 @@ export default function WorkspaceTabs({
   selection, server, overviewView, onOverviewView, serverView, onServerView, allSessions, liveCount,
 }: Props) {
   const { t } = useT();
+  const member = useMember();
   const tab = (view: ServerView, label: React.ReactNode) => (
     <button className={serverView === view ? 'is-active' : ''} onClick={() => onServerView(view)}>{label}</button>
   );
@@ -38,8 +40,8 @@ export default function WorkspaceTabs({
         <>
           {overview('summary', t('remote.summaryTab'))}
           {overview('sessions', <>{t('remote.sessionsTab')} {allSessions > 0 && <em>{allSessions}</em>}</>)}
-          {overview('links', t('share.panelTab'))}
-          {overview('keys', t('remote.sshKey'))}
+          {!member && overview('links', t('share.panelTab'))}
+          {!member && overview('keys', t('remote.sshKey'))}
           {overview('settings', t('common.settings'))}
         </>
       )}
@@ -53,7 +55,7 @@ export default function WorkspaceTabs({
         <>
           {!hasTerminal(server) && hasFiles(server) && tab('files', t('sftp.tab'))}
           {tab('status', t('remote.statusView'))}
-          {hasShell(server) && tab('exec', t('remote.exec'))}
+          {hasShell(server) && !member && tab('exec', t('remote.exec'))}
           {tab('settings', t('common.settings'))}
         </>
       )}
@@ -65,10 +67,10 @@ export default function WorkspaceTabs({
  * The view to show for a server: one it does not offer (a terminal on a
  * files-only server, commands without a shell) falls back to one it does.
  */
-export function viewFor(server: RemoteServer | undefined, view: ServerView): ServerView {
+export function viewFor(server: RemoteServer | undefined, view: ServerView, member = false): ServerView {
   if (!server) return view;
   if ((view === 'sessions' || view === 'terminal') && !hasTerminal(server)) return hasFiles(server) ? 'files' : 'status';
   if (view === 'files' && (hasTerminal(server) || !hasFiles(server))) return hasTerminal(server) ? 'terminal' : 'status';
-  if (view === 'exec' && !hasShell(server)) return 'status';
+  if (view === 'exec' && (member || !hasShell(server))) return 'status';
   return view;
 }

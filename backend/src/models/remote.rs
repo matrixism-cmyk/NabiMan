@@ -48,6 +48,10 @@ pub struct RemoteServer {
     /// switching to it with AUTH TLS.
     #[serde(default)]
     pub ftps_implicit: bool,
+    /// The remote-only member who registered it; empty for the servers the
+    /// administrators keep (see `member_servers`).
+    #[serde(default)]
+    pub owner_id: String,
 }
 
 fn default_terminal() -> String {
@@ -68,6 +72,10 @@ impl RemoteServer {
     /// FTP or FTPS, which have a connection of their own.
     pub fn uses_ftp(&self) -> bool {
         self.files == "ftp" || self.files == "ftps"
+    }
+    /// A remote-only member's own server.
+    pub fn member_owned(&self) -> bool {
+        !self.owner_id.is_empty()
     }
 }
 

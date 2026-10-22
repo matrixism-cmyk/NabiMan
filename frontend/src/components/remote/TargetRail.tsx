@@ -8,6 +8,7 @@ import {
   addressOf, hasFiles, hasShell, hasTerminal, matchesProtocol, PROTOCOL_FILTERS, protocolName, protocolsOf, ProtocolFilter,
 } from './protocols';
 import { RailAction, Selection } from './workspaceState';
+import { useMember } from './member';
 
 interface Props {
   /** A phone: no floating windows, and a long press opens the menu. */
@@ -39,6 +40,7 @@ export default function TargetRail({
   sessionsFor, onSelect, onAction, onFilter, onCheckAll,
 }: Props) {
   const { t } = useT();
+  const member = useMember();
   const [menu, setMenu] = useState<OpenMenu | null>(null);
   const [protocol, setProtocol] = useState<ProtocolFilter>('');
   // Folded to a thin tab, for the most room to work; a phone shows the list on its own anyway.
@@ -93,7 +95,7 @@ export default function TargetRail({
       }
       items.push(
         { key: 'status', icon: '◔', label: t('remote.statusView'), separated: items.length > 0, onSelect: run('status') },
-        ...(hasShell(target.server) ? [{ key: 'exec', icon: '›', label: t('remote.menuExec'), onSelect: run('exec') }] : []),
+        ...(hasShell(target.server) && !member ? [{ key: 'exec', icon: '›', label: t('remote.menuExec'), onSelect: run('exec') }] : []),
         { key: 'check', icon: '↻', label: t('remote.menuCheck'), onSelect: run('check') },
         { key: 'edit', icon: '✎', label: t('remote.menuEdit'), separated: true, onSelect: run('edit') },
         { key: 'delete', icon: '✕', label: t('common.delete'), danger: true, onSelect: run('delete') },
@@ -125,9 +127,11 @@ export default function TargetRail({
           <span className="rw-rail-count">
             <strong>{online}</strong>/{servers.length} {t('common.online')}
           </span>
-          <button className="btn btn-secondary btn-sm" onClick={onCheckAll} disabled={checkingAll || servers.length === 0}>
-            {checkingAll ? t('remote.checking') : t('remote.checkAll')}
-          </button>
+          {!member && (
+            <button className="btn btn-secondary btn-sm" onClick={onCheckAll} disabled={checkingAll || servers.length === 0}>
+              {checkingAll ? t('remote.checking') : t('remote.checkAll')}
+            </button>
+          )}
           {/* The remote workspace alone, at /remote (this tab keeps its sign-in). */}
           {window.location.pathname !== '/remote' && (
             <a className="btn btn-secondary btn-sm rw-standalone" href="/remote" title={t('remote.openStandalone')}
@@ -161,7 +165,7 @@ export default function TargetRail({
           <button className={`rw-item ${selection.kind === 'overview' ? 'is-active' : ''}`}
             onClick={() => onSelect({ kind: 'overview' })}>
             <span className="rw-item-name">{t('remote.overview')}</span>
-            <span className="rw-item-sub">{t('remote.overviewHint')}</span>
+            <span className="rw-item-sub">{t(member ? 'remote.overviewHintMember' : 'remote.overviewHint')}</span>
           </button>
 
           <div className="rw-rail-label">{t('remote.serversGroup')}</div>
@@ -188,6 +192,7 @@ export default function TargetRail({
           <button className={`rw-item rw-item-add ${selection.kind === 'new' ? 'is-active' : ''}`}
             onClick={() => onSelect({ kind: 'new' })}>{t('remote.addServer')}</button>
 
+          {!member && <>
           <div className="rw-rail-label">{t('remote.otherGroup')}</div>
           <button className={`rw-item ${selection.kind === 'local' ? 'is-active' : ''}`}
             title={t(compact ? 'remote.railLongPressHint' : 'remote.railMenuHint')}
@@ -205,6 +210,7 @@ export default function TargetRail({
             <span className="rw-item-name">{t('remote.adhoc')}</span>
             <span className="rw-item-sub">{t('remote.adhocHint')}</span>
           </button>
+          </>}
         </div>
 
         {menu && (

@@ -253,6 +253,7 @@ const t: T = {
     en: 'Summary, sessions, links, SSH key, settings',
     ja: '要約・セッション・リンク・SSH鍵・設定',
   },
+  'remote.overviewHintMember': { ko: '요약 · 세션 · 설정', en: 'Summary, sessions, settings', ja: '要約・セッション・設定' },
   'remote.serversGroup': { ko: '서버', en: 'Servers', ja: 'サーバー' },
   'remote.otherGroup': { ko: '기타', en: 'Other', ja: 'その他' },
   'remote.localShell': { ko: '로컬 셸', en: 'Local shell', ja: 'ローカルシェル' },

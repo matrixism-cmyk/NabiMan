@@ -90,7 +90,7 @@ export default function UserManagementPanel({ initialScope = '' }: { initialScop
     </select></label></div>
     <table className="data-table"><thead><tr><th>아이디</th><th>상태</th><th>소속 및 권한</th><th>관리</th></tr></thead>
       <tbody>{data?.filter(u => (filter === 'all' || u.status === filter) && (!scopeFilter || u.memberships.some(m => `${m.kind}:${m.scope_id}` === scopeFilter))).map(u => <tr key={u.id}>
-        <td><strong>{u.username}</strong>{u.role === 'admin' && <span> · 최고관리자</span>}
+        <td><strong>{u.username}</strong>{u.role === 'admin' && <span> · 최고관리자</span>}{u.role === 'remote' && <span> · 원격 전용</span>}
           {superAdmin && u.status === 'active' && <select className="select-input" aria-label={`${u.username} 서비스 권한`}
             value={u.role} disabled={busy} onChange={async e => {
               const nextRole = e.target.value;
@@ -98,6 +98,7 @@ export default function UserManagementPanel({ initialScope = '' }: { initialScop
               act(() => apiRequest(`/api/users/${u.id}`, { method: 'PUT', body: JSON.stringify({ role: nextRole }) }));
             }}>
             <option value="viewer">일반 회원 (소속별 권한 적용)</option>
+            <option value="remote">원격 전용 회원 (원격 메뉴만, 본인이 등록한 서버만)</option>
             {u.role === 'operator' && <option value="operator">기존 운영자</option>}
             <option value="admin">최고관리자</option>
           </select>}
@@ -115,7 +116,7 @@ export default function UserManagementPanel({ initialScope = '' }: { initialScop
             <button className="btn btn-sm btn-secondary" disabled={busy} onClick={() => setAccessEdit({ user: u, membership: { ...m } })}>접근 설정</button>
             <button className="btn btn-sm btn-secondary" disabled={busy} onClick={() => changeMember(u.username, m, true)}>소속 해제</button>
           </>}
-        </div>)}{u.memberships.length === 0 && (u.role === 'admin' ? '서비스 전체' : u.scope_restricted ? '소속 미지정' : '기존 서비스 권한')}</td>
+        </div>)}{u.memberships.length === 0 && (u.role === 'admin' ? '서비스 전체' : u.role === 'remote' ? '원격 메뉴만' : u.scope_restricted ? '소속 미지정' : '기존 서비스 권한')}</td>
         <td>{superAdmin && <div className="btn-group">
           {u.status === 'active' && <button className="btn btn-sm btn-secondary" disabled={busy} onClick={() => setIdentityUser(u)}>Rancher 계정 연결</button>}
           <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => { setEditing(u); setDraft(u.status === 'pending' ? u.requested_memberships : u.memberships); }}>소속 설정{u.status === 'pending' ? ' / 승인' : ''}</button>

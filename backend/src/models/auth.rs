@@ -8,6 +8,9 @@ pub enum UserRole {
     Operator,
     #[serde(rename = "viewer")]
     Viewer,
+    /// Only the remote workspace, on servers the member registered.
+    #[serde(rename = "remote")]
+    Remote,
 }
 
 impl UserRole {
@@ -16,6 +19,7 @@ impl UserRole {
             Self::Admin => "admin",
             Self::Operator => "operator",
             Self::Viewer => "viewer",
+            Self::Remote => "remote",
         }
     }
 }

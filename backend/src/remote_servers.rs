@@ -124,11 +124,13 @@ async fn list_servers(
         Ok(servers) => servers
             .into_iter()
             .filter(|s| {
-                actor.super_admin()
-                    || !actor.restricted()
-                    || actor
-                        .scope_role(&crate::models::ScopeKind::Server, &s.id)
-                        .is_some()
+                crate::member_servers::listed(&actor, s)
+                    && (actor.super_admin()
+                        || !actor.restricted()
+                        || crate::member_servers::is_member(&actor)
+                        || actor
+                            .scope_role(&crate::models::ScopeKind::Server, &s.id)
+                            .is_some())
             })
             .map(public)
             .collect::<Vec<_>>(),
@@ -137,7 +139,33 @@ async fn list_servers(
     HttpResponse::Ok().json(ApiResponse::ok(servers))
 }
 
-async fn add_server(body: web::Json<AddRemoteServerRequest>) -> HttpResponse {
+/// The signed-in account, which a server may belong to.
+fn actor(
+    req: &actix_web::HttpRequest,
+    store: &web::Data<crate::users::UserStore>,
+) -> Result<crate::models::NabimanUser, HttpResponse> {
+    crate::membership::actor(req, store)
+}
+
+/// A member's server: theirs, logged into with a password, and at an address
+/// they may reach (see `member_servers`).
+fn member_check(server: &mut RemoteServer) -> Result<(), String> {
+    if !server.member_owned() {
+        return Ok(());
+    }
+    server.auth_method = "password".into();
+    crate::member_servers::dial_host(server, server.port).map(drop)
+}
+
+async fn add_server(
+    req: actix_web::HttpRequest,
+    store: web::Data<crate::users::UserStore>,
+    body: web::Json<AddRemoteServerRequest>,
+) -> HttpResponse {
+    let actor = match actor(&req, &store) {
+        Ok(u) => u,
+        Err(r) => return r,
+    };
     if !validate_host(&body.host) {
         return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error("Invalid hostname"));
     }
@@ -196,6 +224,7 @@ async fn add_server(body: web::Json<AddRemoteServerRequest>) -> HttpResponse {
         ftp_port: 21,
         tls_fingerprint: String::new(),
         ftps_implicit: false,
+        owner_id: if crate::member_servers::is_member(&actor) { actor.id.clone() } else { String::new() },
     };
     protocols::apply(&mut server, &protocols::Change {
         terminal: body.terminal.as_deref(),
@@ -211,6 +240,9 @@ async fn add_server(body: web::Json<AddRemoteServerRequest>) -> HttpResponse {
     if !server.uses_ssh() {
         server.auth_method = "password".into();
     }
+    if let Err(e) = member_check(&mut server) {
+        return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error(&e));
+    }
 
     let _guard = SERVER_WRITES.lock().unwrap_or_else(|e| e.into_inner());
     let mut servers = match load_servers() {
@@ -225,16 +257,25 @@ async fn add_server(body: web::Json<AddRemoteServerRequest>) -> HttpResponse {
 }
 
 async fn update_server(
+    req: actix_web::HttpRequest,
+    store: web::Data<crate::users::UserStore>,
     path: web::Path<String>,
     body: web::Json<UpdateRemoteServerRequest>,
 ) -> HttpResponse {
+    let actor = match actor(&req, &store) {
+        Ok(u) => u,
+        Err(r) => return r,
+    };
     let server_id = path.into_inner();
     let _guard = SERVER_WRITES.lock().unwrap_or_else(|e| e.into_inner());
     let mut servers = match load_servers() {
         Ok(servers) => servers,
         Err(error) => return storage_error(error),
     };
-    let srv = match servers.iter_mut().find(|s| s.id == server_id) {
+    let srv = match servers
+        .iter_mut()
+        .find(|s| s.id == server_id && crate::member_servers::usable(&actor, s))
+    {
         Some(s) => s,
         None => {
             return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error("Server not found"))
@@ -312,6 +353,9 @@ async fn update_server(
         }
         srv.has_password = !srv.password_enc.is_empty();
     }
+    if let Err(e) = member_check(srv) {
+        return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error(&e));
+    }
 
     let updated = public(srv.clone());
     if let Err(e) = save_servers(&mut servers) {
@@ -320,7 +364,15 @@ async fn update_server(
     HttpResponse::Ok().json(ApiResponse::ok(updated))
 }
 
-async fn delete_server(path: web::Path<String>) -> HttpResponse {
+async fn delete_server(
+    req: actix_web::HttpRequest,
+    store: web::Data<crate::users::UserStore>,
+    path: web::Path<String>,
+) -> HttpResponse {
+    let actor = match actor(&req, &store) {
+        Ok(u) => u,
+        Err(r) => return r,
+    };
     let server_id = path.into_inner();
     let _guard = SERVER_WRITES.lock().unwrap_or_else(|e| e.into_inner());
     let mut servers = match load_servers() {
@@ -328,7 +380,7 @@ async fn delete_server(path: web::Path<String>) -> HttpResponse {
         Err(error) => return storage_error(error),
     };
     let before = servers.len();
-    servers.retain(|s| s.id != server_id);
+    servers.retain(|s| s.id != server_id || !crate::member_servers::usable(&actor, s));
     if servers.len() == before {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Server not found"));
     }

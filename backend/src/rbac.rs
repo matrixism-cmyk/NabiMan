@@ -12,6 +12,8 @@ pub fn check_permission(role: &UserRole, method: &str, path: &str) -> bool {
         UserRole::Admin => true,
         UserRole::Operator => is_operator_allowed(method, path),
         UserRole::Viewer => is_viewer_allowed(method, path),
+        // Remote-only members are let in by `member_servers`, never by role.
+        UserRole::Remote => false,
     }
 }
 

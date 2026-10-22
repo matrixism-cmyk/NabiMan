@@ -39,6 +39,9 @@ pub(crate) fn visible(actor: &NabimanUser, target: &NabimanUser) -> bool {
 }
 
 pub(crate) fn validate_scope(req: &HttpRequest, m: &Membership) -> Result<(), HttpResponse> {
+    if m.role == UserRole::Remote {
+        return Err(error("원격 전용은 회원 등급이며 소속 역할로는 쓸 수 없습니다"));
+    }
     if m.expires_at
         .as_ref()
         .is_some_and(|s| chrono::DateTime::parse_from_rfc3339(s).is_err())

@@ -2,6 +2,7 @@ import React from 'react';
 import { useT } from '../../shared/i18n';
 import TerminalSettingsForm from '../terminal/TerminalSettingsForm';
 import DictationSettings from '../terminal/dictation/DictationSettings';
+import { useMember } from './member';
 
 /**
  * The remote workspace's own settings, in one place: dictation, and
@@ -11,11 +12,15 @@ import DictationSettings from '../terminal/dictation/DictationSettings';
  */
 export default function RemoteSettingsView() {
   const { t } = useT();
+  // Dictation's settings are the whole server's; a member just uses them.
+  const member = useMember();
   return (
     <div className="rw-settings">
-      <section className="rw-settings-section is-wide">
-        <DictationSettings />
-      </section>
+      {!member && (
+        <section className="rw-settings-section is-wide">
+          <DictationSettings />
+        </section>
+      )}
       <section className="rw-settings-section is-wide">
         <h3>{t('terminal.settings')}</h3>
         <TerminalSettingsForm />

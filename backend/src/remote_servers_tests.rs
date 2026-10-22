@@ -22,6 +22,7 @@ fn server(id: &str) -> RemoteServer {
         ftp_port: 21,
         tls_fingerprint: String::new(),
         ftps_implicit: false,
+        owner_id: String::new(),
     }
 }
 

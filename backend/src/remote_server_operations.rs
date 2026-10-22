@@ -63,8 +63,9 @@ pub(super) async fn check_server(path: web::Path<String>) -> HttpResponse {
 }
 
 pub(super) async fn check_all_servers() -> HttpResponse {
+    // The administrators' fleet; members check their own servers one by one.
     let servers = match load_servers() {
-        Ok(servers) => servers,
+        Ok(servers) => servers.into_iter().filter(|s| !s.member_owned()).collect::<Vec<_>>(),
         Err(error) => return storage_error(error),
     };
     let results: Vec<RemoteServerStatus> =

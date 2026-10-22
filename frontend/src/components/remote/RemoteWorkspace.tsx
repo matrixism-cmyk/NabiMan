@@ -31,14 +31,12 @@ import {
   OverviewView, readPaneState, readSelection, rememberPaneState, rememberSelection, Selection, ServerView,
   sessionLabel,
 } from './workspaceState';
+import { useMember } from './member';
 import './remote-workspace.css';
 
 /**
  * One place for everything remote: the list of things you can connect to on
  * the left, and whatever you are doing with the selected one on the right.
- *
- * It replaces the old split where the server list lived under "원격", the
- * terminal under "시스템", and the fleet summary under "대시보드".
  *
  * A phone shows one half at a time, like an app: the list, then the work
  * full screen with a way back, a key bar under the terminal, and the file
@@ -46,6 +44,7 @@ import './remote-workspace.css';
  */
 export default function RemoteWorkspace() {
   const { t } = useT();
+  const member = useMember();
   const { openTerminal } = useTerminalWindows();
   const viewRef = useRef<TerminalViewHandle>(null);
 
@@ -90,7 +89,7 @@ export default function RemoteWorkspace() {
 
   const selectedServer = selection.kind === 'server' ? servers.find(s => s.id === selection.id) : undefined;
   // A files-only server has no sessions or terminal to open on.
-  const serverView = viewFor(selectedServer, chosenView);
+  const serverView = viewFor(selectedServer, chosenView, member);
 
   // Opening a session list (the fleet's or a target's), or starting a new
   // shell, should show the current state, not whatever the last poll caught.
@@ -99,12 +98,13 @@ export default function RemoteWorkspace() {
       : (selection.kind === 'server' || selection.kind === 'local') && serverView === 'sessions') refetchSessions();
   }, [selection, overviewView, serverView, refetchSessions]);
 
-  // A server deleted elsewhere must not leave the pane pointing at nothing.
+  // Nothing selected that is gone (a deleted server) or not a member's to have.
   useEffect(() => {
-    if (selection.kind === 'server' && servers.length > 0 && !selectedServer) {
+    if ((selection.kind === 'server' && servers.length > 0 && !selectedServer)
+      || (member && (selection.kind === 'local' || selection.kind === 'adhoc'))) {
       setSelection({ kind: 'overview' });
     }
-  }, [selection, servers, selectedServer]);
+  }, [selection, servers, selectedServer, member]);
 
   // A target opens on the sessions already running there, not on a terminal.
   const select = useCallback((next: Selection, view: ServerView = 'sessions') => {
@@ -354,7 +354,7 @@ export default function RemoteWorkspace() {
                   onSaved={async (server) => { await refetchServers(); select({ kind: 'server', id: server.id }, 'settings'); }}
                   onCancel={() => select({ kind: 'overview' })}
                 />
-                <p className="text-secondary">{t('remote.noServersKeyHint')}</p>
+                {!member && <p className="text-secondary">{t('remote.noServersKeyHint')}</p>}
               </div>
             </div>
           )}

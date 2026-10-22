@@ -4,6 +4,7 @@ import type { TerminalStatus, TerminalViewHandle } from '../terminal/TerminalVie
 import SessionNameEdit from '../terminal/SessionNameEdit';
 import AccountDictation from '../terminal/dictation/AccountDictation';
 import Modal from '../../shared/ui/Modal';
+import { useMember } from './member';
 
 interface Props {
   compact: boolean;
@@ -29,6 +30,9 @@ interface Props {
 export default function WorkspaceActions(props: Props) {
   const { t } = useT();
   const { compact, viewRef, terminal } = props;
+  // Sharing is the administrators'; a member's links would not open.
+  const sharing = !useMember();
+  const shareFiles = sharing ? props.onShareFiles : undefined;
   const [sheet, setSheet] = useState(false);
   const statusText = (s: TerminalStatus) => (s === 'connected' ? t('terminal.connected')
     : s === 'reconnecting' ? t('terminal.reconnecting')
@@ -41,8 +45,8 @@ export default function WorkspaceActions(props: Props) {
   if (!compact) {
     return (
       <div className="rw-head-actions">
-        {props.onShareFiles && (
-          <button className="btn btn-secondary btn-sm" onClick={props.onShareFiles}>🔗 {t('share.filesButton')}</button>
+        {shareFiles && (
+          <button className="btn btn-secondary btn-sm" onClick={shareFiles}>🔗 {t('share.filesButton')}</button>
         )}
         {terminal && (
           <>
@@ -52,9 +56,11 @@ export default function WorkspaceActions(props: Props) {
             <button className="btn btn-secondary btn-sm" onClick={props.onDetach} title={t('remote.detachHint')}>⧉ {t('remote.detach')}</button>
             {terminal.sessionId && (<>
               <SessionNameEdit sessionId={terminal.sessionId} onRenamed={props.onRenamed} name={terminal.sessionName} />
-              <button className="btn btn-secondary btn-sm" onClick={props.onShareSession} title={t('share.hint')}>
-                🔗 {t('share.button')}
-              </button>
+              {sharing && (
+                <button className="btn btn-secondary btn-sm" onClick={props.onShareSession} title={t('share.hint')}>
+                  🔗 {t('share.button')}
+                </button>
+              )}
             </>)}
           </>
         )}
@@ -89,13 +95,13 @@ export default function WorkspaceActions(props: Props) {
                   </div>
                 )}
                 <button type="button" className="rw-sheet-item" onClick={run(props.onNewSession)}>＋ {t('terminal.newSession')}</button>
-                {terminal.sessionId && (
+                {terminal.sessionId && sharing && (
                   <button type="button" className="rw-sheet-item" onClick={run(props.onShareSession)}>🔗 {t('share.button')}</button>
                 )}
               </>
             )}
-            {props.onShareFiles && (
-              <button type="button" className="rw-sheet-item" onClick={run(props.onShareFiles)}>🔗 {t('share.filesButton')}</button>
+            {shareFiles && (
+              <button type="button" className="rw-sheet-item" onClick={run(shareFiles)}>🔗 {t('share.filesButton')}</button>
             )}
             <button type="button" className="rw-sheet-item" onClick={run(props.onSettings)}>⚙ {t('terminal.settings')}</button>
             <button type="button" className="rw-sheet-item is-cancel" onClick={run()}>{t('common.close')}</button>

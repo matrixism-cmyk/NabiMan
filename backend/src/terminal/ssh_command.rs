@@ -3,14 +3,19 @@ use super::*;
 /// Resolve the SSH target of a new session: either a saved server (`server_id`,
 /// which may carry a stored password) or explicit host/port/user parameters.
 /// Returns the shell command tmux should run, plus a label for the UI.
+///
+/// `member` is the id of a remote-only member opening it: they may open only
+/// their own saved servers, never a shell on this machine.
 pub(super) fn build_ssh_command(
     query: &str,
     keepalive: bool,
     ka_interval: u64,
+    member: Option<&str>,
 ) -> Result<Option<(String, String, remote_access::RemoteBinding)>, String> {
-    let (host, port, user, password, trust, binding) =
+    let (host, port, user, password, trust, binding, isolation) =
         if let Some(server_id) = parse_query_param(query, "server_id") {
             let srv = crate::remote_servers::find_server(&server_id)?
+                .filter(|s| member.is_none_or(|id| s.owner_id == id))
                 .ok_or_else(|| "Saved server not found".to_string())?;
             match srv.terminal.as_str() {
                 "ssh" => {}
@@ -29,17 +34,21 @@ pub(super) fn build_ssh_command(
             };
             let binding = remote_access::RemoteBinding::from_server(&srv)?;
             let trust = crate::remote_host_trust::shell_options(&srv)?;
-            (srv.host, srv.port.to_string(), srv.user, pw, trust, binding)
+            let host = crate::member_servers::dial_host(&srv, srv.port)?;
+            let isolation = crate::member_servers::ssh_isolation(&srv);
+            (host, srv.port.to_string(), srv.user, pw, trust, binding, isolation)
+        } else if member.is_some() {
+            return Err("원격 전용 회원은 등록한 서버로만 접속할 수 있습니다.".into());
         } else if let Some(host) = parse_query_param(query, "ssh_host") {
             let port = parse_query_param(query, "ssh_port").unwrap_or_else(|| "22".into());
             let user = parse_query_param(query, "ssh_user").unwrap_or_else(|| "root".into());
             let saved = crate::remote_servers::load_servers()?
                 .into_iter()
-                .find(|s| s.terminal == "ssh" && s.host == host && s.port.to_string() == port && s.user == user)
+                .find(|s| s.terminal == "ssh" && s.host == host && s.port.to_string() == port && s.user == user && !s.member_owned())
                 .ok_or("Register and verify this server before opening a terminal")?;
             let binding = remote_access::RemoteBinding::from_server(&saved)?;
             let trust = crate::remote_host_trust::shell_options(&saved)?;
-            (host, port, user, None, trust, binding)
+            (host, port, user, None, trust, binding, &[][..])
         } else {
             return Ok(None);
         };
@@ -57,7 +66,12 @@ pub(super) fn build_ssh_command(
         let path = pw_file.delete_after(PW_FILE_TTL_SECS);
         cmd.push_str(&format!("sshpass -f {} ", path));
     }
-    cmd.push_str(&format!("ssh {} ", trust));
+    cmd.push_str("ssh ");
+    for opt in isolation {
+        cmd.push_str(opt);
+        cmd.push(' ');
+    }
+    cmd.push_str(&format!("{} ", trust));
     if using_saved_password {
         // Go straight to password auth. Offering keys first can exhaust the
         // server's MaxAuthTries before the password is ever tried, which the
@@ -134,7 +148,8 @@ fn build_telnet_command(
         return Err("Invalid Telnet params".into());
     }
     let skip = parse_query_param(query, "no_saved_password").is_some_and(|v| v == "1");
-    let mut cmd = format!("{} --host {} --port {} --user {}", telnet_client()?, quote(&srv.host), srv.port, quote(&srv.user));
+    let host = crate::member_servers::dial_host(srv, srv.port)?;
+    let mut cmd = format!("{} --host {} --port {} --user {}", telnet_client()?, quote(&host), srv.port, quote(&srv.user));
     let password = if skip { None } else { crate::remote_servers::server_password(srv) };
     if let Some(pw) = password {
         let pw_file = ssh_auth::write_password_file(&pw)?;

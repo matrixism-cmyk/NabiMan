@@ -92,6 +92,7 @@ pub(super) fn source_role(user: &NabimanUser, tenant: &str, remote_role: &str) -
         UserRole::Viewer => remote_role == "read-only",
         UserRole::Operator => ["read-only", "project-member"].contains(&remote_role),
         UserRole::Admin => ["read-only", "project-member", "project-owner"].contains(&remote_role),
+        UserRole::Remote => false,
     };
     permitted.then(|| membership.role.as_str().into())
 }

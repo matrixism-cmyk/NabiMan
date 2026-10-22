@@ -34,6 +34,7 @@ fn server_record(public_key: String, fingerprint: String, port: u16) -> RemoteSe
         ftp_port: 21,
         tls_fingerprint: String::new(),
         ftps_implicit: false,
+        owner_id: String::new(),
     }
 }
 

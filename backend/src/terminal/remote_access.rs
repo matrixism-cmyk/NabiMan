@@ -91,6 +91,22 @@ pub(crate) fn allowed(session: &super::session::TmuxSession) -> bool {
     }
 }
 
+/// Whether `user` may see and use `session`: anyone who could before, except
+/// that a remote-only member gets only their own sessions on their own
+/// servers — not one on this machine, nor anybody else's shared one.
+pub(crate) fn member_may_use(user: &crate::models::NabimanUser, session: &super::session::TmuxSession) -> bool {
+    if !crate::member_servers::is_member(user) {
+        return true;
+    }
+    session.owned_by(&user.id)
+        && session.remote_binding.as_ref().is_some_and(|b| {
+            crate::remote_servers::find_server(&b.server_id)
+                .ok()
+                .flatten()
+                .is_some_and(|s| s.owner_id == user.id)
+        })
+}
+
 pub(crate) fn attachment_allowed(store: &super::session::PtyStore, id: &str, name: &str) -> bool {
     let session = store.lock().ok().and_then(|map| map.get(id).cloned());
     session.is_some_and(|session| session.tmux_name == name && allowed(&session))

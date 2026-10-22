@@ -30,6 +30,9 @@ pub fn permission(user: &NabimanUser, method: &str, path: &str) -> bool {
     if user.super_admin() {
         return true;
     }
+    if crate::member_servers::is_member(user) {
+        return crate::member_servers::permitted(user, method, path);
+    }
     if let Some(rest) = path.strip_prefix("/api/scope-settings/") {
         let parts: Vec<_> = rest.split('/').collect();
         if parts.len() != 2 && !(parts.len() == 3 && parts[2] == "history" && method == "GET") {

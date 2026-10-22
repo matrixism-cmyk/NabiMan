@@ -18,8 +18,9 @@ fn line(protocol: &str, result: Result<String, String>) -> ProtocolCheck {
     }
 }
 
-async fn tcp(host: &str, port: u16) -> Result<String, String> {
-    match tokio::time::timeout(Duration::from_secs(5), tokio::net::TcpStream::connect((host, port))).await {
+async fn tcp(server: &RemoteServer, port: u16) -> Result<String, String> {
+    let host = crate::member_servers::dial_host(server, port)?;
+    match tokio::time::timeout(Duration::from_secs(5), tokio::net::TcpStream::connect((host.as_str(), port))).await {
         Ok(Ok(_)) => Ok(format!("Port {port} answers")),
         Ok(Err(e)) => Err(format!("Cannot reach port {port}: {e}")),
         Err(_) => Err(format!("Port {port} did not answer")),
@@ -61,7 +62,7 @@ pub(crate) async fn probe(server: &RemoteServer) -> RemoteServerStatus {
             checks.push(ProtocolCheck { protocol: "ssh".into(), ok, message: if ok { "Shell available".into() } else { status.hostname.clone() } });
             measured = Some(status);
         }
-        "telnet" => checks.push(line("telnet", tcp(&server.host, server.port).await)),
+        "telnet" => checks.push(line("telnet", tcp(server, server.port).await)),
         _ => {}
     }
     match server.files.as_str() {
@@ -130,7 +131,7 @@ pub(super) async fn detect(path: web::Path<String>) -> HttpResponse {
         checks.push(line("ssh", Err("Approve the host key first".into())));
     }
     if server.terminal == "telnet" {
-        checks.push(line("telnet", tcp(&server.host, server.port).await));
+        checks.push(line("telnet", tcp(&server, server.port).await));
     }
     if server.uses_ftp() {
         checks.push(line(&server.files, ftp::check(&server).await.map(|_| "Logged in".into())));

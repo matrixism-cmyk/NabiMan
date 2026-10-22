@@ -11,6 +11,7 @@ pub(crate) fn extension_points() -> ExtensionPoints {
         public_prefixes: vec!["/api/share/"],
         url_passes: vec![crate::terminal_tickets::url_pass, crate::terminal::sftp::links::url_pass],
         report_parts: vec![("terminal_registry", report::terminals), ("server_inventory", report::servers)],
-        server_exists: Some(|id| crate::remote_servers::find_server(id).map(|s| s.is_some())),
+        // A member's own server is theirs alone, not something to grant others.
+        server_exists: Some(|id| crate::remote_servers::find_server(id).map(|s| s.is_some_and(|s| !s.member_owned()))),
     }
 }

@@ -26,19 +26,27 @@ pub(crate) fn ssh_invocation(
 ) -> Result<(Command, Option<ssh_auth::PwFile>), String> {
     let trust = crate::remote_host_trust::options(srv)?;
     let port = srv.port.to_string();
-    let target = format!("{}@{}", srv.user, srv.host);
+    let target = format!("{}@{}", srv.user, crate::member_servers::dial_host(srv, srv.port)?);
     let timeout = format!("ConnectTimeout={}", connect_timeout);
+    let isolation = crate::member_servers::ssh_isolation(srv);
 
     let password = server_password(srv);
     if let Some(pw) = password {
         let pw_file = ssh_auth::write_password_file(&pw)?;
         let mut cmd = Command::new("sshpass");
-        cmd.args(["-f", pw_file.path(), "ssh", "-o", &timeout]);
+        cmd.args(["-f", pw_file.path(), "ssh"]);
+        cmd.args(isolation);
+        cmd.args(["-o", &timeout]);
         cmd.args(&trust);
         cmd.args(ssh_auth::password_auth_opts());
         cmd.args(extra);
         cmd.args(["-p", &port, &target, remote_cmd]);
         return Ok((cmd, Some(pw_file)));
+    }
+    if srv.member_owned() {
+        // Without a password there is nothing a member's server can be
+        // logged into with: this machine's own keys are not theirs to use.
+        return Err("서버 편집에서 비밀번호를 저장해야 확인하거나 파일을 열 수 있습니다".into());
     }
 
     let mut cmd = Command::new("ssh");

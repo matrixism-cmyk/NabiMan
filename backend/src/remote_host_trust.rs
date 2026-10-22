@@ -48,7 +48,13 @@ pub async fn update(
         Ok(actor) => actor,
         Err(r) => return r,
     };
-    if !actor.super_admin() && !actor.manages(&crate::models::ScopeKind::Server, &path) {
+    // A remote-only member looks after the servers they registered.
+    let own = crate::member_servers::is_member(&actor)
+        && crate::remote_servers::find_server(&path)
+            .ok()
+            .flatten()
+            .is_some_and(|s| s.owner_id == actor.id);
+    if !actor.super_admin() && !own && !actor.manages(&crate::models::ScopeKind::Server, &path) {
         return HttpResponse::Forbidden().json(ApiResponse::<()>::error(
             "Host trust requires a server administrator",
         ));
