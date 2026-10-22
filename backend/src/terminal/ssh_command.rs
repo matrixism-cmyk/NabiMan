@@ -4,18 +4,18 @@ use super::*;
 /// which may carry a stored password) or explicit host/port/user parameters.
 /// Returns the shell command tmux should run, plus a label for the UI.
 ///
-/// `member` is the id of a remote-only member opening it: they may open only
-/// their own saved servers, never a shell on this machine.
+/// `member` is a remote-only member opening it: they may open only their own
+/// and their assigned saved servers, never a shell on this machine.
 pub(super) fn build_ssh_command(
     query: &str,
     keepalive: bool,
     ka_interval: u64,
-    member: Option<&str>,
+    member: Option<&crate::models::NabimanUser>,
 ) -> Result<Option<(String, String, remote_access::RemoteBinding)>, String> {
     let (host, port, user, password, trust, binding, isolation) =
         if let Some(server_id) = parse_query_param(query, "server_id") {
             let srv = crate::remote_servers::find_server(&server_id)?
-                .filter(|s| member.is_none_or(|id| s.owner_id == id))
+                .filter(|s| member.is_none_or(|m| crate::member_servers::usable(m, s)))
                 .ok_or_else(|| "Saved server not found".to_string())?;
             match srv.terminal.as_str() {
                 "ssh" => {}

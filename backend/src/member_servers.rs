@@ -1,35 +1,53 @@
 //! Remote-only members (role `remote`) and the servers they register.
 //!
 //! A member sees the remote workspace and nothing else, and in it only the
-//! servers they added themselves: never the administrators' servers, never
-//! this machine's own shell or files. Their servers are reached with the
-//! password they gave, never with NabiMan's SSH key or this machine's ssh
-//! settings, and only at a public address: not this machine, nor the network
-//! it sits in.
+//! servers they added themselves and those an administrator assigned them
+//! (a server membership, with its on/off switch and expiry): never this
+//! machine's own shell or files.
+//!
+//! Their own servers are reached with the password they gave, never with
+//! NabiMan's SSH key or this machine's ssh settings, and only at a public
+//! address: not this machine, nor the network it sits in. An assigned server
+//! is reached the way the administrators set it up, but a member only works
+//! on it — a terminal, its files, a check — and never edits it.
 
 use std::net::{IpAddr, ToSocketAddrs};
 
-use actix_web::HttpRequest;
+use actix_web::{web, HttpRequest};
 
-use crate::models::{NabimanUser, RemoteServer, UserRole};
+use crate::models::{NabimanUser, RemoteServer, ScopeKind, UserRole};
 
 pub fn is_member(user: &NabimanUser) -> bool {
     user.role == UserRole::Remote
 }
 
-/// Whether `server` shows in `user`'s lists: a member's own servers for that
-/// member, the shared ones for everyone else.
+/// An administrators' server assigned to `user`, switched on and not expired.
+pub fn assigned(user: &NabimanUser, server: &RemoteServer) -> bool {
+    !server.member_owned()
+        && user
+            .memberships
+            .iter()
+            .any(|m| m.kind == ScopeKind::Server && m.scope_id == server.id && m.accessible())
+}
+
+/// Whether `server` shows in `user`'s lists: a member's own and assigned
+/// servers for that member, the shared ones for everyone else.
 pub fn listed(user: &NabimanUser, server: &RemoteServer) -> bool {
     if is_member(user) {
-        server.owner_id == user.id
+        usable(user, server)
     } else {
         !server.member_owned()
     }
 }
 
-/// Whether `user` may use `server`. An administrator can still reach a
-/// member's server by its id; a member only their own.
+/// Whether `user` may work on `server`: a terminal, its files, a check. An
+/// administrator can still reach a member's server by its id.
 pub fn usable(user: &NabimanUser, server: &RemoteServer) -> bool {
+    !is_member(user) || server.owner_id == user.id || assigned(user, server)
+}
+
+/// Whether `user` may change or delete `server`: a member only their own.
+pub fn manageable(user: &NabimanUser, server: &RemoteServer) -> bool {
     !is_member(user) || server.owner_id == user.id
 }
 
@@ -37,17 +55,20 @@ pub fn usable(user: &NabimanUser, server: &RemoteServer) -> bool {
 /// this machine's own.
 pub fn request_may_use(req: &HttpRequest, server: Option<&RemoteServer>) -> bool {
     match (crate::auth::verified_role(req), crate::auth::verified_user_id(req)) {
-        (Some(UserRole::Remote), Some(id)) => server.is_some_and(|s| s.owner_id == id),
+        (Some(UserRole::Remote), Some(id)) => server.is_some_and(|s| {
+            s.owner_id == id
+                || req
+                    .app_data::<web::Data<crate::users::UserStore>>()
+                    .and_then(|users| users.lock().ok()?.iter().find(|u| u.id == id).cloned())
+                    .is_some_and(|u| assigned(&u, s))
+        }),
         (Some(_), Some(_)) => true,
         _ => false,
     }
 }
 
-fn owns(user: &NabimanUser, id: &str) -> bool {
-    crate::remote_servers::find_server(id)
-        .ok()
-        .flatten()
-        .is_some_and(|s| s.owner_id == user.id)
+fn server(id: &str) -> Option<RemoteServer> {
+    crate::remote_servers::find_server(id).ok().flatten()
 }
 
 /// What a member may call: their account, the terminal and its files, and
@@ -96,19 +117,20 @@ pub fn permitted(user: &NabimanUser, method: &str, path: &str) -> bool {
     }
     if let Some(rest) = path.strip_prefix("/api/terminal/sftp/") {
         let id = rest.split('/').next().unwrap_or("");
-        return owns(user, id);
+        return server(id).is_some_and(|s| usable(user, &s));
     }
     if let Some(rest) = path.strip_prefix("/api/remote-servers/") {
         let mut parts = rest.split('/');
         let id = parts.next().unwrap_or("");
         let action = parts.next();
-        if parts.next().is_some() || !owns(user, id) {
+        let Some(s) = server(id).filter(|_| parts.next().is_none()) else {
             return false;
-        }
+        };
         return match action {
-            None => matches!(method, "PUT" | "DELETE"),
-            Some("host-trust") => method == "PUT",
-            Some("check" | "detect") => method == "POST",
+            None => matches!(method, "PUT" | "DELETE") && manageable(user, &s),
+            Some("host-trust") => method == "PUT" && manageable(user, &s),
+            Some("detect" | "host-key") => method == "POST" && manageable(user, &s),
+            Some("check") => method == "POST" && usable(user, &s),
             Some(_) => false,
         };
     }
@@ -237,6 +259,24 @@ mod tests {
         assert!(!listed(&m, &someone_elses) && !usable(&m, &someone_elses));
         assert!(listed(&admin, &shared) && !listed(&admin, &own));
         assert!(usable(&admin, &own));
+    }
+
+    #[test]
+    fn an_assigned_server_is_used_but_never_edited_and_ends_with_its_assignment() {
+        let mut m = member();
+        let shared = server("", "example.com");
+        m.memberships = vec![serde_json::from_value(serde_json::json!({
+            "kind": "server", "scope_id": "srv", "role": "viewer"
+        }))
+        .unwrap()];
+        assert!(listed(&m, &shared) && usable(&m, &shared) && !manageable(&m, &shared));
+        // Assigning someone else's own server gives nothing.
+        assert!(!usable(&m, &server("m2", "example.com")));
+        m.memberships[0].enabled = false;
+        assert!(!listed(&m, &shared) && !usable(&m, &shared));
+        m.memberships[0].enabled = true;
+        m.memberships[0].expires_at = Some("2000-01-01T00:00:00Z".into());
+        assert!(!usable(&m, &shared));
     }
 
     #[test]

@@ -70,8 +70,9 @@ export default function UserManagementPanel({ initialScope = '' }: { initialScop
     {superAdmin && identityUser && <ExternalIdentityEditor key={identityUser.id} user={identityUser} onClose={() => setIdentityUser(null)} />}
     {inspection && <TenantAccessInspection key={`${inspection.tenantId}:${inspection.userId}`} {...inspection} onClose={() => setInspection(null)} onInspected={refetch} />}
     {editing && <div className="inline-form">
-      <h3>{editing.username} · 승인 및 소속 설정</h3>
-      <MembershipEditor options={options} value={draft} onChange={setDraft} />
+      <h3>{editing.username} · {editing.role === 'remote' ? '승인 및 지정 서버 설정' : '승인 및 소속 설정'}</h3>
+      {editing.role === 'remote' && <p>원격 전용 회원은 본인이 등록한 서버와 여기서 지정한 서버를 원격 메뉴에서 씁니다. 지정한 서버는 터미널·파일·상태 확인만 할 수 있고, 수정·삭제·명령 실행은 할 수 없습니다. 접속은 관리자가 설정한 방식(SSH 키·저장된 비밀번호)으로 이루어집니다.</p>}
+      <MembershipEditor options={options} value={draft} onChange={setDraft} remote={editing.role === 'remote'} />
       <div className="btn-group">
         <button className="btn btn-primary" disabled={busy} onClick={() => review(editing, 'active', draft)}>승인하고 저장</button>
         <button className="btn btn-secondary" disabled={busy} onClick={() => setEditing(null)}>취소</button>
@@ -98,14 +99,14 @@ export default function UserManagementPanel({ initialScope = '' }: { initialScop
               act(() => apiRequest(`/api/users/${u.id}`, { method: 'PUT', body: JSON.stringify({ role: nextRole }) }));
             }}>
             <option value="viewer">일반 회원 (소속별 권한 적용)</option>
-            <option value="remote">원격 전용 회원 (원격 메뉴만, 본인이 등록한 서버만)</option>
+            <option value="remote">원격 전용 회원 (원격 메뉴만, 본인 서버와 지정 서버)</option>
             {u.role === 'operator' && <option value="operator">기존 운영자</option>}
             <option value="admin">최고관리자</option>
           </select>}
         </td>
         <td>{statusLabel[u.status]}</td>
         <td>{u.memberships.map(m => <div key={`${m.kind}:${m.scope_id}`}>
-          {options.find(s => s.kind === m.kind && s.id === m.scope_id)?.label || m.scope_id} · {membershipRole[m.role]}
+          {options.find(s => s.kind === m.kind && s.id === m.scope_id)?.label || m.scope_id} · {u.role === 'remote' ? '지정 서버' : membershipRole[m.role]}
           <span> · {accessActive(m) ? '접근 허용' : '접근 차단'}{m.kind === 'server' && m.role !== 'viewer' && m.allow_exec === false ? ' · 명령 실행 차단' : ''}{m.expires_at ? ` · 만료 ${new Date(m.expires_at).toLocaleString()}` : ''}</span>
           {m.kind === 'tenant' && (superAdmin || u.id !== me?.id && m.role !== 'admin' && manageable.some(s => s.kind === 'tenant' && s.id === m.scope_id)) && <button className="btn btn-sm btn-secondary" onClick={() => setInspection({ tenantId: m.scope_id, userId: u.id })}>실제 접근 확인</button>}
           {!superAdmin && u.id !== me?.id && m.role !== 'admin' && manageable.some(s => s.kind === m.kind && s.id === m.scope_id) && <>
@@ -116,10 +117,10 @@ export default function UserManagementPanel({ initialScope = '' }: { initialScop
             <button className="btn btn-sm btn-secondary" disabled={busy} onClick={() => setAccessEdit({ user: u, membership: { ...m } })}>접근 설정</button>
             <button className="btn btn-sm btn-secondary" disabled={busy} onClick={() => changeMember(u.username, m, true)}>소속 해제</button>
           </>}
-        </div>)}{u.memberships.length === 0 && (u.role === 'admin' ? '서비스 전체' : u.role === 'remote' ? '원격 메뉴만' : u.scope_restricted ? '소속 미지정' : '기존 서비스 권한')}</td>
+        </div>)}{u.memberships.length === 0 && (u.role === 'admin' ? '서비스 전체' : u.role === 'remote' ? '원격 메뉴만 (본인 서버)' : u.scope_restricted ? '소속 미지정' : '기존 서비스 권한')}</td>
         <td>{superAdmin && <div className="btn-group">
           {u.status === 'active' && <button className="btn btn-sm btn-secondary" disabled={busy} onClick={() => setIdentityUser(u)}>Rancher 계정 연결</button>}
-          <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => { setEditing(u); setDraft(u.status === 'pending' ? u.requested_memberships : u.memberships); }}>소속 설정{u.status === 'pending' ? ' / 승인' : ''}</button>
+          <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => { setEditing(u); setDraft(u.status === 'pending' ? u.requested_memberships : u.memberships); }}>{u.role === 'remote' ? '서버 지정' : '소속 설정'}{u.status === 'pending' ? ' / 승인' : ''}</button>
           {u.status === 'pending' && <button className="btn btn-sm btn-secondary" disabled={busy} onClick={() => review(u, 'rejected', [])}>반려</button>}
           {u.status === 'active' && u.id !== me?.id && <button className="btn btn-sm btn-secondary" disabled={busy} onClick={() => review(u, 'suspended')}>이용 정지</button>}
           {u.id !== me?.id && <button className="btn btn-sm btn-danger" disabled={busy} onClick={async () => {

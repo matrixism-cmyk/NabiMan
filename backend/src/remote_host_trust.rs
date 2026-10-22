@@ -120,6 +120,50 @@ pub async fn update(
     HttpResponse::Ok().json(ApiResponse::ok(response))
 }
 
+/// The key the server itself presents, read with ssh-keyscan, to fill in the
+/// form: nothing is trusted until someone compares the fingerprint and
+/// registers it. A member's server is asked at its checked public address.
+pub async fn scan(
+    req: HttpRequest,
+    path: web::Path<String>,
+    users: web::Data<crate::users::UserStore>,
+) -> HttpResponse {
+    let actor = match crate::membership::actor(&req, &users) {
+        Ok(actor) => actor,
+        Err(r) => return r,
+    };
+    let server = match crate::remote_servers::find_server(&path) {
+        Ok(Some(s)) if crate::member_servers::manageable(&actor, &s) => s,
+        Ok(_) => return HttpResponse::NotFound().json(ApiResponse::<()>::error("Server not found")),
+        Err(e) => return HttpResponse::InternalServerError().json(ApiResponse::<()>::error(&e)),
+    };
+    let found = web::block(move || {
+        let host = crate::member_servers::dial_host(&server, server.port)?;
+        let out = std::process::Command::new("ssh-keyscan")
+            .args(["-T", "8", "-t", "ed25519,ecdsa,rsa", "-p", &server.port.to_string(), "--", &host])
+            .output()
+            .map_err(|_| "Cannot run ssh-keyscan".to_string())?;
+        let text = String::from_utf8_lossy(&out.stdout);
+        let keys: Vec<_> = text
+            .lines()
+            .filter(|l| !l.starts_with('#'))
+            .filter_map(|l| parse_key(&l.split_whitespace().skip(1).collect::<Vec<_>>().join(" ")).ok())
+            .collect();
+        // The strongest kind the server offers, as ssh itself would prefer.
+        ["ssh-ed25519", "ecdsa", "rsa"]
+            .iter()
+            .find_map(|kind| keys.iter().find(|(k, _)| k.contains(kind)).cloned())
+            .ok_or_else(|| format!("{}:{} 에서 SSH 호스트 키를 받지 못했습니다", server.host, server.port))
+    })
+    .await;
+    match found {
+        Ok(Ok((public_key, fingerprint))) => HttpResponse::Ok()
+            .json(ApiResponse::ok(serde_json::json!({ "public_key": public_key, "fingerprint": fingerprint }))),
+        Ok(Err(e)) => HttpResponse::Ok().json(ApiResponse::<()>::error(&e)),
+        Err(_) => HttpResponse::InternalServerError().json(ApiResponse::<()>::error("The scan stopped unexpectedly")),
+    }
+}
+
 /// Each immutable trust version has its own known_hosts file. Existing sessions
 /// retain their version; live revocation must separately bind the approval generation.
 /// New sessions use current trust. No global TOFU fallback.

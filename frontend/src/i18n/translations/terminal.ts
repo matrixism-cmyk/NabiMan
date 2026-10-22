@@ -15,6 +15,9 @@ const t: T = {
   'remote.trust.unverified': { ko: "미확인 — SSH 접속 차단", en: "Unverified \u2014 SSH connections blocked", ja: "未確認 — SSH 接続をブロック" },
   'remote.trust.verified': { ko: "확인자", en: "Verified by", ja: "確認者" },
   'remote.trust.required': { ko: "공개키, 지문, 확인 사유를 입력하세요.", en: "Enter the public key, fingerprint and verification reason.", ja: "公開鍵、指紋、確認理由を入力してください。" },
+  'remote.trust.fetch': { ko: "서버에서 키 가져오기", en: "Fetch the key from the server", ja: "サーバーから鍵を取得" },
+  'remote.trust.fetched': { ko: "서버가 보낸 키를 채웠습니다. 지문 {fingerprint} 이(가) 서버의 지문과 같은지 확인한 뒤 등록하세요.", en: "Filled in the key the server sent. Check that {fingerprint} is the server's fingerprint, then register it.", ja: "サーバーが送った鍵を入力しました。指紋 {fingerprint} がサーバーのものと同じか確認してから登録してください。" },
+  'remote.trust.fetchedReason': { ko: "서버에서 직접 가져온 키", en: "Key fetched from the server", ja: "サーバーから直接取得した鍵" },
   'remote.trust.success': { ko: "서버 신뢰 설정을 저장했습니다.", en: "Host trust saved.", ja: "ホストの信頼を保存しました。" },
 
   // --- Saved passwords on remote servers ---
@@ -253,6 +256,7 @@ const t: T = {
     en: 'Summary, sessions, links, SSH key, settings',
     ja: '要約・セッション・リンク・SSH鍵・設定',
   },
+  'remote.assigned': { ko: '관리자 지정', en: 'Assigned', ja: '管理者指定' },
   'remote.overviewHintMember': { ko: '요약 · 세션 · 설정', en: 'Summary, sessions, settings', ja: '要約・セッション・設定' },
   'remote.serversGroup': { ko: '서버', en: 'Servers', ja: 'サーバー' },
   'remote.otherGroup': { ko: '기타', en: 'Other', ja: 'その他' },

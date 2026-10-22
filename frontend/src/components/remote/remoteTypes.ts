@@ -19,6 +19,8 @@ export interface RemoteServer {
   /** True when an SSH password is stored (encrypted) for this server. */
   has_password?: boolean;
   host_trust_version?: string;
+  /** The remote-only member who registered it; empty for the administrators' servers. */
+  owner_id?: string;
   host_trust?: { public_key: string; fingerprint: string; verified_by: string; verified_at: string; reason: string } | null;
   /** How a terminal reaches it; records from before this are SSH. */
   terminal?: 'ssh' | 'telnet' | 'none';

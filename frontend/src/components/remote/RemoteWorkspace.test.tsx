@@ -301,6 +301,12 @@ describe('remote workspace', () => {
 
     fireEvent.click(itemByName('web-prod-01'));
     expect(tabs().queryByRole('button', { name: '실행' })).toBeNull();
-    expect(openMenuOn('web-prod-01').queryByText('원격 실행')).toBeNull();
+    // An administrators' server assigned to them: worked on, never edited.
+    expect(within(itemByName('web-prod-01')).getByText('관리자 지정')).toBeInTheDocument();
+    expect(tabs().queryByRole('button', { name: '환경설정' })).toBeNull();
+    const menu = openMenuOn('web-prod-01');
+    expect(menu.queryByText('원격 실행')).toBeNull();
+    expect(menu.queryByRole('menuitem', { name: '삭제' })).toBeNull();
+    expect(menu.getByRole('menuitem', { name: '연결' })).toBeInTheDocument();
   });
 });

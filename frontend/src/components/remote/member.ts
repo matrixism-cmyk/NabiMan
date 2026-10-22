@@ -10,3 +10,6 @@ import { createContext, useContext } from 'react';
 export const MemberContext = createContext(false);
 
 export const useMember = () => useContext(MemberContext);
+
+/** For a member, a server an administrator assigned them: theirs to work on, not to edit. */
+export const assignedTo = (member: boolean, server?: { owner_id?: string }) => member && Boolean(server) && !server?.owner_id;

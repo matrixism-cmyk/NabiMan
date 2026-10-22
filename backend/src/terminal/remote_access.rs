@@ -92,8 +92,9 @@ pub(crate) fn allowed(session: &super::session::TmuxSession) -> bool {
 }
 
 /// Whether `user` may see and use `session`: anyone who could before, except
-/// that a remote-only member gets only their own sessions on their own
-/// servers — not one on this machine, nor anybody else's shared one.
+/// that a remote-only member gets only their own sessions on servers they may
+/// use — not one on this machine, nor anybody else's shared one. An assignment
+/// switched off or expired ends them.
 pub(crate) fn member_may_use(user: &crate::models::NabimanUser, session: &super::session::TmuxSession) -> bool {
     if !crate::member_servers::is_member(user) {
         return true;
@@ -103,7 +104,7 @@ pub(crate) fn member_may_use(user: &crate::models::NabimanUser, session: &super:
             crate::remote_servers::find_server(&b.server_id)
                 .ok()
                 .flatten()
-                .is_some_and(|s| s.owner_id == user.id)
+                .is_some_and(|s| crate::member_servers::usable(user, &s))
         })
 }
 

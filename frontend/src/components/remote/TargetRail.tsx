@@ -8,7 +8,7 @@ import {
   addressOf, hasFiles, hasShell, hasTerminal, matchesProtocol, PROTOCOL_FILTERS, protocolName, protocolsOf, ProtocolFilter,
 } from './protocols';
 import { RailAction, Selection } from './workspaceState';
-import { useMember } from './member';
+import { assignedTo, useMember } from './member';
 
 interface Props {
   /** A phone: no floating windows, and a long press opens the menu. */
@@ -97,8 +97,10 @@ export default function TargetRail({
         { key: 'status', icon: '◔', label: t('remote.statusView'), separated: items.length > 0, onSelect: run('status') },
         ...(hasShell(target.server) && !member ? [{ key: 'exec', icon: '›', label: t('remote.menuExec'), onSelect: run('exec') }] : []),
         { key: 'check', icon: '↻', label: t('remote.menuCheck'), onSelect: run('check') },
-        { key: 'edit', icon: '✎', label: t('remote.menuEdit'), separated: true, onSelect: run('edit') },
-        { key: 'delete', icon: '✕', label: t('common.delete'), danger: true, onSelect: run('delete') },
+        ...(assignedTo(member, target.server) ? [] : [
+          { key: 'edit', icon: '✎', label: t('remote.menuEdit'), separated: true, onSelect: run('edit') },
+          { key: 'delete', icon: '✕', label: t('common.delete'), danger: true, onSelect: run('delete') },
+        ]),
       );
     }
     return items;
@@ -184,7 +186,8 @@ export default function TargetRail({
                 <span className={`rw-lamp rw-lamp-${state}`} />
                 <span className="rw-item-name">{server.name}</span>
                 {count > 0 && <span className="rw-item-count" title={t('remote.liveSessions')}>{count}</span>}
-                <span className="rw-item-sub"><ProtocolBadges server={server} />{addressOf(server)}</span>
+                <span className="rw-item-sub"><ProtocolBadges server={server} />{addressOf(server)}
+                  {assignedTo(member, server) && <span className="tag-badge rw-assigned">{t('remote.assigned')}</span>}</span>
               </button>
             );
           })}

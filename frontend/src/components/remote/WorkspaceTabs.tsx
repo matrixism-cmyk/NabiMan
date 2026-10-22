@@ -3,7 +3,7 @@ import { RemoteServer } from './remoteTypes';
 import { useT } from '../../shared/i18n';
 import { hasFiles, hasShell, hasTerminal } from './protocols';
 import { OverviewView, Selection, ServerView } from './workspaceState';
-import { useMember } from './member';
+import { assignedTo, useMember } from './member';
 
 interface Props {
   selection: Selection;
@@ -56,7 +56,7 @@ export default function WorkspaceTabs({
           {!hasTerminal(server) && hasFiles(server) && tab('files', t('sftp.tab'))}
           {tab('status', t('remote.statusView'))}
           {hasShell(server) && !member && tab('exec', t('remote.exec'))}
-          {tab('settings', t('common.settings'))}
+          {!assignedTo(member, server) && tab('settings', t('common.settings'))}
         </>
       )}
     </nav>
@@ -72,5 +72,6 @@ export function viewFor(server: RemoteServer | undefined, view: ServerView, memb
   if ((view === 'sessions' || view === 'terminal') && !hasTerminal(server)) return hasFiles(server) ? 'files' : 'status';
   if (view === 'files' && (hasTerminal(server) || !hasFiles(server))) return hasTerminal(server) ? 'terminal' : 'status';
   if (view === 'exec' && (member || !hasShell(server))) return 'status';
+  if (view === 'settings' && assignedTo(member, server)) return 'status';
   return view;
 }

@@ -190,9 +190,9 @@ async fn ws_terminal(
         .unwrap()
         .iter()
         .find(|u| u.id == grant.user_id && crate::member_servers::is_member(u))
-        .map(|u| u.id.clone());
+        .cloned();
     let (shell_cmd, label, remote_binding) =
-        match build_ssh_command(query, keepalive, user_settings.keepalive_interval_secs, member.as_deref()) {
+        match build_ssh_command(query, keepalive, user_settings.keepalive_interval_secs, member.as_ref()) {
             Ok(Some((cmd, label, binding))) => (Some(cmd), label, Some(binding)),
             Ok(None) => (None, "local".to_string(), None),
             // A target we cannot resolve (deleted server, bad parameters) is
