@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import DictationButton from './DictationButton';
 import { DictationSetup, dictationSetup, openAccountDictation } from './sockets';
 import { useSessionEntry } from '../sessionSettings';
+import type { useVoiceReply } from './useVoiceReply';
 
 interface Props {
   onText: (text: string) => void;
@@ -9,6 +10,8 @@ interface Props {
   variant?: 'head' | 'bar';
   /** The session dictated into: its own pause and Enter, over the server's. */
   sessionId?: string;
+  /** Reads the last answer aloud when it is asked for. */
+  reply?: ReturnType<typeof useVoiceReply>;
 }
 
 /** The microphone for a signed-in account's terminal, once dictation is set up. */

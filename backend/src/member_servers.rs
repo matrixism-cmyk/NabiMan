@@ -145,6 +145,7 @@ pub fn permitted(user: &NabimanUser, method: &str, path: &str) -> bool {
                 | "/api/auth/2fa/verify-setup"
                 | "/api/auth/2fa/disable"
                 | "/api/terminal/tickets"
+                | "/api/terminal/dictation/speak"
                 | "/api/terminal/copies"
                 | "/api/remote-servers"
         ),

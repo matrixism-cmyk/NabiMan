@@ -194,6 +194,9 @@ pub(crate) fn config(cfg: &mut web::ServiceConfig) {
         .route("/api/terminal/claude/settings", web::put().to(put_settings))
         .route("/api/terminal/claude/test", web::post().to(test))
         .route("/api/terminal/claude/speak", web::post().to(speak))
+        // A terminal's answer read aloud when dictation asks for it ("음성으로
+        // 대답해줘"): the same voice, open to whoever may dictate.
+        .route("/api/terminal/dictation/speak", web::post().to(speak))
         .route("/api/terminal/claude/chats", web::get().to(chats::list))
         .route("/api/terminal/claude/chats", web::post().to(chats::create))
         .route("/api/terminal/claude/chats/{id}", web::get().to(chats::get))

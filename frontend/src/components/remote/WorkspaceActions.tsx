@@ -3,6 +3,7 @@ import { useT } from '../../shared/i18n';
 import type { TerminalStatus, TerminalViewHandle } from '../terminal/TerminalView';
 import SessionNameEdit from '../terminal/SessionNameEdit';
 import AccountDictation from '../terminal/dictation/AccountDictation';
+import { useVoiceReply } from '../terminal/dictation/useVoiceReply';
 import Modal from '../../shared/ui/Modal';
 import { useSharing } from './member';
 
@@ -38,8 +39,10 @@ export default function WorkspaceActions(props: Props) {
   const statusText = (s: TerminalStatus) => (s === 'connected' ? t('terminal.connected')
     : s === 'reconnecting' ? t('terminal.reconnecting')
     : s === 'ended' ? t('terminal.sessionEnded') : t('terminal.disconnected'));
+  // "음성으로 대답해줘": the pane's answer, read aloud once it is over.
+  const reply = useVoiceReply(viewRef, terminal?.sessionId || undefined);
   const dictation = terminal && (
-    <AccountDictation variant={compact ? 'bar' : 'head'} sessionId={terminal?.sessionId || undefined}
+    <AccountDictation variant={compact ? 'bar' : 'head'} sessionId={terminal?.sessionId || undefined} reply={reply}
       onText={(text) => viewRef.current?.insertText(text)} onKeys={(keys) => viewRef.current?.sendKeys(keys)} />
   );
 

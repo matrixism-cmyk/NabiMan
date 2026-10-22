@@ -48,3 +48,9 @@
 .dictation-settings .voice-status.is-missing { color: var(--warning); }
 .dictation-settings .form-group .text-warning { display: block; font-size: 12px; }
 
+/* "음성으로 대답해줘": waiting for the answer, or reading it, with a way to stop. */
+.dictation-reply { display: inline-flex; align-items: center; gap: 6px; }
+.dictation-reply-stop {
+  border: 0; border-radius: 4px; padding: 0 6px; line-height: 18px; cursor: pointer;
+  background: var(--danger); color: #fff; font-size: 10px;
+}

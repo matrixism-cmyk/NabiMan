@@ -73,6 +73,16 @@ export function useTerminalHandle(ref: Ref<TerminalViewHandle>, {
     },
     armModifiers: (mods, used) => { if (termRef.current) armModifiers(termRef.current, mods, used); },
     zoomBy: (delta) => zoom.step(delta),
+    screenText: () => {
+      const term = termRef.current;
+      if (!term) return '';
+      const buffer = term.buffer.active;
+      const lines: string[] = [];
+      for (let y = buffer.viewportY; y < buffer.viewportY + term.rows; y += 1) {
+        lines.push(buffer.getLine(y)?.translateToString(true) ?? '');
+      }
+      return lines.join('\n');
+    },
   }), [
     clearBuffer, connect, storageKey, zoom, attemptsRef, endedRef, everConnectedRef,
     joinRef, sessionIdRef, settingsRef, termRef, wsRef,

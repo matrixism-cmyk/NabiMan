@@ -11,6 +11,7 @@ import type { SessionInfo } from '../remote/SessionsView';
 import { clamp, MIN_H, MIN_W, TASKBAR_H, TermWindow } from './windowGeometry';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import AccountDictation from './dictation/AccountDictation';
+import { useVoiceReply } from './dictation/useVoiceReply';
 
 interface FrameProps {
   win: TermWindow;
@@ -25,6 +26,8 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
   const viewRef = useRef<TerminalViewHandle>(null);
   const [status, setStatus] = useState<TerminalStatus>('connecting');
   const [sessionId, setSessionId] = useState('');
+  // "음성으로 대답해줘": this window's answer, read aloud.
+  const reply = useVoiceReply(viewRef, sessionId || undefined);
   const [showShare, setShowShare] = useState(false);
   const [sessionName, setSessionName] = useState('');
   const [showSettings, setShowSettings] = useState(false);
@@ -139,7 +142,7 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
         <span className="term-window-sub">{win.subtitle}</span>
         <span className="term-window-actions">
           <AccountDictation variant="bar" sessionId={sessionId || undefined} onText={(text) => viewRef.current?.insertText(text)}
-            onKeys={(keys) => viewRef.current?.sendKeys(keys)} />
+            onKeys={(keys) => viewRef.current?.sendKeys(keys)} reply={reply} />
           <button
             title={t('terminal.redraw')}
             aria-label={t('terminal.redraw')}

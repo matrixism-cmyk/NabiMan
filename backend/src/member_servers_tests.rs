@@ -57,6 +57,7 @@ fn a_member_may_call_the_terminal_and_nothing_of_the_machine() {
     for (method, path) in [
         ("GET", "/api/terminal"),
         ("POST", "/api/terminal/tickets"),
+        ("POST", "/api/terminal/dictation/speak"),
         ("GET", "/api/terminal/sessions"),
         ("PUT", "/api/terminal/sessions/pty_1/name"),
         ("DELETE", "/api/terminal/sessions/pty_1"),
@@ -117,6 +118,7 @@ fn what_an_administrator_switches_off_is_closed() {
     for (method, path) in [
         ("GET", "/api/terminal/dictation"),
         ("GET", "/api/terminal/dictation/settings"),
+        ("POST", "/api/terminal/dictation/speak"),
         ("POST", "/api/remote-servers"),
         ("POST", "/api/terminal/copies"),
     ] {

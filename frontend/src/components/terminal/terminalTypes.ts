@@ -40,6 +40,8 @@ export interface TerminalViewHandle {
   armModifiers: (mods: Mods, used: () => void) => void;
   /** Text a step larger (positive) or smaller. */
   zoomBy: (delta: number) => void;
+  /** The lines on screen now, as text: enough to tell whether output is still coming. */
+  screenText: () => string;
 }
 
 export interface TerminalViewProps {

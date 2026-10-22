@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Action, finalText, Resampler, Typist, utteranceActions } from './speech';
 import { opusUplink, pcmUplink, Uplink } from './uplink';
 import { LevelMeter } from './meter';
+import { takeVoiceAsk } from './voiceReply';
 import { markActivity } from '../../../shared/auth/useIdleLogout';
 
 export type DictationState = 'idle' | 'starting' | 'listening' | 'stopping';
@@ -23,7 +24,12 @@ interface Options {
   enterOnPause?: boolean;
   /** Ask the service to take only the enrolled voice ("내 목소리만"). */
   voiceLock?: boolean;
+  /** A line asked for its answer read aloud ("음성으로 대답해줘") has just run. */
+  onVoiceAsk?: () => void;
 }
+
+/** A request said on its own this soon after Enter is for the line that just ran. */
+const ASK_AFTER_ENTER_MS = 15000;
 
 /** Hands the microphone's samples over as they come, off the audio thread. */
 const TAP = `class NabimanTap extends AudioWorkletProcessor {
@@ -43,7 +49,7 @@ const PAUSE_MS = 1200;
  * changing — or once the service makes it final; never twice. "엔터" presses
  * Enter. What is heard but not typed yet shows as `partial`.
  */
-export function useDictation({ open, onText, onKeys, muted = false, endpointMs = 0, enterOnPause = false, voiceLock = false }: Options) {
+export function useDictation({ open, onText, onKeys, muted = false, endpointMs = 0, enterOnPause = false, voiceLock = false, onVoiceAsk }: Options) {
   const [state, setState] = useState<DictationState>('idle');
   const [partial, setPartial] = useState('');
   const [error, setError] = useState('');
@@ -55,8 +61,13 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
   const typist = useRef(new Typist());
   const heard = useRef('');
   const pause = useRef<number | undefined>(undefined);
-  const handlers = useRef({ onText, onKeys });
-  handlers.current = { onText, onKeys };
+  const handlers = useRef({ onText, onKeys, onVoiceAsk });
+  handlers.current = { onText, onKeys, onVoiceAsk };
+  /** "음성으로 대답해줘" was said on the line being typed: its Enter starts the reading. */
+  const askArmed = useRef(false);
+  /** Requests found in the whole transcript so far (the page's own guess keeps all of it). */
+  const asksSeen = useRef(0);
+  const lastEnter = useRef(0);
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
   const pauseRef = useRef({ endpointMs, enterOnPause, voiceLock });
@@ -70,15 +81,37 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
     markActivity();
     for (const action of actions) {
       if (action.type === 'text') { handlers.current.onText(action.text); lineHasText.current = true; }
-      else if (action.type === 'enter') { handlers.current.onKeys('\r'); lineHasText.current = false; }
+      else if (action.type === 'enter') {
+        handlers.current.onKeys('\r');
+        lineHasText.current = false;
+        lastEnter.current = Date.now();
+        if (askArmed.current) { askArmed.current = false; handlers.current.onVoiceAsk?.(); }
+      }
       else handlers.current.onKeys('\x7f'.repeat(action.count));
     }
   }, []);
 
   /** Brings the prompt up to what has been said (the page's own guess at pauses). */
   const typeUpTo = useCallback((said: string) => {
-    if (!ends.current) perform(typist.current.to(said));
+    if (ends.current) return;
+    // Only where an answer can be read aloud is the request taken out.
+    const { text, asks } = handlers.current.onVoiceAsk ? takeVoiceAsk(said) : { text: said, asks: 0 };
+    if (asks > asksSeen.current) { asksSeen.current = asks; askArmed.current = true; }
+    perform(typist.current.to(text));
   }, [perform]);
+
+  /** Notes a request in one finished utterance; on its own just after Enter, it is for that line. */
+  const noteAsk = useCallback((said: string) => {
+    if (!handlers.current.onVoiceAsk) return said;
+    const { text, asks } = takeVoiceAsk(said);
+    if (!asks) return said;
+    if (!text.trim() && !lineHasText.current && Date.now() - lastEnter.current < ASK_AFTER_ENTER_MS) {
+      handlers.current.onVoiceAsk?.();
+    } else {
+      askArmed.current = true;
+    }
+    return text;
+  }, []);
 
   const release = useCallback(() => {
     window.clearTimeout(pause.current);
@@ -98,6 +131,8 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
     setBlocked(0);
     setState('starting');
     typist.current = new Typist();
+    askArmed.current = false;
+    asksSeen.current = 0;
     heard.current = '';
     ends.current = false;
     lineHasText.current = false;
@@ -147,7 +182,7 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
           ends.current = true;
           window.clearTimeout(pause.current);
           setPartial('');
-          perform(utteranceActions(msg.text || '', pauseRef.current.enterOnPause, lineHasText.current));
+          perform(utteranceActions(noteAsk(msg.text || ''), pauseRef.current.enterOnPause, lineHasText.current));
           return;
         }
         if (msg.type === 'partial' && pauseRef.current.endpointMs > 0 && typeof msg.utterance === 'string') {
@@ -171,7 +206,7 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
             window.clearTimeout(pause.current);
             pause.current = window.setTimeout(() => { typeUpTo(heard.current); setPartial(''); }, PAUSE_MS);
           }
-          setPartial(typist.current.pending(all));
+          setPartial(typist.current.pending(handlers.current.onVoiceAsk ? takeVoiceAsk(all).text : all));
         } else if (msg.type === 'final') {
           typeUpTo(finalText(msg.committed || '', msg.partial || ''));
           setPartial('');
@@ -189,7 +224,7 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
       const name = e instanceof DOMException ? e.name : '';
       setError(name === 'NotAllowedError' ? 'denied' : name === 'NotFoundError' ? 'nomic' : e instanceof Error && e.message !== 'dictation' ? e.message : 'connection');
     }
-  }, [open, release, typeUpTo, perform, meter]);
+  }, [open, release, typeUpTo, perform, noteAsk, meter]);
 
   /** Stops listening, and types what the last words turn out to be. */
   const stop = useCallback(() => {

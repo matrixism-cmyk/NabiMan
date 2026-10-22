@@ -152,3 +152,62 @@ test('"내 목소리만" is asked for in the opening message, and the service\'s
   expect(view.result.current.error).toBe('먼저 계정 화면에서 목소리를 등록해 주세요.');
 });
 
+
+describe('"음성으로 대답해줘"', () => {
+  const setupAsk = (enterOnPause: boolean, endpointMs = 1500) => {
+    const onText = jest.fn();
+    const onKeys = jest.fn();
+    const onVoiceAsk = jest.fn();
+    const view = renderHook(() => useDictation({
+      open: () => Promise.resolve(new FakeSocket() as unknown as WebSocket), onText, onKeys, endpointMs, enterOnPause, onVoiceAsk,
+    }));
+    return { ...view, onText, onKeys, onVoiceAsk };
+  };
+
+  it('is not typed, and its line running asks for the answer read aloud', async () => {
+    const { result, onText, onKeys, onVoiceAsk } = setupAsk(true);
+    await begin(result);
+    act(() => FakeSocket.last.hear({ type: 'endpoint', text: '사과는 무슨 색이야 음성으로 대답해줘', reason: 'silence' }));
+    expect(onText).toHaveBeenCalledWith('사과는 무슨 색이야');
+    expect(onKeys).toHaveBeenCalledWith('\r');
+    expect(onVoiceAsk).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for "엔터" when a pause does not send', async () => {
+    const { result, onKeys, onVoiceAsk } = setupAsk(false);
+    await begin(result);
+    act(() => FakeSocket.last.hear({ type: 'endpoint', text: '디스크 사용량 알려줘 소리로 알려줘', reason: 'silence' }));
+    expect(onVoiceAsk).not.toHaveBeenCalled();
+    act(() => FakeSocket.last.hear({ type: 'endpoint', text: '엔터', reason: 'silence' }));
+    expect(onKeys).toHaveBeenCalledWith('\r');
+    expect(onVoiceAsk).toHaveBeenCalledTimes(1);
+  });
+
+  it('said on its own just after Enter, is for the line that ran', async () => {
+    const { result, onText, onVoiceAsk } = setupAsk(true);
+    await begin(result);
+    act(() => FakeSocket.last.hear({ type: 'endpoint', text: '오늘 할 일 정리해줘', reason: 'silence' }));
+    act(() => FakeSocket.last.hear({ type: 'endpoint', text: '음성으로 대답해 주세요', reason: 'silence' }));
+    expect(onText).toHaveBeenCalledTimes(1);
+    expect(onVoiceAsk).toHaveBeenCalledTimes(1);
+  });
+
+  it('with the page guessing pauses, the request is erased as it is recognised, and Enter asks', async () => {
+    const { result, onText, onKeys, onVoiceAsk } = setupAsk(false, 0);
+    await begin(result);
+    act(() => FakeSocket.last.hear({ type: 'partial', committed: '', partial: '날씨 알려줘 음성으로 대답해줘' }));
+    act(() => FakeSocket.last.hear({ type: 'partial', committed: '', partial: '날씨 알려줘 음성으로 대답해줘' }));
+    expect(onText).toHaveBeenCalledWith('날씨 알려줘');
+    act(() => FakeSocket.last.hear({ type: 'partial', committed: '', partial: '날씨 알려줘 음성으로 대답해줘 엔터' }));
+    act(() => { jest.advanceTimersByTime(1300); });
+    expect(onKeys).toHaveBeenCalledWith('\r');
+    expect(onVoiceAsk).toHaveBeenCalledTimes(1);
+  });
+
+  it('is typed like any words where nothing can read the answer', async () => {
+    const { result, onText } = setupPauses(true);
+    await begin(result);
+    act(() => FakeSocket.last.hear({ type: 'endpoint', text: '음성으로 대답해줘', reason: 'silence' }));
+    expect(onText).toHaveBeenCalledWith('음성으로 대답해줘');
+  });
+});
