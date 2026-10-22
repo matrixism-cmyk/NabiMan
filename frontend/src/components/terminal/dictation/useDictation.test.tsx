@@ -204,6 +204,20 @@ describe('"음성으로 대답해줘"', () => {
     expect(onVoiceAsk).toHaveBeenCalledTimes(1);
   });
 
+  it('with "음성으로 대답하기" on, every line with words that runs asks, said or not', async () => {
+    const onVoiceAsk = jest.fn();
+    const { result } = renderHook(() => useDictation({
+      open: () => Promise.resolve(new FakeSocket() as unknown as WebSocket), onText: jest.fn(), onKeys: jest.fn(),
+      endpointMs: 1500, enterOnPause: false, onVoiceAsk, replyAlways: true,
+    }));
+    await begin(result);
+    act(() => FakeSocket.last.hear({ type: 'endpoint', text: '디스크 사용량 알려줘 엔터', reason: 'silence' }));
+    expect(onVoiceAsk).toHaveBeenCalledTimes(1);
+    // An Enter on an empty line (answering a yes/no, say) reads nothing new.
+    act(() => FakeSocket.last.hear({ type: 'endpoint', text: '엔터', reason: 'silence' }));
+    expect(onVoiceAsk).toHaveBeenCalledTimes(1);
+  });
+
   it('is typed like any words where nothing can read the answer', async () => {
     const { result, onText } = setupPauses(true);
     await begin(result);

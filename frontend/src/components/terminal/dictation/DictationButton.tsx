@@ -19,6 +19,8 @@ interface Props {
   voiceLock?: boolean;
   /** Reads the answer aloud when "음성으로 대답해줘" ends a line; none where it cannot. */
   reply?: ReturnType<typeof useVoiceReply>;
+  /** Every dictated line's answer is read aloud, asked for or not ("음성으로 대답하기"). */
+  replyAlways?: boolean;
 }
 
 const KNOWN = ['denied', 'nomic', 'connection'];
@@ -29,10 +31,10 @@ const KNOWN = ['denied', 'nomic', 'connection'];
  * and the words still being worked out show under it; what is final is typed
  * at the prompt, and a spoken "엔터" presses Enter.
  */
-export default function DictationButton({ open, onText, onKeys, variant = 'head', endpointMs, enterOnPause, voiceLock, reply }: Props) {
+export default function DictationButton({ open, onText, onKeys, variant = 'head', endpointMs, enterOnPause, voiceLock, reply, replyAlways }: Props) {
   const { t } = useT();
   const { state, partial, error, blocked, meter, start, stop } = useDictation({
-    open, onText, onKeys, endpointMs, enterOnPause, voiceLock, onVoiceAsk: reply?.ask,
+    open, onText, onKeys, endpointMs, enterOnPause, voiceLock, onVoiceAsk: reply?.ask, replyAlways: Boolean(reply && replyAlways),
     // The answer read aloud must not be heard as the next thing said.
     muted: reply?.state === 'reading',
   });
@@ -50,7 +52,8 @@ export default function DictationButton({ open, onText, onKeys, variant = 'head'
   const seconds = String((endpointMs || 0) / 1000);
   const startHint = !endpointMs ? t('dictation.startHint')
     : enterOnPause ? t('dictation.startHintPauseEnter', { seconds }) : t('dictation.startHintPause', { seconds });
-  const hint = voiceLock ? `${startHint} ${t('dictation.voiceLockHint')}` : startHint;
+  const locked = voiceLock ? `${startHint} ${t('dictation.voiceLockHint')}` : startHint;
+  const hint = reply && replyAlways ? `${locked} ${t('dictation.voiceReplyOnHint')}` : locked;
   return (
     <span className={`dictation dictation-${variant}`}>
       <button type="button" className={`btn btn-secondary btn-sm dictation-btn ${on ? 'is-on' : ''} is-${state}`}

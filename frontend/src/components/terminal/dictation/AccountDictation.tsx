@@ -26,6 +26,7 @@ export default function AccountDictation({ sessionId, ...props }: Props) {
   return setup?.available ? (
     <DictationButton open={openAccountDictation} endpointMs={own?.dictation_pause_ms ?? setup.endpoint_ms}
       enterOnPause={own?.dictation_auto_enter ?? setup.auto_enter}
-      voiceLock={own?.dictation_voice_lock ?? setup.voice_lock} {...props} />
+      voiceLock={own?.dictation_voice_lock ?? setup.voice_lock}
+      replyAlways={own?.dictation_voice_reply ?? setup.voice_reply} {...props} />
   ) : null;
 }

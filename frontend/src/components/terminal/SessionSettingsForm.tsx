@@ -130,6 +130,12 @@ export default function SessionSettingsForm({ sessionId, onDone }: { sessionId: 
           <label className="session-follow"><input id="ss-voice" type="checkbox" checked={draft.dictation_voice_lock ?? voice.voice_lock}
             onChange={(e) => set('dictation_voice_lock', e.target.checked)} /><span>{t('dictation.voiceLock')}</span></label>
         </Field>
+        <Field id="ss-reply" label={t('dictation.voiceReply')} inherited={on(voice.voice_reply)}
+          following={draft.dictation_voice_reply == null} onFollow={follow('dictation_voice_reply', voice.voice_reply)}>
+          <label className="session-follow"><input id="ss-reply" type="checkbox" checked={draft.dictation_voice_reply ?? voice.voice_reply}
+            onChange={(e) => set('dictation_voice_reply', e.target.checked)} /><span>{t('dictation.voiceReply')}</span></label>
+          <small className="text-secondary">{t('dictation.voiceReplyHint')}</small>
+        </Field>
       </>)}
 
       {keep && (

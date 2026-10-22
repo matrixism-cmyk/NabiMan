@@ -26,6 +26,8 @@ interface Options {
   voiceLock?: boolean;
   /** A line asked for its answer read aloud ("음성으로 대답해줘") has just run. */
   onVoiceAsk?: () => void;
+  /** Every dictated line that runs asks for it, said or not ("음성으로 대답하기"). */
+  replyAlways?: boolean;
 }
 
 /** A request said on its own this soon after Enter is for the line that just ran. */
@@ -49,7 +51,7 @@ const PAUSE_MS = 1200;
  * changing — or once the service makes it final; never twice. "엔터" presses
  * Enter. What is heard but not typed yet shows as `partial`.
  */
-export function useDictation({ open, onText, onKeys, muted = false, endpointMs = 0, enterOnPause = false, voiceLock = false, onVoiceAsk }: Options) {
+export function useDictation({ open, onText, onKeys, muted = false, endpointMs = 0, enterOnPause = false, voiceLock = false, onVoiceAsk, replyAlways = false }: Options) {
   const [state, setState] = useState<DictationState>('idle');
   const [partial, setPartial] = useState('');
   const [error, setError] = useState('');
@@ -61,8 +63,8 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
   const typist = useRef(new Typist());
   const heard = useRef('');
   const pause = useRef<number | undefined>(undefined);
-  const handlers = useRef({ onText, onKeys, onVoiceAsk });
-  handlers.current = { onText, onKeys, onVoiceAsk };
+  const handlers = useRef({ onText, onKeys, onVoiceAsk, replyAlways });
+  handlers.current = { onText, onKeys, onVoiceAsk, replyAlways };
   /** "음성으로 대답해줘" was said on the line being typed: its Enter starts the reading. */
   const askArmed = useRef(false);
   /** Requests found in the whole transcript so far (the page's own guess keeps all of it). */
@@ -83,9 +85,14 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
       if (action.type === 'text') { handlers.current.onText(action.text); lineHasText.current = true; }
       else if (action.type === 'enter') {
         handlers.current.onKeys('\r');
+        // A line with words ran: its answer is read when asked for, or always if so set.
+        const ran = lineHasText.current;
         lineHasText.current = false;
         lastEnter.current = Date.now();
-        if (askArmed.current) { askArmed.current = false; handlers.current.onVoiceAsk?.(); }
+        if (askArmed.current || (ran && handlers.current.replyAlways)) {
+          askArmed.current = false;
+          handlers.current.onVoiceAsk?.();
+        }
       }
       else handlers.current.onKeys('\x7f'.repeat(action.count));
     }

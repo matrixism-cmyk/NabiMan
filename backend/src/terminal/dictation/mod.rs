@@ -47,6 +47,10 @@ pub(crate) struct Settings {
     /// the key's owner, since every dictation here goes out with one key.
     #[serde(default)]
     pub voice_lock: bool,
+    /// Read each dictated line's answer aloud, as if "음성으로 대답해줘" had
+    /// been said; a session may set its own. Off unless turned on.
+    #[serde(default)]
+    pub voice_reply: bool,
 }
 
 /// Where a pause of this long can end what was said; the service takes 300 to 10000 ms.
@@ -129,7 +133,7 @@ async fn get_settings(req: HttpRequest) -> HttpResponse {
     let key = s.key();
     let mut out = serde_json::json!({
         "available": key.is_some(), "language": s.language(),
-        "endpoint_ms": s.endpoint_ms(), "auto_enter": s.auto_enter(), "voice_lock": s.voice_lock,
+        "endpoint_ms": s.endpoint_ms(), "auto_enter": s.auto_enter(), "voice_lock": s.voice_lock, "voice_reply": s.voice_reply,
     });
     if admin {
         out["url"] = s.url().into();
@@ -150,6 +154,7 @@ struct Change {
     endpoint_ms: Option<u32>,
     auto_enter: Option<bool>,
     voice_lock: Option<bool>,
+    voice_reply: Option<bool>,
 }
 
 async fn put_settings(req: HttpRequest, body: web::Json<Change>) -> HttpResponse {
@@ -178,6 +183,9 @@ async fn put_settings(req: HttpRequest, body: web::Json<Change>) -> HttpResponse
     }
     if let Some(on) = body.auto_enter {
         s.auto_enter = Some(on);
+    }
+    if let Some(on) = body.voice_reply {
+        s.voice_reply = on;
     }
     if let Some(on) = body.voice_lock {
         s.voice_lock = on;
