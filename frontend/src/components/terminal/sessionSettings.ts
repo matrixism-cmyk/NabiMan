@@ -16,6 +16,7 @@ export interface SessionOverrides {
   restore_scrollback?: boolean | null;
   dictation_pause_ms?: number | null;
   dictation_auto_enter?: boolean | null;
+  dictation_voice_lock?: boolean | null;
 }
 
 /** What the session itself holds: kept alive, and when it closes if not. */

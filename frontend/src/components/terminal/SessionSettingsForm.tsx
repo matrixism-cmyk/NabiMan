@@ -125,6 +125,11 @@ export default function SessionSettingsForm({ sessionId, onDone }: { sessionId: 
           <label className="session-follow"><input id="ss-enter" type="checkbox" checked={draft.dictation_auto_enter ?? voice.auto_enter}
             onChange={(e) => set('dictation_auto_enter', e.target.checked)} /><span>{t('dictation.autoEnter')}</span></label>
         </Field>
+        <Field id="ss-voice" label={t('dictation.voiceLock')} inherited={on(voice.voice_lock)}
+          following={draft.dictation_voice_lock == null} onFollow={follow('dictation_voice_lock', voice.voice_lock)}>
+          <label className="session-follow"><input id="ss-voice" type="checkbox" checked={draft.dictation_voice_lock ?? voice.voice_lock}
+            onChange={(e) => set('dictation_voice_lock', e.target.checked)} /><span>{t('dictation.voiceLock')}</span></label>
+        </Field>
       </>)}
 
       {keep && (

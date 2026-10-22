@@ -4,6 +4,7 @@ import { apiPost, apiRequest } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/i18n';
 import { forgetDictationAvailability } from './sockets';
 import PauseField from './PauseField';
+import VoiceLockField from './VoiceLockField';
 
 interface Setup {
   available: boolean;
@@ -14,6 +15,7 @@ interface Setup {
   key_hint?: string | null;
   endpoint_ms?: number;
   auto_enter?: boolean;
+  voice_lock?: boolean;
 }
 
 const LANGUAGES = ['korean', 'english', 'japanese', 'chinese', 'auto'];
@@ -32,6 +34,7 @@ export default function DictationSettings() {
   const [language, setLanguage] = useState('korean');
   const [pause, setPause] = useState(1500);
   const [autoEnter, setAutoEnter] = useState(true);
+  const [voiceLock, setVoiceLock] = useState(false);
   const [key, setKey] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -43,6 +46,7 @@ export default function DictationSettings() {
     setLanguage(s.language || 'korean');
     setPause(s.endpoint_ms ?? 1500);
     setAutoEnter(s.auto_enter !== false);
+    setVoiceLock(Boolean(s.voice_lock));
   };
 
   useEffect(() => {
@@ -54,7 +58,7 @@ export default function DictationSettings() {
   const save = async (clearKey = false) => {
     setBusy(true);
     setMessage('');
-    const body: Record<string, string | number | boolean> = { url, address, language, endpoint_ms: pause, auto_enter: autoEnter };
+    const body: Record<string, string | number | boolean> = { url, address, language, endpoint_ms: pause, auto_enter: autoEnter, voice_lock: voiceLock };
     if (key.trim() || clearKey) body.key = clearKey ? '' : key.trim();
     const r = await apiRequest<Setup>('/api/terminal/dictation/settings', { method: 'PUT', body: JSON.stringify(body) });
     setBusy(false);
@@ -110,6 +114,7 @@ export default function DictationSettings() {
           <small className="text-secondary">{t('dictation.autoEnterHint')}</small>
         </div>
       )}
+      <VoiceLockField value={voiceLock} onChange={setVoiceLock} keySet={Boolean(setup.key_set)} />
       <div className="btn-group">
         <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => save()}>{t('common.save')}</button>
         <button type="button" className="btn btn-secondary btn-sm" disabled={busy || !setup.key_set} onClick={test}>{t('dictation.test')}</button>

@@ -28,16 +28,18 @@ export interface DictationSetup {
   endpoint_ms: number;
   /** In a terminal, press Enter at each pause too. */
   auto_enter: boolean;
+  /** Take only the voice enrolled with the service's account. */
+  voice_lock: boolean;
 }
 
-const NONE: DictationSetup = { available: false, endpoint_ms: 0, auto_enter: false };
+const NONE: DictationSetup = { available: false, endpoint_ms: 0, auto_enter: false, voice_lock: false };
 let setup: Promise<DictationSetup> | null = null;
 
 /** How dictation is set up on this server; asked once per page. */
 export function dictationSetup(): Promise<DictationSetup> {
   setup ??= apiRequest<Partial<DictationSetup>>('/api/terminal/dictation/settings')
     .then((r) => (r.success && r.data ? {
-      available: Boolean(r.data.available), endpoint_ms: r.data.endpoint_ms ?? 1500, auto_enter: Boolean(r.data.auto_enter),
+      available: Boolean(r.data.available), endpoint_ms: r.data.endpoint_ms ?? 1500, auto_enter: Boolean(r.data.auto_enter), voice_lock: Boolean(r.data.voice_lock),
     } : NONE))
     .catch(() => NONE);
   return setup;

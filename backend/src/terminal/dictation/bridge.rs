@@ -118,6 +118,21 @@ fn pause_settings(asked: &serde_json::Value) -> serde_json::Value {
     out
 }
 
+/// What the service is told first: the checked pause settings, the
+/// language, and that nothing is kept there. "내 목소리만" takes only the key
+/// owner's voice, so only an account asks for it — a share link's visitor
+/// would be heard by no one.
+fn opening(asked: &serde_json::Value, language: &str, account: bool) -> serde_json::Value {
+    let mut open = pause_settings(asked);
+    if account && asked.get("voice_lock").and_then(|v| v.as_bool()) == Some(true) {
+        open["voice_lock"] = true.into();
+    }
+    open["language"] = language.into();
+    open["title"] = "NabiMan terminal".into();
+    open["save"] = false.into();
+    open
+}
+
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Dictation {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         match msg {
@@ -137,10 +152,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Dictation {
                     // page asks for (if known), and never kept by the service.
                     let asked = value.get("language").and_then(|l| l.as_str()).filter(|l| LANGUAGES.contains(l));
                     let language = asked.unwrap_or(self.settings.language());
-                    let mut open = pause_settings(&value);
-                    open["language"] = language.into();
-                    open["title"] = "NabiMan terminal".into();
-                    open["save"] = false.into();
+                    let open = opening(&value, language, matches!(self.grant, Admission::Account(_)));
                     self.opened = true;
                     self.send(WsMessage::text(open.to_string()));
                 }
@@ -286,5 +298,14 @@ mod tests {
                     serde_json::json!({ "endpoint_ms": "1500" }), serde_json::json!({ "endpoint_ms": 0, "min_speech_ms": 9000 })] {
             assert_eq!(pause_settings(&bad), serde_json::json!({}), "{bad}");
         }
+    }
+
+    #[test]
+    fn only_an_account_asks_for_its_own_voice_and_nothing_is_kept() {
+        let asked = serde_json::json!({ "voice_lock": true, "endpoint_ms": 2000, "save": true, "title": "mine" });
+        let account = opening(&asked, "korean", true);
+        assert_eq!(account, serde_json::json!({ "voice_lock": true, "endpoint_ms": 2000, "language": "korean", "title": "NabiMan terminal", "save": false }));
+        assert!(opening(&asked, "korean", false).get("voice_lock").is_none(), "a share visitor never gets it");
+        assert!(opening(&serde_json::json!({ "voice_lock": "yes" }), "korean", true).get("voice_lock").is_none());
     }
 }

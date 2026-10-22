@@ -140,3 +140,14 @@ test('an older service with no end-of-speech detection keeps the old way', async
   act(() => FakeSocket.last.hear({ type: 'partial', committed: '', partial: 'uptime' }));
   expect(onText).toHaveBeenCalledWith('uptime');
 });
+
+test('"내 목소리만" is asked for in the opening message, and the service\'s refusal is shown', async () => {
+  const view = renderHook(() => useDictation({
+    open: () => Promise.resolve(new FakeSocket() as unknown as WebSocket), onText: jest.fn(), onKeys: jest.fn(), endpointMs: 1500, voiceLock: true,
+  }));
+  await begin(view.result);
+  expect(JSON.parse(FakeSocket.last.sent[0] as string)).toEqual({ endpoint_ms: 1500, voice_lock: true });
+  act(() => FakeSocket.last.hear({ type: 'error', message: '먼저 계정 화면에서 목소리를 등록해 주세요.' }));
+  expect(view.result.current.error).toBe('먼저 계정 화면에서 목소리를 등록해 주세요.');
+});
+

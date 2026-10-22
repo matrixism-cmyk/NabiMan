@@ -40,4 +40,8 @@
 .dictation-settings .form-group > label.dictation-check { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text); cursor: pointer; }
 .dictation-check input { width: auto; margin: 0; }
 .dictation-settings > .btn-group { margin-top: 4px; flex-wrap: wrap; }
+.dictation-settings .voice-status { padding: 0; }
+.dictation-settings .voice-status.is-ready { color: var(--success); }
+.dictation-settings .voice-status.is-missing { color: var(--warning); }
+.dictation-settings .form-group .text-warning { display: block; font-size: 12px; }
 

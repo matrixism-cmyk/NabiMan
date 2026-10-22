@@ -3,7 +3,7 @@
 //!
 //! What a session can set for itself is how it is shown and dictated into —
 //! font, size, history kept in the browser, replaying history, the pause
-//! that ends a sentence and whether it presses Enter. Whether it is kept
+//! that ends a sentence, whether it presses Enter, and "내 목소리만". Whether it is kept
 //! alive and when it closes were always the session's own (fixed when it
 //! was made, changed by their own routes); the SSH keep-alive interval is
 //! used only as the connection starts, so it stays with the account.
@@ -39,6 +39,8 @@ pub(crate) struct Overrides {
     pub dictation_pause_ms: Option<u32>,
     #[serde(default)]
     pub dictation_auto_enter: Option<bool>,
+    #[serde(default)]
+    pub dictation_voice_lock: Option<bool>,
 }
 
 impl Overrides {

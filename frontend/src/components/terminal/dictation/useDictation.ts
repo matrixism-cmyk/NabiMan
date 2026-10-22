@@ -19,6 +19,8 @@ interface Options {
   endpointMs?: number;
   /** Press Enter (send) at each pause, not only when "엔터" is said. */
   enterOnPause?: boolean;
+  /** Ask the service to take only the enrolled voice ("내 목소리만"). */
+  voiceLock?: boolean;
 }
 
 /** Hands the microphone's samples over as they come, off the audio thread. */
@@ -39,7 +41,7 @@ const PAUSE_MS = 1200;
  * changing — or once the service makes it final; never twice. "엔터" presses
  * Enter. What is heard but not typed yet shows as `partial`.
  */
-export function useDictation({ open, onText, onKeys, muted = false, endpointMs = 0, enterOnPause = false }: Options) {
+export function useDictation({ open, onText, onKeys, muted = false, endpointMs = 0, enterOnPause = false, voiceLock = false }: Options) {
   const [state, setState] = useState<DictationState>('idle');
   const [partial, setPartial] = useState('');
   const [error, setError] = useState('');
@@ -51,8 +53,8 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
   handlers.current = { onText, onKeys };
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
-  const pauseRef = useRef({ endpointMs, enterOnPause });
-  pauseRef.current = { endpointMs, enterOnPause };
+  const pauseRef = useRef({ endpointMs, enterOnPause, voiceLock });
+  pauseRef.current = { endpointMs, enterOnPause, voiceLock };
   /** The service tells where speech ends (newer ones): its word wins over the guess. */
   const ends = useRef(false);
   const lineHasText = useRef(false);
@@ -158,8 +160,8 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
       };
       ws.onclose = () => { release(); setPartial(''); setState('idle'); };
       ws.onerror = () => setError('connection');
-      const pauseMs = pauseRef.current.endpointMs;
-      ws.send(JSON.stringify(pauseMs > 0 ? { endpoint_ms: pauseMs } : {}));
+      const { endpointMs: pauseMs, voiceLock: onlyMe } = pauseRef.current;
+      ws.send(JSON.stringify({ ...(pauseMs > 0 ? { endpoint_ms: pauseMs } : {}), ...(onlyMe ? { voice_lock: true } : {}) }));
       setState('listening');
     } catch (e) {
       media?.getTracks().forEach((t) => t.stop());

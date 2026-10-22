@@ -43,6 +43,10 @@ pub(crate) struct Settings {
     /// said. None is the default: on.
     #[serde(default)]
     pub auto_enter: Option<bool>,
+    /// Take only the voice enrolled with the service's account ("내 목소리만"):
+    /// the key's owner, since every dictation here goes out with one key.
+    #[serde(default)]
+    pub voice_lock: bool,
 }
 
 /// Where a pause of this long can end what was said; the service takes 300 to 10000 ms.
@@ -125,7 +129,7 @@ async fn get_settings(req: HttpRequest) -> HttpResponse {
     let key = s.key();
     let mut out = serde_json::json!({
         "available": key.is_some(), "language": s.language(),
-        "endpoint_ms": s.endpoint_ms(), "auto_enter": s.auto_enter(),
+        "endpoint_ms": s.endpoint_ms(), "auto_enter": s.auto_enter(), "voice_lock": s.voice_lock,
     });
     if admin {
         out["url"] = s.url().into();
@@ -145,6 +149,7 @@ struct Change {
     key: Option<String>,
     endpoint_ms: Option<u32>,
     auto_enter: Option<bool>,
+    voice_lock: Option<bool>,
 }
 
 async fn put_settings(req: HttpRequest, body: web::Json<Change>) -> HttpResponse {
@@ -173,6 +178,9 @@ async fn put_settings(req: HttpRequest, body: web::Json<Change>) -> HttpResponse
     }
     if let Some(on) = body.auto_enter {
         s.auto_enter = Some(on);
+    }
+    if let Some(on) = body.voice_lock {
+        s.voice_lock = on;
     }
     if let Some(language) = &body.language {
         if !LANGUAGES.contains(&language.as_str()) {
@@ -227,13 +235,38 @@ async fn test(req: HttpRequest) -> HttpResponse {
     }
 }
 
+/// Whether the service's account (the key's owner) has a voice enrolled for
+/// "내 목소리만", and where to enrol one: the service's own account page, which
+/// asks for consent and checks the recording. Nothing of the voice comes here.
+async fn voiceprint() -> HttpResponse {
+    let s = load();
+    let Some(key) = s.key() else {
+        return HttpResponse::Ok().json(ApiResponse::<()>::error("No API key is set"));
+    };
+    let enrol_at = format!("{}/account#voice", s.url());
+    match voice::voiceprint(&s, &key).await {
+        Ok(v) => {
+            let flag = |k: &str| v.get(k).and_then(|x| x.as_bool()).unwrap_or(false);
+            let text = |k: &str| v.get(k).and_then(|x| x.as_str()).map(str::to_string);
+            HttpResponse::Ok().insert_header(("Cache-Control", "no-store")).json(ApiResponse::ok(serde_json::json!({
+                "enrolled": flag("enrolled"), "stale": flag("stale"),
+                "redo": v.get("redo").is_some_and(|r| !r.is_null()),
+                "created_at": text("created_at"), "last_used_at": text("last_used_at"),
+                "use_count": v.get("use_count").and_then(|x| x.as_u64()), "enrol_at": enrol_at,
+            })))
+        }
+        Err(e) => HttpResponse::Ok().json(ApiResponse::<()>::error(&e)),
+    }
+}
+
 pub(crate) fn config(cfg: &mut web::ServiceConfig) {
     cfg.route("/api/terminal/dictation", web::get().to(bridge::start))
         // Public: checked against the share link in `start_shared`.
         .route("/api/share/{token}/dictation", web::get().to(bridge::start_shared))
         .route("/api/terminal/dictation/settings", web::get().to(get_settings))
         .route("/api/terminal/dictation/settings", web::put().to(put_settings))
-        .route("/api/terminal/dictation/test", web::post().to(test));
+        .route("/api/terminal/dictation/test", web::post().to(test))
+        .route("/api/terminal/dictation/voiceprint", web::get().to(voiceprint));
 }
 
 #[cfg(test)]

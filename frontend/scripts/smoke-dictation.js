@@ -20,6 +20,11 @@ const OUT = process.env.SMOKE_OUT || '/tmp';
 const VOICE_URL = process.env.SMOKE_VOICE_URL || 'http://127.0.0.1:19999';
 const VOICE_KEY = process.env.SMOKE_VOICE_KEY || 'vk_test_dictation_key';
 const PAUSE = process.env.SMOKE_PAUSE === '1';
+// With SMOKE_VOICE_LOCK=1 (and SMOKE_VOICE_LOG, the stand-in's log): "내 목소리만"
+// is turned on, and only the account's microphones may ask the service for it.
+const VOICE_LOCK = process.env.SMOKE_VOICE_LOCK === '1';
+const VOICE_LOG = process.env.SMOKE_VOICE_LOG;
+const opened = () => require('fs').readFileSync(VOICE_LOG, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((e) => e.event === 'open');
 
 const results = [];
 const check = (name, ok, detail = '') => {
@@ -66,6 +71,13 @@ async function dictate(page, scope, label) {
   const set = await api(page, '/api/terminal/dictation/settings', { method: 'PUT', body: JSON.stringify({ url: VOICE_URL, address: '', key: VOICE_KEY }) });
   check('dictation is set up', set.data?.available === true, JSON.stringify(set).slice(0, 120));
   if (PAUSE) check('Enter at a pause is on', set.data?.auto_enter === true && set.data?.endpoint_ms > 0, JSON.stringify(set.data));
+  const before = VOICE_LOCK ? opened().length : 0;
+  if (VOICE_LOCK) {
+    const locked = await api(page, '/api/terminal/dictation/settings', { method: 'PUT', body: JSON.stringify({ voice_lock: true }) });
+    check('"내 목소리만" can be turned on', locked.data?.voice_lock === true);
+    const print = await api(page, '/api/terminal/dictation/voiceprint');
+    check('the enrolled voice is reported, with where to enrol', print.data?.enrolled === true && /\/account#voice$/.test(print.data?.enrol_at || ''), JSON.stringify(print));
+  }
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForSelector('.app-header');
 
@@ -105,6 +117,11 @@ async function dictate(page, scope, label) {
   await visitor.goto(`${BASE}/share/${readOnly.data.token}`, { waitUntil: 'networkidle' });
   await visitor.waitForSelector('.xterm-screen', { timeout: 20000 });
   check('a read-only link offers no microphone', !(await visitor.getByRole('button', { name: '음성 받아쓰기 시작' }).count()));
+  if (VOICE_LOCK) {
+    const asks = opened().slice(before).map((e) => Boolean(e.opening.voice_lock));
+    check('the pane and the window ask for "내 목소리만"; the share visitor never does', JSON.stringify(asks) === '[true,true,false]', JSON.stringify(asks));
+    await api(page, '/api/terminal/dictation/settings', { method: 'PUT', body: JSON.stringify({ voice_lock: false }) });
+  }
   for (const l of [link, readOnly]) await api(page, `/api/terminal/share-links/${l.data.token}`, { method: 'DELETE' });
 
   check('no page errors', problems.length === 0, problems.join(' | '));

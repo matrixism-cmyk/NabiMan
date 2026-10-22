@@ -42,6 +42,15 @@ const t: T = {
   'dictation.pauseHint': { ko: '음성 서비스가 말이 멈춘 곳을 알려 주면, 그때까지 한 말을 한 번에 입력합니다. 한국어는 문장 중간에도 0.5~1초 쉬는 일이 많아 1.5초를 권합니다.', en: 'The speech service says where speech stops, and what was said is typed at once. Korean often pauses 0.5–1 s mid-sentence: 1.5 s is a good start.', ja: '音声サービスが話の切れ目を知らせると、そこまでの言葉をまとめて入力します。韓国語は文の途中でも0.5〜1秒止まることが多いので1.5秒がおすすめです。' },
   'dictation.autoEnter': { ko: '말이 멈추면 자동으로 엔터 누르기', en: 'Press Enter automatically at each pause', ja: '話が止まったら自動で Enter を押す' },
   'dictation.autoEnterHint': { ko: '말이 멈추면 그때까지 말한 내용 끝에 엔터를 눌러 바로 실행합니다. 모든 터미널(떠 있는 창, 공유 링크 포함)에 적용됩니다. 끄면 "엔터"라고 말할 때만 실행합니다.', en: 'When you pause, Enter is pressed after what you said, so it runs at once. Applies to every terminal, floating windows and share links included. Off, a line runs only when "엔터" is said.', ja: '話が止まると、そこまでの内容の後に Enter を押してすぐ実行します。すべてのターミナル（浮動ウィンドウ・共有リンクを含む）に適用されます。オフにすると「엔터」と言ったときだけ実行します。' },
+  'dictation.voiceLock': { ko: '내 목소리만 받아쓰기', en: 'Only my voice', ja: '自分の声だけ' },
+  'dictation.voiceLockSettingHint': { ko: '음성 서비스 계정에 등록한 목소리만 받아쓰고, 옆 사람 말이나 TV 소리는 거릅니다. 받아쓰기가 1초쯤 늦어집니다. 나비맨은 API 키 하나로 받아쓰므로 그 키 주인의 목소리입니다. 공유 링크 방문자에게는 적용되지 않습니다.', en: 'Takes only the voice enrolled with the speech service’s account, and filters out other people or a TV. About a second slower. NabiMan dictates with one API key, so it is that key’s owner’s voice. Never applied to share link visitors.', ja: '音声サービスのアカウントに登録した声だけを書き取り、周りの人の声やテレビの音は除きます。約1秒遅れます。NabiMan は API キー1つで書き取るため、そのキーの持ち主の声です。共有リンクの訪問者には適用されません。' },
+  'dictation.voiceLockHint': { ko: '(내 목소리만: 등록한 목소리만 받아씁니다)', en: '(only my voice: just the enrolled voice is taken)', ja: '（自分の声だけ: 登録した声だけ書き取ります）' },
+  'dictation.voiceEnrolled': { ko: '목소리 등록됨 · {count}번 사용', en: 'Voice enrolled · used {count} times', ja: '声を登録済み · {count}回使用' },
+  'dictation.voiceNotEnrolled': { ko: '아직 목소리를 등록하지 않았습니다', en: 'No voice enrolled yet', ja: 'まだ声が登録されていません' },
+  'dictation.voiceRedo': { ko: '목소리를 다시 등록해야 합니다', en: 'The voice needs enrolling again', ja: '声の再登録が必要です' },
+  'dictation.voiceNeedsKey': { ko: 'API 키를 저장하면 목소리 등록 상태를 볼 수 있습니다', en: 'Save an API key to see whether a voice is enrolled', ja: 'API キーを保存すると登録状態が見られます' },
+  'dictation.voiceEnrolLink': { ko: '음성 서비스 계정 화면에서 등록', en: 'Enrol on the speech service’s account page', ja: '音声サービスのアカウント画面で登録' },
+  'dictation.voiceLockWithout': { ko: '목소리를 등록하기 전에는 받아쓰기를 시작할 때 "먼저 목소리를 등록해 주세요" 오류가 납니다.', en: 'Until a voice is enrolled, dictation stops at the start asking for one.', ja: '声を登録するまでは、書き取りの開始時に登録を求めるエラーになります。' },
 };
 
 export default t;

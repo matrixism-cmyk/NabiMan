@@ -13,6 +13,8 @@ interface Props {
   /** The service's end-of-speech detection: the pause that ends a sentence, and whether it presses Enter. */
   endpointMs?: number;
   enterOnPause?: boolean;
+  /** Only the enrolled voice is taken ("내 목소리만"). */
+  voiceLock?: boolean;
 }
 
 const KNOWN = ['denied', 'nomic', 'connection'];
@@ -22,19 +24,20 @@ const KNOWN = ['denied', 'nomic', 'connection'];
  * While it listens, the words still being worked out show under it; what is
  * final is typed at the prompt, and a spoken "엔터" presses Enter.
  */
-export default function DictationButton({ open, onText, onKeys, variant = 'head', endpointMs, enterOnPause }: Props) {
+export default function DictationButton({ open, onText, onKeys, variant = 'head', endpointMs, enterOnPause, voiceLock }: Props) {
   const { t } = useT();
-  const { state, partial, error, start, stop } = useDictation({ open, onText, onKeys, endpointMs, enterOnPause });
+  const { state, partial, error, start, stop } = useDictation({ open, onText, onKeys, endpointMs, enterOnPause, voiceLock });
   const on = state === 'listening' || state === 'starting';
   const message = error ? (KNOWN.includes(error) ? t(`dictation.${error}`) : error) : '';
   // What a press will do, as this server is set up: Enter at a pause, a pause only, or "엔터" alone.
   const seconds = String((endpointMs || 0) / 1000);
   const startHint = !endpointMs ? t('dictation.startHint')
     : enterOnPause ? t('dictation.startHintPauseEnter', { seconds }) : t('dictation.startHintPause', { seconds });
+  const hint = voiceLock ? `${startHint} ${t('dictation.voiceLockHint')}` : startHint;
   return (
     <span className={`dictation dictation-${variant}`}>
       <button type="button" className={`btn btn-secondary btn-sm dictation-btn ${on ? 'is-on' : ''} is-${state}`}
-        aria-pressed={on} title={on ? t('dictation.stopHint') : startHint}
+        aria-pressed={on} title={on ? t('dictation.stopHint') : hint}
         aria-label={t(on ? 'dictation.stop' : 'dictation.start')}
         onMouseDown={(e) => e.preventDefault()}
         onClick={(e) => { e.stopPropagation(); if (on) stop(); else if (state === 'idle') start(); }}>

@@ -48,6 +48,19 @@ pub(super) async fn health(s: &Settings, key: &str) -> Result<serde_json::Value,
     }
 }
 
+/// `GET /api/voiceprint`: whether the key's account has a voice enrolled.
+pub(super) async fn voiceprint(s: &Settings, key: &str) -> Result<serde_json::Value, String> {
+    let client = http(s, Duration::from_secs(15)).await?;
+    let res = client.get(format!("{}/api/voiceprint", s.url())).bearer_auth(key).send().await
+        .map_err(|e| format!("Cannot reach the dictation service: {e}"))?;
+    match res.status().as_u16() {
+        200 => res.json().await.map_err(|e| format!("Unexpected answer: {e}")),
+        401 | 403 => Err("The dictation service refused the API key".into()),
+        404 => Err("This dictation service has no voice enrolment (내 목소리만)".into()),
+        code => Err(format!("The dictation service answered HTTP {code}")),
+    }
+}
+
 /// `POST /api/tts`: `text` read aloud, as a WAV file. Nothing is kept by the service.
 pub(super) async fn speak(s: &Settings, key: &str, body: &serde_json::Value) -> Result<Vec<u8>, String> {
     let client = http(s, Duration::from_secs(120)).await?;
