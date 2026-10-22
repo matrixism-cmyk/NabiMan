@@ -2,7 +2,7 @@
 //
 //   SMOKE_URL=http://127.0.0.1:18096 npm run smoke:screen
 //
-// The top folds away (▴) and comes back (▾), remembered; the remote
+// The top folds away (the ▴ tab under the menu) and comes back (▾), remembered; the remote
 // workspace has its own settings tab; terminals use the bundled coding font
 // (D2Coding by default, Korean two cells wide), and a font picked in the
 // settings applies to an open terminal; Esc inside a terminal does not end
@@ -42,7 +42,7 @@ const api = (page, path, init = {}) => page.evaluate(async ({ path, init }) => {
   await page.click('.cat-btn:has-text("원격")');
   const top = async () => (await page.locator('.rw').boundingBox()).y;
   const before = await top();
-  await page.locator('.app-header button[aria-label^="상단 접기"]').click();
+  await page.locator('.chrome-fold').click();
   check('▴ folds away the logo and the menu', !(await page.locator('.app-header').isVisible()) && !(await page.locator('.cat-nav').isVisible()));
   const after = await top();
   check('the workspace moves to the top of the screen', after <= 8 && before - after > 100, `${before} → ${after}`);
@@ -52,15 +52,14 @@ const api = (page, path, init = {}) => page.evaluate(async ({ path, init }) => {
   await page.locator('.chrome-handle').click();
   check('▾ brings it back', await page.locator('.app-header').isVisible());
 
-  // 2. The remote workspace's own settings, with the same switch.
+  // 2. The remote workspace's own settings.
   await page.locator('.rw-item', { hasText: '전체 현황' }).click();
   await page.locator('.rw-tabs button', { hasText: '환경설정' }).click();
   const box = page.locator('.rw-settings');
   await box.waitFor();
   check('the remote workspace has a settings tab', await box.locator('h3', { hasText: '터미널' }).count() >= 1);
-  await box.locator('.rw-settings-check input').check();
-  check('its switch folds the top as well', !(await page.locator('.app-header').isVisible()));
-  await box.locator('.rw-settings-check input').uncheck();
+  check('folding the top is no longer a setting there (the tab under the menu does it)', await box.locator('.rw-settings-check').count() === 0);
+  check('the header has no fold button of its own any more', await page.locator('.app-header button[aria-label^="상단 접기"]').count() === 0);
 
   // 3. Terminals use D2Coding, loaded, Korean two cells wide.
   await page.locator('.rw-item', { hasText: '로컬 셸' }).click();

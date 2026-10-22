@@ -259,6 +259,13 @@
 .rw-settings-check { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
 .rw-settings-check input { width: auto; margin: 0; }
 .rw-settings .dictation-settings { margin-top: 0; padding-top: 0; border-top: 0; }
+/* Dictation across the whole width too, its fields in the same two columns. */
+.rw-settings-section.is-wide .dictation-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px; align-items: start; }
+.rw-settings-section.is-wide .dictation-settings > h4,
+.rw-settings-section.is-wide .dictation-settings > p,
+.rw-settings-section.is-wide .dictation-settings > .message,
+.rw-settings-section.is-wide .dictation-settings > .btn-group { grid-column: 1 / -1; }
+@media (max-width: 760px) { .rw-settings-section.is-wide .dictation-settings { grid-template-columns: minmax(0, 1fr); } }
 
 /* The server list folded to a thin tab. */
 .rw-rail.is-folded { width: auto; flex: 0 0 auto; background: none; border: 0; overflow: visible; }

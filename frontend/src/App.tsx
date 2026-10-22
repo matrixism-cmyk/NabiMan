@@ -231,7 +231,6 @@ function App() {
           <ThemeSelector compact />
           <LanguageSelector />
           <button className="btn btn-secondary" title={t('app.commandPalette')} onClick={() => setShowPalette(true)}>⌘K</button>
-          <button className="btn btn-secondary" title={t('app.hideChrome')} aria-label={t('app.hideChrome')} onClick={() => setChromeHidden(true)}>▴</button>
           <button className="btn btn-secondary" title={t('app.focusMode')} onClick={enterFocus}>⛶</button>
           <button className="btn btn-secondary" onClick={() => setShowChangePw(true)}>{t('app.changePassword')}</button>
           <button className="btn btn-secondary logout-btn" onClick={handleLogout}>{t('app.logout')}</button>
@@ -250,6 +249,12 @@ function App() {
         ))}
       </nav>
       <div className="app-body">
+        {/* Folding the logo and the menu away: a small tab in the gap under the
+            menu, where the one that unfolds them (▾, at the top) will be. */}
+        {!chromeHidden && !focusMode && (
+          <button type="button" className="chrome-fold" onClick={() => setChromeHidden(true)}
+            title={t('app.hideChrome')} aria-label={t('app.hideChrome')}>▴</button>
+        )}
         {currentCat.tabs.length > 1 && (
           <aside className="sidebar">
             <div className="sidebar-heading">{t(currentCat.labelKey)}</div>
