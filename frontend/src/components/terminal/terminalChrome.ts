@@ -7,6 +7,7 @@ import { TerminalSettings } from './settings';
 import { fontOf } from './terminalFonts';
 import { applyArmed } from './stickyKeys';
 import { blobsFromClipboardItems, pathsForClipboardFiles } from './pasteFile';
+import { HangulComposer, needsHangulComposer } from './hangul';
 
 const THEME = {
   background: '#0f1923', foreground: '#e0e6ed', cursor: '#3b82f6', cursorAccent: '#0f1923',
@@ -191,7 +192,12 @@ export function attachTerminalIo(
   sendResize: ((cols: number, rows: number) => void) | null,
 ): void {
   // Ctrl or Alt tapped on a phone's key bar applies to the next key typed.
-  term.onData((data) => send(applyArmed(term, data)));
+  // On an iPhone or iPad, Korean letters arrive one by one: put them together.
+  const hangul = needsHangulComposer() ? new HangulComposer() : null;
+  term.onData((data) => {
+    const keys = applyArmed(term, data);
+    send(hangul ? hangul.feed(keys) : keys);
+  });
   term.onBinary((data) => {
     const buf = new Uint8Array(data.length);
     for (let i = 0; i < data.length; i++) buf[i] = data.charCodeAt(i);
