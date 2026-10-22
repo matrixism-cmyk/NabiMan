@@ -151,7 +151,7 @@ const t: T = {
     ja: '保存済みパスワードを使用 (空欄で自動)',
   },
   // --- Share links ---
-  'share.button': { ko: '내부 사용자 공유', en: 'Share with users', ja: 'ユーザーと共有' },
+  'share.button': { ko: '세션 공유', en: 'Share session', ja: 'セッションを共有' },
   'share.hint': {
     ko: '이 터미널만 볼 수 있는 링크를 만들어 다른 사람에게 전달합니다.',
     en: 'Create a link that opens just this terminal for someone else.',

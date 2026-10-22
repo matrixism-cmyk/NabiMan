@@ -100,6 +100,9 @@ const api = (page, path, init = {}) => page.evaluate(async ({ path, init }) => {
   // 4. Another font from the ⚙ settings applies to the open terminal.
   await page.locator('.rw-head-actions button[title="터미널 설정"]').click();
   const dialog = page.locator('.term-settings');
+  // From a session the dialog opens on that session; the font for all is on the other side.
+  const all = dialog.getByRole('tab', { name: '전체 기본값' });
+  if (await all.count()) await all.click();
   await dialog.locator('#term-font').selectOption('jetbrains');
   check('the picker shows a sample in the font', (await dialog.locator('.term-font-sample').getAttribute('style')).includes('JetBrains'));
   await dialog.locator('.term-settings-form').getByRole('button', { name: '저장' }).click();

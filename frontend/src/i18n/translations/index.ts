@@ -18,6 +18,7 @@ import mecWizard from './mec-wizard';
 import noc from './noc';
 import terminal from './terminal';
 import dictation from './dictation';
+import sessionSettings from './session-settings';
 import sftp from './sftp';
 import remoteProtocols from './remote-protocols';
 import remoteBase from './remote-base';
@@ -46,6 +47,7 @@ const translations: Translations = {
   ...noc,
   ...terminal,
   ...dictation,
+  ...sessionSettings,
   ...remoteBase,
   ...sftp,
   ...claude,

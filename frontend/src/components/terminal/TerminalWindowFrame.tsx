@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import TerminalView, { TerminalStatus, TerminalViewHandle } from './TerminalView';
 import TerminalWithFiles from '../remote/TerminalWithFiles';
-import { useTerminalSettings } from './settings';
+import { useSessionTerminalSettings } from './sessionSettings';
+import TerminalSettingsModal from './TerminalSettingsModal';
 import { useT } from '../../shared/i18n';
 import ShareDialog from './ShareDialog';
 import SessionNameEdit from './SessionNameEdit';
@@ -21,12 +22,13 @@ interface FrameProps {
 
 export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, onEndSession }: FrameProps) {
   const { t } = useT();
-  const { settings } = useTerminalSettings();
   const viewRef = useRef<TerminalViewHandle>(null);
   const [status, setStatus] = useState<TerminalStatus>('connecting');
   const [sessionId, setSessionId] = useState('');
   const [showShare, setShowShare] = useState(false);
   const [sessionName, setSessionName] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  const settings = useSessionTerminalSettings(sessionId || undefined);
 
   // The window knows its session only by id; look its name up once attached.
   useEffect(() => {
@@ -136,7 +138,7 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
         )}
         <span className="term-window-sub">{win.subtitle}</span>
         <span className="term-window-actions">
-          <AccountDictation variant="bar" onText={(text) => viewRef.current?.insertText(text)}
+          <AccountDictation variant="bar" sessionId={sessionId || undefined} onText={(text) => viewRef.current?.insertText(text)}
             onKeys={(keys) => viewRef.current?.sendKeys(keys)} />
           <button
             title={t('terminal.redraw')}
@@ -149,9 +151,11 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
           </svg></button>
           <button title={t('terminal.reconnect')} onClick={(e) => { e.stopPropagation(); viewRef.current?.reconnect(); }}>↻</button>
           <button title={t('terminal.newSession')} onClick={(e) => { e.stopPropagation(); viewRef.current?.newSession(); }}>+</button>
-          {sessionId && (
+          {sessionId && (<>
             <button title={t('share.hint')} onClick={(e) => { e.stopPropagation(); setShowShare(true); }}>🔗</button>
-          )}
+            <button title={t('terminal.sessionSettings')} aria-label={t('terminal.sessionSettings')}
+              onClick={(e) => { e.stopPropagation(); setShowSettings(true); }}>⚙</button>
+          </>)}
           <button title={t('terminal.minimize')} onClick={(e) => { e.stopPropagation(); onUpdate(win.id, { minimized: true }); }}>─</button>
           <button title={win.maximized ? t('terminal.restoreSize') : t('terminal.maximize')} onClick={(e) => { e.stopPropagation(); toggleMaximize(); }}>▢</button>
           <button
@@ -184,6 +188,9 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
           />
         </TerminalWithFiles>
       </div>
+      {showSettings && sessionId && (
+        <TerminalSettingsModal sessionId={sessionId} sessionName={sessionName || win.title} onClose={() => setShowSettings(false)} />
+      )}
       {showShare && sessionId && (
         <ShareDialog sessionId={sessionId} sessionLabel={sessionName || `${win.title} · ${win.subtitle}`} onClose={() => setShowShare(false)} />
       )}

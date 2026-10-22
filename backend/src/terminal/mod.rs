@@ -13,6 +13,7 @@ mod pty;
 mod registry;
 pub(crate) mod remote_access;
 pub(crate) mod session;
+mod session_settings;
 mod settings;
 pub(crate) mod sftp;
 pub mod share;
@@ -337,6 +338,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(ws_terminal);
     handlers::configure(cfg);
     paste_file::config(cfg);
+    session_settings::config(cfg);
     sftp::config(cfg);
     dictation::config(cfg);
     claude_voice::config(cfg);

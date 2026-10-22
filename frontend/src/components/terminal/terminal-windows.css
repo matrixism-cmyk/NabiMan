@@ -197,6 +197,21 @@
 .term-settings-form .filter-input { margin-bottom: 0; }
 .term-settings .filter-input { margin-bottom: 0; }
 
+/* The dialog's two sides: this session, and the defaults for all. */
+.term-settings-sides { display: flex; gap: 4px; margin: 0 0 14px; border-bottom: 1px solid var(--border); }
+.term-settings-sides button { border: 0; background: none; color: var(--text-secondary); padding: 8px 12px; cursor: pointer; font-size: 13px;
+  border-bottom: 2px solid transparent; margin-bottom: -1px; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.term-settings-sides button.is-active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+.session-settings-hint { grid-column: 1 / -1; margin: 0 0 6px; padding: 0; }
+.session-follow { display: flex !important; align-items: center; gap: 8px; margin: 0 0 6px !important; font-size: 12.5px; color: var(--text-secondary); cursor: pointer; }
+.session-follow input { width: auto; margin: 0; }
+.session-field .select-input { align-self: flex-start; min-width: 200px; }
+.session-keep { grid-column: 1 / -1; padding-top: 10px; border-top: 1px solid var(--border); }
+.session-keep .select-input { margin: 4px 0; }
+.term-settings .session-settings-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0 28px; }
+.share-view-settings .form-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.share-view-settings .filter-input, .share-view-settings .select-input { margin: 0; }
+
 @media (max-width: 720px) {
   .term-window:not(.term-window-minimized) {
     left: 0 !important;

@@ -34,7 +34,7 @@ export default function WorkspaceActions(props: Props) {
     : s === 'reconnecting' ? t('terminal.reconnecting')
     : s === 'ended' ? t('terminal.sessionEnded') : t('terminal.disconnected'));
   const dictation = terminal && (
-    <AccountDictation variant={compact ? 'bar' : 'head'}
+    <AccountDictation variant={compact ? 'bar' : 'head'} sessionId={terminal?.sessionId || undefined}
       onText={(text) => viewRef.current?.insertText(text)} onKeys={(keys) => viewRef.current?.sendKeys(keys)} />
   );
 

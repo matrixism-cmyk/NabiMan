@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TerminalView, { TerminalViewHandle } from './TerminalView';
-import { DEFAULT_TERMINAL_SETTINGS } from './settings';
+import ShareViewSettings, { useShareView, viewSettings } from './ShareViewSettings';
 import { issueShareTicket, readShareInfo, ShareAdmissionError, ShareFilesGrant, ShareInfo } from './shareAdmission';
 import TerminalWithFiles from '../remote/TerminalWithFiles';
 import SftpPanel from '../remote/sftp/SftpPanel';
@@ -32,6 +32,9 @@ function SharePageContent({ token }: { token: string }) {
   const [checking, setChecking] = useState(false);
   // The file panel's key comes with each admission and lives in memory only.
   const [files, setFiles] = useState<ShareFilesGrant | null>(null);
+  const [view, setView] = useShareView();
+  const [showView, setShowView] = useState(false);
+  const drawWith = useMemo(() => viewSettings(view), [view]);
   const filesSource = useMemo(
     () => (files ? shareSource(token, files.key, files.mode === 'write') : null),
     [token, files],
@@ -160,7 +163,8 @@ function SharePageContent({ token }: { token: string }) {
         {!info.alive && <span className="status-badge down">{t('share.ended')}</span>}
         <span className="share-head-spacer" />
         {info.dictation && !info.read_only && (
-          <DictationButton open={() => openShareDictation(token, (query) => acquireTicket(query))} endpointMs={info.dictation_pause_ms} enterOnPause={info.dictation_auto_enter}
+          <DictationButton open={() => openShareDictation(token, (query) => acquireTicket(query))} endpointMs={view.dictation_pause_ms ?? info.dictation_pause_ms}
+            enterOnPause={view.dictation_auto_enter ?? info.dictation_auto_enter}
             onText={(text) => viewRef.current?.insertText(text)} onKeys={(keys) => viewRef.current?.sendKeys(keys)} />
         )}
         <button
@@ -173,6 +177,8 @@ function SharePageContent({ token }: { token: string }) {
         <button className="btn btn-secondary btn-sm" onClick={() => viewRef.current?.reconnect()}>
           {t('terminal.reconnect')}
         </button>
+        <button className="btn btn-secondary btn-sm" title={t('share.viewSettings')} aria-label={t('share.viewSettings')}
+          onClick={() => setShowView(true)}>⚙</button>
       </header>
       <div className="share-body">
         <TerminalWithFiles target={null} name={info.label} source={filesSource}
@@ -181,13 +187,17 @@ function SharePageContent({ token }: { token: string }) {
             ref={viewRef}
             target={{ kind: 'local' }}
             storageKey={`share_${token}`}
-            settings={DEFAULT_TERMINAL_SETTINGS}
+            settings={drawWith}
             share={{ token, acquireTicket }}
             grid={{ cols: info.cols, rows: info.rows }}
             active
           />
         </TerminalWithFiles>
       </div>
+      {showView && (
+        <ShareViewSettings view={view} onChange={setView} onClose={() => setShowView(false)}
+          dictation={info.dictation && !info.read_only ? { pause_ms: info.dictation_pause_ms ?? 1500, auto_enter: Boolean(info.dictation_auto_enter) } : null} />
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { useApi, apiPost } from '../../shared/api/useApi';
 import { RemoteServer, RemoteServerStatus } from './remoteTypes';
 import { useT } from '../../shared/i18n';
 import TerminalView, { TerminalStatus, TerminalTarget, TerminalViewHandle } from '../terminal/TerminalView';
-import { useTerminalSettings } from '../terminal/settings';
+import { useSessionTerminalSettings } from '../terminal/sessionSettings';
 import { useTerminalWindows } from '../terminal/TerminalWindows';
 import { paneEnded, pruneSessionZooms, startFresh } from '../terminal/terminalStorage';
 import TerminalSettingsModal from '../terminal/TerminalSettingsModal';
@@ -46,7 +46,6 @@ import './remote-workspace.css';
  */
 export default function RemoteWorkspace() {
   const { t } = useT();
-  const { settings } = useTerminalSettings();
   const { openTerminal } = useTerminalWindows();
   const viewRef = useRef<TerminalViewHandle>(null);
 
@@ -209,6 +208,7 @@ export default function RemoteWorkspace() {
   // "This pane" is the pane mounted for this target, even kept behind the list.
   const currentSessionId = showTerminalPane ? paneSessions[storageKey] || '' : '';
   useEffect(() => { if (currentSessionId) refetchSessions(); }, [currentSessionId, refetchSessions]);
+  const settings = useSessionTerminalSettings(currentSessionId || undefined);
   const terminalVisible = (hasSessionsView && serverView === 'terminal')
     || (selection.kind === 'adhoc' && Boolean(adhocTarget));
 
@@ -386,7 +386,7 @@ export default function RemoteWorkspace() {
       {shareFiles && selectedServer && (
         <ShareDialog serverId={selectedServer.id} sessionLabel={`${selectedServer.name} · ${headSub}`} onClose={() => setShareFiles(false)} />
       )}
-      {showSettings && <TerminalSettingsModal onClose={() => setShowSettings(false)} />}
+      {showSettings && <TerminalSettingsModal onClose={() => setShowSettings(false)} sessionId={currentSessionId || undefined} sessionName={headTitle} />}
       {showShare && (shareTarget || currentSessionId) && (
         <ShareDialog
           sessionId={shareTarget || currentSessionId}
