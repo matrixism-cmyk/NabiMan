@@ -78,7 +78,8 @@ test('a correction erases what changed; stopping types the last words', async ()
   await begin(result);
   act(() => { FakeSocket.last.hear({ type: 'partial', committed: '', partial: '오늘 날씨.' }); jest.advanceTimersByTime(1300); });
   expect(onText).toHaveBeenLastCalledWith('오늘 날씨.');
-  act(() => result.current.stop());
+  // "stop" follows whatever the encoder still holds: a moment later.
+  await act(async () => { result.current.stop(); await Promise.resolve(); await Promise.resolve(); });
   expect(FakeSocket.last.sent).toContain(JSON.stringify({ type: 'stop' }));
   act(() => FakeSocket.last.hear({ type: 'final', committed: '오늘 날씨가 좋다', partial: '' }));
   expect(onKeys).toHaveBeenCalledWith('\x7f');

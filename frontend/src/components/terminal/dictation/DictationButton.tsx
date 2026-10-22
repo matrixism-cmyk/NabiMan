@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useT } from '../../../shared/i18n';
 import { useDictation } from './useDictation';
 import './dictation.css';
@@ -26,7 +26,15 @@ const KNOWN = ['denied', 'nomic', 'connection'];
  */
 export default function DictationButton({ open, onText, onKeys, variant = 'head', endpointMs, enterOnPause, voiceLock }: Props) {
   const { t } = useT();
-  const { state, partial, error, start, stop } = useDictation({ open, onText, onKeys, endpointMs, enterOnPause, voiceLock });
+  const { state, partial, error, blocked, start, stop } = useDictation({ open, onText, onKeys, endpointMs, enterOnPause, voiceLock });
+  // "내 목소리만" says at the end how much of other voices it kept out; shown for a moment.
+  const [keptOut, setKeptOut] = useState(0);
+  useEffect(() => {
+    if (!blocked) return undefined;
+    setKeptOut(blocked);
+    const timer = window.setTimeout(() => setKeptOut(0), 6000);
+    return () => window.clearTimeout(timer);
+  }, [blocked]);
   const on = state === 'listening' || state === 'starting';
   const message = error ? (KNOWN.includes(error) ? t(`dictation.${error}`) : error) : '';
   // What a press will do, as this server is set up: Enter at a pause, a pause only, or "엔터" alone.
@@ -53,6 +61,9 @@ export default function DictationButton({ open, onText, onKeys, variant = 'head'
         </span>
       )}
       {message && !on && <span className="dictation-bubble is-error" role="alert">{message}</span>}
+      {keptOut > 0 && !on && !message && (
+        <span className="dictation-bubble" role="status">{t('dictation.keptOut', { seconds: keptOut })}</span>
+      )}
     </span>
   );
 }

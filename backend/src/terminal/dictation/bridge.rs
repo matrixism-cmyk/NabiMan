@@ -24,6 +24,8 @@ use crate::users::UserStore;
 const LONGEST: Duration = Duration::from_secs(61 * 60);
 /// 16 kHz × 16 bit for an hour, and a little more.
 const MOST_AUDIO: u64 = 16_000 * 2 * 3_660;
+/// The same hour as Opus, at twice the most a page sends (32 kbps): 64 kbps.
+const MOST_OPUS: u64 = 64_000 / 8 * 3_660;
 /// One audio frame from the page; it sends 0.1 s (3200 bytes) at a time.
 const BIGGEST_FRAME: usize = 64 * 1024;
 const CHECK_EVERY: Duration = Duration::from_secs(30);
@@ -60,6 +62,8 @@ struct Dictation {
     to_voice: Option<mpsc::UnboundedSender<WsMessage>>,
     opened: bool,
     audio: u64,
+    /// The sound comes as Opus bundles (VSP/1), not PCM.
+    opus: bool,
     since: Instant,
 }
 
@@ -127,6 +131,18 @@ fn opening(asked: &serde_json::Value, language: &str, account: bool) -> serde_js
     if account && asked.get("voice_lock").and_then(|v| v.as_bool()) == Some(true) {
         open["voice_lock"] = true.into();
     }
+    // How the sound comes: PCM (the default, said by nothing) or Opus bundles.
+    // Without this a page's Opus would be read as PCM. Rate and size are for
+    // the service's notes only.
+    if asked.get("codec").and_then(|v| v.as_str()) == Some("opus") {
+        open["codec"] = "opus".into();
+        if let Some(rate) = asked.get("bitrate").and_then(|v| v.as_u64()).filter(|r| (6_000..=128_000).contains(r)) {
+            open["bitrate"] = rate.into();
+        }
+        if asked.get("sample_rate").and_then(|v| v.as_u64()) == Some(16_000) {
+            open["sample_rate"] = 16_000.into();
+        }
+    }
     open["language"] = language.into();
     open["title"] = "NabiMan terminal".into();
     open["save"] = false.into();
@@ -153,6 +169,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Dictation {
                     let asked = value.get("language").and_then(|l| l.as_str()).filter(|l| LANGUAGES.contains(l));
                     let language = asked.unwrap_or(self.settings.language());
                     let open = opening(&value, language, matches!(self.grant, Admission::Account(_)));
+                    self.opus = open.get("codec").and_then(|c| c.as_str()) == Some("opus");
                     self.opened = true;
                     self.send(WsMessage::text(open.to_string()));
                 }
@@ -162,7 +179,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Dictation {
                     return;
                 }
                 self.audio += bytes.len() as u64;
-                if self.audio > MOST_AUDIO {
+                if self.audio > if self.opus { MOST_OPUS } else { MOST_AUDIO } {
                     self.fail(ctx, "Dictation is limited to an hour at a time");
                     return;
                 }
@@ -242,7 +259,7 @@ fn begin(grant: Admission, req: &HttpRequest, stream: web::Payload) -> Result<Ht
     let Some(key) = settings.key() else {
         return Ok(HttpResponse::ServiceUnavailable().finish());
     };
-    let actor = Dictation { grant, settings, key, to_voice: None, opened: false, audio: 0, since: Instant::now() };
+    let actor = Dictation { grant, settings, key, to_voice: None, opened: false, audio: 0, opus: false, since: Instant::now() };
     ws::start(actor, req, stream)
 }
 
@@ -307,5 +324,16 @@ mod tests {
         assert_eq!(account, serde_json::json!({ "voice_lock": true, "endpoint_ms": 2000, "language": "korean", "title": "NabiMan terminal", "save": false }));
         assert!(opening(&asked, "korean", false).get("voice_lock").is_none(), "a share visitor never gets it");
         assert!(opening(&serde_json::json!({ "voice_lock": "yes" }), "korean", true).get("voice_lock").is_none());
+    }
+
+    #[test]
+    fn opus_is_passed_on_checked_and_anything_else_stays_pcm() {
+        let opus = opening(&serde_json::json!({ "codec": "opus", "bitrate": 32000, "sample_rate": 16000 }), "korean", false);
+        assert_eq!((opus["codec"].as_str(), opus["bitrate"].as_u64(), opus["sample_rate"].as_u64()), (Some("opus"), Some(32000), Some(16000)));
+        let odd = opening(&serde_json::json!({ "codec": "opus", "bitrate": 999_999, "sample_rate": 48000 }), "korean", true);
+        assert!(odd.get("bitrate").is_none() && odd.get("sample_rate").is_none() && odd["codec"] == "opus");
+        for other in [serde_json::json!({ "codec": "flac" }), serde_json::json!({ "codec": "pcm16" }), serde_json::json!({})] {
+            assert!(opening(&other, "korean", true).get("codec").is_none(), "{other}");
+        }
     }
 }

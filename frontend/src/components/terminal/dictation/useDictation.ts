@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Action, finalText, Resampler, Typist, utteranceActions } from './speech';
+import { opusUplink, pcmUplink, Uplink } from './uplink';
 import { markActivity } from '../../../shared/auth/useIdleLogout';
 
 export type DictationState = 'idle' | 'starting' | 'listening' | 'stopping';
@@ -45,7 +46,9 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
   const [state, setState] = useState<DictationState>('idle');
   const [partial, setPartial] = useState('');
   const [error, setError] = useState('');
-  const live = useRef<{ ws: WebSocket; media: MediaStream; audio: AudioContext } | null>(null);
+  const live = useRef<{ ws: WebSocket; media: MediaStream; audio: AudioContext; uplink: Uplink } | null>(null);
+  /** Seconds of other voices "내 목소리만" kept out, as the service reports at the end. */
+  const [blocked, setBlocked] = useState(0);
   const typist = useRef(new Typist());
   const heard = useRef('');
   const pause = useRef<number | undefined>(undefined);
@@ -81,6 +84,7 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
     if (!now) return;
     now.media.getTracks().forEach((t) => t.stop());
     now.audio.close().catch(() => undefined);
+    now.uplink.close();
     if (now.ws.readyState <= WebSocket.OPEN) now.ws.close();
   }, []);
 
@@ -88,6 +92,7 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
     if (live.current) return;
     setError('');
     setPartial('');
+    setBlocked(0);
     setState('starting');
     typist.current = new Typist();
     heard.current = '';
@@ -105,13 +110,19 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
         ws.onerror = () => reject(new Error('dictation'));
         ws.onclose = () => reject(new Error('dictation'));
       });
+      const send = (data: ArrayBuffer) => { if (ws.readyState === WebSocket.OPEN) ws.send(data); };
+      // Opus where the browser can make it (an eighth of the bytes), PCM where not.
+      const uplink = (await opusUplink(send)) ?? pcmUplink(send);
+      // The opening message comes before any sound: how it is sent, and how to listen.
+      const { endpointMs: pauseMs, voiceLock: onlyMe } = pauseRef.current;
+      ws.send(JSON.stringify({ ...uplink.config, ...(pauseMs > 0 ? { endpoint_ms: pauseMs } : {}), ...(onlyMe ? { voice_lock: true } : {}) }));
       const audio = new AudioContext();
       const resampler = new Resampler(audio.sampleRate);
       const source = audio.createMediaStreamSource(media);
       const feed = (samples: Float32Array) => {
         if (ws.readyState !== WebSocket.OPEN) return;
         // Muted, the stream goes on (the service keeps listening) but hears silence.
-        for (const frame of resampler.push(samples)) ws.send(mutedRef.current ? new ArrayBuffer(frame.byteLength) : frame);
+        for (const frame of resampler.push(samples)) uplink.push(frame, mutedRef.current);
       };
       const url = URL.createObjectURL(new Blob([TAP], { type: 'application/javascript' }));
       await audio.audioWorklet.addModule(url);
@@ -119,7 +130,7 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
       const tap = new AudioWorkletNode(audio, 'nabiman-tap');
       tap.port.onmessage = (e) => feed(e.data as Float32Array);
       source.connect(tap);
-      live.current = { ws, media, audio };
+      live.current = { ws, media, audio, uplink };
       ws.onmessage = (e) => {
         if (typeof e.data !== 'string') return;
         let msg: { type?: string; committed?: string; partial?: string; message?: string; utterance?: string; text?: string };
@@ -137,6 +148,10 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
           ends.current = true;
           setPartial(msg.utterance);
           return;
+        }
+        if (msg.type === 'final') {
+          const kept = (msg as { uplink?: { voice_blocked_sec?: number } }).uplink?.voice_blocked_sec;
+          if (typeof kept === 'number' && kept >= 0.5) setBlocked(Math.round(kept));
         }
         if (msg.type === 'final' && ends.current) { setPartial(''); return; }
         if (msg.type === 'partial') {
@@ -160,8 +175,6 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
       };
       ws.onclose = () => { release(); setPartial(''); setState('idle'); };
       ws.onerror = () => setError('connection');
-      const { endpointMs: pauseMs, voiceLock: onlyMe } = pauseRef.current;
-      ws.send(JSON.stringify({ ...(pauseMs > 0 ? { endpoint_ms: pauseMs } : {}), ...(onlyMe ? { voice_lock: true } : {}) }));
       setState('listening');
     } catch (e) {
       media?.getTracks().forEach((t) => t.stop());
@@ -179,11 +192,14 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
     setState('stopping');
     now.media.getTracks().forEach((t) => t.stop());
     now.audio.close().catch(() => undefined);
-    if (now.ws.readyState === WebSocket.OPEN) now.ws.send(JSON.stringify({ type: 'stop' }));
+    // What is still in the encoder goes first, or the last words are cut off.
+    now.uplink.finish().catch(() => undefined).then(() => {
+      if (now.ws.readyState === WebSocket.OPEN) now.ws.send(JSON.stringify({ type: 'stop' }));
+    });
     window.setTimeout(() => { if (live.current === now) release(); setState('idle'); }, LAST_WORDS_MS);
   }, [release]);
 
   useEffect(() => release, [release]);
 
-  return { state, partial, error, start, stop };
+  return { state, partial, error, blocked, start, stop };
 }
