@@ -1,4 +1,5 @@
 mod bounded_command;
+mod access_rules;
 mod accounts;
 mod alert_rules;
 mod api_keys;

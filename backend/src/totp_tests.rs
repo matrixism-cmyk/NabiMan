@@ -19,6 +19,7 @@ async fn second_factor_alone_cannot_issue_tokens() {
         totp_secret: Some(secret),
         mfa: Default::default(),
         remote_permissions: Default::default(),
+        access: Default::default(),
         status: Default::default(),
         memberships: vec![],
         requested_memberships: vec![],
@@ -66,6 +67,7 @@ async fn active_second_factor_cannot_be_replaced_without_disabling_it() {
         totp_secret: Some(original_secret.clone()),
         mfa: Default::default(),
         remote_permissions: Default::default(),
+        access: Default::default(),
         status: Default::default(),
         memberships: vec![],
         requested_memberships: vec![],
@@ -152,6 +154,7 @@ fn fixture_user() -> crate::models::NabimanUser {
         )),
         mfa: Default::default(),
         remote_permissions: Default::default(),
+        access: Default::default(),
         share_authorization_version: "fixture".into(),
     }
 }

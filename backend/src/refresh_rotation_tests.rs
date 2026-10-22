@@ -18,6 +18,7 @@ fn account() -> NabimanUser {
         totp_secret: None,
         mfa: Default::default(),
         remote_permissions: Default::default(),
+        access: Default::default(),
         share_authorization_version: "fixture".into(),
     }
 }

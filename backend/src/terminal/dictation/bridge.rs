@@ -50,7 +50,9 @@ impl Admission {
         match self {
             Admission::Account(grant) => grant.valid(),
             Admission::Share { link, shares, users } => live_link(shares, users, &link.token)
-                .is_some_and(|now| now.same_authorization(link) && !now.read_only),
+                .is_some_and(|now| {
+                    now.same_authorization(link) && !now.read_only && crate::terminal::share::owner_dictates(users, &now)
+                }),
         }
     }
 }
@@ -292,7 +294,9 @@ pub(super) async fn start_shared(
     let Some(snapshot) = crate::terminal::share_ticket::redeem(&req, &token, &tickets) else {
         return Ok(HttpResponse::Unauthorized().finish());
     };
-    let Some(link) = live_link(&shares, &users, &token).filter(|l| l.same_authorization(&snapshot)) else {
+    let Some(link) = live_link(&shares, &users, &token)
+        .filter(|l| l.same_authorization(&snapshot) && crate::terminal::share::owner_dictates(&users, l))
+    else {
         return Ok(HttpResponse::Forbidden().finish());
     };
     if link.read_only || link.files_only() {

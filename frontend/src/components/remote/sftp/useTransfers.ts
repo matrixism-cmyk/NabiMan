@@ -27,8 +27,11 @@ export interface TransferRow {
  * Uploads and downloads for one server's file panel, one at a time so a large
  * batch does not open dozens of connections, each with its own progress row.
  */
-export function useTransfers(source: SftpSource, onUploaded: (dir: string) => void) {
+export function useTransfers(source: SftpSource, onUploaded: (dir: string) => void, uploadLimit?: number | null) {
   const { t } = useT();
+  // The largest file this account may send, as the server last said.
+  const limit = useRef(uploadLimit);
+  limit.current = uploadLimit;
   const [rows, setRows] = useState<TransferRow[]>([]);
   const nextId = useRef(1);
   const running = useRef<Map<number, Transfer>>(new Map());
@@ -77,6 +80,10 @@ export function useTransfers(source: SftpSource, onUploaded: (dir: string) => vo
         const parts = job.rel.split('/');
         const name = parts.pop() || job.file.name;
         const target = parts.length ? joinPath(dir, parts.join('/')) : dir;
+        if (limit.current && job.file.size > limit.current) {
+          patch(job.id, { status: 'failed', message: t('sftp.tooBig', { mb: Math.floor(limit.current / 1048576) }) });
+          continue;
+        }
         rates.current.set(job.id, startRate(performance.now()));
         const progress = (loaded: number) => {
           const before = rates.current.get(job.id) || startRate(performance.now());

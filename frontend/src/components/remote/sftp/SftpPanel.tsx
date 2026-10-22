@@ -44,8 +44,8 @@ interface Menu { x: number; y: number; entry?: SftpEntry; opener: HTMLElement | 
 export default function SftpPanel({ source, serverName, onInsert, onClose }: Props) {
   const { t } = useT();
   const pathKey = `nabiman_sftp_path_${source.key}`;
-  const writable = source.writable;
   const [listing, setListing] = useState<SftpListing | null>(null);
+  const writable = source.writable && listing?.may?.write !== false;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -90,10 +90,10 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
   const refresh = useCallback(() => load(current.current), [load]);
   const transfers = useTransfers(source, useCallback((dir: string) => {
     if (dir === current.current) refresh();
-  }, [refresh]));
+  }, [refresh]), listing?.may?.upload_limit);
 
   // Copies from other servers' panels landing here; an account's panel only.
-  const copyScope = source.shareKey ? undefined : source.scope;
+  const copyScope = source.shareKey || listing?.may?.copy === false ? undefined : source.scope;
   const copies = useCopies(copyScope, useCallback((dir: string) => {
     if (dir === current.current) refresh();
   }, [refresh]));

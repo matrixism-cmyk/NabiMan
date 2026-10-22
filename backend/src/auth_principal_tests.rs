@@ -29,6 +29,7 @@ async fn authenticated_identity_ignores_spoofed_headers_and_unverified_claims() 
         totp_secret: None,
         mfa: Default::default(),
         remote_permissions: Default::default(),
+        access: Default::default(),
     }]));
     let claims = auth::Claims {
         sub: "operator".into(),

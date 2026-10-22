@@ -154,6 +154,7 @@ pub fn register_authenticated_session(
         || current.share_authorization_version != authenticated.share_authorization_version
         || current.memberships != authenticated.memberships
         || current.scope_restricted != authenticated.scope_restricted
+        || crate::access_rules::admits(current, ip.parse().ok()).is_err()
     {
         return false;
     }
@@ -178,6 +179,7 @@ pub struct RefreshRequest {
 
 #[post("/api/auth/refresh")]
 async fn refresh_token(
+    req: actix_web::HttpRequest,
     body: web::Json<RefreshRequest>,
     secret: web::Data<JwtSecret>,
     sessions: web::Data<SessionStore>,
@@ -206,8 +208,10 @@ async fn refresh_token(
     let Some(session) = sessions.get(&claims.sid) else {
         return HttpResponse::Unauthorized().json(ApiResponse::<()>::error("Session revoked"));
     };
+    let ip = crate::access_rules::client_ip(&req);
     let Some(user) = users.iter().find(|u| {
         u.active()
+            && crate::access_rules::admits(u, ip).is_ok()
             && u.username == claims.sub
             && u.id == session.user_id
             && !u.id.is_empty()

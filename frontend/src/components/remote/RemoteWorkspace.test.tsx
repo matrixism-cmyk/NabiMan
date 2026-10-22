@@ -4,7 +4,7 @@ import { I18nProvider } from '../../i18n';
 import { TerminalSettingsProvider } from '../terminal/settings';
 import { TerminalWindowsProvider } from '../terminal/TerminalWindows';
 import RemoteWorkspace from './RemoteWorkspace';
-import { MemberContext, Sharing, SharingContext } from './member';
+import { DEFAULT_GRANTS, GrantsContext, MemberContext, MemberGrants } from './member';
 
 const SERVERS = [
   { id: 'srv_1', name: 'web-prod-01', host: '192.168.1.100', port: 22, user: 'root',
@@ -56,14 +56,13 @@ jest.mock('../../shared/api/useApi', () => ({
   apiDelete: () => Promise.resolve({ success: true, data: null, message: '' }),
 }));
 
-const NONE: Sharing = { sessions: false, files: false };
-function renderWorkspace(member = false, sharing: Sharing = member ? NONE : { sessions: true, files: true }) {
+function renderWorkspace(member = false, grants: MemberGrants | null = member ? DEFAULT_GRANTS : null) {
   return render(
     <I18nProvider>
       <TerminalSettingsProvider>
         <TerminalWindowsProvider>
           <MemberContext.Provider value={member}>
-            <SharingContext.Provider value={sharing}><RemoteWorkspace /></SharingContext.Provider>
+            <GrantsContext.Provider value={grants}><RemoteWorkspace /></GrantsContext.Provider>
           </MemberContext.Provider>
         </TerminalWindowsProvider>
       </TerminalSettingsProvider>
@@ -315,7 +314,7 @@ describe('remote workspace', () => {
 
   // 세션 공유 granted by an administrator: the member's sessions get the link.
   it('offers a member session links only once granted', () => {
-    renderWorkspace(true, { sessions: true, files: false });
+    renderWorkspace(true, { ...DEFAULT_GRANTS, share_sessions: true });
     expect(tabs().getByRole('button', { name: '공유 링크' })).toBeInTheDocument();
     fireEvent.click(tabs().getByRole('button', { name: /세션/ }));
     const links = () => Array.from(document.querySelectorAll('.session-actions button')).filter(b => b.textContent === '🔗');

@@ -2,6 +2,8 @@
 mod profile;
 #[path = "users_storage.rs"]
 mod storage;
+#[path = "user_admin.rs"]
+mod admin;
 use storage::*;
 pub(crate) use storage::{commit_users, generate_id};
 
@@ -27,6 +29,7 @@ struct StoredUser<'a> {
     totp_secret: &'a Option<String>,
     mfa: &'a crate::models::MfaState,
     remote_permissions: &'a crate::models::RemotePermissions,
+    access: &'a crate::models::AccessRules,
 }
 
 pub type UserStore = Arc<Mutex<Vec<NabimanUser>>>;
@@ -79,6 +82,7 @@ pub fn new_user_store(pw_hash: &str) -> UserStore {
         totp_secret: None,
         mfa: Default::default(),
         remote_permissions: Default::default(),
+        access: Default::default(),
         status: Default::default(),
         memberships: vec![],
         requested_memberships: vec![],
@@ -165,6 +169,7 @@ pub fn ensure_oauth_user(store: &UserStore, username: &str, _role: &str) -> Resu
             totp_secret: None,
             mfa: Default::default(),
             remote_permissions: Default::default(),
+            access: Default::default(),
         });
         commit_users(&mut users, previous)?;
         return Err("최고관리자의 가입 승인이 필요합니다".into());
@@ -252,6 +257,7 @@ async fn create_user(
         totp_secret: None,
         mfa: Default::default(),
         remote_permissions: Default::default(),
+        access: Default::default(),
         status: Default::default(),
         memberships: vec![],
         requested_memberships: vec![],
@@ -316,8 +322,8 @@ async fn update_user(
             user.scope_restricted = true;
         }
     }
-    if let Some(ref permissions) = body.remote_permissions {
-        user.remote_permissions = permissions.clone();
+    if let Err(e) = admin::apply(user, body.remote_permissions.as_ref(), body.access.as_ref()) {
+        return HttpResponse::BadRequest().json(ApiResponse::<()>::error(&e));
     }
     match commit_users(&mut users, previous) {
         Ok(()) => {
@@ -376,6 +382,10 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("", web::get().to(list_users))
             .route("", web::post().to(create_user))
             .route("/me", web::get().to(profile::get_me))
+            .route("/my-address", web::get().to(admin::my_address))
+            .route("/{id}/overview", web::get().to(admin::overview))
+            .route("/{id}/sign-out", web::post().to(admin::sign_out))
+            .route("/{id}/share-links/revoke", web::post().to(admin::revoke_links))
             .route("/{id}", web::put().to(update_user))
             .route("/{id}", web::delete().to(delete_user)),
     );

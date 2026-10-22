@@ -44,6 +44,7 @@ fn user(id: &str, role: UserRole) -> NabimanUser {
         totp_secret: None,
         mfa: Default::default(),
         remote_permissions: Default::default(),
+        access: Default::default(),
     }
 }
 #[test]

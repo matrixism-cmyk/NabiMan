@@ -39,8 +39,9 @@ pub struct MfaState {
 }
 
 /// What a remote-only member may do beyond working on their servers, each
-/// granted by an administrator. The administrators may always do all of it.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+/// set by an administrator. The administrators may always do all of it. The
+/// defaults keep what members could already do, and grant no sharing.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct RemotePermissions {
     /// Share links to their terminal sessions (세션 공유).
     #[serde(default)]
@@ -48,13 +49,106 @@ pub struct RemotePermissions {
     /// Share links to a server's files, and the file panel in a session's link.
     #[serde(default)]
     pub share_files: bool,
+    /// Their links may last at most this many days (0: no limit, permanent allowed).
+    #[serde(default)]
+    pub share_max_days: u32,
+    /// Their links must carry a password.
+    #[serde(default)]
+    pub share_require_password: bool,
+    /// Their links only show: no typing, files at most browsed.
+    #[serde(default)]
+    pub share_view_only: bool,
+    /// Voice dictation into the terminal (the administrators' speech service).
+    #[serde(default = "yes")]
+    pub dictation: bool,
+    /// Registering servers of their own, and editing them.
+    #[serde(default = "yes")]
+    pub register_servers: bool,
+    /// Changing files on servers an administrator assigned them (upload,
+    /// delete, rename, permissions). Off: browse and download only.
+    #[serde(default = "yes")]
+    pub assigned_file_write: bool,
+    /// Copying files from one server to another.
+    #[serde(default = "yes")]
+    pub copy_between_servers: bool,
+    /// Sessions kept alive with no idle limit (세션 유지).
+    #[serde(default = "yes")]
+    pub keep_sessions: bool,
+    /// At most this many sessions at once (0: no limit).
+    #[serde(default)]
+    pub max_sessions: u32,
+    /// A session left idle this long ends (0: no limit).
+    #[serde(default)]
+    pub max_idle_minutes: u32,
+    /// At most this many servers of their own (0: no limit).
+    #[serde(default)]
+    pub max_servers: u32,
+    /// One upload may be at most this many megabytes (0: no limit).
+    #[serde(default)]
+    pub max_upload_mb: u32,
+}
+
+fn yes() -> bool {
+    true
+}
+
+impl Default for RemotePermissions {
+    fn default() -> Self {
+        Self {
+            share_sessions: false,
+            share_files: false,
+            share_max_days: 0,
+            share_require_password: false,
+            share_view_only: false,
+            dictation: true,
+            register_servers: true,
+            assigned_file_write: true,
+            copy_between_servers: true,
+            keep_sessions: true,
+            max_sessions: 0,
+            max_idle_minutes: 0,
+            max_servers: 0,
+            max_upload_mb: 0,
+        }
+    }
 }
 
 impl RemotePermissions {
-    /// Whether anything granted before is no longer granted.
+    /// Whether sharing that was allowed before is no longer: the links it
+    /// made must not come back if it is allowed again.
     pub fn narrowed_from(&self, before: &Self) -> bool {
         (before.share_sessions && !self.share_sessions) || (before.share_files && !self.share_files)
     }
+}
+
+/// When and from where an account may be used, and how it signs in. Set by
+/// the super administrator for any account but their own kind.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+pub struct AccessRules {
+    /// The account stops working at this moment (RFC 3339).
+    #[serde(default)]
+    pub expires_at: Option<String>,
+    /// Two-step sign-in is required of this account.
+    #[serde(default)]
+    pub require_mfa: bool,
+    /// Signing in only from these addresses or networks (`203.0.113.7`,
+    /// `203.0.113.0/24`); empty: from anywhere.
+    #[serde(default)]
+    pub allowed_networks: Vec<String>,
+    /// Only within these hours, Korean time; none: at any time.
+    #[serde(default)]
+    pub allowed_hours: Option<HourWindow>,
+}
+
+/// Hours of the day (Korean time), from `start` up to `end` (exclusive; an end
+/// before the start runs past midnight), on the given weekdays (0 Monday to
+/// 6 Sunday; empty: every day).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct HourWindow {
+    pub start: u8,
+    pub end: u8,
+    #[serde(default)]
+    pub days: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -86,6 +180,8 @@ pub struct NabimanUser {
     pub mfa: MfaState,
     #[serde(default)]
     pub remote_permissions: RemotePermissions,
+    #[serde(default)]
+    pub access: AccessRules,
 }
 
 #[derive(Deserialize)]
@@ -100,6 +196,7 @@ pub struct UpdateUserRequest {
     pub password: Option<String>,
     pub role: Option<UserRole>,
     pub remote_permissions: Option<RemotePermissions>,
+    pub access: Option<AccessRules>,
 }
 
 #[derive(Deserialize)]
@@ -156,8 +253,10 @@ impl Membership {
 }
 
 impl NabimanUser {
+    /// Approved, not suspended, and (for anyone but an administrator) not past
+    /// the end of its time.
     pub fn active(&self) -> bool {
-        self.status == AccountStatus::Active
+        self.status == AccountStatus::Active && (self.role == UserRole::Admin || !self.access.expired())
     }
     pub fn super_admin(&self) -> bool {
         self.active() && self.role == UserRole::Admin

@@ -37,6 +37,12 @@ const LOCAL: &str = "local";
 fn fail(status: StatusCode, message: &str) -> HttpResponse {
     HttpResponse::build(status).json(ApiResponse::<()>::error(message))
 }
+/// An upload past what a member may send at once.
+fn too_big(limit: Option<u64>) -> HttpResponse {
+    let mb = limit.unwrap_or(0) / (1024 * 1024);
+    fail(StatusCode::PAYLOAD_TOO_LARGE, &format!("업로드는 한 파일에 {mb}MB까지 할 수 있습니다"))
+}
+
 fn bad(message: &str) -> HttpResponse {
     fail(StatusCode::BAD_REQUEST, message)
 }

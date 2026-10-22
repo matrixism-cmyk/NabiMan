@@ -1,0 +1,158 @@
+/* 회원 관리: the list on the left, one member's detail beside it. */
+.users-admin .panel-header { align-items: flex-start; }
+.users-lead { margin: 6px 0 0; max-width: 760px; line-height: 1.6; font-size: 13px; }
+.users-lead a { color: var(--primary); }
+
+.users-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.users-stat {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 14px; cursor: pointer;
+  background: var(--surface-alt); border: 1px solid var(--border); border-radius: 8px; color: var(--text); text-align: left;
+}
+.users-stat:hover { border-color: var(--primary); }
+.users-stat strong { font-size: 22px; line-height: 1.1; }
+.users-stat span { font-size: 12px; color: var(--text-secondary); }
+.users-stat.is-warn strong { color: var(--warning); }
+
+.users-pending {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 10px 14px; margin-bottom: 14px; border-radius: 8px;
+  background: rgba(243, 156, 18, 0.12); border: 1px solid rgba(243, 156, 18, 0.4); color: var(--text);
+}
+
+.users-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.users-search { width: 200px; max-width: 100%; }
+.users-shown { margin-left: auto; font-size: 13px; }
+.users-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.users-seg button { background: transparent; border: 0; border-right: 1px solid var(--border); color: var(--text-secondary); padding: 6px 10px; cursor: pointer; font-size: 13px; }
+.users-seg button:last-child { border-right: 0; }
+.users-seg button.is-on { background: var(--primary); color: var(--primary-fg); }
+
+.users-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+.users-layout.has-detail { grid-template-columns: minmax(0, 1fr) minmax(400px, 48%); }
+.users-list { min-width: 0; overflow-x: auto; }
+.users-table { width: 100%; }
+.users-table tbody tr { cursor: pointer; }
+.users-table tbody tr:hover { background: var(--surface-alt); }
+.users-table tbody tr.is-selected { background: rgba(59, 130, 246, 0.14); box-shadow: inset 3px 0 0 var(--primary); }
+.users-table tbody tr:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.users-table td { vertical-align: middle; }
+.users-scopes { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.users-security { display: flex; flex-wrap: wrap; gap: 4px; }
+.users-empty { color: var(--text-secondary); padding: 16px 4px; }
+.users-me { margin-left: 6px; font-size: 11px; padding: 1px 6px; border-radius: 8px; background: var(--surface-alt); color: var(--text-secondary); }
+
+.users-role, .users-state, .users-chip {
+  display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; white-space: nowrap;
+  background: var(--surface-alt); color: var(--text-secondary);
+}
+.users-role.role-admin { background: rgba(231, 76, 60, 0.15); color: var(--danger); }
+.users-role.role-remote { background: rgba(59, 130, 246, 0.15); color: var(--primary); }
+.users-role.role-viewer { background: rgba(46, 204, 113, 0.12); color: var(--success); }
+.users-state.is-ok, .users-chip.is-ok { background: rgba(46, 204, 113, 0.14); color: var(--success); }
+.users-state.is-warn, .users-chip.is-warn { background: rgba(243, 156, 18, 0.15); color: var(--warning); }
+.users-state.is-bad { background: rgba(231, 76, 60, 0.15); color: var(--danger); }
+.users-chip { font-weight: 500; font-size: 11px; }
+
+.users-detail {
+  position: sticky; top: 12px; max-height: calc(100vh - 140px); overflow-y: auto; min-width: 0;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+}
+.users-detail-head { padding: 16px 18px 12px; border-bottom: 1px solid var(--border); }
+.users-detail-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.users-detail-title h3 { margin: 0; font-size: 18px; color: var(--text); }
+.users-close { background: transparent; border: 0; color: var(--text-secondary); font-size: 22px; cursor: pointer; line-height: 1; }
+.users-detail-badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 8px; }
+.users-detail-sub { font-size: 12px; margin: 0 0 10px; line-height: 1.6; }
+.users-actions { flex-wrap: wrap; }
+
+.users-tabs { display: flex; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+.users-tabs button {
+  background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--text-secondary);
+  padding: 10px 12px; cursor: pointer; font-size: 13px; white-space: nowrap;
+}
+.users-tabs button.is-on { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+.users-tab-body { padding: 14px 16px 18px; }
+
+.users-sections, .users-overview { display: flex; flex-direction: column; gap: 12px; }
+.users-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+.users-card h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 14px; color: var(--text); }
+.users-card h4 em { font-style: normal; font-size: 12px; color: var(--text-secondary); }
+.users-card h4 .btn { margin-left: auto; }
+.users-card p { margin: 6px 0; font-size: 12px; line-height: 1.6; }
+.users-card label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-secondary); }
+.users-card .btn-group { margin-top: 10px; }
+.users-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.users-row > label { flex: 1 1 180px; }
+.users-card .users-row .btn-group { margin-top: 0; }
+/* With a member open beside it, the list keeps to who and what. */
+.users-layout.has-detail .users-extra { display: none; }
+.users-add { margin-bottom: 14px; }
+
+.users-numbers { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.users-numbers div { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+.users-numbers strong { display: block; font-size: 20px; color: var(--text); }
+.users-numbers span { font-size: 12px; color: var(--text-secondary); }
+.users-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.users-lines li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 13px; padding: 6px 0; border-bottom: 1px dashed var(--border); }
+.users-lines li:last-child { border-bottom: 0; }
+.users-lines code { font-size: 12px; color: var(--text-secondary); }
+.users-lines .text-secondary { font-size: 12px; }
+.users-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-secondary); flex: none; }
+.users-dot.is-ok { background: var(--success); }
+.users-dot.is-bad { background: var(--danger); }
+
+.users-grants { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.users-card label.users-grant, .users-grant {
+  display: flex; flex-direction: row; align-items: flex-start; gap: 10px; padding: 10px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text);
+}
+.users-grant.is-on { border-color: var(--primary); background: rgba(59, 130, 246, 0.08); }
+.users-grant.is-dim { opacity: 0.55; }
+.users-grant input { width: 16px; height: 16px; margin: 2px 0 0; flex: none; }
+.users-grant span { display: flex; flex-direction: column; gap: 3px; }
+.users-grant strong { font-size: 13px; }
+.users-grant small { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+
+.users-limits { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.users-card label.users-limit { gap: 4px; color: var(--text); }
+.users-limit small { color: var(--text-secondary); font-size: 11px; line-height: 1.5; }
+.users-limit-input { display: flex; align-items: center; gap: 6px; }
+.users-limit-input input { width: 110px; }
+.users-limit-input em { font-style: normal; color: var(--text-secondary); font-size: 12px; }
+
+.users-networks { width: 100%; box-sizing: border-box; font-family: var(--font-mono, monospace); resize: vertical; }
+.users-warn { color: var(--warning); }
+.users-hours { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-top: 10px; }
+.users-days { display: inline-flex; gap: 4px; }
+.users-days button {
+  width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg);
+  color: var(--text-secondary); cursor: pointer;
+}
+.users-days button.is-on { background: var(--primary); border-color: var(--primary); color: var(--primary-fg); }
+
+.users-role-list, .users-roles { display: flex; flex-direction: column; gap: 8px; border: 0; padding: 0; margin: 0; }
+.users-roles legend { font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
+.users-card label.users-role-choice, .users-role-choice {
+  display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: center; cursor: pointer;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+}
+.users-role-choice.is-on { border-color: var(--primary); background: rgba(59, 130, 246, 0.08); }
+.users-role-choice input { grid-row: span 2; }
+.users-role-choice small { color: var(--text-secondary); font-size: 12px; }
+.users-save { margin-top: 2px; }
+.users-membership { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 4px 0; }
+
+.users-form { display: flex; flex-direction: column; gap: 12px; min-width: min(460px, 100%); }
+.users-form label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-secondary); }
+
+@media (max-width: 1180px) {
+  .users-layout.has-detail { grid-template-columns: minmax(0, 1fr); }
+  .users-detail { position: static; max-height: none; }
+}
+@media (max-width: 720px) {
+  .users-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .users-numbers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .users-shown { margin-left: 0; }
+  .users-search { width: 100%; }
+  .users-seg { flex-wrap: wrap; }
+}

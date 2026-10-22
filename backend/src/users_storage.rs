@@ -155,6 +155,7 @@ pub(super) fn serialize_users(users: &[NabimanUser]) -> Result<String, String> {
             totp_secret: &user.totp_secret,
             mfa: &user.mfa,
             remote_permissions: &user.remote_permissions,
+            access: &user.access,
         })
         .collect();
     serde_json::to_string_pretty(&stored).map_err(|e| e.to_string())

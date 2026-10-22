@@ -161,10 +161,17 @@ async fn toggle_share(
     }))
 }
 
+/// The signed-in account, to hold a member's session to its limits.
+fn account(req: &HttpRequest, users: &crate::users::UserStore) -> Option<crate::models::NabimanUser> {
+    let id = crate::auth::verified_user_id(req)?;
+    users.lock().ok()?.iter().find(|u| u.id == id).cloned()
+}
+
 async fn set_timeout(
     path: web::Path<String>,
     body: web::Json<TimeoutRequest>,
     store: web::Data<PtyStore>,
+    users: web::Data<crate::users::UserStore>,
     req: HttpRequest,
 ) -> HttpResponse {
     let id = path.into_inner();
@@ -185,18 +192,20 @@ async fn set_timeout(
     ) {
         return HttpResponse::Ok().json(crate::models::ApiResponse::<()>::error("Not owner"));
     }
+    let (_, timeout_secs) = account(&req, &users)
+        .map_or((false, body.timeout_secs), |u| crate::member_servers::session_terms(&u, false, body.timeout_secs));
     if let Err(response) = commit_edit(&mut map, &id, |s| {
-        s.timeout_secs = body.timeout_secs;
-        if body.timeout_secs != 0 {
+        s.timeout_secs = timeout_secs;
+        if timeout_secs != 0 {
             s.keepalive = false;
         }
     }) {
         return response;
     }
-    let label = if body.timeout_secs == 0 {
+    let label = if timeout_secs == 0 {
         "permanent".to_string()
     } else {
-        format!("{}s", body.timeout_secs)
+        format!("{}s", timeout_secs)
     };
     HttpResponse::Ok().json(crate::models::ApiResponse::ok(format!(
         "Timeout set to {}",
@@ -211,6 +220,7 @@ async fn set_keepalive(
     store: web::Data<PtyStore>,
     req: HttpRequest,
     preferences: web::Data<SettingsStore>,
+    users: web::Data<crate::users::UserStore>,
 ) -> HttpResponse {
     let id = path.into_inner();
     let username = extract_username_header(&req);
@@ -236,17 +246,21 @@ async fn set_keepalive(
             )
         }
     };
+    let asked = if body.keepalive { 0 } else { user_settings.idle_timeout_secs.min(MAX_TIMEOUT_SECS) };
+    let (keepalive, timeout_secs) = account(&req, &users)
+        .map_or((body.keepalive, asked), |u| crate::member_servers::session_terms(&u, body.keepalive, asked));
+    if body.keepalive && !keepalive {
+        return HttpResponse::Ok().json(crate::models::ApiResponse::<()>::error(
+            "세션 유지는 관리자가 허용하지 않았습니다",
+        ));
+    }
     if let Err(response) = commit_edit(&mut map, &id, |s| {
-        s.keepalive = body.keepalive;
-        s.timeout_secs = if body.keepalive {
-            0
-        } else {
-            user_settings.idle_timeout_secs.min(MAX_TIMEOUT_SECS)
-        };
+        s.keepalive = keepalive;
+        s.timeout_secs = timeout_secs;
     }) {
         return response;
     }
-    HttpResponse::Ok().json(crate::models::ApiResponse::ok(if body.keepalive {
+    HttpResponse::Ok().json(crate::models::ApiResponse::ok(if keepalive {
         "Keep-alive enabled"
     } else {
         "Keep-alive disabled"

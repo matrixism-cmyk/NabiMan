@@ -136,10 +136,12 @@ async fn verify_login(
             ))
         }
     };
+    if let Err(why) = crate::access_rules::admits(&user, crate::access_rules::client_ip(&req)) {
+        return HttpResponse::Forbidden().json(ApiResponse::<()>::error(&why));
+    }
     let sid = crate::jwt_sessions::generate_session_id();
-    let ip = req
-        .peer_addr()
-        .map(|a| a.ip().to_string())
+    let ip = crate::access_rules::client_ip(&req)
+        .map(|a| a.to_string())
         .unwrap_or_default();
     if !crate::jwt_sessions::register_authenticated_session(
         &sessions,

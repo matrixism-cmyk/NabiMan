@@ -40,6 +40,7 @@ const t: T = {
   'sftp.copyDone': { ko: '파일 {count}개 복사됨', en: '{count} files copied', ja: 'ファイル {count} 件をコピー' },
   'sftp.copyCancelled': { ko: '취소됨 · 파일 {count}개는 복사됨', en: 'Cancelled · {count} files were copied', ja: '取消 · ファイル {count} 件はコピー済み' },
   'sftp.skipped': { ko: '건너뜀', en: 'Skipped', ja: 'スキップ' },
+  'sftp.tooBig': { ko: '한 파일에 {mb}MB까지 올릴 수 있습니다', en: 'Uploads are limited to {mb} MB per file', ja: '1ファイル {mb}MB までアップロードできます' },
   'sftp.connecting': { ko: '연결하는 중…', en: 'Connecting…', ja: '接続中…' },
   'sftp.retry': { ko: '다시 시도', en: 'Retry', ja: '再試行' },
   'sftp.empty': { ko: '빈 폴더입니다. 파일을 끌어다 놓으면 이곳에 올라갑니다.', en: 'This folder is empty. Drop files here to upload them.', ja: '空のフォルダーです。ファイルをドロップするとアップロードされます。' },

@@ -1,15 +1,25 @@
 import React from 'react';
 import MemberAccessFields from './MemberAccessFields';
+import type { MemberGrants } from './remote/member';
 export interface Membership { kind: 'server' | 'tenant'; scope_id: string; role: 'admin' | 'operator' | 'viewer'; enabled?: boolean; allow_exec?: boolean | null; expires_at?: string | null }
 export interface MemberUser {
   mfa_blocked?: boolean;
   id: string; username: string; role: string; status: 'active' | 'pending' | 'rejected' | 'suspended';
   memberships: Membership[]; requested_memberships: Membership[]; scope_restricted: boolean;
   /** What a remote-only member may do beyond working on their servers. */
-  remote_permissions?: RemotePermissions;
+  remote_permissions?: MemberGrants;
+  access?: AccessRules;
+  totp_enabled?: boolean;
   created_at: string; last_login: string | null;
 }
-export interface RemotePermissions { share_sessions: boolean; share_files: boolean }
+export type { MemberGrants as RemotePermissions } from './remote/member';
+/** When and from where an account may be used (the account's `access`). */
+export interface AccessRules {
+  expires_at?: string | null;
+  require_mfa: boolean;
+  allowed_networks: string[];
+  allowed_hours?: { start: number; end: number; days: number[] } | null;
+}
 export interface ScopeOption { kind: Membership['kind']; id: string; label: string }
 export const membershipRole = { admin: '소속 관리자', operator: '운영자', viewer: '조회자' };
 /** `remote`: a remote-only member's assigned servers — servers only, no role to pick. */

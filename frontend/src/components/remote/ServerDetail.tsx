@@ -3,7 +3,7 @@ import { apiPost, apiRequest } from '../../shared/api/useApi';
 import { RemoteServer, RemoteServerStatus } from './remoteTypes';
 import { useT } from '../../shared/i18n';
 import { DeployKeyDialog } from './SshKeyComponents';
-import { useMember } from './member';
+import { assignedTo, useGrants, useMember } from './member';
 import ServerForm from './ServerForm';
 import HostTrustForm from './HostTrustForm';
 import ProtocolDetect, { CheckList } from './ProtocolDetect';
@@ -103,6 +103,9 @@ export function ServerSettingsView({ server, onChanged, onDeleted }: SettingsPro
   // A member's server logs in with its password; NabiMan's key is not theirs.
   const member = useMember();
   const keys = hasShell(server) && !member;
+  // A member who may not register servers keeps theirs as they are.
+  const grants = useGrants();
+  const editable = !grants || grants.register_servers || assignedTo(member, server);
   // Approving the host key is when SSH can first be tried.
   const [approved, setApproved] = useState(0);
   const ssh = usesSsh(server);
@@ -136,7 +139,8 @@ export function ServerSettingsView({ server, onChanged, onDeleted }: SettingsPro
           onSaved={(approvedNow) => { onChanged(); if (approvedNow) setApproved(n => n + 1); }} />
       )}
       <ProtocolDetect server={server} onChanged={onChanged} trigger={approved} />
-      <ServerForm key={`${server.id}:${server.terminal || 'ssh'}:${server.files || 'sftp'}`} server={server} onSaved={onChanged} />
+      {editable ? <ServerForm key={`${server.id}:${server.terminal || 'ssh'}:${server.files || 'sftp'}`} server={server} onSaved={onChanged} />
+        : <p className="text-secondary">{t('remote.editNotAllowed')}</p>}
     </div>
   );
 }

@@ -8,7 +8,7 @@ import {
   addressOf, hasFiles, hasShell, hasTerminal, matchesProtocol, PROTOCOL_FILTERS, protocolName, protocolsOf, ProtocolFilter,
 } from './protocols';
 import { RailAction, Selection } from './workspaceState';
-import { assignedTo, useMember } from './member';
+import { assignedTo, useGrants, useMember } from './member';
 
 interface Props {
   /** A phone: no floating windows, and a long press opens the menu. */
@@ -41,6 +41,11 @@ export default function TargetRail({
 }: Props) {
   const { t } = useT();
   const member = useMember();
+  // A member adds servers when allowed, up to the number allowed.
+  const grants = useGrants();
+  const own = servers.filter(s => s.owner_id).length;
+  const canAdd = !grants || grants.register_servers;
+  const full = Boolean(grants?.max_servers && own >= grants.max_servers);
   const [menu, setMenu] = useState<OpenMenu | null>(null);
   const [protocol, setProtocol] = useState<ProtocolFilter>('');
   // Folded to a thin tab, for the most room to work; a phone shows the list on its own anyway.
@@ -192,8 +197,13 @@ export default function TargetRail({
             );
           })}
           {servers.length === 0 && <p className="rw-rail-empty">{t('remote.noServers')}</p>}
-          <button className={`rw-item rw-item-add ${selection.kind === 'new' ? 'is-active' : ''}`}
-            onClick={() => onSelect({ kind: 'new' })}>{t('remote.addServer')}</button>
+          {canAdd && (
+            <button className={`rw-item rw-item-add ${selection.kind === 'new' ? 'is-active' : ''}`} disabled={full}
+              title={full ? t('remote.serverLimit', { count: grants?.max_servers || 0 }) : undefined}
+              onClick={() => onSelect({ kind: 'new' })}>
+              {t('remote.addServer')}{grants?.max_servers ? ` (${own}/${grants.max_servers})` : ''}
+            </button>
+          )}
 
           {!member && <>
           <div className="rw-rail-label">{t('remote.otherGroup')}</div>

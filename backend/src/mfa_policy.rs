@@ -6,6 +6,9 @@ pub fn required(user: &NabimanUser) -> Result<bool, String> {
     if user.super_admin() {
         return Ok(false);
     }
+    if user.access.require_mfa {
+        return Ok(true);
+    }
     for membership in user.memberships.iter().filter(|m| m.accessible()) {
         if crate::scope_settings::read(&membership.kind, &membership.scope_id)?.require_mfa {
             return Ok(true);

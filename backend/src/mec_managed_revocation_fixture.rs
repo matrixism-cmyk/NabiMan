@@ -24,6 +24,7 @@ pub(super) fn user(id: &str, role: UserRole) -> NabimanUser {
         totp_secret: None,
         mfa: Default::default(),
         remote_permissions: Default::default(),
+        access: Default::default(),
     }
 }
 pub(super) fn tenant(state: &web::Data<mec::MecState>, now: chrono::DateTime<chrono::Utc>) {

@@ -37,6 +37,8 @@ export interface SftpListing {
   entries: SftpEntry[];
   truncated: boolean;
   attrs?: SftpAttrsCaps;
+  /** What this account may do here: change files, copy to other servers, and the largest upload. */
+  may?: { write: boolean; copy: boolean; upload_limit?: number | null };
 }
 
 export interface AttrsChange {

@@ -133,6 +133,16 @@ pub(super) fn publish(
         None => None,
     };
 
+    let days = (!body.permanent).then(|| body.expires_in_secs as f64 / 86400.0);
+    if let Err(why) = crate::member_servers::share_terms(
+        &owner,
+        days,
+        password_hash.is_some(),
+        body.read_only,
+        body.files == ShareFiles::Write,
+    ) {
+        return no_store(HttpResponse::BadRequest().json(ApiResponse::<()>::error(&why)));
+    }
     let token = match generate_token() {
         Ok(t) => t,
         Err(_) => return storage_error(),

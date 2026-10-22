@@ -20,8 +20,13 @@ const path = require('path');
       localStorage.setItem('nabiman_lang', 'ko');
     }, { ...fixture, origin });
     await page.goto(origin + '/#administration/usermgmt');
-    const row = page.getByRole('row').filter({ hasText: 'identity-fixture' });
-    await row.getByRole('button', { name: 'Rancher 계정 연결', exact: true }).click();
+    // The member's detail opens beside the list; the link lives under 계정.
+    const openLink = async () => {
+      await page.getByRole('row').filter({ hasText: 'identity-fixture' }).click();
+      await page.getByRole('tab', { name: '계정', exact: true }).click();
+      await page.getByRole('button', { name: 'Rancher 계정 연결', exact: true }).click();
+    };
+    await openLink();
     await page.getByText('mock://rancher', { exact: true }).waitFor();
     await page.getByLabel('Rancher 계정 ID', { exact: true }).fill(fixture.remote_id);
     await page.getByLabel('계정 확인 및 연결 사유', { exact: true }).fill('Fixture owner verified by highest administrator');
@@ -31,7 +36,7 @@ const path = require('path');
     if (response.status() !== 201 || response.headers()['cache-control'] !== 'no-store') throw new Error('Link API failed');
     await page.getByText('external-fixture · ' + fixture.remote_id, { exact: true }).waitFor();
     await page.reload();
-    await page.getByRole('row').filter({ hasText: 'identity-fixture' }).getByRole('button', { name: 'Rancher 계정 연결', exact: true }).click();
+    await openLink();
     await page.getByText('external-fixture · ' + fixture.remote_id, { exact: true }).waitFor();
     if (await page.getByRole('button', { name: '확인하고 연결', exact: true }).count()) throw new Error('Existing identity could be replaced');
     await page.screenshot({ path: path.resolve(__dirname, '../../screenshots/external-identity.png'), fullPage: true });

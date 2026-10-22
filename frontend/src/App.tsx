@@ -15,6 +15,7 @@ import IdleWarning from './components/IdleWarning';
 import { useIdleLogout } from './shared/auth/useIdleLogout';
 import { useChromeHidden } from './shared/ui/useChromeHidden';
 import RemoteShell, { isStandaloneRemote } from './components/remote/RemoteShell';
+import { DEFAULT_GRANTS } from './components/remote/member';
 import CommandPalette from './components/CommandPalette';
 import LanguageSelector from './shared/ui/LanguageSelector';
 import { Tab, Category, CatDef, categories } from './nav';
@@ -211,8 +212,7 @@ function App() {
     <TerminalWindowsProvider key={currentUser.username} owner={currentUser.username} active={currentUser.role === 'admin' || member}>
       <RemoteShell username={currentUser.username} allowed={(currentUser.role === 'admin' && !scoped) || member}
         member={member} onChangePassword={member ? () => setShowChangePw(true) : undefined} onLogout={handleLogout}
-        sharing={member ? { sessions: Boolean(currentUser.remote_permissions?.share_sessions),
-          files: Boolean(currentUser.remote_permissions?.share_files) } : undefined} />
+        grants={member ? { ...DEFAULT_GRANTS, ...currentUser.remote_permissions } : null} />
       {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
       {idle.secondsLeft !== null && <IdleWarning seconds={idle.secondsLeft} onStay={idle.stay} />}
     </TerminalWindowsProvider>

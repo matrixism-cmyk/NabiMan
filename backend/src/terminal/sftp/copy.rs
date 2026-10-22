@@ -163,6 +163,9 @@ pub(super) async fn start(req: HttpRequest, b: web::Json<Start>) -> HttpResponse
     };
     let from = match account_target(&req, &b.from) { Ok(t) => t, Err(r) => return r };
     let to = match account_target(&req, &b.to) { Ok(t) => t, Err(r) => return r };
+    if to.server.as_ref().is_some_and(|s| !crate::member_servers::may_write(&req, s)) {
+        return fail(StatusCode::FORBIDDEN, "이 서버의 파일은 바꿀 수 없습니다 (관리자 설정)");
+    }
     let src = match from.fs().await { Ok(fs) => fs, Err(r) => return r };
     let dst = match to.fs().await { Ok(fs) => fs, Err(r) => return r };
     match dst.stat(&b.dir).await {

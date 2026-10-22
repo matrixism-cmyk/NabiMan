@@ -28,6 +28,7 @@ fn user() -> NabimanUser {
         totp_secret: None,
         mfa: Default::default(),
         remote_permissions: Default::default(),
+        access: Default::default(),
     }
 }
 async fn fixture() -> (MecState, UserStore, membership_store::Operation, String) {

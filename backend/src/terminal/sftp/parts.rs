@@ -75,6 +75,10 @@ fn conflict(message: &str, data: serde_json::Value) -> HttpResponse {
 /// where it ends, and are told where that is when they do not.
 pub(super) async fn chunk(req: HttpRequest, q: web::Query<PartQuery>, mut body: web::Payload) -> HttpResponse {
     let t = tryr!(resolve(&req));
+    let limit = crate::member_servers::upload_limit(&req);
+    if limit.is_some_and(|max| q.offset > max) {
+        return super::too_big(limit);
+    }
     let (part, target) = tryr!(paths(&q));
     let fs = tryr!(t.fs().await);
     let mut file = if q.offset == 0 {
@@ -94,6 +98,11 @@ pub(super) async fn chunk(req: HttpRequest, q: web::Query<PartQuery>, mut body: 
         let Ok(piece) = piece else {
             return fail(StatusCode::BAD_GATEWAY, "The upload was interrupted");
         };
+        if limit.is_some_and(|max| q.offset + written + piece.len() as u64 > max) {
+            drop(file);
+            let _ = fs.remove_file(&part).await;
+            return super::too_big(limit);
+        }
         if let Err(e) = file.write_all(&piece).await {
             return fail(StatusCode::BAD_GATEWAY, &format!("Write failed: {e}"));
         }
@@ -109,6 +118,9 @@ pub(super) async fn chunk(req: HttpRequest, q: web::Query<PartQuery>, mut body: 
 /// exactly as large as the file the browser sent.
 pub(super) async fn finish(req: HttpRequest, q: web::Query<PartQuery>) -> HttpResponse {
     let t = tryr!(resolve(&req));
+    if crate::member_servers::upload_limit(&req).is_some_and(|max| q.size > max) {
+        return super::too_big(crate::member_servers::upload_limit(&req));
+    }
     let (part, target) = tryr!(paths(&q));
     let fs = tryr!(t.fs().await);
     let have = tryr!(fs.stat(&part).await.map_err(|e| t.error(e))).size;

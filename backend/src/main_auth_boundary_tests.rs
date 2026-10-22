@@ -25,6 +25,7 @@ async fn viewer_cannot_reach_shell_or_root_file_download() {
         totp_secret: None,
         mfa: Default::default(),
         remote_permissions: Default::default(),
+        access: Default::default(),
         status: Default::default(),
         memberships: vec![],
         requested_memberships: vec![],

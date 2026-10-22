@@ -180,7 +180,7 @@ async fn callback(
         &sid,
         &user,
         false,
-        "oauth",
+        &crate::access_rules::client_ip(&request).map(|a| a.to_string()).unwrap_or_else(|| "oauth".into()),
     ) {
         return HttpResponse::Unauthorized().json(ApiResponse::<()>::error(
             "Account changed during authentication; sign in again",

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { apiPost, apiRequest } from '../../shared/api/useApi';
 import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
-import { useMember, useSharing } from './member';
+import { useGrants, useMember, useSharing } from './member';
 
 export interface SessionInfo {
   id: string; label: string; owner: string; ws_count: number; shared: boolean;
@@ -42,6 +42,9 @@ export default function SessionsView({
   const { t } = useT();
   const member = useMember();
   const sharing = useSharing();
+  // "세션 유지" only when an administrator allows it and set no idle limit.
+  const grants = useGrants();
+  const canKeep = !grants || (grants.keep_sessions && !grants.max_idle_minutes);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [message, setMessage] = useState('');
@@ -156,7 +159,8 @@ export default function SessionsView({
                 <button className="btn btn-secondary btn-sm" title={t('share.hint')} disabled={!attachable} onClick={() => onShare(session)}>🔗</button>
               )}
               <button className={`btn btn-sm ${session.keepalive ? 'btn-primary' : 'btn-secondary'}`}
-                title={t('terminal.keepaliveHint')} onClick={() => toggle(session, 'keepalive')}>
+                disabled={!canKeep && !session.keepalive}
+                title={t(canKeep ? 'terminal.keepaliveHint' : 'terminal.keepaliveNotAllowed')} onClick={() => toggle(session, 'keepalive')}>
                 {t('terminal.keepaliveShort')} {session.keepalive ? 'ON' : 'OFF'}
               </button>
               {!member && (

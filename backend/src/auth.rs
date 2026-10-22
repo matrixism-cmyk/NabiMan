@@ -96,9 +96,15 @@ pub async fn login(
     match bcrypt::verify(&body.password, &user.password_hash) {
         Ok(true) => {
             if !user.active() {
-                return HttpResponse::Forbidden().json(ApiResponse::<()>::error(
-                    "가입 승인 대기, 반려 또는 이용 정지 상태입니다. 최고관리자에게 문의하세요.",
-                ));
+                let why = if user.status == crate::models::AccountStatus::Active && user.access.expired() {
+                    "계정 이용 기간이 끝났습니다. 관리자에게 문의하세요."
+                } else {
+                    "가입 승인 대기, 반려 또는 이용 정지 상태입니다. 최고관리자에게 문의하세요."
+                };
+                return HttpResponse::Forbidden().json(ApiResponse::<()>::error(why));
+            }
+            if let Err(why) = crate::access_rules::admits(&user, crate::access_rules::client_ip(&req)) {
+                return HttpResponse::Forbidden().json(ApiResponse::<()>::error(&why));
             }
             // Check if 2FA is enabled
             if user.totp_enabled {
@@ -108,9 +114,8 @@ pub async fn login(
             }
             crate::users::update_last_login(&user_store, username);
             let sid = crate::jwt_sessions::generate_session_id();
-            let ip = req
-                .peer_addr()
-                .map(|a| a.ip().to_string())
+            let ip = crate::access_rules::client_ip(&req)
+                .map(|a| a.to_string())
                 .unwrap_or_default();
             if !crate::jwt_sessions::register_authenticated_session(
                 &sessions,
@@ -319,6 +324,11 @@ pub fn check_auth(
         sid: claims.sid.clone(),
         expires: claims.exp,
     });
+    // Where and when the account may be used holds for every request, so a
+    // sign-in outside its hours or network stops working there and then.
+    if crate::access_rules::admits(&user, crate::access_rules::client_ip(req.request())).is_err() {
+        return AuthDecision::Unauthorized;
+    }
     let verified = sessions
         .lock()
         .unwrap()

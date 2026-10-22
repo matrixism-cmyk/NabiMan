@@ -56,8 +56,14 @@ pub(super) async fn list(req: HttpRequest, q: web::Query<PathQuery>) -> HttpResp
         super::attrs::name_entries(&mut entries, names);
     }
     let attrs = super::attrs::capabilities(&fs, names.as_deref());
+    // What this account may do here, so the panel offers only that.
+    let may = serde_json::json!({
+        "write": t.share.is_some() || t.server.as_ref().is_none_or(|s| crate::member_servers::may_write(&req, s)),
+        "copy": t.share.is_none() && crate::member_servers::may_copy(&req),
+        "upload_limit": crate::member_servers::upload_limit(&req),
+    });
     HttpResponse::Ok().json(ApiResponse::ok(serde_json::json!({
-        "path": path, "parent": parent(&path), "entries": entries, "truncated": truncated, "attrs": attrs,
+        "path": path, "parent": parent(&path), "entries": entries, "truncated": truncated, "attrs": attrs, "may": may,
     })))
 }
 
@@ -163,6 +169,11 @@ pub(super) async fn upload(
         return bad("Invalid file name");
     }
     let path = join(&q.dir, &q.name);
+    let limit = crate::member_servers::upload_limit(&req);
+    let declared = req.headers().get("content-length").and_then(|v| v.to_str().ok()?.parse::<u64>().ok());
+    if limit.is_some_and(|max| declared.is_some_and(|n| n > max)) {
+        return super::too_big(limit);
+    }
     let fs = tryr!(t.fs().await);
     let existed = fs.exists(&path).await;
     if existed && !q.overwrite {
@@ -178,6 +189,10 @@ pub(super) async fn upload(
             problem = Some("The upload was interrupted".into());
             break;
         };
+        if limit.is_some_and(|max| written + chunk.len() as u64 > max) {
+            problem = Some(String::new());
+            break;
+        }
         if let Err(e) = file.write_all(&chunk).await {
             problem = Some(format!("Write failed: {e}"));
             break;
@@ -195,6 +210,9 @@ pub(super) async fn upload(
         // already gone, so it is left for the operator to see.
         if !existed {
             let _ = fs.remove_file(&path).await;
+        }
+        if message.is_empty() {
+            return super::too_big(limit);
         }
         return fail(StatusCode::BAD_GATEWAY, &message);
     }

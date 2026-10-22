@@ -29,6 +29,7 @@ fn user() -> NabimanUser {
         totp_secret: None,
         mfa: Default::default(),
         remote_permissions: Default::default(),
+        access: Default::default(),
     }
 }
 #[test]
@@ -165,6 +166,7 @@ fn live_grant_tracks_logout_role_suspension_and_absolute_session_age() {
         sessions: sessions.clone(),
         users: users.clone(),
         path: "/api/terminal".into(),
+        ip: None,
     };
     assert!(g.valid());
     let mut missing_identity = g.clone();
@@ -340,6 +342,7 @@ async fn guarded_stream_closes_while_idle_and_rechecks_before_each_event() {
         sessions: sessions.clone(),
         users: users.clone(),
         path: "/api/mec/v1/dashboard/live/stream".into(),
+        ip: None,
     };
     let pending = futures::stream::pending::<Result<web::Bytes, std::convert::Infallible>>();
     let guarded = crate::stream_access::guard(pending, grant.clone());
@@ -382,6 +385,7 @@ fn stream_grant_uses_its_endpoint_policy_instead_of_terminal_privileges() {
         sessions,
         users: users.clone(),
         path: "/api/mec/v1/dashboard/live/stream".into(),
+        ip: None,
     };
     assert!(grant.valid());
     grant.path = "/api/terminal".into();

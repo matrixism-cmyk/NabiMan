@@ -146,6 +146,7 @@ async fn register(
         totp_secret: None,
         mfa: Default::default(),
         remote_permissions: Default::default(),
+        access: Default::default(),
     });
     match commit_users(&mut users, previous) {
         Ok(()) => HttpResponse::Created().json(ApiResponse::ok(

@@ -82,6 +82,25 @@ pub fn may_share(user: &NabimanUser, session: bool, files: bool) -> bool {
             && (!files || user.remote_permissions.share_files))
 }
 
+/// What a member's link must keep to, beyond being allowed at all: how long
+/// it may last (`days`, `None` for permanent), a password, and only showing.
+pub fn share_terms(user: &NabimanUser, days: Option<f64>, password: bool, read_only: bool, files_write: bool) -> Result<(), String> {
+    if !is_member(user) {
+        return Ok(());
+    }
+    let p = &user.remote_permissions;
+    if p.share_max_days > 0 && days.is_none_or(|d| d > f64::from(p.share_max_days)) {
+        return Err(format!("공유 링크는 {}일까지만 만들 수 있습니다", p.share_max_days));
+    }
+    if p.share_require_password && !password {
+        return Err("공유 링크에는 비밀번호를 걸어야 합니다".into());
+    }
+    if p.share_view_only && (!read_only || files_write) {
+        return Err("공유 링크는 보기 전용으로만 만들 수 있습니다".into());
+    }
+    Ok(())
+}
+
 /// Whether `user` has share links to look after: the administrators, and any
 /// member (who may still revoke links once the permission is gone).
 pub fn keeps_shares(user: &NabimanUser) -> bool {
@@ -91,6 +110,17 @@ pub fn keeps_shares(user: &NabimanUser) -> bool {
 /// What a member may call: their account, the terminal and its files, and
 /// their own servers. Everything else stays closed.
 pub fn permitted(user: &NabimanUser, method: &str, path: &str) -> bool {
+    let granted = &user.remote_permissions;
+    // What an administrator may switch off for this member.
+    if path.starts_with("/api/terminal/dictation") && !granted.dictation {
+        return false;
+    }
+    if method == "POST" && path == "/api/remote-servers" && !granted.register_servers {
+        return false;
+    }
+    if method == "POST" && path == "/api/terminal/copies" && !granted.copy_between_servers {
+        return false;
+    }
     let fixed = match method {
         "GET" => matches!(
             path,
@@ -147,7 +177,12 @@ pub fn permitted(user: &NabimanUser, method: &str, path: &str) -> bool {
     }
     if let Some(rest) = path.strip_prefix("/api/terminal/sftp/") {
         let id = rest.split('/').next().unwrap_or("");
-        return server(id).is_some_and(|s| usable(user, &s));
+        let op = rest.rsplit('/').next().unwrap_or("");
+        let writes = ["upload", "upload-part", "upload-finish", "upload-abort", "mkdir", "rename", "delete", "attrs"];
+        return server(id).is_some_and(|s| {
+            usable(user, &s)
+                && (!writes.contains(&op) || s.owner_id == user.id || granted.assigned_file_write)
+        });
     }
     if let Some(rest) = path.strip_prefix("/api/remote-servers/") {
         let mut parts = rest.split('/');
@@ -157,7 +192,9 @@ pub fn permitted(user: &NabimanUser, method: &str, path: &str) -> bool {
             return false;
         };
         return match action {
-            None => matches!(method, "PUT" | "DELETE") && manageable(user, &s),
+            None => {
+                manageable(user, &s) && (method == "DELETE" || (method == "PUT" && granted.register_servers))
+            }
             Some("host-trust") => method == "PUT" && manageable(user, &s),
             Some("detect" | "host-key") => method == "POST" && manageable(user, &s),
             Some("check") => method == "POST" && usable(user, &s),
@@ -165,6 +202,68 @@ pub fn permitted(user: &NabimanUser, method: &str, path: &str) -> bool {
         };
     }
     false
+}
+
+/// An idle session ends after this long when "세션 유지" is not allowed and
+/// no shorter limit was set.
+const DEFAULT_IDLE_SECS: u64 = 3600;
+
+/// How long a member's session may run idle, and whether it may be kept
+/// alive, within what an administrator allows: `(keepalive, timeout_secs)`,
+/// where 0 seconds is no limit. Anyone else gets what they asked for.
+pub fn session_terms(user: &NabimanUser, keepalive: bool, timeout_secs: u64) -> (bool, u64) {
+    if !is_member(user) {
+        return (keepalive, timeout_secs);
+    }
+    let p = &user.remote_permissions;
+    let cap = u64::from(p.max_idle_minutes) * 60;
+    let keep = keepalive && p.keep_sessions && cap == 0;
+    let mut timeout = if keep { 0 } else { timeout_secs };
+    if !keep && timeout == 0 && (!p.keep_sessions || cap > 0) {
+        timeout = if cap > 0 { cap } else { DEFAULT_IDLE_SECS };
+    }
+    if cap > 0 {
+        timeout = timeout.min(cap);
+    }
+    (keep, timeout)
+}
+
+/// Why a member may not open one more session, when they have `running`.
+pub fn session_limit(user: &NabimanUser, running: usize) -> Option<String> {
+    let max = user.remote_permissions.max_sessions as usize;
+    (is_member(user) && max > 0 && running >= max)
+        .then(|| format!("세션은 동시에 {max}개까지 열 수 있습니다. 쓰지 않는 세션을 종료한 뒤 다시 여세요."))
+}
+
+/// The largest single upload a member may make, in bytes; `None`: no limit.
+pub fn upload_limit(req: &HttpRequest) -> Option<u64> {
+    let user = signed_in(req)?;
+    let mb = user.remote_permissions.max_upload_mb;
+    (is_member(&user) && mb > 0).then(|| u64::from(mb) * 1024 * 1024)
+}
+
+/// Whether the signed-in member may change files on `server` (always on their
+/// own; on an assigned one when allowed). Everyone else: yes.
+pub fn may_write(req: &HttpRequest, server: &RemoteServer) -> bool {
+    match signed_in(req) {
+        Some(u) if is_member(&u) => server.owner_id == u.id || u.remote_permissions.assigned_file_write,
+        _ => true,
+    }
+}
+
+/// Whether the signed-in account may copy files between servers.
+pub fn may_copy(req: &HttpRequest) -> bool {
+    signed_in(req).is_none_or(|u| !is_member(&u) || u.remote_permissions.copy_between_servers)
+}
+
+fn signed_in(req: &HttpRequest) -> Option<NabimanUser> {
+    let id = crate::auth::verified_user_id(req)?;
+    req.app_data::<web::Data<crate::users::UserStore>>()?
+        .lock()
+        .ok()?
+        .iter()
+        .find(|u| u.id == id)
+        .cloned()
 }
 
 /// ssh options for a member's server, given before any other so they win:
@@ -255,135 +354,5 @@ fn public(ip: IpAddr) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn member() -> NabimanUser {
-        serde_json::from_value(serde_json::json!({
-            "id": "m1", "username": "member", "password_hash": "", "role": "remote",
-            "created_at": "now", "status": "active"
-        }))
-        .unwrap()
-    }
-
-    fn server(owner: &str, host: &str) -> RemoteServer {
-        serde_json::from_value(serde_json::json!({
-            "id": "srv", "name": "n", "host": host, "port": 22, "user": "u",
-            "auth_method": "password", "tags": [], "memo": "", "created_at": "now",
-            "owner_id": owner
-        }))
-        .unwrap()
-    }
-
-    #[test]
-    fn a_member_sees_only_their_own_servers_and_others_never_see_them() {
-        let m = member();
-        let mut admin = m.clone();
-        admin.id = "a1".into();
-        admin.role = UserRole::Admin;
-        let own = server("m1", "example.com");
-        let shared = server("", "example.com");
-        let someone_elses = server("m2", "example.com");
-        assert!(listed(&m, &own) && usable(&m, &own));
-        assert!(!listed(&m, &shared) && !usable(&m, &shared));
-        assert!(!listed(&m, &someone_elses) && !usable(&m, &someone_elses));
-        assert!(listed(&admin, &shared) && !listed(&admin, &own));
-        assert!(usable(&admin, &own));
-    }
-
-    #[test]
-    fn an_assigned_server_is_used_but_never_edited_and_ends_with_its_assignment() {
-        let mut m = member();
-        let shared = server("", "example.com");
-        m.memberships = vec![serde_json::from_value(serde_json::json!({
-            "kind": "server", "scope_id": "srv", "role": "viewer"
-        }))
-        .unwrap()];
-        assert!(listed(&m, &shared) && usable(&m, &shared) && !manageable(&m, &shared));
-        // Assigning someone else's own server gives nothing.
-        assert!(!usable(&m, &server("m2", "example.com")));
-        m.memberships[0].enabled = false;
-        assert!(!listed(&m, &shared) && !usable(&m, &shared));
-        m.memberships[0].enabled = true;
-        m.memberships[0].expires_at = Some("2000-01-01T00:00:00Z".into());
-        assert!(!usable(&m, &shared));
-    }
-
-    #[test]
-    fn a_member_may_call_the_terminal_and_nothing_of_the_machine() {
-        let m = member();
-        for (method, path) in [
-            ("GET", "/api/terminal"),
-            ("POST", "/api/terminal/tickets"),
-            ("GET", "/api/terminal/sessions"),
-            ("PUT", "/api/terminal/sessions/pty_1/name"),
-            ("DELETE", "/api/terminal/sessions/pty_1"),
-            ("GET", "/api/remote-servers"),
-            ("POST", "/api/remote-servers"),
-            ("POST", "/api/auth/change-password"),
-            ("GET", "/api/users/me"),
-            // Their share links: whether they may make one is checked where it is made.
-            ("GET", "/api/terminal/share-links"),
-            ("POST", "/api/terminal/sessions/pty_1/share-link"),
-            ("DELETE", "/api/terminal/share-links/abc"),
-        ] {
-            assert!(permitted(&m, method, path), "{method} {path}");
-        }
-        for (method, path) in [
-            ("GET", "/api/server/status"),
-            ("GET", "/api/files/list"),
-            ("POST", "/api/terminal/claude/chats"),
-            ("PUT", "/api/terminal/dictation/settings"),
-            ("POST", "/api/terminal/dictation/test"),
-            ("POST", "/api/terminal/paste-file"),
-            ("POST", "/api/terminal/sessions/pty_1/share"),
-            ("POST", "/api/terminal/files/srv_x/share-link"),
-            ("GET", "/api/terminal/sftp/local/list"),
-            ("POST", "/api/remote-servers/check-all"),
-            ("GET", "/api/remote-servers/ssh-key"),
-            ("POST", "/api/remote-servers/srv_x/exec"),
-            ("PUT", "/api/users/m1"),
-            ("PUT", "/api/app-settings"),
-        ] {
-            assert!(!permitted(&m, method, path), "{method} {path}");
-        }
-    }
-
-    #[test]
-    fn a_member_shares_only_what_an_administrator_granted() {
-        let mut m = member();
-        assert!(!may_share(&m, true, false) && !may_share(&m, false, true));
-        m.remote_permissions.share_sessions = true;
-        assert!(may_share(&m, true, false));
-        // A session's link with its files needs the files permission too.
-        assert!(!may_share(&m, true, true) && !may_share(&m, false, true));
-        m.remote_permissions.share_files = true;
-        assert!(may_share(&m, true, true) && may_share(&m, false, true));
-        m.status = crate::models::AccountStatus::Suspended;
-        assert!(!may_share(&m, true, false));
-        let before = m.remote_permissions.clone();
-        m.remote_permissions.share_files = false;
-        assert!(m.remote_permissions.narrowed_from(&before) && !before.narrowed_from(&m.remote_permissions));
-    }
-
-    #[test]
-    fn a_members_server_is_refused_inside_this_machine_or_its_network() {
-        for host in [
-            "127.0.0.1", "localhost", "10.1.2.3", "172.16.0.9", "192.168.0.1", "169.254.169.254",
-            "100.64.0.1", "0.0.0.0", "::1", "fd00::1", "fe80::1", "::ffff:127.0.0.1",
-        ] {
-            assert!(dial_host(&server("m1", host), 22).is_err(), "{host}");
-        }
-        assert_eq!(dial_host(&server("m1", "8.8.8.8"), 22).unwrap(), "8.8.8.8");
-        // The administrators' servers are theirs to point anywhere.
-        assert_eq!(dial_host(&server("", "127.0.0.1"), 22).unwrap(), "127.0.0.1");
-    }
-
-    #[test]
-    fn a_members_server_gets_no_keys_or_settings_of_this_machine() {
-        let opts = ssh_isolation(&server("m1", "example.com"));
-        assert!(opts.windows(2).any(|w| w == ["-F", "/dev/null"]));
-        assert!(opts.contains(&"PubkeyAuthentication=no"));
-        assert!(ssh_isolation(&server("", "example.com")).is_empty());
-    }
-}
+#[path = "member_servers_tests.rs"]
+mod tests;

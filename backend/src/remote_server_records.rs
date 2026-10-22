@@ -106,6 +106,15 @@ pub(super) async fn add_server(
     if let Err(e) = member_check(&mut server) {
         return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error(&e));
     }
+    let max = actor.remote_permissions.max_servers as usize;
+    if server.member_owned() && max > 0 {
+        let own = load_servers().map(|all| all.iter().filter(|s| s.owner_id == actor.id).count()).unwrap_or(0);
+        if own >= max {
+            return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error(&format!(
+                "직접 등록할 수 있는 서버는 {max}대까지입니다"
+            )));
+        }
+    }
 
     let _guard = SERVER_WRITES.lock().unwrap_or_else(|e| e.into_inner());
     let mut servers = match load_servers() {

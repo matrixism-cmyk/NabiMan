@@ -44,6 +44,8 @@ pub(crate) struct ConnectionGrant {
     pub(crate) sessions: SessionStore,
     pub(crate) users: UserStore,
     pub(crate) path: String,
+    /// Where the connection came from, held to the account's allowed networks.
+    pub(crate) ip: Option<std::net::IpAddr>,
 }
 impl ConnectionGrant {
     pub(crate) fn from_request(
@@ -59,6 +61,7 @@ impl ConnectionGrant {
             sessions,
             users,
             path: req.path().into(),
+            ip: crate::access_rules::client_ip(req),
         })
     }
     pub(crate) fn valid(&self) -> bool {
@@ -85,6 +88,7 @@ impl ConnectionGrant {
         }
         crate::users::find_user_by_name(&self.users, &self.username).is_some_and(|u| {
             u.id == self.user_id
+                && crate::access_rules::admits(&u, self.ip).is_ok()
                 && crate::mfa_policy::permitted(&u, session.mfa_verified, method, &self.path)
                 && crate::scope_access::permission(&u, method, &self.path)
         })

@@ -17,6 +17,9 @@ use management::{create_share, list_shares, revoke_share};
 
 #[path = "share_files.rs"]
 mod files;
+#[path = "share_accounts.rs"]
+mod accounts;
+pub(crate) use accounts::{links_of, owner_dictates, revoke_links_of};
 use files::{create_files_share, files_link_alive};
 pub(crate) use files::files_link_server;
 #[cfg(test)]
@@ -158,6 +161,20 @@ pub(crate) fn owner_may_share(owner: &NabimanUser, link: &ShareLink) -> bool {
     }
     if !crate::member_servers::is_member(owner) {
         return true;
+    }
+    // A link made before tighter terms were set ends once they are.
+    let days = (link.expires_unix != PERMANENT_UNIX)
+        .then(|| link.expires_unix.saturating_sub(link.created_unix) as f64 / 86400.0);
+    if crate::member_servers::share_terms(
+        owner,
+        days,
+        link.password_hash.is_some(),
+        link.read_only,
+        link.files == ShareFiles::Write,
+    )
+    .is_err()
+    {
+        return false;
     }
     let server = if link.files_only() { &link.server_id } else { &link.via_server };
     crate::remote_servers::find_server(server)

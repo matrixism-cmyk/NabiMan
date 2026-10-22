@@ -191,6 +191,10 @@ async fn ws_terminal(
         .iter()
         .find(|u| u.id == grant.user_id && crate::member_servers::is_member(u))
         .cloned();
+    // A member's session keeps to the idle limit an administrator set.
+    let (keepalive, timeout_secs) = member
+        .as_ref()
+        .map_or((keepalive, timeout_secs), |m| crate::member_servers::session_terms(m, keepalive, timeout_secs));
     let (shell_cmd, label, remote_binding) =
         match build_ssh_command(query, keepalive, user_settings.keepalive_interval_secs, member.as_ref()) {
             Ok(Some((cmd, label, binding))) => (Some(cmd), label, Some(binding)),
@@ -216,6 +220,13 @@ async fn ws_terminal(
     let tmux_name = format!("nb_{}_{}", safe_user, sid);
 
     let mut map = store.lock().unwrap();
+    if let Some(why) = member
+        .as_ref()
+        .and_then(|m| crate::member_servers::session_limit(m, map.values().filter(|s| s.owned_by(&m.id)).count()))
+    {
+        drop(map);
+        return ws::start(NoticeSocket::new(&why), &req, stream);
+    }
     let candidate = match registry::prepare_insert(
         &map,
         sid.clone(),

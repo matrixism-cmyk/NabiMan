@@ -3,7 +3,7 @@ import Modal from '../../shared/ui/Modal';
 import { apiPost, apiRequest } from '../../shared/api/useApi';
 import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
-import { useSharing } from '../remote/member';
+import { useGrants, useSharing } from '../remote/member';
 
 export interface ShareLink {
   token: string;
@@ -70,8 +70,14 @@ export default function ShareDialog({ sessionId = '', serverId = '', sessionLabe
   const { t } = useT();
   // A member's session link carries files only when files were granted too.
   const filesGranted = useSharing().files;
+  // And keeps to the terms an administrator set for the member's links.
+  const grants = useGrants();
+  const maxSecs = grants?.share_max_days ? grants.share_max_days * 86400 : 0;
+  const expiries = EXPIRY_CHOICES.filter((c) => !maxSecs || (c.secs > 0 && c.secs <= maxSecs));
+  const viewOnly = Boolean(grants?.share_view_only);
+  const needsPassword = Boolean(grants?.share_require_password);
   const titleId = useId();
-  const [expiry, setExpiry] = useState(24 * 3600);
+  const [expiry, setExpiry] = useState(maxSecs && maxSecs < 24 * 3600 ? expiries[expiries.length - 1].secs : 24 * 3600);
   const [password, setPassword] = useState('');
   const [readOnly, setReadOnly] = useState(true);
   // A files link is nothing without files: it starts on browsing.
@@ -92,6 +98,7 @@ export default function ShareDialog({ sessionId = '', serverId = '', sessionLabe
   useEffect(() => { load(); }, [load]);
 
   const create = async () => {
+    if (needsPassword && !password.trim()) { setMessage(t('share.passwordRequired')); return; }
     setBusy(true);
     const res = await apiPost<ShareLink>(filesOnly
       ? `/api/terminal/files/${serverId}/share-link`
@@ -99,7 +106,7 @@ export default function ShareDialog({ sessionId = '', serverId = '', sessionLabe
       expires_in_secs: expiry,
       permanent: expiry === 0,
       password: password.trim(),
-      read_only: readOnly,
+      read_only: readOnly || viewOnly,
       files,
     });
     setBusy(false);
@@ -137,7 +144,7 @@ export default function ShareDialog({ sessionId = '', serverId = '', sessionLabe
         <div className="form-group">
           <label>{t('share.expiry')}</label>
           <div className="filter-row">
-            {EXPIRY_CHOICES.map((choice) => (
+            {expiries.map((choice) => (
               <button
                 key={choice.secs} type="button"
                 className={`btn btn-sm ${expiry === choice.secs ? 'btn-primary' : 'btn-secondary'}`}
@@ -155,13 +162,13 @@ export default function ShareDialog({ sessionId = '', serverId = '', sessionLabe
             placeholder={t('share.passwordPlaceholder')}
             onChange={(e) => setPassword(e.target.value)}
           />
-          <small className="text-secondary">{t('share.passwordHint')}</small>
+          <small className="text-secondary">{t(needsPassword ? 'share.passwordRequired' : 'share.passwordHint')}</small>
         </div>
 
         {!filesOnly && (
           <div className="form-group">
             <label>
-              <input type="checkbox" checked={readOnly} onChange={(e) => setReadOnly(e.target.checked)} />{' '}
+              <input type="checkbox" checked={readOnly || viewOnly} disabled={viewOnly} onChange={(e) => setReadOnly(e.target.checked)} />{' '}
               {t('share.readOnly')}
             </label>
             <small className="text-secondary">{t('share.readOnlyHint')}</small>
@@ -171,7 +178,7 @@ export default function ShareDialog({ sessionId = '', serverId = '', sessionLabe
         {filesGranted && <div className="form-group">
           <label id={`${titleId}-files`}>{t('share.files')}</label>
           <div className="filter-row" role="radiogroup" aria-labelledby={`${titleId}-files`}>
-            {FILES_CHOICES.filter((choice) => !filesOnly || choice.value !== 'none').map((choice) => (
+            {FILES_CHOICES.filter((choice) => (!filesOnly || choice.value !== 'none') && !(viewOnly && choice.value === 'write')).map((choice) => (
               <button
                 key={choice.value} type="button" role="radio" aria-checked={files === choice.value}
                 className={`btn btn-sm ${files === choice.value ? 'btn-primary' : 'btn-secondary'}`}

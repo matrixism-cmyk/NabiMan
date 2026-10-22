@@ -12,13 +12,45 @@ export const MemberContext = createContext(false);
 export const useMember = () => useContext(MemberContext);
 
 /**
- * The share links this account may make: an administrator always both, a
- * member what an administrator granted (세션 공유, 파일 공유).
+ * What an administrator lets a member do beyond working on their servers
+ * (the account's `remote_permissions`). Limits of 0 mean no limit.
  */
-export interface Sharing { sessions: boolean; files: boolean }
-export const SharingContext = createContext<Sharing>({ sessions: true, files: true });
+export interface MemberGrants {
+  share_sessions: boolean;
+  share_files: boolean;
+  share_max_days: number;
+  share_require_password: boolean;
+  share_view_only: boolean;
+  dictation: boolean;
+  register_servers: boolean;
+  assigned_file_write: boolean;
+  copy_between_servers: boolean;
+  keep_sessions: boolean;
+  max_sessions: number;
+  max_idle_minutes: number;
+  max_servers: number;
+  max_upload_mb: number;
+}
 
-export const useSharing = () => useContext(SharingContext);
+/** What a new member may do: what members always could, and no sharing. */
+export const DEFAULT_GRANTS: MemberGrants = {
+  share_sessions: false, share_files: false, share_max_days: 0, share_require_password: false, share_view_only: false,
+  dictation: true, register_servers: true, assigned_file_write: true, copy_between_servers: true, keep_sessions: true,
+  max_sessions: 0, max_idle_minutes: 0, max_servers: 0, max_upload_mb: 0,
+};
+
+/** `null` for an administrator, who may do all of it. */
+export const GrantsContext = createContext<MemberGrants | null>(null);
+
+export const useGrants = () => useContext(GrantsContext);
+
+/** The share links this account may make. */
+export interface Sharing { sessions: boolean; files: boolean }
+
+export const useSharing = (): Sharing => {
+  const grants = useGrants();
+  return { sessions: !grants || grants.share_sessions, files: !grants || grants.share_files };
+};
 
 /** For a member, a server an administrator assigned them: theirs to work on, not to edit. */
 export const assignedTo = (member: boolean, server?: { owner_id?: string }) => member && Boolean(server) && !server?.owner_id;

@@ -217,6 +217,7 @@ const t: T = {
     en: 'This link has expired or been revoked.',
     ja: 'このリンクは期限切れか取り消されています。',
   },
+  'share.passwordRequired': { ko: '관리자 설정에 따라 공유 링크에는 비밀번호를 걸어야 합니다.', en: 'Your administrator requires a password on share links.', ja: '管理者の設定により、共有リンクにはパスワードが必要です。' },
   'share.panelTab': { ko: '공유 링크', en: 'Share links', ja: '共有リンク' },
   'share.panelTitle': { ko: '발급한 공유 링크', en: 'Share links you created', ja: '発行した共有リンク' },
   'share.panelWarning': {
@@ -256,6 +257,9 @@ const t: T = {
     en: 'Summary, sessions, links, SSH key, settings',
     ja: '要約・セッション・リンク・SSH鍵・設定',
   },
+  'remote.serverLimit': { ko: '직접 등록할 수 있는 서버는 {count}대까지입니다', en: 'You can register up to {count} servers', ja: '登録できるサーバーは {count} 台までです' },
+  'remote.editNotAllowed': { ko: '관리자 설정에 따라 서버 정보는 바꿀 수 없습니다. 삭제나 호스트 키 확인은 할 수 있습니다.', en: 'Your administrator does not allow changing server details. You can still delete it or verify its host key.', ja: '管理者の設定によりサーバー情報は変更できません。削除やホスト鍵の確認はできます。' },
+  'terminal.keepaliveNotAllowed': { ko: '관리자 설정에 따라 세션 유지를 켤 수 없습니다', en: 'Your administrator does not allow keeping sessions alive', ja: '管理者の設定によりセッション維持はできません' },
   'remote.assigned': { ko: '관리자 지정', en: 'Assigned', ja: '管理者指定' },
   'remote.overviewHintMember': { ko: '요약 · 세션 · 설정', en: 'Summary, sessions, settings', ja: '要約・セッション・設定' },
   'remote.serversGroup': { ko: '서버', en: 'Servers', ja: 'サーバー' },
