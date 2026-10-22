@@ -22,6 +22,10 @@ export function readStored(key: string): string {
 }
 
 export function writeStored(key: string, value: string) {
+  // A pane closing after a sign-out must not write its screen back: an
+  // account's screens are kept only while it is signed in (a share link's
+  // visitor has no account, and keeps theirs).
+  if (key.startsWith(bufKey('')) && !key.startsWith(bufKey('share_')) && !signedIn()) return;
   try {
     localStorage.setItem(key, value);
   } catch {
@@ -160,4 +164,57 @@ export function paneEnded(storageKey: string): boolean {
 export function startFresh(storageKey: string) {
   try { localStorage.removeItem(bufKey(storageKey)); } catch { /* ignore */ }
   writeStored(sidKey(storageKey), '');
+}
+
+const OWNER_KEY = 'nabiman_term_owner';
+
+/** The account signed in in this tab, by its token's subject; null when none. */
+function signedIn(): string | null {
+  try {
+    const token = sessionStorage.getItem('nabiman_token');
+    const part = token?.split('.')[1];
+    if (!part) return null;
+    const json = atob(part.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(part.length / 4) * 4, '='));
+    const sub = JSON.parse(json).sub;
+    return typeof sub === 'string' && sub ? sub : null;
+  } catch { return null; }
+}
+
+/** Every pane's stored screen and session, of whoever used this browser. */
+export function forgetAllScreens() {
+  try {
+    const gone: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith(bufKey('')) || k.startsWith(sidKey('')))) gone.push(k);
+    }
+    gone.forEach((k) => localStorage.removeItem(k));
+  } catch { /* storage blocked: nothing was kept either */ }
+}
+
+/**
+ * Stored screens are an account's own: what a terminal printed (passwords
+ * and keys included) must not greet the next person at this browser. On
+ * signing out — by hand, for being idle or on expiry — they go; on signing
+ * in as someone else than whose they are, they go too. The same account
+ * signing in again (or in a new tab) finds its screens as it left them.
+ */
+export function guardScreens(event?: Event) {
+  const who = signedIn();
+  if (!who) {
+    // Only a sign-out clears; a page that has not signed in yet knows nobody.
+    if (event) forgetAllScreens();
+    return;
+  }
+  try {
+    if (localStorage.getItem(OWNER_KEY) !== who) {
+      forgetAllScreens();
+      localStorage.setItem(OWNER_KEY, who);
+    }
+  } catch { /* storage blocked */ }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('nabiman_auth_changed', guardScreens);
+  guardScreens();
 }

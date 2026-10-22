@@ -50,6 +50,12 @@ export function createTerminal(settings: TerminalSettings): { term: Terminal; fi
  * clipboard write. The xterm-side selection is copied too, for panes where tmux
  * is not in the way.
  */
+/** How long after a click, touch or key in a terminal it may set the clipboard. */
+export const OSC52_GESTURE_MS = 3000;
+/** The most an OSC 52 may carry (base64): about 1 MB of text. */
+const OSC52_MAX_CHARS = 1_400_000;
+const GESTURES = ['mousedown', 'mouseup', 'touchend', 'keydown'] as const;
+
 export function attachClipboard(
   term: Terminal,
   container: HTMLElement | null,
@@ -75,9 +81,15 @@ export function attachClipboard(
   };
 
   // tmux (and any other full-screen app) asks the terminal to set the clipboard
-  // with OSC 52; xterm.js leaves that to the embedder for safety.
+  // with OSC 52; xterm.js leaves that to the embedder for safety. Any output
+  // can carry one — a file someone else wrote, shown with cat — so it is taken
+  // only just after the operator selected or pressed a key in this terminal,
+  // which is when tmux copies, and only up to a sane size.
+  let lastGesture = -Infinity;
+  const gesture = () => { lastGesture = performance.now(); };
   const oscDispose = term.parser.registerOscHandler(52, (data: string) => {
     const payload = data.slice(data.indexOf(';') + 1);
+    if (performance.now() - lastGesture > OSC52_GESTURE_MS || payload.length > OSC52_MAX_CHARS) return true;
     try {
       const binary = atob(payload);
       const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
@@ -152,6 +164,7 @@ export function attachClipboard(
 
   container?.addEventListener('paste', onPaste, true);
   container?.addEventListener('contextmenu', onContextMenu);
+  for (const type of GESTURES) container?.addEventListener(type, gesture, true);
   container?.addEventListener('mousedown', onMouseDown);
   container?.addEventListener('mouseup', onMouseUp);
   container?.addEventListener('dblclick', onMouseUp);
@@ -161,6 +174,7 @@ export function attachClipboard(
     oscDispose.dispose();
     container?.removeEventListener('paste', onPaste, true);
     container?.removeEventListener('contextmenu', onContextMenu);
+    for (const type of GESTURES) container?.removeEventListener(type, gesture, true);
     container?.removeEventListener('mousedown', onMouseDown);
     container?.removeEventListener('mouseup', onMouseUp);
     container?.removeEventListener('dblclick', onMouseUp);

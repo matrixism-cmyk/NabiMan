@@ -81,3 +81,30 @@ fn missing_terminal_program_returns_spawn_error() {
     );
     assert!(result.is_err(), "exec failure must reach the caller");
 }
+
+/// A process's state letter in /proc (Z: a zombie), or None once it is gone.
+fn state(pid: nix::unistd::Pid) -> Option<char> {
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    stat.rsplit(')').next()?.trim().chars().next()
+}
+
+#[test]
+fn a_closed_attachment_leaves_no_zombie() {
+    let child = |script: &str| {
+        // Waited for by the reaper under test, not here.
+        #[allow(clippy::zombie_processes)]
+        let c = std::process::Command::new("sh").args(["-c", script]).spawn().unwrap();
+        nix::unistd::Pid::from_raw(c.id() as i32)
+    };
+    // Exits on its own: collected once it does.
+    let quick = child("sleep 0.2");
+    spawn::reap_within(quick, std::time::Duration::from_secs(5));
+    // Ignores hangups and lingers: ended after the grace period, then collected.
+    let stubborn = child("trap '' HUP TERM; sleep 30");
+    spawn::reap_within(stubborn, std::time::Duration::from_millis(300));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while (state(quick).is_some() || state(stubborn).is_some()) && std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    assert_eq!((state(quick), state(stubborn)), (None, None), "both are gone, not zombies");
+}

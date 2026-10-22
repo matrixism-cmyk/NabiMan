@@ -5,6 +5,8 @@ use operations::*;
 pub(crate) mod protocols;
 #[path = "remote_check.rs"]
 pub(crate) mod check;
+#[path = "remote_servers_cache.rs"]
+mod cache;
 
 use crate::models::{
     AddRemoteServerRequest, ApiResponse, RemoteExecRequest, RemoteServer, RemoteServerStatus,
@@ -24,7 +26,7 @@ fn data_file_path() -> String {
 }
 
 pub fn load_servers() -> Result<Vec<RemoteServer>, String> {
-    load_servers_at(std::path::Path::new(&data_file_path()))
+    cache::cached(std::path::Path::new(&data_file_path()), load_servers_at)
 }
 
 fn load_servers_at(path: &std::path::Path) -> Result<Vec<RemoteServer>, String> {
@@ -81,8 +83,10 @@ pub(crate) fn save_servers(servers: &mut [RemoteServer]) -> Result<(), String> {
     }
     let json =
         serde_json::to_string_pretty(servers).map_err(|e| format!("Serialize error: {}", e))?;
-    crate::private_storage::write(std::path::Path::new(&data_file_path()), json.as_bytes())
-        .map_err(|e| format!("Write error: {}", e))
+    let written = crate::private_storage::write(std::path::Path::new(&data_file_path()), json.as_bytes())
+        .map_err(|e| format!("Write error: {}", e));
+    cache::forget();
+    written
 }
 
 fn generate_id() -> String {

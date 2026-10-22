@@ -106,6 +106,28 @@ const screen = (p) => p.$eval('.xterm-rows', el => el.textContent);
 
   const all = await screen(page);
   check('no control-prefix junk on screen', !all.includes('PASTE:'));
+
+  // 9. Copying out: tmux hands a selection over as OSC 52, which reaches the
+  //    clipboard only just after a click or key in this pane. The same
+  //    sequence arriving on its own (output of a file, say) is ignored.
+  const clip = () => page.evaluate(() => navigator.clipboard.readText());
+  const run = async (cmd) => { await page.keyboard.press('Control+u'); await page.keyboard.type(cmd); await page.keyboard.press('Enter'); };
+  await run('echo OSC52WORD');
+  await page.waitForTimeout(1200);
+  await page.evaluate(() => navigator.clipboard.writeText('BEFORE-SELECT'));
+  const row = await page.evaluateHandle(() => [...document.querySelectorAll('.xterm-rows > div')].reverse().find((r) => r.textContent.trim() === 'OSC52WORD'));
+  const rowBox = await row.asElement().boundingBox();
+  await page.mouse.dblclick(rowBox.x + 20, rowBox.y + rowBox.height / 2);
+  await page.waitForTimeout(1500);
+  check('a word selected in tmux reaches the clipboard', (await clip()) === 'OSC52WORD');
+  await page.keyboard.press('q');
+  await page.evaluate(() => navigator.clipboard.writeText('KEEP-ME'));
+  await run("sleep 4; printf '\\033]52;c;%s\\a' \"$(printf INJECTED | base64)\"");
+  await page.waitForTimeout(6500);
+  check('a clipboard write arriving on its own is ignored', (await clip()) === 'KEEP-ME');
+  await run("printf '\\033]52;c;%s\\a' \"$(printf TYPED-NOW | base64)\"");
+  await page.waitForTimeout(1500);
+  check('the same, right after a key in the pane, goes through', (await clip()) === 'TYPED-NOW');
   await browser.close();
   const failed = results.filter((ok) => !ok).length;
   console.log(`${results.length - failed}/${results.length} checks passed`);

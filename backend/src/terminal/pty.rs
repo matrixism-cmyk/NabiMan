@@ -274,7 +274,7 @@ impl Actor for WsBridge {
         // tmux session itself keeps running with the shell inside it.
         drop(self.master_file.take());
         drop(self.share_lease.take());
-        let _ = nix::sys::wait::waitpid(self.child_pid, Some(nix::sys::wait::WaitPidFlag::WNOHANG));
+        spawn::reap_later(self.child_pid);
         if let Ok(mut map) = self.store.lock() {
             if let Some(s) = map.get_mut(&self.session_id) {
                 s.ws_count = s.ws_count.saturating_sub(1);
