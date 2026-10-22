@@ -3,6 +3,7 @@ import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import { getSettings, VoiceSettings, VoiceStatus } from './claudeApi';
 import { useVoiceChat } from './useVoiceChat';
+import Waveform from '../terminal/dictation/Waveform';
 import './claude.css';
 
 /**
@@ -55,6 +56,7 @@ export default function ClaudeChatPanel() {
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [v.chat?.messages.length, v.streaming]);
 
   const listening = v.dictation.state === 'listening' || v.dictation.state === 'starting';
+  const hearing = v.dictation.state === 'listening' && v.phase === 'idle';
   const stateText = v.phase === 'thinking' ? (v.tool ? t('claude.usingTool', { name: v.tool }) : t('claude.thinking'))
     : v.phase === 'speaking' ? t('claude.speaking')
     : listening ? t(settings?.auto_send && settings.endpoint_ms > 0 ? 'claude.listeningPause' : 'claude.listening') : t('claude.micOff');
@@ -119,8 +121,10 @@ export default function ClaudeChatPanel() {
         )}
 
         <footer className="cv-composer">
-          <div className={`cv-state is-${v.phase} ${listening ? 'is-listening' : ''}`} role="status">
+          <div className={`cv-state is-${v.phase} ${listening ? 'is-listening' : ''} ${hearing ? 'is-hearing' : ''}`} role="status">
             <span className="cv-state-dot" />{stateText}
+            {/* The microphone's loudness while it is heard: not while an answer is read (it rests then). */}
+            {hearing && <Waveform meter={v.dictation.meter} />}
             {(v.phase !== 'idle') && (
               <button type="button" className="btn btn-secondary btn-sm cv-stop" onClick={v.stop}>■ {t('claude.stop')}</button>
             )}
