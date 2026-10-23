@@ -17,6 +17,7 @@ const t: T = {
   'remote.trust.required': { ko: "공개키, 지문, 확인 사유를 입력하세요.", en: "Enter the public key, fingerprint and verification reason.", ja: "公開鍵、指紋、確認理由を入力してください。" },
   'remote.trust.fetch': { ko: "서버에서 키 가져오기", en: "Fetch the key from the server", ja: "サーバーから鍵を取得" },
   'remote.trust.fetched': { ko: "서버가 보낸 키를 채웠습니다. 지문 {fingerprint} 이(가) 서버의 지문과 같은지 확인한 뒤 등록하세요.", en: "Filled in the key the server sent. Check that {fingerprint} is the server's fingerprint, then register it.", ja: "サーバーが送った鍵を入力しました。指紋 {fingerprint} がサーバーのものと同じか確認してから登録してください。" },
+  'remote.trust.legacy': { ko: '이 서버는 옛 SSH 방식만 지원합니다. 등록하면 "구식 SSH"로 표시되고, 접속은 자동으로 맞춰 이루어집니다.', en: 'This server supports only old SSH algorithms. It will be marked "Legacy SSH" and connected to automatically.', ja: 'このサーバーは旧式のSSH方式のみ対応します。「旧式SSH」と表示され、自動で合わせて接続します。' },
   'remote.trust.fetchedReason': { ko: "서버에서 직접 가져온 키", en: "Key fetched from the server", ja: "サーバーから直接取得した鍵" },
   'remote.trust.success': { ko: "서버 신뢰 설정을 저장했습니다.", en: "Host trust saved.", ja: "ホストの信頼を保存しました。" },
 

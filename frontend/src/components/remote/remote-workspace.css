@@ -231,6 +231,7 @@
   color: var(--text-secondary);
 }
 .proto-badge.is-plain { color: var(--warning); border-color: var(--warning); }
+.proto-badge.is-legacy { color: var(--warning); border-color: var(--warning); background: rgba(243, 156, 18, 0.12); }
 .rw-lamp-partial { background: var(--warning); }
 .rw-rail-filters { display: flex; align-items: stretch; gap: 6px; margin: 10px 12px 0; }
 .rw-rail-filters .filter-input { flex: 1; min-width: 0; margin-bottom: 0; }

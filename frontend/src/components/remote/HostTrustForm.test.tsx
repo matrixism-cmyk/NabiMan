@@ -27,7 +27,7 @@ it('preserves previous fingerprint when replacing and shows conflict', async () 
   fireEvent.change(screen.getByLabelText('확인 경로와 변경 사유'), { target: { value: 'console verified rotation' } });
   fireEvent.click(screen.getByRole('button', { name: '확인한 키 등록 또는 교체' }));
   await screen.findByText('Host trust changed; reload');
-  expect(JSON.parse(request.mock.calls[0][1].body)).toEqual({ host: 'example.test', port: 22, public_key: 'ssh-ed25519 NEW', fingerprint: 'SHA256:new', previous_fingerprint: 'SHA256:old', previous_version: 'approval-before', reason: 'console verified rotation' });
+  expect(JSON.parse(request.mock.calls[0][1].body)).toEqual({ host: 'example.test', port: 22, public_key: 'ssh-ed25519 NEW', fingerprint: 'SHA256:new', previous_fingerprint: 'SHA256:old', previous_version: 'approval-before', reason: 'console verified rotation', legacy: false });
   expect(saved).not.toHaveBeenCalled();
 });
 it('revokes trust with an explicit reason and refreshes server', async () => {
@@ -35,7 +35,7 @@ it('revokes trust with an explicit reason and refreshes server', async () => {
   fireEvent.change(screen.getByLabelText('확인 경로와 변경 사유'), { target: { value: 'retired host key' } });
   fireEvent.click(screen.getByRole('button', { name: '신뢰 해제' }));
   await waitFor(() => expect(saved).toHaveBeenCalled());
-  expect(JSON.parse(request.mock.calls[0][1].body)).toEqual({ host: 'example.test', port: 22, public_key: '', fingerprint: '', previous_fingerprint: 'SHA256:old', previous_version: 'approval-before', reason: 'retired host key' });
+  expect(JSON.parse(request.mock.calls[0][1].body)).toEqual({ host: 'example.test', port: 22, public_key: '', fingerprint: '', previous_fingerprint: 'SHA256:old', previous_version: 'approval-before', reason: 'retired host key', legacy: false });
 });
 it('fills in the key a server not yet trusted presents, and registers it only when asked', async () => {
   post.mockResolvedValue({ success: true, data: { public_key: 'ssh-ed25519 FETCHED', fingerprint: 'SHA256:fetched' } });

@@ -33,6 +33,8 @@ const t: T = {
   },
   'remote.proto.only': { ko: '{name} 전용', en: '{name} only', ja: '{name} のみ' },
   'remote.proto.filter': { ko: '모든 프로토콜', en: 'All protocols', ja: 'すべてのプロトコル' },
+  'remote.proto.legacy': { ko: '구식 SSH', en: 'Legacy SSH', ja: '旧式SSH' },
+  'remote.proto.legacyHint': { ko: '옛 SSH 방식(구형 키 교환·암호)만 지원하는 서버입니다. 나비맨이 자동으로 맞춰 접속합니다.', en: 'This server supports only old SSH algorithms; NabiMan connects using them automatically.', ja: '旧式のSSH方式のみ対応するサーバーです。NabiManが自動で合わせて接続します。' },
   'remote.proto.plain': { ko: '암호화되지 않는 연결', en: 'Unencrypted connection', ja: '暗号化されない接続' },
   'remote.menuFiles': { ko: '파일 열기', en: 'Open files', ja: 'ファイルを開く' },
   'remote.status.partial': { ko: '일부만 됨', en: 'Partly reachable', ja: '一部のみ' },

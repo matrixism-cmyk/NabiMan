@@ -87,6 +87,7 @@ pub(super) async fn add_server(
         ftp_port: 21,
         tls_fingerprint: String::new(),
         ftps_implicit: false,
+        legacy_ssh: false,
         owner_id: if crate::member_servers::is_member(&actor) { actor.id.clone() } else { String::new() },
     };
     protocols::apply(&mut server, &protocols::Change {

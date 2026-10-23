@@ -53,18 +53,20 @@ describe('useColumns persistence and reorder', () => {
     expect(template(result.current.state).startsWith('20px minmax(120px, 1fr)')).toBe(true);
   });
   it('an account source saves to the server, not the browser', () => {
-    const put = jest.fn(() => Promise.resolve({ success: true, data: 'saved', message: '' }));
-    jest.spyOn(require('../../../shared/api/useApi'), 'apiRequest').mockImplementation((...a: unknown[]) => {
-      const [, init] = a as [string, { method?: string } | undefined];
-      return init?.method === 'PUT' ? put(...a) : Promise.resolve({ success: true, data: {}, message: '' });
-    });
+    const calls: Array<{ path: string; init?: { method?: string; body?: string } }> = [];
+    jest.spyOn(require('../../../shared/api/useApi'), 'apiRequest')
+      .mockImplementation(((path: string, init?: { method?: string; body?: string }) => {
+        calls.push({ path, init });
+        return Promise.resolve({ success: true, data: init?.method === 'PUT' ? 'saved' : {}, message: '' });
+      }) as unknown as (...a: unknown[]) => unknown);
     jest.useFakeTimers();
     const { result } = renderHook(() => useColumns(accountSource('srv_9')));
     act(() => result.current.toggle('mode'));
     act(() => jest.advanceTimersByTime(600));
     expect(localStorage.getItem('nabiman_sftp_columns_srv_9')).toBeNull();
-    expect(put).toHaveBeenCalled();
-    const body = JSON.parse((put.mock.calls[0][1] as { body: string }).body);
+    const put = calls.find((c) => c.init?.method === 'PUT' && c.path === '/api/terminal/sftp/columns');
+    expect(put).toBeTruthy();
+    const body = JSON.parse(put!.init!.body!);
     expect(body.scope).toBe('srv_9');
     expect(body.layout.shown).toContain('mode');
     jest.useRealTimers();

@@ -48,6 +48,12 @@ pub struct RemoteServer {
     /// switching to it with AUTH TLS.
     #[serde(default)]
     pub ftps_implicit: bool,
+    /// The server speaks only the old SSH algorithms (legacy key exchange,
+    /// host key or ciphers). Set when its host key is approved; lets the UI
+    /// mark it and is informational — the SSH options always allow the old
+    /// algorithms as a low-priority fallback regardless.
+    #[serde(default)]
+    pub legacy_ssh: bool,
     /// The remote-only member who registered it; empty for the servers the
     /// administrators keep (see `member_servers`).
     #[serde(default)]

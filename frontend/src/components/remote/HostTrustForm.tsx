@@ -9,6 +9,7 @@ export default function HostTrustForm({ server, onSaved }: { server: RemoteServe
   const [key, setKey] = useState(server.host_trust?.public_key || '');
   const [fingerprint, setFingerprint] = useState(server.host_trust?.fingerprint || '');
   const [reason, setReason] = useState('');
+  const [legacy, setLegacy] = useState(Boolean(server.legacy_ssh));
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const prefix = `host-trust-${server.id}`;
@@ -17,10 +18,11 @@ export default function HostTrustForm({ server, onSaved }: { server: RemoteServe
   const fetchKey = useCallback(async () => {
     setBusy(true);
     try {
-      const res = await apiPost<{ public_key: string; fingerprint: string }>(`/api/remote-servers/${server.id}/host-key`, {});
+      const res = await apiPost<{ public_key: string; fingerprint: string; legacy?: boolean }>(`/api/remote-servers/${server.id}/host-key`, {});
       if (!res.success || !res.data) { setMessage(res.message || t('common.error')); return; }
       setKey(res.data.public_key);
       setFingerprint(res.data.fingerprint);
+      setLegacy(Boolean(res.data.legacy));
       setReason(r => r || t('remote.trust.fetchedReason'));
       setMessage(t('remote.trust.fetched', { fingerprint: res.data.fingerprint }));
     } catch (error) { setMessage(error instanceof Error ? error.message : t('common.error')); }
@@ -39,7 +41,7 @@ export default function HostTrustForm({ server, onSaved }: { server: RemoteServe
           host: server.host, port: server.port,
           public_key: revoke ? '' : key.trim(), fingerprint: revoke ? '' : fingerprint.trim(),
           previous_fingerprint: server.host_trust?.fingerprint || '',
-          previous_version: server.host_trust_version || '', reason: reason.trim(),
+          previous_version: server.host_trust_version || '', reason: reason.trim(), legacy: revoke ? false : legacy,
         }),
       });
       if (!res.success) { setMessage(res.message); return; }
@@ -52,6 +54,7 @@ export default function HostTrustForm({ server, onSaved }: { server: RemoteServe
     <p>{t('remote.trust.hint')}</p>
     <p>{server.host_trust ? `${t('remote.trust.verified')}: ${server.host_trust.verified_by} · ${server.host_trust.verified_at}` : t('remote.trust.unverified')}</p>
     {message && <p role="status">{message}</p>}
+    {legacy && <p className="text-warning">{t('remote.trust.legacy')}</p>}
     <div className="form-group"><label htmlFor={`${prefix}-key`}>{t('remote.trust.key')}</label>
       <textarea id={`${prefix}-key`} value={key} onChange={e => setKey(e.target.value)} maxLength={8192} className="filter-input" placeholder="ssh-ed25519 AAAA…" /></div>
     <div className="form-group"><label htmlFor={`${prefix}-fingerprint`}>{t('remote.trust.fingerprint')}</label>

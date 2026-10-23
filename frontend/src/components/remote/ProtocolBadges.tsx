@@ -20,6 +20,9 @@ export default function ProtocolBadges({ server }: { server: RemoteServer }) {
           {protocolName(p)}
         </span>
       ))}
+      {server.legacy_ssh && (
+        <span className="proto-badge is-legacy" title={t('remote.proto.legacyHint')}>{t('remote.proto.legacy')}</span>
+      )}
     </span>
   );
 }
