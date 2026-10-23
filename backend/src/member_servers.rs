@@ -133,6 +133,7 @@ pub fn permitted(user: &NabimanUser, method: &str, path: &str) -> bool {
                 | "/api/terminal/dictation"
                 | "/api/terminal/dictation/settings"
                 | "/api/terminal/dictation/voiceprint"
+                | "/api/terminal/sftp/columns"
                 | "/api/terminal/copies"
                 | "/api/remote-servers"
         ),
@@ -149,7 +150,7 @@ pub fn permitted(user: &NabimanUser, method: &str, path: &str) -> bool {
                 | "/api/terminal/copies"
                 | "/api/remote-servers"
         ),
-        "PUT" => path == "/api/terminal/settings",
+        "PUT" => matches!(path, "/api/terminal/settings" | "/api/terminal/sftp/columns"),
         _ => false,
     };
     if fixed {

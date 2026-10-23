@@ -101,7 +101,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
   const dragOut = useDragOut(source);
   const here = listing?.path || '';
   const pathOf = useCallback((name: string) => joinPath(current.current, name), []);
-  const columns = useColumns();
+  const columns = useColumns(source);
   const visible = useMemo(
     () => sortEntries((listing?.entries || []).filter((e) => showHidden || !e.name.startsWith('.')), columns.state.sort),
     [listing, showHidden, columns.state.sort],

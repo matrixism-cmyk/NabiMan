@@ -116,6 +116,7 @@ const authHeader = (src: SftpSource): [string, string] =>
 export const joinPath = (dir: string, name: string) => (dir.endsWith('/') ? `${dir}${name}` : `${dir}/${name}`);
 export const baseName = (path: string) => path.replace(/\/+$/, '').split('/').pop() || path;
 export const isFolder = (e: SftpEntry) => e.kind === 'dir' || e.to_dir;
+export const isLink = (e: SftpEntry) => e.kind === 'link';
 
 /** A path quoted for a POSIX shell, ready to paste as one argument. */
 export function shellQuote(path: string): string {

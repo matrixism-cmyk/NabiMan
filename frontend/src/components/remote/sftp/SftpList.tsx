@@ -3,7 +3,7 @@ import { useT } from '../../../shared/i18n';
 import { useLongPress } from '../../../shared/ui/useLongPress';
 import { formatSize, isFolder, modeString, SftpEntry } from './sftpApi';
 import SftpHeader from './SftpHeader';
-import { ColumnKey, Columns, minWidth, template } from './sftpColumns';
+import { ColumnKey, Columns, fileType, minWidth, ownerGroup, template } from './sftpColumns';
 
 export interface Editing {
   mode: 'new' | 'rename';
@@ -98,10 +98,12 @@ export default function SftpList(props: Props) {
   const tableRef = useRef<HTMLDivElement>(null);
   const cell = (entry: SftpEntry, key: Exclude<ColumnKey, 'name'>) => {
     const folder = isFolder(entry);
-    const value = key === 'size' ? (folder ? '' : formatSize(entry.size))
-      : key === 'mtime' ? when(entry.mtime)
-      : key === 'mode' ? (entry.mode !== null ? modeString(entry.mode) : '')
-      : key === 'owner' ? (entry.owner ?? entry.uid ?? '') : (entry.group ?? entry.gid ?? '');
+    let value: string;
+    if (key === 'size') value = folder ? '' : formatSize(entry.size);
+    else if (key === 'mtime') value = when(entry.mtime);
+    else if (key === 'mode') value = entry.mode !== null ? modeString(entry.mode) : '';
+    else if (key === 'ownergroup') value = ownerGroup(entry);
+    else { const ft = fileType(entry); value = ft.label ? t(ft.label) : ft.ext.toUpperCase(); }
     return <span key={key} className={`sftp-col sftp-c-${key}`}>{value}</span>;
   };
   // On a touch screen a tap opens, as phones do; a long press opens the menu

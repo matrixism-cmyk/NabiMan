@@ -1,7 +1,7 @@
 import React, { RefObject, useRef, useState } from 'react';
 import { useT } from '../../../shared/i18n';
-import RailContextMenu, { RailMenuItem } from '../RailContextMenu';
-import { ColumnKey, Columns, MAX_WIDTH, MIN_WIDTH, OPTIONAL } from './sftpColumns';
+import ColumnChooser from './ColumnChooser';
+import { ColumnKey, Columns, MAX_WIDTH, MIN_WIDTH } from './sftpColumns';
 
 interface Props {
   columns: Columns;
@@ -10,7 +10,7 @@ interface Props {
 }
 
 const LABEL: Record<ColumnKey, string> = {
-  name: 'sftp.col.name', size: 'sftp.col.size', mtime: 'sftp.col.mtime', mode: 'sftp.col.mode', owner: 'sftp.col.owner', group: 'sftp.col.group',
+  name: 'sftp.col.name', size: 'sftp.col.size', type: 'sftp.col.type', mtime: 'sftp.col.mtime', mode: 'sftp.col.mode', ownergroup: 'sftp.col.ownergroup',
 };
 
 /**
@@ -71,13 +71,6 @@ export default function SftpHeader({ columns, listRef }: Props) {
     );
   };
 
-  const items: RailMenuItem[] = [
-    ...OPTIONAL.map((key) => ({
-      key, icon: state.shown.includes(key) ? '✓' : '', label: t(LABEL[key]), onSelect: () => columns.toggle(key),
-    })),
-    { key: 'reset', icon: '↺', label: t('sftp.col.reset'), separated: true, onSelect: columns.reset },
-  ];
-
   return (
     <div className="sftp-row sftp-colhead" role="row"
       onClick={(e) => e.stopPropagation()}
@@ -86,7 +79,7 @@ export default function SftpHeader({ columns, listRef }: Props) {
       {heading('name')}
       {state.shown.map((key) => heading(key))}
       {menu && (
-        <RailContextMenu x={menu.x} y={menu.y} opener={menu.opener} title={t('sftp.col.choose')} items={items} onClose={() => setMenu(null)} />
+        <ColumnChooser x={menu.x} y={menu.y} opener={menu.opener} columns={columns} label={(k) => t(LABEL[k])} onClose={() => setMenu(null)} />
       )}
     </div>
   );
