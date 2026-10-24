@@ -22,6 +22,8 @@ pub mod vnc_console;
 pub mod vnc_registry;
 pub mod rdp_tunnel;
 pub mod vnc_access;
+pub mod console_share;
+mod console_handlers;
 pub mod share_store;
 pub(crate) mod share_ticket;
 pub mod telnet_client;
@@ -371,4 +373,5 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     recording::config(cfg);
     vnc_console::config(cfg);
     rdp_tunnel::config(cfg);
+    console_share::config(cfg);
 }

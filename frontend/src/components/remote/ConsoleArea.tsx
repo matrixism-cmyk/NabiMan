@@ -9,13 +9,14 @@ import { Selection } from './workspaceState';
 
 /** The VM-console work area: a live console (with edit/delete for admins on a
  *  registered one) or the add/edit form. Keeps that logic out of the workspace. */
-export default function ConsoleArea({ selection, consoles, canManage, onSelect, onChanged, onAccess }: {
+export default function ConsoleArea({ selection, consoles, canManage, onSelect, onChanged, onAccess, onShare }: {
   selection: Selection;
   consoles: VmConsole[];
   canManage: boolean;
   onSelect: (s: Selection) => void;
   onChanged: () => void | Promise<void>;
   onAccess: (key: string, label: string) => void;
+  onShare: (key: string, label: string) => void;
 }) {
   const { t } = useT();
 
@@ -29,7 +30,7 @@ export default function ConsoleArea({ selection, consoles, canManage, onSelect, 
       if (!(await confirmDialog({ message: t('remote.console.deleteConfirm', { label }), danger: true, confirmLabel: t('common.delete') }))) return;
       await deleteConsole(vm); await onChanged(); onSelect({ kind: 'overview' });
     };
-    const common = { label, canEdit: canManage && !selection.builtin, onEdit: edit, onDelete: del, canGrant: canManage, onGrant: () => onAccess(vm, label) };
+    const common = { label, canEdit: canManage && !selection.builtin, onEdit: edit, onDelete: del, canGrant: canManage, onGrant: () => onAccess(vm, label), canShare: true, onShare: () => onShare(vm, label) };
     return rec?.protocol === 'rdp'
       ? <RdpConsoleView target={vm} {...common} />
       : <VncConsoleView vm={vm} {...common} />;

@@ -9,9 +9,9 @@ type Status = 'connecting' | 'connected' | 'disconnected';
 /** An RDP console in the browser, over NabiMan's guacd tunnel. Guacamole draws
  *  the desktop and carries keyboard, mouse and clipboard — including copy/paste
  *  to and from the VM, natively (no VNC-style keystroke workaround). */
-export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelete, canGrant, onGrant, popout }: {
+export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelete, canGrant, onGrant, canShare, onShare, popout, share }: {
   target: string; label: string; canEdit?: boolean; onEdit?: () => void; onDelete?: () => void;
-  canGrant?: boolean; onGrant?: () => void; popout?: boolean;
+  canGrant?: boolean; onGrant?: () => void; canShare?: boolean; onShare?: () => void; popout?: boolean; share?: { token: string; viewOnly: boolean };
 }) {
   const { t } = useT();
   const host = useRef<HTMLDivElement>(null);
@@ -51,7 +51,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
     setStatus('connecting'); setError('');
     const el = host.current;
     if (!el) return undefined;
-    const tunnel = new Guacamole.WebSocketTunnel('api/remote/rdp');
+    const tunnel = new Guacamole.WebSocketTunnel(share ? `api/cshare/${encodeURIComponent(share.token)}/ws` : 'api/remote/rdp');
     const c = new Guacamole.Client(tunnel);
     client.current = c;
     const display = c.getDisplay();
@@ -81,29 +81,34 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
       reader.onend = () => { navigator.clipboard.writeText(text).catch(() => { /* ignore */ }); };
     };
 
-    rdpTicket(target).then((ticket) => {
-      if (!live) return;
-      const w = Math.max(el.clientWidth || 1280, 640);
-      const h = Math.max(el.clientHeight || 800, 480);
-      c.connect(`target=${encodeURIComponent(target)}&ticket=${ticket}&GUAC_WIDTH=${w}&GUAC_HEIGHT=${h}&GUAC_DPI=96`);
-    }).catch((e) => { if (live) { setStatus('disconnected'); setError(e instanceof Error ? e.message : t('common.error')); } });
+    const dims = () => `GUAC_WIDTH=${Math.max(el.clientWidth || 1280, 640)}&GUAC_HEIGHT=${Math.max(el.clientHeight || 800, 480)}&GUAC_DPI=96`;
+    if (share) {
+      c.connect(dims());
+    } else {
+      rdpTicket(target).then((ticket) => {
+        if (!live) return;
+        c.connect(`target=${encodeURIComponent(target)}&ticket=${ticket}&${dims()}`);
+      }).catch((e) => { if (live) { setStatus('disconnected'); setError(e instanceof Error ? e.message : t('common.error')); } });
+    }
 
-    // Mouse
-    const mouse = new Guacamole.Mouse(display.getElement());
-    mouse.onmousedown = mouse.onmouseup = mouse.onmousemove = (state: any) => c.sendMouseState(state);
-    // Keyboard (while the console has focus)
-    const kb = new Guacamole.Keyboard(el);
-    kb.onkeydown = (keysym: number) => c.sendKeyEvent(1, keysym);
-    kb.onkeyup = (keysym: number) => c.sendKeyEvent(0, keysym);
-    keyboard.current = kb;
-    el.addEventListener('mouseenter', pushClipboard);
-    window.addEventListener('focus', pushClipboard);
+    // Input (skipped entirely for a view-only share).
+    let kb: any = null;
+    if (!share?.viewOnly) {
+      const mouse = new Guacamole.Mouse(display.getElement());
+      mouse.onmousedown = mouse.onmouseup = mouse.onmousemove = (state: any) => c.sendMouseState(state);
+      kb = new Guacamole.Keyboard(el);
+      kb.onkeydown = (keysym: number) => c.sendKeyEvent(1, keysym);
+      kb.onkeyup = (keysym: number) => c.sendKeyEvent(0, keysym);
+      keyboard.current = kb;
+      el.addEventListener('mouseenter', pushClipboard);
+      window.addEventListener('focus', pushClipboard);
+    }
 
     return () => {
       live = false;
       el.removeEventListener('mouseenter', pushClipboard);
       window.removeEventListener('focus', pushClipboard);
-      try { kb.onkeydown = null; kb.onkeyup = null; } catch { /* ignore */ }
+      try { if (kb) { kb.onkeydown = null; kb.onkeyup = null; } } catch { /* ignore */ }
       try { c.disconnect(); } catch { /* already gone */ }
       client.current = null; keyboard.current = null;
     };
@@ -114,14 +119,16 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
       <div className="rw-console-bar">
         <strong>{label}</strong>
         <span className="rw-proto-tag">RDP</span>
+        {share?.viewOnly && <span className="rw-proto-tag">{t('remote.console.share.viewOnly')}</span>}
         <span className={`rw-console-state is-${status}`}>{t(`remote.console.${status}`)}</span>
         <span className="rw-console-spacer" />
-        {status === 'connected' && <AccountDictation variant="bar" onText={dictate} onKeys={dictateKeys} />}
+        {status === 'connected' && !share?.viewOnly && <AccountDictation variant="bar" onText={dictate} onKeys={dictateKeys} />}
         {!popout && <button className="btn btn-secondary btn-sm" onClick={() => window.open(`/remote#rdp/${encodeURIComponent(target)}`, `rdp_${target}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no')}>{t('remote.console.detach')}</button>}
-        <button className="btn btn-secondary btn-sm" onClick={() => { try { const c = client.current; c?.sendKeyEvent(1, 0xffe3); c?.sendKeyEvent(1, 0xffe9); c?.sendKeyEvent(1, 0xffff); c?.sendKeyEvent(0, 0xffff); c?.sendKeyEvent(0, 0xffe9); c?.sendKeyEvent(0, 0xffe3); } catch { /* not ready */ } }} disabled={status !== 'connected'}>Ctrl+Alt+Del</button>
+        {!share?.viewOnly && <button className="btn btn-secondary btn-sm" onClick={() => { try { const c = client.current; c?.sendKeyEvent(1, 0xffe3); c?.sendKeyEvent(1, 0xffe9); c?.sendKeyEvent(1, 0xffff); c?.sendKeyEvent(0, 0xffff); c?.sendKeyEvent(0, 0xffe9); c?.sendKeyEvent(0, 0xffe3); } catch { /* not ready */ } }} disabled={status !== 'connected'}>Ctrl+Alt+Del</button>}
         {status === 'disconnected' && <button className="btn btn-primary btn-sm" onClick={() => setAttempt(a => a + 1)}>{t('remote.console.reconnect')}</button>}
         {canEdit && <button className="btn btn-secondary btn-sm" onClick={onEdit}>{t('common.edit')}</button>}
         {canGrant && <button className="btn btn-secondary btn-sm" onClick={onGrant}>{t('remote.console.access.btn')}</button>}
+        {canShare && <button className="btn btn-secondary btn-sm" onClick={onShare}>{t('remote.console.share.btn')}</button>}
         {canEdit && <button className="btn btn-danger btn-sm" onClick={onDelete}>{t('common.delete')}</button>}
       </div>
       {error && <p role="alert" className="message rw-console-error" onClick={() => setError('')}>{error}</p>}

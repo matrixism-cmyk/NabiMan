@@ -77,7 +77,15 @@ struct RdpConsole {
     params: RdpParams,
     started: Instant,
     to_guacd: Option<mpsc::UnboundedSender<Vec<u8>>>,
-    grant: crate::stream_access::ConnectionGrant,
+    life: super::console_share::Lifeline,
+    view_only: bool,
+}
+
+/// The opcode of a Guacamole instruction (`len.opcode,…;`), if parseable.
+fn guac_opcode(text: &str) -> Option<&str> {
+    let dot = text.find('.')?;
+    let n: usize = text.get(..dot)?.parse().ok()?;
+    text.get(dot + 1..dot + 1 + n)
 }
 
 #[derive(Message)]
@@ -97,7 +105,7 @@ impl Actor for RdpConsole {
         let params = self.params.clone();
         actix::spawn(async move { pump(params, rx, addr).await });
         ctx.run_interval(CHECK_EVERY, |act, ctx| {
-            if !act.grant.valid() || act.started.elapsed() > LONGEST {
+            if !act.life.valid() || act.started.elapsed() > LONGEST {
                 ctx.close(None);
                 ctx.stop();
             }
@@ -113,6 +121,11 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for RdpConsole {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         match msg {
             Ok(ws::Message::Text(text)) => {
+                // A view-only share may keep the display in sync but cannot drive
+                // the VM: mouse, keyboard and clipboard instructions are dropped.
+                if self.view_only && matches!(guac_opcode(&text), Some("mouse" | "key" | "clipboard")) {
+                    return;
+                }
                 if let Some(tx) = &self.to_guacd {
                     let _ = tx.send(text.into_bytes().to_vec());
                 }
@@ -280,8 +293,29 @@ async fn ws_rdp(
         dpi: dims("GUAC_DPI", 96),
     };
     ws::WsResponseBuilder::new(
-        RdpConsole { params, started: Instant::now(), to_guacd: None, grant },
+        RdpConsole { params, started: Instant::now(), to_guacd: None, life: super::console_share::Lifeline::Account(grant), view_only: false },
         &req,
+        stream,
+    )
+    .protocols(&["guacamole"])
+    .start()
+}
+
+/// Opens an RDP console for a share link (no account), view-only or control.
+pub(super) fn open_shared_rdp(
+    req: &HttpRequest,
+    stream: web::Payload,
+    console: &str,
+    view_only: bool,
+    token: String,
+) -> Result<HttpResponse, actix_web::Error> {
+    let Some((host, port, user, password)) = super::vnc_registry::rdp_login(console) else {
+        return Ok(HttpResponse::NotFound().finish());
+    };
+    let params = RdpParams { host, port, user, password, width: 1280, height: 800, dpi: 96 };
+    ws::WsResponseBuilder::new(
+        RdpConsole { params, started: Instant::now(), to_guacd: None, life: super::console_share::Lifeline::Share(token), view_only },
+        req,
         stream,
     )
     .protocols(&["guacamole"])

@@ -4,6 +4,7 @@ import './shared/styles';
 import App from './App';
 import { I18nProvider } from './i18n';
 import SharePage from './components/terminal/SharePage';
+import ConsoleSharePage from './components/remote/ConsoleSharePage';
 import { ConfirmHost } from './shared/ui/ConfirmDialog';
 import reportWebVitals from './reportWebVitals';
 
@@ -14,11 +15,17 @@ const root = ReactDOM.createRoot(
 const shareToken = window.location.pathname.startsWith('/share/')
   ? window.location.pathname.slice('/share/'.length).replace(/\/$/, '')
   : '';
+// /cshare/<token> opens one shared VM console for someone without an account.
+const consoleShareToken = window.location.pathname.startsWith('/cshare/')
+  ? window.location.pathname.slice('/cshare/'.length).replace(/\/$/, '')
+  : '';
 
 root.render(
   <React.StrictMode>
     <I18nProvider>
-      {shareToken ? (
+      {consoleShareToken ? (
+        <ConsoleSharePage token={consoleShareToken} />
+      ) : shareToken ? (
         <SharePage token={shareToken} />
       ) : (
         <App />

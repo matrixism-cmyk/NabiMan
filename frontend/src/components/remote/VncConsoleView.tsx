@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import RFB from '@novnc/novnc/lib/rfb.js';
 import { useT } from '../../shared/i18n';
-import { consoleWsUrl } from './vncApi';
+import { consoleWsUrl, shareWsUrl } from './vncApi';
 import { typeText } from './vncInput';
 import AccountDictation from '../terminal/dictation/AccountDictation';
 
@@ -9,8 +9,8 @@ type Status = 'connecting' | 'connected' | 'disconnected';
 
 /** A browser VNC console for an internal VM, over NabiMan's own proxy. noVNC
  *  (RFB) draws into the canvas; the WebSocket is admitted by a one-use ticket. */
-export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, canGrant, onGrant, popout }: {
-  vm: string; label: string; canEdit?: boolean; onEdit?: () => void; onDelete?: () => void; canGrant?: boolean; onGrant?: () => void; popout?: boolean;
+export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, canGrant, onGrant, canShare, onShare, popout, share }: {
+  vm: string; label: string; canEdit?: boolean; onEdit?: () => void; onDelete?: () => void; canGrant?: boolean; onGrant?: () => void; canShare?: boolean; onShare?: () => void; popout?: boolean; share?: { token: string; viewOnly: boolean };
 }) {
   const { t } = useT();
   const host = useRef<HTMLDivElement>(null);
@@ -30,11 +30,12 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
     setStatus('connecting'); setError('');
     (async () => {
       try {
-        const url = await consoleWsUrl(vm, controller.signal);
+        const url = share ? shareWsUrl(share.token) : await consoleWsUrl(vm, controller.signal);
         if (!live || !host.current) return;
         const client = new RFB(host.current, url, { wsProtocols: ['binary'] });
         client.scaleViewport = scale;
         client.resizeSession = !scale;
+        client.viewOnly = Boolean(share?.viewOnly);
         client.background = '#0b0d10';
         client.addEventListener('connect', () => live && setStatus('connected'));
         client.addEventListener('disconnect', (e: Event) => {
@@ -67,7 +68,7 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
     const el = host.current;
     if (!el) return undefined;
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'v' || e.key === 'V')) {
+      if (!share?.viewOnly && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'v' || e.key === 'V')) {
         e.preventDefault(); e.stopImmediatePropagation();
         navigator.clipboard.readText().then((text) => {
           if (text && rfb.current) { typeText(rfb.current, text); setPasted(true); setTimeout(() => setPasted(false), 1200); }
@@ -99,15 +100,17 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
       <div className="rw-console-bar">
         <strong>{label}</strong>
         <span className={`rw-console-state is-${status}`}>{t(`remote.console.${status}`)}</span>
+        {share?.viewOnly && <span className="rw-proto-tag">{t('remote.console.share.viewOnly')}</span>}
         <span className="rw-console-spacer" />
         <label className="rw-console-toggle"><input type="checkbox" checked={scale} onChange={e => setScale(e.target.checked)} /> {t('remote.console.fit')}</label>
-        {status === 'connected' && <AccountDictation variant="bar" onText={dictate} onKeys={dictateKeys} />}
-        <button className={`btn btn-secondary btn-sm ${clipOpen ? 'is-active' : ''}`} onClick={openClip} disabled={status !== 'connected'}>{t('remote.console.clip.btn')}</button>
+        {status === 'connected' && !share?.viewOnly && <AccountDictation variant="bar" onText={dictate} onKeys={dictateKeys} />}
+        {!share?.viewOnly && <button className={`btn btn-secondary btn-sm ${clipOpen ? 'is-active' : ''}`} onClick={openClip} disabled={status !== 'connected'}>{t('remote.console.clip.btn')}</button>}
         {!popout && <button className="btn btn-secondary btn-sm" onClick={() => window.open(`/remote#console/${encodeURIComponent(vm)}`, `vnccon_${vm}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no')}>{t('remote.console.detach')}</button>}
-        <button className="btn btn-secondary btn-sm" onClick={() => { try { rfb.current?.sendCtrlAltDel(); } catch { /* not ready */ } }} disabled={status !== 'connected'}>Ctrl+Alt+Del</button>
+        {!share?.viewOnly && <button className="btn btn-secondary btn-sm" onClick={() => { try { rfb.current?.sendCtrlAltDel(); } catch { /* not ready */ } }} disabled={status !== 'connected'}>Ctrl+Alt+Del</button>}
         {status === 'disconnected' && <button className="btn btn-primary btn-sm" onClick={() => setAttempt(a => a + 1)}>{t('remote.console.reconnect')}</button>}
         {canEdit && <button className="btn btn-secondary btn-sm" onClick={onEdit}>{t('common.edit')}</button>}
         {canGrant && <button className="btn btn-secondary btn-sm" onClick={onGrant}>{t('remote.console.access.btn')}</button>}
+        {canShare && <button className="btn btn-secondary btn-sm" onClick={onShare}>{t('remote.console.share.btn')}</button>}
         {canEdit && <button className="btn btn-danger btn-sm" onClick={onDelete}>{t('common.delete')}</button>}
       </div>
       {clipOpen && (

@@ -15,11 +15,11 @@ use futures::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::Message as WsMessage;
 
-use crate::models::{ApiResponse, UserRole};
+use crate::models::UserRole;
 
 /// name, label, local websockify port. Mirrors the nginx console locations;
 /// only these fixed targets are reachable — never an arbitrary port.
-const CONSOLES: &[(&str, &str, u16)] = &[
+pub(super) const CONSOLES: &[(&str, &str, u16)] = &[
     ("winsrv2022", "Windows Server 2022", 6081),
     ("win11", "Windows 11", 6080),
     ("win11-2", "Windows 11 (2)", 6082),
@@ -30,7 +30,7 @@ const BIGGEST_FRAME: usize = 1 << 20; // One RFB frame; 1 MiB is ample.
 const LONGEST: Duration = Duration::from_secs(12 * 60 * 60);
 const CHECK_EVERY: Duration = Duration::from_secs(30);
 
-fn port_for(vm: &str) -> Option<u16> {
+pub(super) fn port_for(vm: &str) -> Option<u16> {
     CONSOLES.iter().find(|(n, _, _)| *n == vm).map(|(_, _, p)| *p)
 }
 
@@ -51,12 +51,55 @@ fn resolve(vm: &str) -> Option<Target> {
     super::vnc_registry::find(vm).map(|c| Target::RawTcp(c.host, c.port))
 }
 
+/// Whether a console key names a real console (built-in bridge or registered).
+pub(super) fn console_exists(key: &str) -> bool {
+    port_for(key).is_some() || super::vnc_registry::find(key).is_some()
+}
+
+/// A console's display label and protocol ("vnc"|"rdp"), for share pages.
+pub(super) fn console_label_protocol(key: &str) -> Option<(String, String)> {
+    if let Some((_, label, _)) = CONSOLES.iter().find(|(n, _, _)| *n == key) {
+        return Some(((*label).to_string(), "vnc".into()));
+    }
+    super::vnc_registry::find(key).map(|c| (c.label, c.protocol))
+}
+
+/// Opens a console for a share link (no account): VNC here, RDP via guacd.
+pub(super) fn open_shared_console(
+    req: &HttpRequest,
+    stream: actix_web::web::Payload,
+    console: &str,
+    view_only: bool,
+    token: String,
+) -> Result<HttpResponse, actix_web::Error> {
+    let protocol = console_label_protocol(console).map(|(_, p)| p).unwrap_or_else(|| "vnc".into());
+    if protocol == "rdp" {
+        return super::rdp_tunnel::open_shared_rdp(req, stream, console, view_only, token);
+    }
+    let Some(target) = resolve(console) else {
+        return Ok(HttpResponse::NotFound().finish());
+    };
+    ws::WsResponseBuilder::new(
+        VncConsole {
+            target,
+            started: Instant::now(),
+            to_upstream: None,
+            life: super::console_share::Lifeline::Share(token),
+            view_only,
+        },
+        req,
+        stream,
+    )
+    .protocols(&["binary"])
+    .start()
+}
+
 /// Registering or changing a console is an administrator action.
-fn may_manage_console(req: &HttpRequest) -> bool {
+pub(super) fn may_manage_console(req: &HttpRequest) -> bool {
     matches!(crate::auth::verified_role(req), Some(UserRole::Admin))
 }
 
-fn is_admin(req: &HttpRequest) -> bool {
+pub(super) fn is_admin(req: &HttpRequest) -> bool {
     matches!(crate::auth::verified_role(req), Some(UserRole::Admin))
 }
 
@@ -72,7 +115,8 @@ struct VncConsole {
     target: Target,
     started: Instant,
     to_upstream: Option<mpsc::UnboundedSender<WsMessage>>,
-    grant: crate::stream_access::ConnectionGrant,
+    life: super::console_share::Lifeline,
+    view_only: bool,
 }
 
 #[derive(Message)]
@@ -101,7 +145,7 @@ impl Actor for VncConsole {
         actix::spawn(async move { connect_and_pump(target, rx, addr).await });
         // The account can be signed out or lose access while connected.
         ctx.run_interval(CHECK_EVERY, |act, ctx| {
-            if !act.grant.valid() || act.started.elapsed() > LONGEST {
+            if !act.life.valid() || act.started.elapsed() > LONGEST {
                 ctx.close(None);
                 ctx.stop();
             }
@@ -118,12 +162,13 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for VncConsole {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         match msg {
             Ok(ws::Message::Binary(bytes)) => {
-                if bytes.len() <= BIGGEST_FRAME {
+                // A view-only share never sends input to the VM.
+                if !self.view_only && bytes.len() <= BIGGEST_FRAME {
                     self.send(WsMessage::binary(bytes));
                 }
             }
             // noVNC speaks binary; a text frame is harmless to pass through.
-            Ok(ws::Message::Text(text)) => self.send(WsMessage::text(text.to_string())),
+            Ok(ws::Message::Text(text)) => { if !self.view_only { self.send(WsMessage::text(text.to_string())); } }
             Ok(ws::Message::Ping(p)) => ctx.pong(&p),
             Ok(ws::Message::Close(_)) | Err(_) => {
                 self.send(WsMessage::Close(None));
@@ -275,7 +320,8 @@ async fn ws_console(
             target,
             started: Instant::now(),
             to_upstream: None,
-            grant,
+            life: super::console_share::Lifeline::Account(grant),
+            view_only: false,
         },
         &req,
         stream,
@@ -283,118 +329,8 @@ async fn ws_console(
     .protocols(&["binary"])
     .start()
 }
-/// `GET /api/remote/consoles` — the VM consoles the caller may open: the
-/// built-in internal bridges (read-only) and the admin-registered ones.
-#[actix_web::get("/api/remote/consoles")]
-async fn list_consoles(req: HttpRequest) -> HttpResponse {
-    let admin = is_admin(&req);
-    let uid = crate::auth::verified_user_id(&req).unwrap_or_default();
-    let visible = |key: &str| admin || super::vnc_access::allowed(&uid, key);
-    let mut list: Vec<serde_json::Value> = CONSOLES
-        .iter()
-        .filter(|(name, _, _)| visible(name))
-        .map(|(name, label, _)| serde_json::json!({ "name": name, "label": label, "protocol": "vnc", "builtin": true }))
-        .collect();
-    for c in super::vnc_registry::load() {
-        if visible(&c.id) {
-            list.push(serde_json::json!({
-                "name": c.id, "label": c.label, "host": c.host, "port": c.port,
-                "protocol": c.protocol, "user": c.user, "has_password": !c.password_enc.is_empty(), "builtin": false
-            }));
-        }
-    }
-    HttpResponse::Ok().json(ApiResponse::ok(list))
-}
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ConsoleBody {
-    label: String,
-    host: String,
-    port: u16,
-    #[serde(default = "vnc_default")]
-    protocol: String,
-    #[serde(default)]
-    user: String,
-    #[serde(default)]
-    password: Option<String>,
-}
-fn vnc_default() -> String {
-    "vnc".into()
-}
-fn as_json(c: super::vnc_registry::Console) -> serde_json::Value {
-    serde_json::json!({ "name": c.id, "label": c.label, "host": c.host, "port": c.port,
-        "protocol": c.protocol, "user": c.user, "has_password": !c.password_enc.is_empty(), "builtin": false })
-}
-/// `POST /api/remote/consoles` — register an external VNC console (admin).
-#[actix_web::post("/api/remote/consoles")]
-async fn create_console(req: HttpRequest, body: web::Json<ConsoleBody>) -> HttpResponse {
-    if !may_manage_console(&req) {
-        return HttpResponse::Forbidden().finish();
-    }
-    match super::vnc_registry::create(&body.label, &body.host, body.port, &body.protocol, &body.user, body.password.as_deref().unwrap_or("")) {
-        Ok(c) => HttpResponse::Ok().json(ApiResponse::ok(as_json(c))),
-        Err(e) => HttpResponse::BadRequest().json(ApiResponse::<()>::error(&e)),
-    }
-}
-/// `PUT /api/remote/consoles/{id}` — edit a registered console (admin).
-#[actix_web::put("/api/remote/consoles/{id}")]
-async fn update_console(req: HttpRequest, id: web::Path<String>, body: web::Json<ConsoleBody>) -> HttpResponse {
-    if !may_manage_console(&req) {
-        return HttpResponse::Forbidden().finish();
-    }
-    match super::vnc_registry::update(&id, &body.label, &body.host, body.port, &body.protocol, &body.user, body.password.as_deref()) {
-        Ok(c) => HttpResponse::Ok().json(ApiResponse::ok(as_json(c))),
-        Err(e) => HttpResponse::BadRequest().json(ApiResponse::<()>::error(&e)),
-    }
-}
-/// `DELETE /api/remote/consoles/{id}` — remove a registered console (admin).
-#[actix_web::delete("/api/remote/consoles/{id}")]
-async fn delete_console(req: HttpRequest, id: web::Path<String>) -> HttpResponse {
-    if !may_manage_console(&req) {
-        return HttpResponse::Forbidden().finish();
-    }
-    match super::vnc_registry::delete(&id) {
-        Ok(()) => {
-            super::vnc_access::forget(&id);
-            HttpResponse::Ok().json(ApiResponse::ok(()))
-        }
-        Err(e) => HttpResponse::BadRequest().json(ApiResponse::<()>::error(&e)),
-    }
-}
-/// `GET /api/remote/consoles/{key}/access` — who may open this console (admin).
-#[actix_web::get("/api/remote/consoles/{key}/access")]
-async fn get_access(req: HttpRequest, key: web::Path<String>) -> HttpResponse {
-    if !is_admin(&req) {
-        return HttpResponse::Forbidden().finish();
-    }
-    HttpResponse::Ok().json(ApiResponse::ok(super::vnc_access::allowed_users(&key)))
-}
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-struct AccessBody {
-    users: Vec<String>,
-}
-/// `PUT /api/remote/consoles/{key}/access` — set who may open this console (admin).
-#[actix_web::put("/api/remote/consoles/{key}/access")]
-async fn set_access(req: HttpRequest, key: web::Path<String>, body: web::Json<AccessBody>) -> HttpResponse {
-    if !is_admin(&req) {
-        return HttpResponse::Forbidden().finish();
-    }
-    // Only a real console key may carry a grant.
-    if port_for(&key).is_none() && super::vnc_registry::find(&key).is_none() {
-        return HttpResponse::NotFound().finish();
-    }
-    match super::vnc_access::set(&key, body.users.clone()) {
-        Ok(()) => HttpResponse::Ok().json(ApiResponse::ok(())),
-        Err(e) => HttpResponse::BadRequest().json(ApiResponse::<()>::error(&e)),
-    }
-}
 pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.service(ws_console)
-        .service(list_consoles)
-        .service(create_console)
-        .service(update_console)
-        .service(delete_console)
-        .service(get_access)
-        .service(set_access);
+    cfg.service(ws_console);
+    super::console_handlers::config(cfg);
 }
+

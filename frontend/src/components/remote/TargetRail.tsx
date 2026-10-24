@@ -89,8 +89,9 @@ export default function TargetRail({
         { key: 'open', icon: '▶', label: t('remote.menuConnect'), onSelect: act('open') },
         { key: 'detach', icon: '⧉', label: t('remote.console.detach'), onSelect: act('detach') },
       ];
+      items.push({ key: 'share', icon: '↗', label: t('remote.console.share.btn'), separated: true, onSelect: act('share') });
       if (canManageConsoles) {
-        items.push({ key: 'access', icon: '◍', label: t('remote.console.access.btn'), separated: true, onSelect: act('access') });
+        items.push({ key: 'access', icon: '◍', label: t('remote.console.access.btn'), onSelect: act('access') });
         if (!c.builtin) {
           items.push(
             { key: 'edit', icon: '✎', label: t('remote.menuEdit'), onSelect: act('edit') },

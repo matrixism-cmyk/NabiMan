@@ -20,6 +20,7 @@ import TargetRail from './TargetRail';
 import AdhocConnect from './AdhocConnect';
 import ConsoleArea from './ConsoleArea';
 import ConsoleAccessModal from './ConsoleAccessModal';
+import ConsoleShareModal from './ConsoleShareModal';
 import { deleteConsole, VmConsole } from './vncApi';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import TerminalWithFiles, { filesScope } from './TerminalWithFiles';
@@ -38,7 +39,6 @@ import {
 } from './workspaceState';
 import { useMember } from './member';
 import './remote-workspace.css';
-
 /**
  * One place for everything remote: the list of things you can connect to on
  * the left, and whatever you are doing with the selected one on the right.
@@ -54,6 +54,7 @@ export default function RemoteWorkspace() {
   const { data: me } = useApi<{ role: string }>(member ? '' : '/api/users/me');
   const canManageConsoles = me?.role === 'admin';
   const [accessConsole, setAccessConsole] = useState<{ key: string; label: string } | null>(null);
+  const [shareConsole, setShareConsole] = useState<{ key: string; label: string } | null>(null);
   const { openTerminal } = useTerminalWindows();
   const viewRef = useRef<TerminalViewHandle>(null);
   const { data: serverData, refetch: refetchServers } = useApi<RemoteServer[]>('/api/remote-servers', 30000);
@@ -86,24 +87,20 @@ export default function RemoteWorkspace() {
     rememberSelection(selection);
     rememberPaneState({ view: chosenView, connected: Array.from(connected), join: joinSessionId });
   }, [selection, chosenView, connected, joinSessionId]);
-
   // Each session remembers the size it was zoomed to; drop the sizes of
   // sessions that have since ended.
   useEffect(() => {
     if (sessionData) pruneSessionZooms(sessions.filter(s => s.alive).map(s => s.id));
   }, [sessionData, sessions]);
-
   const selectedServer = selection.kind === 'server' ? servers.find(s => s.id === selection.id) : undefined;
   // A files-only server has no sessions or terminal to open on.
   const serverView = viewFor(selectedServer, chosenView, member);
-
   // Opening a session list (the fleet's or a target's), or starting a new
   // shell, should show the current state, not whatever the last poll caught.
   useEffect(() => {
     if (selection.kind === 'overview' ? overviewView === 'sessions'
       : (selection.kind === 'server' || selection.kind === 'local') && serverView === 'sessions') refetchSessions();
   }, [selection, overviewView, serverView, refetchSessions]);
-
   // Nothing selected that is gone (a deleted server) or not a member's to have.
   useEffect(() => {
     if ((selection.kind === 'server' && servers.length > 0 && !selectedServer)
@@ -157,6 +154,7 @@ export default function RemoteWorkspace() {
     else if (action === 'detach') window.open(`/remote#${c.protocol === 'rdp' ? 'rdp' : 'console'}/${encodeURIComponent(c.name)}`, `con_${c.name}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no');
     else if (action === 'edit') select({ kind: 'console-form', edit: { id: c.name, label: c.label, host: c.host || '', port: c.port || (c.protocol === 'rdp' ? 3389 : 5900), protocol: c.protocol || 'vnc', user: c.user || '' } });
     else if (action === 'access') setAccessConsole({ key: c.name, label: c.label });
+    else if (action === 'share') setShareConsole({ key: c.name, label: c.label });
     else if (action === 'delete') {
       if (!(await confirmDialog({ message: t('remote.console.deleteConfirm', { label: c.label }), danger: true, confirmLabel: t('common.delete') }))) return;
       await deleteConsole(c.name); await refetchConsoles();
@@ -224,7 +222,6 @@ export default function RemoteWorkspace() {
       ? `${adhocTarget.user}@${adhocTarget.host}:${adhocTarget.port}`
       : selection.kind === 'local' ? t('remote.localShellHint')
       : '';
-
   return (
     <div className={`rw ${compact ? `rw-compact rw-pane-${pane}` : ''}`}>
       <TargetRail
@@ -364,9 +361,11 @@ export default function RemoteWorkspace() {
           {(selection.kind === 'console' || selection.kind === 'console-form') && (
             <ConsoleArea selection={selection} consoles={consoles || []} canManage={canManageConsoles}
               onSelect={select} onChanged={refetchConsoles}
-              onAccess={(key, label) => setAccessConsole({ key, label })} />
+              onAccess={(key, label) => setAccessConsole({ key, label })}
+              onShare={(key, label) => setShareConsole({ key, label })} />
           )}
           {accessConsole && <ConsoleAccessModal console={accessConsole.key} label={accessConsole.label} onClose={() => setAccessConsole(null)} />}
+          {shareConsole && <ConsoleShareModal console={shareConsole.key} label={shareConsole.label} onClose={() => setShareConsole(null)} />}
           {isServerTarget && selectedServer && serverView === 'files' && <FilesView server={selectedServer} />}
           {isServerTarget && selectedServer && serverView === 'status' && (
             <div className="rw-view rw-view-scroll"><ServerStatusView server={selectedServer} /></div>
