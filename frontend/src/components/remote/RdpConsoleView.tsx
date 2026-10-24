@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Guacamole from '../../vendor/guacamole-common.js';
 import { useT } from '../../shared/i18n';
 import { rdpTicket } from './vncApi';
+import AccountDictation from '../terminal/dictation/AccountDictation';
 
 type Status = 'connecting' | 'connected' | 'disconnected';
 
@@ -30,6 +31,19 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
       const writer = new Guacamole.StringWriter(stream);
       writer.sendText(text); writer.sendEnd();
     }).catch(() => { /* no permission */ });
+  };
+
+  // Voice dictation typed into the VM. RDP accepts Unicode keystrokes, so Hangul
+  // works too (unlike VNC).
+  const key = (c: any, cp: number) => { const ks = cp < 0x100 ? cp : 0x01000000 + cp; c.sendKeyEvent(1, ks); c.sendKeyEvent(0, ks); };
+  const dictate = (text: string) => { const c = client.current; if (!c) return; for (const ch of text) { const cp = ch.codePointAt(0) ?? 0; if (cp) key(c, cp); } };
+  const dictateKeys = (keys: string) => {
+    const c = client.current; if (!c) return;
+    for (const ch of keys) {
+      if (ch === '\r' || ch === '\n') { c.sendKeyEvent(1, 0xff0d); c.sendKeyEvent(0, 0xff0d); }
+      else if (ch === '\x7f' || ch === '\b') { c.sendKeyEvent(1, 0xff08); c.sendKeyEvent(0, 0xff08); }
+      else { const cp = ch.codePointAt(0) ?? 0; if (cp) key(c, cp); }
+    }
   };
 
   useEffect(() => {
@@ -102,6 +116,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
         <span className="rw-proto-tag">RDP</span>
         <span className={`rw-console-state is-${status}`}>{t(`remote.console.${status}`)}</span>
         <span className="rw-console-spacer" />
+        {status === 'connected' && <AccountDictation variant="bar" onText={dictate} onKeys={dictateKeys} />}
         {!popout && <button className="btn btn-secondary btn-sm" onClick={() => window.open(`/remote#rdp/${encodeURIComponent(target)}`, `rdp_${target}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no')}>{t('remote.console.detach')}</button>}
         <button className="btn btn-secondary btn-sm" onClick={() => { try { const c = client.current; c?.sendKeyEvent(1, 0xffe3); c?.sendKeyEvent(1, 0xffe9); c?.sendKeyEvent(1, 0xffff); c?.sendKeyEvent(0, 0xffff); c?.sendKeyEvent(0, 0xffe9); c?.sendKeyEvent(0, 0xffe3); } catch { /* not ready */ } }} disabled={status !== 'connected'}>Ctrl+Alt+Del</button>
         {status === 'disconnected' && <button className="btn btn-primary btn-sm" onClick={() => setAttempt(a => a + 1)}>{t('remote.console.reconnect')}</button>}

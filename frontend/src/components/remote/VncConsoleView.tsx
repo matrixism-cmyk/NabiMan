@@ -3,6 +3,7 @@ import RFB from '@novnc/novnc/lib/rfb.js';
 import { useT } from '../../shared/i18n';
 import { consoleWsUrl } from './vncApi';
 import { typeText } from './vncInput';
+import AccountDictation from '../terminal/dictation/AccountDictation';
 
 type Status = 'connecting' | 'connected' | 'disconnected';
 
@@ -82,6 +83,17 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
     setClipOpen((o) => !o);
   };
 
+  // Voice dictation typed into the VM (ASCII reliable; Hangul limited on VNC).
+  const dictate = (text: string) => { if (rfb.current) typeText(rfb.current, text); };
+  const dictateKeys = (keys: string) => {
+    const r = rfb.current; if (!r) return;
+    for (const ch of keys) {
+      if (ch === '\r' || ch === '\n') r.sendKey(0xff0d, null);
+      else if (ch === '\x7f' || ch === '\b') r.sendKey(0xff08, null);
+      else { const cp = ch.codePointAt(0) ?? 0; if (cp) r.sendKey(cp < 0x100 ? cp : 0x01000000 + cp, null); }
+    }
+  };
+
   return (
     <div className="rw-view rw-console">
       <div className="rw-console-bar">
@@ -89,6 +101,7 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
         <span className={`rw-console-state is-${status}`}>{t(`remote.console.${status}`)}</span>
         <span className="rw-console-spacer" />
         <label className="rw-console-toggle"><input type="checkbox" checked={scale} onChange={e => setScale(e.target.checked)} /> {t('remote.console.fit')}</label>
+        {status === 'connected' && <AccountDictation variant="bar" onText={dictate} onKeys={dictateKeys} />}
         <button className={`btn btn-secondary btn-sm ${clipOpen ? 'is-active' : ''}`} onClick={openClip} disabled={status !== 'connected'}>{t('remote.console.clip.btn')}</button>
         {!popout && <button className="btn btn-secondary btn-sm" onClick={() => window.open(`/remote#console/${encodeURIComponent(vm)}`, `vnccon_${vm}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no')}>{t('remote.console.detach')}</button>}
         <button className="btn btn-secondary btn-sm" onClick={() => { try { rfb.current?.sendCtrlAltDel(); } catch { /* not ready */ } }} disabled={status !== 'connected'}>Ctrl+Alt+Del</button>
