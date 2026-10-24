@@ -21,6 +21,7 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
   const [clipOpen, setClipOpen] = useState(false);
   const [sendText, setSendText] = useState('');
   const [vmClip, setVmClip] = useState('');
+  const [pasted, setPasted] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -57,6 +58,24 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
   }, [vm, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (rfb.current) { rfb.current.scaleViewport = scale; rfb.current.resizeSession = !scale; } }, [scale]);
+
+  // Ctrl/Cmd+V while the console has focus pastes the browser clipboard into the
+  // VM as keystrokes — no panel, no VM changes. (ASCII is reliable; Hangul/IME
+  // may not map on a plain VNC server.)
+  useEffect(() => {
+    const el = host.current;
+    if (!el) return undefined;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'v' || e.key === 'V')) {
+        e.preventDefault(); e.stopImmediatePropagation();
+        navigator.clipboard.readText().then((text) => {
+          if (text && rfb.current) { typeText(rfb.current, text); setPasted(true); setTimeout(() => setPasted(false), 1200); }
+        }).catch(() => { /* needs clipboard permission */ });
+      }
+    };
+    el.addEventListener('keydown', onKey, true);
+    return () => el.removeEventListener('keydown', onKey, true);
+  }, []);
 
   const openClip = async () => {
     try { const text = await navigator.clipboard.readText(); if (text) setSendText(text); } catch { /* no permission */ }
@@ -95,7 +114,8 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
         </div>
       )}
       {error && <p role="alert" className="message rw-console-error" onClick={() => setError('')}>{error}</p>}
-      <div ref={host} className="rw-console-screen" />
+      {pasted && <div className="rw-console-toast">{t('remote.console.clip.pasted')}</div>}
+      <div ref={host} className="rw-console-screen" tabIndex={-1} />
     </div>
   );
 }

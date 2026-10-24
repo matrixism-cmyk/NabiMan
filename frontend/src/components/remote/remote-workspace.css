@@ -332,3 +332,6 @@
 .rw-console-clip-row { display: flex; gap: 8px; align-items: center; }
 .rw-console-clip-row input { flex: 1; font-size: 12px; }
 .rw-console-clip-hint { font-size: 11px; color: var(--text-secondary); }
+
+.rw-console-toast { position: absolute; top: 56px; left: 50%; transform: translateX(-50%); z-index: 5; background: rgba(46,160,67,.92); color: #fff; padding: 4px 12px; border-radius: 999px; font-size: 12px; pointer-events: none; }
+.rw-console { position: relative; }
