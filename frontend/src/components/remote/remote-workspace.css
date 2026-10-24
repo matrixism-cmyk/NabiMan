@@ -151,7 +151,13 @@
 .rw-section .panel { margin-bottom: 0; }
 
 .rw-form { display: flex; flex-direction: column; gap: 10px; }
-.rw-form .form-grid { margin-bottom: 0; }
+.rw-form .form-grid { margin-bottom: 0; align-items: start; }
+/* In the server form every field fills its cell and relies on the grid's
+   own gap for spacing, so a select (파일 접속) is never cramped against the
+   field below it (SSH 포트) the way an input's extra bottom margin made it. */
+.rw-form .form-grid .form-group { min-width: 0; }
+.rw-form .form-grid .filter-input,
+.rw-form .form-grid .select-input { width: 100%; margin-bottom: 0; box-sizing: border-box; }
 
 .rw-connect { display: flex; align-items: center; justify-content: center; padding: 24px; }
 .rw-connect-card {
