@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { RemoteServer } from './remoteTypes';
 import { useT } from '../../shared/i18n';
 import RailContextMenu, { RailMenuItem } from './RailContextMenu';
+import { VmConsole } from './vncApi';
 import { useLongPress } from '../../shared/ui/useLongPress';
 import ProtocolBadges from './ProtocolBadges';
 import {
@@ -19,9 +20,10 @@ interface Props {
   filter: string;
   checkingAll: boolean;
   localSessions: number;
-  consoles?: { name: string; label: string; builtin: boolean; protocol?: string }[];
+  consoles?: VmConsole[];
   canManageConsoles?: boolean;
   onAddConsole?: () => void;
+  onConsoleAction?: (console: VmConsole, action: string) => void;
   sessionsFor: (server: RemoteServer) => number;
   onSelect: (next: Selection) => void;
   /** Something picked from an entry's right-click menu. */
@@ -30,7 +32,7 @@ interface Props {
   onCheckAll: () => void;
 }
 
-type MenuTarget = { kind: 'server'; server: RemoteServer } | { kind: 'local' };
+type MenuTarget = { kind: 'server'; server: RemoteServer } | { kind: 'local' } | { kind: 'console'; console: VmConsole };
 
 const FOLD_KEY = 'nabiman_rail_folded';
 
@@ -39,7 +41,7 @@ interface OpenMenu { x: number; y: number; target: MenuTarget; opener: HTMLEleme
 /** Everything you can connect to, in one list: the fleet, the servers, the
  *  local shell, and a one-off target that is not worth saving. */
 export default function TargetRail({
-  compact, servers, selection, online, filter, checkingAll, localSessions, consoles = [], canManageConsoles, onAddConsole,
+  compact, servers, selection, online, filter, checkingAll, localSessions, consoles = [], canManageConsoles, onAddConsole, onConsoleAction,
   sessionsFor, onSelect, onAction, onFilter, onCheckAll,
 }: Props) {
   const { t } = useT();
@@ -80,6 +82,24 @@ export default function TargetRail({
   };
 
   const itemsFor = (target: MenuTarget): RailMenuItem[] => {
+    if (target.kind === 'console') {
+      const c = target.console;
+      const act = (a: string) => () => onConsoleAction?.(c, a);
+      const items: RailMenuItem[] = [
+        { key: 'open', icon: '▶', label: t('remote.menuConnect'), onSelect: act('open') },
+        { key: 'detach', icon: '⧉', label: t('remote.console.detach'), onSelect: act('detach') },
+      ];
+      if (canManageConsoles) {
+        items.push({ key: 'access', icon: '◍', label: t('remote.console.access.btn'), separated: true, onSelect: act('access') });
+        if (!c.builtin) {
+          items.push(
+            { key: 'edit', icon: '✎', label: t('remote.menuEdit'), onSelect: act('edit') },
+            { key: 'delete', icon: '✕', label: t('common.delete'), danger: true, onSelect: act('delete') },
+          );
+        }
+      }
+      return items;
+    }
     const selectionOf: Selection = target.kind === 'server'
       ? { kind: 'server', id: target.server.id } : { kind: 'local' };
     const run = (action: RailAction) => () => onAction(selectionOf, action);
@@ -213,7 +233,9 @@ export default function TargetRail({
             {consoles.map(vm => (
               <button key={vm.name}
                 className={`rw-item ${selection.kind === 'console' && selection.vm === vm.name ? 'is-active' : ''}`}
-                onClick={() => onSelect({ kind: 'console', vm: vm.name, label: vm.label, builtin: vm.builtin })}>
+                aria-haspopup="menu"
+                onClick={() => onSelect({ kind: 'console', vm: vm.name, label: vm.label, builtin: vm.builtin })}
+                onContextMenu={(e) => openMenu(e, { kind: 'console', console: vm })}>
                 <span className="rw-lamp rw-lamp-local" />
                 <span className="rw-item-name">{vm.label}</span>
                 <span className="rw-item-sub">{vm.builtin ? t('remote.consoleHint') : (vm.protocol === 'rdp' ? t('remote.consoleHintRdp') : t('remote.consoleHintExternal'))}</span>
@@ -251,7 +273,7 @@ export default function TargetRail({
           <RailContextMenu
             x={menu.x}
             y={menu.y}
-            title={menu.target.kind === 'server' ? menu.target.server.name : t('remote.localShell')}
+            title={menu.target.kind === 'server' ? menu.target.server.name : menu.target.kind === 'console' ? menu.target.console.label : t('remote.localShell')}
             items={itemsFor(menu.target)}
             opener={menu.opener}
             onClose={closeMenu}

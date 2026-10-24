@@ -19,7 +19,9 @@ import TargetSessionsView from './TargetSessionsView';
 import TargetRail from './TargetRail';
 import AdhocConnect from './AdhocConnect';
 import ConsoleArea from './ConsoleArea';
-import { VmConsole } from './vncApi';
+import ConsoleAccessModal from './ConsoleAccessModal';
+import { deleteConsole, VmConsole } from './vncApi';
+import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import TerminalWithFiles, { filesScope } from './TerminalWithFiles';
 import RemoteSettingsView from './RemoteSettingsView';
 import RecordingsView from './RecordingsView';
@@ -51,6 +53,7 @@ export default function RemoteWorkspace() {
   const { data: consoles, refetch: refetchConsoles } = useApi<VmConsole[]>('/api/remote/consoles');
   const { data: me } = useApi<{ role: string }>(member ? '' : '/api/users/me');
   const canManageConsoles = me?.role === 'admin';
+  const [accessConsole, setAccessConsole] = useState<{ key: string; label: string } | null>(null);
   const { openTerminal } = useTerminalWindows();
   const viewRef = useRef<TerminalViewHandle>(null);
   const { data: serverData, refetch: refetchServers } = useApi<RemoteServer[]>('/api/remote-servers', 30000);
@@ -108,7 +111,6 @@ export default function RemoteWorkspace() {
       setSelection({ kind: 'overview' });
     }
   }, [selection, servers, selectedServer, member]);
-
   // A target opens on the sessions already running there, not on a terminal.
   const select = useCallback((next: Selection, view: ServerView = 'sessions') => {
     setSelection(next);
@@ -116,15 +118,12 @@ export default function RemoteWorkspace() {
     setManualPassword(false);
     setJoinSessionId(undefined);
   }, []);
-
   const label = selection.kind === 'local' ? 'local'
     : selection.kind === 'server' && selectedServer ? sessionLabel(selectedServer)
     : selection.kind === 'adhoc' && adhocTarget ? `${adhocTarget.proto}:${adhocTarget.user}@${adhocTarget.host}:${adhocTarget.port}`
     : null;
-
   const targetSessions = useMemo(() => (label ? sessions.filter(s => s.label === label) : []), [sessions, label]);
   const liveCount = targetSessions.filter(s => s.alive).length;
-
   const terminalTarget: TerminalTarget | null =
     selection.kind === 'local' ? { kind: 'local' }
     : selection.kind === 'server' && selectedServer && hasTerminal(selectedServer)
@@ -133,18 +132,15 @@ export default function RemoteWorkspace() {
     : selection.kind === 'adhoc' && adhocTarget
       ? { kind: 'ssh', host: adhocTarget.host, port: adhocTarget.port, user: adhocTarget.user, telnet: adhocTarget.proto === 'telnet' }
     : null;
-
   const storageKey = joinSessionId ? `ws_join_${joinSessionId}`
     : selection.kind === 'local' ? 'ws_local'
     : selection.kind === 'server' ? `ws_srv_${selection.id}${manualPassword ? '_manual' : ''}`
     : selection.kind === 'adhoc' && adhocTarget ? `ws_adhoc_${adhocTarget.proto}_${adhocTarget.user}@${adhocTarget.host}:${adhocTarget.port}`
     : '';
-
   // Selecting a target never dials on its own, not even into a running
   // session: it shows the sessions, and waits for "참여" or "접속".
   const attached = Boolean(terminalTarget)
     && (Boolean(joinSessionId) || connected.has(storageKey));
-
   const connect = (skipSaved = false) => {
     setManualPassword(skipSaved);
     const key = selection.kind === 'server' ? `ws_srv_${selection.id}${skipSaved ? '_manual' : ''}` : storageKey;
@@ -152,12 +148,21 @@ export default function RemoteWorkspace() {
     setConnected(prev => new Set(prev).add(key));
     setServerView('terminal');
   };
-
   const { connectTo, runRailAction } = useTargetActions({
     servers, selection, select, joinSessionId, manualPassword, connected, setConnected,
     setServerView, viewRef, openTerminal, refetchSessions, refetchServers, setError: setCheckError,
   });
-
+  const consoleAction = async (c: VmConsole, action: string) => {
+    if (action === 'open') { select({ kind: 'console', vm: c.name, label: c.label, builtin: c.builtin }); showWork(); }
+    else if (action === 'detach') window.open(`/remote#${c.protocol === 'rdp' ? 'rdp' : 'console'}/${encodeURIComponent(c.name)}`, `con_${c.name}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no');
+    else if (action === 'edit') select({ kind: 'console-form', edit: { id: c.name, label: c.label, host: c.host || '', port: c.port || (c.protocol === 'rdp' ? 3389 : 5900), protocol: c.protocol || 'vnc', user: c.user || '' } });
+    else if (action === 'access') setAccessConsole({ key: c.name, label: c.label });
+    else if (action === 'delete') {
+      if (!(await confirmDialog({ message: t('remote.console.deleteConfirm', { label: c.label }), danger: true, confirmLabel: t('common.delete') }))) return;
+      await deleteConsole(c.name); await refetchConsoles();
+      if (selection.kind === 'console' && selection.vm === c.name) select({ kind: 'overview' });
+    }
+  };
   const detach = () => {
     if (!terminalTarget) return;
     const title = selection.kind === 'server' && selectedServer ? selectedServer.name
@@ -168,7 +173,6 @@ export default function RemoteWorkspace() {
     if (selection.kind === 'server') setServerView('status');
     else select({ kind: 'overview' });
   };
-
   const attachSession = (session: SessionInfo) => {
     if (session.id === currentSessionId) { setServerView('terminal'); return; } // already open here
     const server = servers.find(s => sessionLabel(s) === session.label);
@@ -178,7 +182,6 @@ export default function RemoteWorkspace() {
     setJoinSessionId(session.id);
     setServerView('terminal');
   };
-
   const popOutSession = (session: SessionInfo) => {
     const server = servers.find(s => sessionLabel(s) === session.label);
     openTerminal(
@@ -188,7 +191,6 @@ export default function RemoteWorkspace() {
       { title: server?.name || session.label, joinSessionId: session.id },
     );
   };
-
   const checkAll = async () => {
     setCheckingAll(true);
     setCheckError('');
@@ -197,13 +199,10 @@ export default function RemoteWorkspace() {
     setCheckingAll(false);
     refetchServers();
   };
-
   const online = servers.filter(s => s.status === 'online').length;
-
   const countFor = (server: RemoteServer) =>
     sessions.filter(s => s.label === sessionLabel(server) && s.alive).length;
   const localCount = sessions.filter(s => s.label === 'local' && s.alive).length;
-
   const isServerTarget = selection.kind === 'server' && Boolean(selectedServer);
   /** Targets that open on their session list: a saved server or the local shell. */
   const hasSessionsView = (isServerTarget && Boolean(selectedServer && hasTerminal(selectedServer))) || selection.kind === 'local';
@@ -214,13 +213,11 @@ export default function RemoteWorkspace() {
   const settings = useSessionTerminalSettings(currentSessionId || undefined);
   const terminalVisible = (hasSessionsView && serverView === 'terminal')
     || (selection.kind === 'adhoc' && Boolean(adhocTarget));
-
   const headTitle = selection.kind === 'overview' ? t('remote.title')
     : selection.kind === 'new' ? t('remote.addRemoteServer')
     : selection.kind === 'local' ? t('remote.localShell')
     : selection.kind === 'adhoc' ? t('remote.adhoc')
     : selectedServer?.name || '';
-
   const headSub = selection.kind === 'server' && selectedServer
     ? addressOf(selectedServer)
     : selection.kind === 'adhoc' && adhocTarget
@@ -241,6 +238,7 @@ export default function RemoteWorkspace() {
         consoles={consoles || []}
         canManageConsoles={canManageConsoles}
         onAddConsole={() => select({ kind: 'console-form', edit: null })}
+        onConsoleAction={consoleAction}
         sessionsFor={countFor}
         onSelect={(next) => { select(next); showWork(); }}
         onAction={(target, action) => {
@@ -365,8 +363,10 @@ export default function RemoteWorkspace() {
           )}
           {(selection.kind === 'console' || selection.kind === 'console-form') && (
             <ConsoleArea selection={selection} consoles={consoles || []} canManage={canManageConsoles}
-              onSelect={select} onChanged={refetchConsoles} />
+              onSelect={select} onChanged={refetchConsoles}
+              onAccess={(key, label) => setAccessConsole({ key, label })} />
           )}
+          {accessConsole && <ConsoleAccessModal console={accessConsole.key} label={accessConsole.label} onClose={() => setAccessConsole(null)} />}
           {isServerTarget && selectedServer && serverView === 'files' && <FilesView server={selectedServer} />}
           {isServerTarget && selectedServer && serverView === 'status' && (
             <div className="rw-view rw-view-scroll"><ServerStatusView server={selectedServer} /></div>
