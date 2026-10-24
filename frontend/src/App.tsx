@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import './App.css';
 import './components.css';
 import './design.css';
@@ -14,6 +14,7 @@ import HeaderMenu from './components/HeaderMenu';
 import IdleWarning from './components/IdleWarning';
 import { useIdleLogout } from './shared/auth/useIdleLogout';
 import { useChromeHidden } from './shared/ui/useChromeHidden';
+import { useFocusMode } from './shared/ui/useFocusMode';
 import RemoteShell, { isStandaloneRemote } from './components/remote/RemoteShell';
 import ConsolePopout, { isConsolePopout } from './components/remote/ConsolePopout';
 import { DEFAULT_GRANTS } from './components/remote/member';
@@ -46,42 +47,9 @@ function App() {
   const [showChangePw, setShowChangePw] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
   const [hiddenTabs, setHiddenTabs] = useState<Set<Tab>>(new Set());
-  // Focus mode: hide the top bars + left sidebar so only the content frame shows.
-  // Also drives the browser Fullscreen API for a true edge-to-edge view.
-  const [focusMode, setFocusMode] = useState(false);
+  // Focus mode: edge-to-edge, content-only view (shared with the remote shell).
+  const { focusMode, enterFocus, exitFocus } = useFocusMode();
   const [chromeHidden, setChromeHidden] = useChromeHidden();
-
-  const enterFocus = useCallback(() => {
-    setFocusMode(true);
-    const el = document.documentElement;
-    // Esc belongs to the terminal (vim, less): in fullscreen, hold Esc to leave.
-    const lockEscape = () => (navigator as Navigator & { keyboard?: { lock?: (keys: string[]) => Promise<void> } })
-      .keyboard?.lock?.(['Escape']).catch(() => undefined);
-    if (el.requestFullscreen) el.requestFullscreen().then(lockEscape).catch(() => { /* denied/unsupported */ });
-  }, []);
-  const exitFocus = useCallback(() => {
-    setFocusMode(false);
-    if (document.fullscreenElement && document.exitFullscreen) {
-      document.exitFullscreen().catch(() => {});
-    }
-  }, []);
-
-  // Keep focus mode in sync when the browser leaves fullscreen (Esc / F11 / UI).
-  useEffect(() => {
-    const onFsChange = () => { if (!document.fullscreenElement) setFocusMode(false); };
-    document.addEventListener('fullscreenchange', onFsChange);
-    return () => document.removeEventListener('fullscreenchange', onFsChange);
-  }, []);
-
-  // Esc also exits when focus mode is on without browser fullscreen (denied).
-  useEffect(() => {
-    if (!focusMode) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !(e.target instanceof Element && e.target.closest('.xterm'))) exitFocus();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [focusMode, exitFocus]);
 
   // /remote is the remote workspace on its own: no menus, so no view in the hash.
   const [standalone] = useState(isStandaloneRemote);

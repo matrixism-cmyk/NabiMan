@@ -16,3 +16,8 @@
   .remote-shell-user, .remote-shell-actions select { display: none; }
   .remote-shell-main { overflow-y: auto; display: block; }
 }
+
+/* Fullscreen (content only): hide the bar; Esc leaves. */
+.remote-shell.focus-mode .remote-shell-bar,
+.remote-shell.focus-mode .chrome-handle { display: none; }
+.remote-shell.focus-mode .remote-shell-main { padding: 0; height: 100vh; }

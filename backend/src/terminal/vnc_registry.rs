@@ -18,6 +18,8 @@ pub struct Console {
     pub user: String,
     #[serde(default)]
     pub password_enc: String,
+    #[serde(default)]
+    pub owner_id: String,
 }
 
 fn vnc_proto() -> String {
@@ -54,6 +56,10 @@ fn save(list: &[Console]) -> Result<(), String> {
     crate::private_storage::write(&file(), &json).map_err(|e| format!("Cannot save consoles: {e}"))
 }
 
+pub fn owner_of(id: &str) -> Option<String> {
+    find(id).map(|c| c.owner_id)
+}
+
 pub fn find(id: &str) -> Option<Console> {
     load().into_iter().find(|c| c.id == id)
 }
@@ -83,7 +89,7 @@ fn clean(label: &str, host: &str, port: u16) -> Result<(String, String), String>
     Ok((label.to_string(), host.to_string()))
 }
 
-pub fn create(label: &str, host: &str, port: u16, protocol: &str, user: &str, password: &str) -> Result<Console, String> {
+pub fn create(label: &str, host: &str, port: u16, protocol: &str, user: &str, password: &str, owner_id: &str) -> Result<Console, String> {
     let (label, host) = clean(label, host, port)?;
     let protocol = norm_protocol(protocol)?;
     let mut list = load();
@@ -98,6 +104,7 @@ pub fn create(label: &str, host: &str, port: u16, protocol: &str, user: &str, pa
         user: user.trim().to_string(),
         password_enc: seal(&protocol, password)?,
         protocol,
+        owner_id: owner_id.to_string(),
     };
     list.push(console.clone());
     save(&list)?;
@@ -154,7 +161,7 @@ pub fn upsert_builtin(name: &str, label: &str, protocol: &str, host: &str, port:
     // A default VNC overlay (no host) is the same as no overlay: drop it.
     if protocol == "vnc" && host.trim().is_empty() {
         list.retain(|c| c.id != name);
-        let out = Console { id: name.into(), label: label.into(), host: String::new(), port, protocol, user: String::new(), password_enc: String::new() };
+        let out = Console { id: name.into(), label: label.into(), host: String::new(), port, protocol, user: String::new(), password_enc: String::new(), owner_id: String::new() };
         save(&list)?;
         return Ok(out);
     }
@@ -167,7 +174,7 @@ pub fn upsert_builtin(name: &str, label: &str, protocol: &str, host: &str, port:
         (None, Some(cur)) if protocol == "rdp" => cur.password_enc.clone(),
         _ => String::new(),
     };
-    let console = Console { id: name.into(), label: label.into(), host: host.trim().into(), port, protocol, user: user.trim().into(), password_enc };
+    let console = Console { id: name.into(), label: label.into(), host: host.trim().into(), port, protocol, user: user.trim().into(), password_enc, owner_id: String::new() };
     match existing {
         Some(i) => list[i] = console.clone(),
         None => list.push(console.clone()),

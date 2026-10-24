@@ -151,11 +151,18 @@ pub fn permitted(user: &NabimanUser, method: &str, path: &str) -> bool {
                 | "/api/terminal/dictation/speak"
                 | "/api/terminal/copies"
                 | "/api/remote-servers"
+                | "/api/remote/consoles"
         ),
         "PUT" => matches!(path, "/api/terminal/settings" | "/api/terminal/sftp/columns"),
         _ => false,
     };
     if fixed {
+        return true;
+    }
+    // Console registry sub-paths (edit/delete a console, its access, its share
+    // links): the console handlers authorize by ownership or admin, so RBAC
+    // only lets the request reach them.
+    if path.starts_with("/api/remote/consoles/") {
         return true;
     }
     if let Some(rest) = path.strip_prefix("/api/terminal/sessions/") {

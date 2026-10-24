@@ -56,11 +56,7 @@ pub(super) fn build_ssh_command(
             let trust = crate::remote_host_trust::shell_options(&saved)?;
             (host, port, user, None, trust, binding, &[][..], Vec::new())
         } else if let Some(host) = parse_query_param(query, "telnet_host") {
-            // Ad-hoc Telnet: no host key to verify, so any address is allowed —
-            // but not for remote-only members, who use assigned servers only.
-            if member.is_some() {
-                return Err("회원은 임시 접속을 사용할 수 없습니다".into());
-            }
+            // Ad-hoc Telnet: no host key to verify, so any address is allowed.
             let port = parse_query_param(query, "telnet_port").unwrap_or_else(|| "23".into());
             let user = parse_query_param(query, "telnet_user").unwrap_or_default();
             return build_adhoc_telnet(&host, &port, &user).map(Some);

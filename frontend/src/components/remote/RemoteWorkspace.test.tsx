@@ -292,7 +292,8 @@ describe('remote workspace', () => {
     renderWorkspace(true);
     expect(itemByName('web-prod-01')).toBeTruthy();
     expect(rail().textContent).not.toContain('로컬 셸');
-    expect(rail().textContent).not.toContain('임시 접속');
+    // A member may make a one-off ad-hoc connection, but not a shell of this machine.
+    expect(rail().textContent).toContain('임시 접속');
     expect(rail().textContent).not.toContain('전체 확인');
     // A target of this machine's remembered from before falls back to the overview.
     expect(screen.queryByText('로컬 셸 세션')).toBeNull();

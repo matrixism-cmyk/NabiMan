@@ -51,7 +51,7 @@ export default function RemoteWorkspace() {
   const { t } = useT();
   const member = useMember();
   const { data: consoles, refetch: refetchConsoles } = useApi<VmConsole[]>('/api/remote/consoles');
-  const { data: me } = useApi<{ role: string }>(member ? '' : '/api/users/me');
+  const { data: me } = useApi<{ role: string }>('/api/users/me');
   const canManageConsoles = me?.role === 'admin';
   const [accessConsole, setAccessConsole] = useState<{ key: string; label: string } | null>(null);
   const [shareConsole, setShareConsole] = useState<{ key: string; label: string } | null>(null);
@@ -104,7 +104,7 @@ export default function RemoteWorkspace() {
   // Nothing selected that is gone (a deleted server) or not a member's to have.
   useEffect(() => {
     if ((selection.kind === 'server' && servers.length > 0 && !selectedServer)
-      || (member && (selection.kind === 'local' || selection.kind === 'adhoc'))) {
+      || (member && selection.kind === 'local')) {
       setSelection({ kind: 'overview' });
     }
   }, [selection, servers, selectedServer, member]);
@@ -234,6 +234,7 @@ export default function RemoteWorkspace() {
         localSessions={localCount}
         consoles={consoles || []}
         canManageConsoles={canManageConsoles}
+        canAddConsole={me?.role === 'admin' || me?.role === 'remote'}
         onAddConsole={() => select({ kind: 'console-form', edit: null })}
         onConsoleAction={consoleAction}
         sessionsFor={countFor}

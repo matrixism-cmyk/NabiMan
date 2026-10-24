@@ -5,6 +5,7 @@ import LanguageSelector from '../../shared/ui/LanguageSelector';
 import RemoteWorkspace from './RemoteWorkspace';
 import { GrantsContext, MemberContext, MemberGrants } from './member';
 import { useChromeHidden } from '../../shared/ui/useChromeHidden';
+import { useFocusMode } from '../../shared/ui/useFocusMode';
 import './remote-shell.css';
 
 /** Whether this page was opened as the remote workspace on its own (/remote). */
@@ -31,6 +32,7 @@ interface Props {
 export default function RemoteShell({ username, allowed, member = false, grants = null, onChangePassword, onLogout }: Props) {
   const { t } = useT();
   const [folded, setFolded] = useChromeHidden();
+  const { focusMode, enterFocus, exitFocus } = useFocusMode();
   useEffect(() => {
     const before = document.title;
     document.title = t('remote.shell.title');
@@ -38,7 +40,7 @@ export default function RemoteShell({ username, allowed, member = false, grants 
   }, [t]);
 
   return (
-    <div className={`remote-shell ${folded ? 'is-folded' : ''}`}>
+    <div className={`remote-shell ${folded ? 'is-folded' : ''} ${focusMode ? 'focus-mode' : ''}`}>
       {folded ? (
         <button type="button" className="chrome-handle" onClick={() => setFolded(false)}
           title={t('app.showChrome')} aria-label={t('app.showChrome')}>▾</button>
@@ -56,6 +58,8 @@ export default function RemoteShell({ username, allowed, member = false, grants 
             {onChangePassword && (
               <button type="button" className="btn btn-secondary btn-sm" onClick={onChangePassword}>{t('app.changePassword')}</button>
             )}
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => (focusMode ? exitFocus() : enterFocus())}
+              title={t('app.focusMode')} aria-label={t('app.focusMode')}>⛶</button>
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => setFolded(true)}
               title={t('app.hideChrome')} aria-label={t('app.hideChrome')}>▴</button>
             <button type="button" className="btn btn-secondary btn-sm" onClick={onLogout}>{t('app.logout')}</button>

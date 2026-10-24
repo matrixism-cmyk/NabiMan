@@ -22,6 +22,7 @@ interface Props {
   localSessions: number;
   consoles?: VmConsole[];
   canManageConsoles?: boolean;
+  canAddConsole?: boolean;
   onAddConsole?: () => void;
   onConsoleAction?: (console: VmConsole, action: string) => void;
   sessionsFor: (server: RemoteServer) => number;
@@ -41,7 +42,7 @@ interface OpenMenu { x: number; y: number; target: MenuTarget; opener: HTMLEleme
 /** Everything you can connect to, in one list: the fleet, the servers, the
  *  local shell, and a one-off target that is not worth saving. */
 export default function TargetRail({
-  compact, servers, selection, online, filter, checkingAll, localSessions, consoles = [], canManageConsoles, onAddConsole, onConsoleAction,
+  compact, servers, selection, online, filter, checkingAll, localSessions, consoles = [], canManageConsoles, canAddConsole, onAddConsole, onConsoleAction,
   sessionsFor, onSelect, onAction, onFilter, onCheckAll,
 }: Props) {
   const { t } = useT();
@@ -227,7 +228,7 @@ export default function TargetRail({
             </button>
           )}
 
-          {(consoles.length > 0 || canManageConsoles) && <>
+          {(consoles.length > 0 || canAddConsole) && <>
             <div className="rw-rail-label">{t('remote.consoleGroup')}</div>
             {consoles.map(vm => (
               <button key={vm.name}
@@ -240,15 +241,15 @@ export default function TargetRail({
                 <span className="rw-item-sub">{vm.builtin ? t('remote.consoleHint') : (vm.protocol === 'rdp' ? t('remote.consoleHintRdp') : t('remote.consoleHintExternal'))}</span>
               </button>
             ))}
-            {canManageConsoles && (
+            {canAddConsole && (
               <button className={`rw-item rw-item-add ${selection.kind === 'console-form' ? 'is-active' : ''}`}
                 onClick={() => onAddConsole?.()}>
                 {t('remote.console.add')}
               </button>
             )}
           </>}
-          {!member && <>
           <div className="rw-rail-label">{t('remote.otherGroup')}</div>
+          {!member && (
           <button className={`rw-item ${selection.kind === 'local' ? 'is-active' : ''}`}
             title={t(compact ? 'remote.railLongPressHint' : 'remote.railMenuHint')}
             aria-haspopup="menu"
@@ -260,12 +261,12 @@ export default function TargetRail({
             {localSessions > 0 && <span className="rw-item-count">{localSessions}</span>}
             <span className="rw-item-sub">{t('remote.localShellHint')}</span>
           </button>
+          )}
           <button className={`rw-item ${selection.kind === 'adhoc' ? 'is-active' : ''}`}
             onClick={() => onSelect({ kind: 'adhoc' })}>
             <span className="rw-item-name">{t('remote.adhoc')}</span>
             <span className="rw-item-sub">{t('remote.adhocHint')}</span>
           </button>
-          </>}
         </div>
 
         {menu && (

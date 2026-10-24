@@ -10,6 +10,7 @@ export interface VmConsole {
   port?: number;
   user?: string;
   has_password?: boolean;
+  can_manage?: boolean;
 }
 
 /** The internal VM consoles the account may open (admins/operators). */

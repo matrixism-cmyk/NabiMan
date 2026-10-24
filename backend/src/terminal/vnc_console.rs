@@ -94,11 +94,6 @@ pub(super) fn open_shared_console(
     .start()
 }
 
-/// Registering or changing a console is an administrator action.
-pub(super) fn may_manage_console(req: &HttpRequest) -> bool {
-    matches!(crate::auth::verified_role(req), Some(UserRole::Admin))
-}
-
 pub(super) fn is_admin(req: &HttpRequest) -> bool {
     matches!(crate::auth::verified_role(req), Some(UserRole::Admin))
 }
@@ -107,8 +102,28 @@ pub(super) fn is_admin(req: &HttpRequest) -> bool {
 /// any; anyone else only a console delegated to their account (vnc_access).
 pub(super) fn may_open(req: &HttpRequest, console: &str) -> bool {
     is_admin(req)
-        || crate::auth::verified_user_id(req)
-            .is_some_and(|uid| super::vnc_access::allowed(&uid, console))
+        || crate::auth::verified_user_id(req).is_some_and(|uid| {
+            super::vnc_access::allowed(&uid, console)
+                || super::vnc_registry::owner_of(console).as_deref() == Some(uid.as_str())
+        })
+}
+
+/// Who may register a new console: an admin or a remote-only member (for their
+/// own). Operators and viewers do not.
+pub(super) fn may_create_console(req: &HttpRequest) -> bool {
+    matches!(crate::auth::verified_role(req), Some(UserRole::Admin) | Some(UserRole::Remote))
+}
+
+/// Who may edit or delete a specific registered console: an admin or its owner.
+/// Built-in consoles have no owner, so only an admin configures them.
+pub(super) fn may_manage(req: &HttpRequest, console: &str) -> bool {
+    if is_admin(req) {
+        return true;
+    }
+    match (crate::auth::verified_user_id(req), super::vnc_registry::owner_of(console)) {
+        (Some(uid), Some(owner)) => !owner.is_empty() && owner == uid,
+        _ => false,
+    }
 }
 
 struct VncConsole {
