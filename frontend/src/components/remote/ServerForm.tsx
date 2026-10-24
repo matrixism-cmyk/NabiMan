@@ -166,7 +166,10 @@ export default function ServerForm({ server, onSaved, onCancel }: Props) {
             <select value={auth} onChange={e => setAuth(e.target.value)} className="select-input">
               <option value="key">{t('remote.sshKey')}</option>
               <option value="password">{t('accounts.password')}</option>
-            </select></div>
+              <option value="cert">{t('remote.auth.cert')}</option>
+            </select>
+            {auth === 'cert' && <small className="text-secondary" style={{ fontSize: 11 }}>{t('remote.auth.certHint')}</small>}
+            </div>
         )}
         {method === 'password' && (
           <div className="form-group"><label>{t('remote.password')}</label>

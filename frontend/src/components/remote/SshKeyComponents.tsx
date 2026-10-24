@@ -77,6 +77,33 @@ export function SshKeyPanel() {
       {!keyInfo?.exists && (
         <p className="text-secondary">{t('sshKey.noKeyHint')}</p>
       )}
+      <CaKeyPanel />
+    </div>
+  );
+}
+
+/** NabiMan's SSH CA public key: install it on a server to connect with a
+ *  short-lived certificate instead of a stored password. */
+function CaKeyPanel() {
+  const { t } = useT();
+  const { data: ca } = useApi<string>('/api/remote-servers/ssh-ca');
+  const [copied, setCopied] = useState(false);
+  if (!ca) return null;
+  const copy = () => { navigator.clipboard.writeText(ca).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); };
+  return (
+    <div className="ssh-ca" style={{ marginTop: 18, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+      <h3>{t('sshKey.ca.title')}</h3>
+      <p className="text-secondary" style={{ fontSize: 12 }}>{t('sshKey.ca.intro')}</p>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+        <label style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{t('sshKey.ca.pubkey')}</label>
+        <button className="btn btn-secondary btn-sm" onClick={copy}>{copied ? t('sshKey.copied') : t('sshKey.copy')}</button>
+      </div>
+      <pre className="config-preview" style={{ fontSize: 11, wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>{ca}</pre>
+      <ol className="text-secondary" style={{ fontSize: 12, lineHeight: 1.7, paddingLeft: 18 }}>
+        <li>{t('sshKey.ca.step1')} <code>/etc/ssh/nabiman_ca.pub</code></li>
+        <li>{t('sshKey.ca.step2')} <code>sshd_config</code>: <code>TrustedUserCAKeys /etc/ssh/nabiman_ca.pub</code></li>
+        <li>{t('sshKey.ca.step3')}</li>
+      </ol>
     </div>
   );
 }

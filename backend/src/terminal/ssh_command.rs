@@ -12,7 +12,7 @@ pub(super) fn build_ssh_command(
     ka_interval: u64,
     member: Option<&crate::models::NabimanUser>,
 ) -> Result<Option<(String, String, remote_access::RemoteBinding)>, String> {
-    let (host, port, user, password, trust, binding, isolation) =
+    let (host, port, user, password, trust, binding, isolation, cert_opts): (_, _, _, _, _, _, _, Vec<String>) =
         if let Some(server_id) = parse_query_param(query, "server_id") {
             let srv = crate::remote_servers::find_server(&server_id)?
                 .filter(|s| member.is_none_or(|m| crate::member_servers::usable(m, s)))
@@ -36,7 +36,13 @@ pub(super) fn build_ssh_command(
             let trust = crate::remote_host_trust::shell_options(&srv)?;
             let host = crate::member_servers::dial_host(&srv, srv.port)?;
             let isolation = crate::member_servers::ssh_isolation(&srv);
-            (host, srv.port.to_string(), srv.user, pw, trust, binding, isolation)
+            let (pw, cert_opts) = if crate::ssh_cert::uses_cert(&srv) {
+                let auth = crate::ssh_cert::sign_for(&srv)?;
+                (None, crate::ssh_cert::ssh_opts(&auth))
+            } else {
+                (pw, Vec::new())
+            };
+            (host, srv.port.to_string(), srv.user, pw, trust, binding, isolation, cert_opts)
         } else if member.is_some() {
             return Err("원격 전용 회원은 등록한 서버로만 접속할 수 있습니다.".into());
         } else if let Some(host) = parse_query_param(query, "ssh_host") {
@@ -48,7 +54,7 @@ pub(super) fn build_ssh_command(
                 .ok_or("Register and verify this server before opening a terminal")?;
             let binding = remote_access::RemoteBinding::from_server(&saved)?;
             let trust = crate::remote_host_trust::shell_options(&saved)?;
-            (host, port, user, None, trust, binding, &[][..])
+            (host, port, user, None, trust, binding, &[][..], Vec::new())
         } else {
             return Ok(None);
         };
@@ -77,6 +83,10 @@ pub(super) fn build_ssh_command(
         cmd.push(' ');
     }
     cmd.push_str(&format!("{} ", trust));
+    for opt in &cert_opts {
+        cmd.push_str(opt);
+        cmd.push(' ');
+    }
     if using_saved_password {
         // Go straight to password auth. Offering keys first can exhaust the
         // server's MaxAuthTries before the password is ever tried, which the

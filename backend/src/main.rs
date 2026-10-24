@@ -55,6 +55,7 @@ mod services;
 mod session_management;
 mod sessions;
 mod ssh_auth;
+mod ssh_cert;
 mod ssh_keys;
 mod ssl;
 mod stream_access;
@@ -67,7 +68,6 @@ mod traffic;
 mod updates;
 mod users;
 mod vhost;
-
 use actix_cors::Cors;
 use actix_files as afs;
 use actix_web::body::EitherBody;

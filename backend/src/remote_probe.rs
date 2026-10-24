@@ -30,6 +30,17 @@ pub(crate) fn ssh_invocation(
     let timeout = format!("ConnectTimeout={}", connect_timeout);
     let isolation = crate::member_servers::ssh_isolation(srv);
 
+    if crate::ssh_cert::uses_cert(srv) {
+        let auth = crate::ssh_cert::sign_for(srv)?;
+        let mut cmd = Command::new("ssh");
+        cmd.args(&trust);
+        cmd.args(isolation);
+        cmd.args(crate::ssh_cert::ssh_opts(&auth));
+        cmd.args(["-o", &timeout, "-o", "BatchMode=yes", "-o", "ServerAliveInterval=15"]);
+        cmd.args(extra);
+        cmd.args(["-p", &port, &target, remote_cmd]);
+        return Ok((cmd, None));
+    }
     let password = server_password(srv);
     if let Some(pw) = password {
         let pw_file = ssh_auth::write_password_file(&pw)?;

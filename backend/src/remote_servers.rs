@@ -150,6 +150,15 @@ async fn list_servers(
     HttpResponse::Ok().json(ApiResponse::ok(servers))
 }
 
+/// NabiMan's SSH CA public key, for installing on servers that will trust
+/// certificate authentication. Public by nature; no secret leaves here.
+async fn ssh_ca() -> HttpResponse {
+    match crate::ssh_cert::ca_public_key() {
+        Ok(key) => HttpResponse::Ok().json(ApiResponse::ok(key)),
+        Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<()>::error(&e)),
+    }
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/remote-servers")
@@ -157,6 +166,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("", web::post().to(add_server))
             .route("/check-all", web::post().to(check_all_servers))
             .route("/ssh-key", web::get().to(ssh_keys::get_ssh_key_info))
+            .route("/ssh-ca", web::get().to(ssh_ca))
             .route(
                 "/ssh-key/generate",
                 web::post().to(ssh_keys::generate_ssh_key),
