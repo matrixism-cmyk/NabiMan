@@ -14,7 +14,8 @@ declare module '@novnc/novnc/lib/rfb.js' {
     focusOnClick: boolean;
     disconnect(): void;
     sendCtrlAltDel(): void;
-    sendKey(keysym: number, code: string, down?: boolean): void;
+    sendKey(keysym: number, code?: string | null, down?: boolean): void;
+    clipboardPasteFrom(text: string): void;
     focus(): void;
   }
 }

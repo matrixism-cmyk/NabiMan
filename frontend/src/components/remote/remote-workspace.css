@@ -324,3 +324,11 @@
 .rw-console-popout { position: fixed; inset: 0; display: flex; flex-direction: column; background: #0b0d10; }
 .rw-console-popout .rw-console { height: 100%; }
 .rw-console-missing { align-items: center; justify-content: center; color: var(--text-secondary); font-size: 14px; }
+
+/* VM console clipboard panel */
+.rw-console-clip { display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--bg-secondary, rgba(127,127,127,.06)); }
+.rw-console-clip label { font-size: 11px; color: var(--text-secondary); }
+.rw-console-clip textarea { width: 100%; resize: vertical; font-family: inherit; font-size: 13px; }
+.rw-console-clip-row { display: flex; gap: 8px; align-items: center; }
+.rw-console-clip-row input { flex: 1; font-size: 12px; }
+.rw-console-clip-hint { font-size: 11px; color: var(--text-secondary); }

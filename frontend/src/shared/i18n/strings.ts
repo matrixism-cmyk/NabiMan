@@ -21,6 +21,7 @@ const strings: Translations = {
   'common.online': { ko: '온라인', en: 'online', ja: 'オンライン' },
   'common.offline': { ko: '오프라인', en: 'offline', ja: 'オフライン' },
   'common.unknown': { ko: '알 수 없음', en: 'unknown', ja: '不明' },
+  'common.copy': { ko: '복사', en: 'Copy', ja: 'コピー' },
   'common.connect': { ko: '연결', en: 'Connect', ja: '接続' },
   'common.settings': { ko: '환경설정', en: 'Settings', ja: '設定' },
   'common.language': { ko: '언어', en: 'Language', ja: '言語' },
