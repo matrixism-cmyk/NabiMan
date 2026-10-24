@@ -58,6 +58,11 @@ pub(super) fn build_ssh_command(
     }
 
     let mut cmd = String::new();
+    // The pane runs inside tmux (TERM=tmux-256color), but an old or minimal
+    // remote server often has no terminfo for it, so clear/vi fail with
+    // "unknown terminal type". Request xterm-256color for the remote session,
+    // which is supported almost everywhere and renders fine inside tmux.
+    cmd.push_str("TERM=xterm-256color ");
     let using_saved_password = password.is_some();
     if let Some(pw) = password {
         // sshpass reads the password from a 0600 file that is deleted shortly
