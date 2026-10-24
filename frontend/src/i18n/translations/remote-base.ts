@@ -43,6 +43,7 @@ const t: T = {
   'remote.console.access.none': { ko: '위임할 수 있는 다른 계정이 없습니다.', en: 'No other accounts to delegate to.', ja: '委任できる他のアカウントがありません。' },
   'remote.console.share.btn': { ko: '공유', en: 'Share', ja: '共有' },
   'remote.console.share.viewOnly': { ko: '보기 전용', en: 'View only', ja: '閲覧のみ' },
+  'remote.console.share.warning': { ko: '링크를 받은 사람은 이 VM 콘솔에 그대로 접속할 수 있습니다. 필요한 만큼만 짧게 열고, 끝나면 링크를 삭제하세요.', en: 'Anyone with the link can reach this VM console. Open it only as long as needed, and delete the link when done.', ja: 'リンクを受け取った人はこの VM コンソールに接続できます。必要な間だけ開き、終わったら削除してください。' },
   'remote.console.share.title': { ko: '콘솔 공유 링크', en: 'Console share link', ja: 'コンソール共有リンク' },
   'remote.console.share.intro': { ko: '터미널 공유 링크처럼, 계정 없이 이 콘솔을 여는 링크를 만듭니다. 링크마다 보기 전용 또는 조작 허용을 고릅니다.', en: 'Like a terminal share link, make a link that opens this console without an account. Choose view-only or control per link.', ja: 'ターミナル共有リンクのように、アカウント無しでこのコンソールを開くリンクを作ります。リンクごとに閲覧のみ/操作可を選べます。' },
   'remote.console.share.mode': { ko: '권한', en: 'Access', ja: '権限' },

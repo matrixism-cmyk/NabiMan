@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::ApiResponse;
 
-const MAX_TTL_SECS: u64 = 30 * 24 * 60 * 60;
+const MAX_TTL_SECS: u64 = 90 * 24 * 60 * 60;
 /// Last second of year 9999 — a link that lasts until revoked.
 const PERMANENT_UNIX: u64 = 253_402_300_799;
 

@@ -45,10 +45,16 @@ enum Target {
 /// Resolve a console key to its target, only to a known console — never to an
 /// address taken from the request, so no arbitrary host or port is reachable.
 fn resolve(vm: &str) -> Option<Target> {
-    if let Some(port) = port_for(vm) {
-        return Some(Target::LocalWs(port));
+    // A VNC console with a host — a registered one, or an overlay on a built-in
+    // — reaches that external address over raw TCP. (RDP overlays are opened via
+    // the RDP path, not here.) A built-in with no such overlay uses its local
+    // bridge.
+    if let Some(c) = super::vnc_registry::find(vm) {
+        if c.protocol != "rdp" && !c.host.trim().is_empty() {
+            return Some(Target::RawTcp(c.host, c.port));
+        }
     }
-    super::vnc_registry::find(vm).map(|c| Target::RawTcp(c.host, c.port))
+    port_for(vm).map(Target::LocalWs)
 }
 
 /// Whether a console key names a real console (built-in bridge or registered).
