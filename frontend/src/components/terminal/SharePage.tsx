@@ -8,6 +8,7 @@ import DictationButton from './dictation/DictationButton';
 import { openShareDictation } from './dictation/sockets';
 import { shareSource } from '../remote/sftp/sftpApi';
 import { useT } from '../../shared/i18n';
+import { useFullscreen } from '../../shared/ui/useFullscreen';
 import './terminal-windows.css';
 
 /**
@@ -20,6 +21,8 @@ export default function SharePage({ token }: { token: string }) {
 function SharePageContent({ token }: { token: string }) {
   const { t } = useT();
   const viewRef = useRef<TerminalViewHandle>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const { toggle: toggleFull } = useFullscreen(pageRef);
   const [info, setInfo] = useState<ShareInfo | null>(null);
   const [error, setError] = useState('');
   const [password, setPassword] = useState('');
@@ -155,7 +158,7 @@ function SharePageContent({ token }: { token: string }) {
   }
 
   return (
-    <div className="share-page">
+    <div className="share-page" ref={pageRef}>
       <header className="share-head">
         <strong>{t('share.headTitle')}</strong>
         <code>{info.label}</code>
@@ -177,6 +180,8 @@ function SharePageContent({ token }: { token: string }) {
         <button className="btn btn-secondary btn-sm" onClick={() => viewRef.current?.reconnect()}>
           {t('terminal.reconnect')}
         </button>
+        <button className="btn btn-secondary btn-sm" title={t('remote.console.fullscreen')} aria-label={t('remote.console.fullscreen')}
+          onClick={toggleFull}>⛶</button>
         <button className="btn btn-secondary btn-sm" title={t('share.viewSettings')} aria-label={t('share.viewSettings')}
           onClick={() => setShowView(true)}>⚙</button>
       </header>

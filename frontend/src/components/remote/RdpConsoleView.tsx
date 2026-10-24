@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Guacamole from '../../vendor/guacamole-common.js';
 import { useT } from '../../shared/i18n';
 import { useFullscreen } from '../../shared/ui/useFullscreen';
+import { describeFault, reconnectDelay, RECONNECT_MAX } from './consoleFault';
 import { rdpTicket } from './vncApi';
 import AccountDictation from '../terminal/dictation/AccountDictation';
 
@@ -20,7 +21,10 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
   const client = useRef<any>(null);
   const keyboard = useRef<any>(null);
   const fitRef = useRef<(() => void) | undefined>(undefined);
-  const { full, toggle } = useFullscreen(root, () => fitRef.current?.());
+  const resizeRef = useRef<(() => void) | undefined>(undefined);
+  const retries = useRef(0);
+  const reconnectTimer = useRef<number | undefined>(undefined);
+  const { full, toggle } = useFullscreen(root, () => { fitRef.current?.(); resizeRef.current?.(); });
   const [status, setStatus] = useState<Status>('connecting');
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -71,12 +75,44 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
     display.onresize = fit;
     fitRef.current = fit;
 
+    // Dynamic resolution: when the window or fullscreen size changes, ask guacd
+    // to resize the remote desktop to match (resize-method display-update), so
+    // it stays crisp at 1:1 instead of being scaled. Debounced against resize
+    // storms; guacd's resize then triggers fit().
+    let sizeTimer: number | undefined;
+    const pushSize = () => {
+      if (sizeTimer) window.clearTimeout(sizeTimer);
+      sizeTimer = window.setTimeout(() => {
+        const w = Math.max(el.clientWidth, 640), h = Math.max(el.clientHeight, 480);
+        try { client.current?.sendSize(w, h); } catch { /* not connected yet */ }
+      }, 300);
+    };
+    resizeRef.current = pushSize;
+
+    // On an unexpected drop, auto-reconnect with backoff; but a credential or
+    // permission failure is shown, not retried (retrying a locked account only
+    // makes it worse). `failed` keeps onerror and the state change from both
+    // firing it for one drop.
+    let failed = false;
+    const fail = (fault?: { code?: number; message?: string }) => {
+      if (!live || failed) return;
+      failed = true;
+      const { message, retry } = describeFault(t, fault);
+      if (retry && retries.current < RECONNECT_MAX) {
+        const n = ++retries.current;
+        setStatus('connecting');
+        setError(t('remote.console.reconnecting', { n, max: RECONNECT_MAX }));
+        reconnectTimer.current = window.setTimeout(() => { if (live) setAttempt(a => a + 1); }, reconnectDelay(n));
+      } else {
+        setStatus('disconnected'); setError(message);
+      }
+    };
     c.onstatechange = (state: number) => {
       if (!live) return;
-      if (state === 3) { setStatus('connected'); fit(); }
-      else if (state === 4 || state === 5) setStatus('disconnected');
+      if (state === 3) { retries.current = 0; setStatus('connected'); setError(''); fit(); }
+      else if (state === 5) fail();
     };
-    c.onerror = (err: { message?: string }) => { if (live) { setStatus('disconnected'); setError(err?.message || t('remote.console.lost')); } };
+    c.onerror = (err: { code?: number; message?: string }) => fail(err);
     // Text copied inside the VM → the local clipboard.
     c.onclipboard = (stream: any, mimetype: string) => {
       if (mimetype.indexOf('text') !== 0) return;
@@ -93,7 +129,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
       rdpTicket(target).then((ticket) => {
         if (!live) return;
         c.connect(`target=${encodeURIComponent(target)}&ticket=${ticket}&${dims()}`);
-      }).catch((e) => { if (live) { setStatus('disconnected'); setError(e instanceof Error ? e.message : t('common.error')); } });
+      }).catch((e) => fail({ message: e instanceof Error ? e.message : undefined }));
     }
 
     // Input (skipped entirely for a view-only share).
@@ -111,6 +147,8 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
 
     return () => {
       live = false;
+      if (reconnectTimer.current) window.clearTimeout(reconnectTimer.current);
+      if (sizeTimer) window.clearTimeout(sizeTimer);
       el.removeEventListener('mouseenter', pushClipboard);
       window.removeEventListener('focus', pushClipboard);
       try { if (kb) { kb.onkeydown = null; kb.onkeyup = null; } } catch { /* ignore */ }
@@ -131,7 +169,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
         {!popout && <button className="btn btn-secondary btn-sm" onClick={() => window.open(`/remote#rdp/${encodeURIComponent(target)}`, `rdp_${target}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no')}>{t('remote.console.detach')}</button>}
         <button className="btn btn-secondary btn-sm" onClick={toggle} title={t('remote.console.fullscreen')} aria-label={t('remote.console.fullscreen')} aria-pressed={full}>⛶</button>
         {!share?.viewOnly && <button className="btn btn-secondary btn-sm" onClick={() => { try { const c = client.current; c?.sendKeyEvent(1, 0xffe3); c?.sendKeyEvent(1, 0xffe9); c?.sendKeyEvent(1, 0xffff); c?.sendKeyEvent(0, 0xffff); c?.sendKeyEvent(0, 0xffe9); c?.sendKeyEvent(0, 0xffe3); } catch { /* not ready */ } }} disabled={status !== 'connected'}>Ctrl+Alt+Del</button>}
-        {status === 'disconnected' && <button className="btn btn-primary btn-sm" onClick={() => setAttempt(a => a + 1)}>{t('remote.console.reconnect')}</button>}
+        {status === 'disconnected' && <button className="btn btn-primary btn-sm" onClick={() => { retries.current = 0; setAttempt(a => a + 1); }}>{t('remote.console.reconnect')}</button>}
         {canEdit && <button className="btn btn-secondary btn-sm" onClick={onEdit}>{t('common.edit')}</button>}
         {canGrant && <button className="btn btn-secondary btn-sm" onClick={onGrant}>{t('remote.console.access.btn')}</button>}
         {canShare && <button className="btn btn-secondary btn-sm" onClick={onShare}>{t('remote.console.share.btn')}</button>}
