@@ -19,6 +19,7 @@ interface Props {
   filter: string;
   checkingAll: boolean;
   localSessions: number;
+  consoles?: { name: string; label: string }[];
   sessionsFor: (server: RemoteServer) => number;
   onSelect: (next: Selection) => void;
   /** Something picked from an entry's right-click menu. */
@@ -36,7 +37,7 @@ interface OpenMenu { x: number; y: number; target: MenuTarget; opener: HTMLEleme
 /** Everything you can connect to, in one list: the fleet, the servers, the
  *  local shell, and a one-off target that is not worth saving. */
 export default function TargetRail({
-  compact, servers, selection, online, filter, checkingAll, localSessions,
+  compact, servers, selection, online, filter, checkingAll, localSessions, consoles = [],
   sessionsFor, onSelect, onAction, onFilter, onCheckAll,
 }: Props) {
   const { t } = useT();
@@ -223,6 +224,18 @@ export default function TargetRail({
             <span className="rw-item-name">{t('remote.adhoc')}</span>
             <span className="rw-item-sub">{t('remote.adhocHint')}</span>
           </button>
+          {consoles.length > 0 && <>
+            <div className="rw-rail-label">{t('remote.consoleGroup')}</div>
+            {consoles.map(vm => (
+              <button key={vm.name}
+                className={`rw-item ${selection.kind === 'console' && selection.vm === vm.name ? 'is-active' : ''}`}
+                onClick={() => onSelect({ kind: 'console', vm: vm.name, label: vm.label })}>
+                <span className="rw-lamp rw-lamp-local" />
+                <span className="rw-item-name">{vm.label}</span>
+                <span className="rw-item-sub">{t('remote.consoleHint')}</span>
+              </button>
+            ))}
+          </>}
           </>}
         </div>
 

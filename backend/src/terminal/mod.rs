@@ -18,6 +18,7 @@ mod session_settings;
 mod settings;
 pub(crate) mod sftp;
 pub mod share;
+pub mod vnc_console;
 pub mod share_store;
 pub(crate) mod share_ticket;
 pub mod telnet_client;
@@ -365,4 +366,5 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     claude_voice::config(cfg);
     share::config(cfg);
     recording::config(cfg);
+    vnc_console::config(cfg);
 }

@@ -77,6 +77,7 @@ fn valid_query(query: &str) -> bool {
                     | "telnet_host"
                     | "telnet_port"
                     | "telnet_user"
+                    | "vm"
                     | "history"
             ) && keys.insert(k)
         })
@@ -219,7 +220,10 @@ async fn issue(
 /// The terminal's way in (registered in `remote.rs`): its WebSockets, and
 /// dictation's, open with a ticket — never with an account token in the URL.
 pub(crate) fn url_pass(req: &ServiceRequest) -> Option<Option<auth::Claims>> {
-    if req.path() != "/api/terminal" && req.path() != "/api/terminal/dictation" {
+    if req.path() != "/api/terminal"
+        && req.path() != "/api/terminal/dictation"
+        && req.path() != "/api/remote/console"
+    {
         return None;
     }
     let has = |key: &str| req.query_string().split('&').any(|p| p.starts_with(key));

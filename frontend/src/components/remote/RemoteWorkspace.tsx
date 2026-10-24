@@ -18,6 +18,7 @@ import SessionsView, { SessionInfo } from './SessionsView';
 import TargetSessionsView from './TargetSessionsView';
 import TargetRail from './TargetRail';
 import AdhocConnect from './AdhocConnect';
+import VncConsoleView from './VncConsoleView';
 import TerminalWithFiles, { filesScope } from './TerminalWithFiles';
 import RemoteSettingsView from './RemoteSettingsView';
 import RecordingsView from './RecordingsView';
@@ -46,6 +47,7 @@ import './remote-workspace.css';
 export default function RemoteWorkspace() {
   const { t } = useT();
   const member = useMember();
+  const { data: consoles } = useApi<{ name: string; label: string }[]>(member ? '' : '/api/remote/consoles');
   const { openTerminal } = useTerminalWindows();
   const viewRef = useRef<TerminalViewHandle>(null);
   const { data: serverData, refetch: refetchServers } = useApi<RemoteServer[]>('/api/remote-servers', 30000);
@@ -74,7 +76,6 @@ export default function RemoteWorkspace() {
   const { pane, showWork, showList } = useMobilePane(compact, selection.kind !== 'overview');
   const [filesOpen, setFilesOpen] = useState(false);
   useFullScreenPane(pane === 'work');
-
   useEffect(() => {
     rememberSelection(selection);
     rememberPaneState({ view: chosenView, connected: Array.from(connected), join: joinSessionId });
@@ -234,6 +235,7 @@ export default function RemoteWorkspace() {
         filter={filter}
         checkingAll={checkingAll}
         localSessions={localCount}
+        consoles={consoles || []}
         sessionsFor={countFor}
         onSelect={(next) => { select(next); showWork(); }}
         onAction={(target, action) => {
@@ -337,7 +339,6 @@ export default function RemoteWorkspace() {
               {overviewView === 'settings' && <RemoteSettingsView />}
             </div>
           )}
-
           {hasSessionsView && serverView === 'sessions' && (
             <TargetSessionsView name={headTitle} sessions={targetSessions} currentSessionId={currentSessionId}
               onRefresh={refetchSessions} onAttach={attachSession} onPopOut={popOutSession}
@@ -345,7 +346,6 @@ export default function RemoteWorkspace() {
               onNewSession={() => connectTo(selection, true)}
               onOpenWindow={() => runRailAction(selection, 'window')} />
           )}
-
           {selection.kind === 'new' && (
             <div className="rw-view rw-view-scroll">
               <div className="rw-section">
@@ -358,14 +358,15 @@ export default function RemoteWorkspace() {
               </div>
             </div>
           )}
-
           {selection.kind === 'adhoc' && !adhocTarget && (
             <AdhocConnect onConnect={(target) => {
               setAdhocTarget(target);
               setConnected(prev => new Set(prev).add(`ws_adhoc_${target.proto}_${target.user}@${target.host}:${target.port}`));
             }} />
           )}
-
+          {selection.kind === 'console' && (
+            <VncConsoleView vm={selection.vm} label={selection.label} />
+          )}
           {isServerTarget && selectedServer && serverView === 'files' && <FilesView server={selectedServer} />}
           {isServerTarget && selectedServer && serverView === 'status' && (
             <div className="rw-view rw-view-scroll"><ServerStatusView server={selectedServer} /></div>
@@ -382,7 +383,6 @@ export default function RemoteWorkspace() {
           )}
         </div>
       </section>
-
       {shareFiles && selectedServer && (
         <ShareDialog serverId={selectedServer.id} sessionLabel={`${selectedServer.name} · ${headSub}`} onClose={() => setShareFiles(false)} />
       )}

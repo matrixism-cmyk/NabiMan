@@ -4,6 +4,7 @@ export type Selection =
   | { kind: 'new' }
   | { kind: 'local' }
   | { kind: 'adhoc' }
+  | { kind: 'console'; vm: string; label: string }
   | { kind: 'server'; id: string };
 
 /**
