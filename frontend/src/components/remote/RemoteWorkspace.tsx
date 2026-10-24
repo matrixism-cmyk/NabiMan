@@ -20,6 +20,7 @@ import TargetRail from './TargetRail';
 import AdhocConnect from './AdhocConnect';
 import TerminalWithFiles, { filesScope } from './TerminalWithFiles';
 import RemoteSettingsView from './RemoteSettingsView';
+import RecordingsView from './RecordingsView';
 import WorkspaceActions from './WorkspaceActions';
 import { useCompact, useFullScreenPane, useMobilePane } from './useCompact';
 import WorkspaceTabs, { viewFor } from './WorkspaceTabs';
@@ -47,12 +48,10 @@ export default function RemoteWorkspace() {
   const member = useMember();
   const { openTerminal } = useTerminalWindows();
   const viewRef = useRef<TerminalViewHandle>(null);
-
   const { data: serverData, refetch: refetchServers } = useApi<RemoteServer[]>('/api/remote-servers', 30000);
   const { data: sessionData, refetch: refetchSessions } = useApi<SessionInfo[]>('/api/terminal/sessions', 10000);
   const servers = useMemo(() => serverData || [], [serverData]);
   const sessions = useMemo(() => sessionData || [], [sessionData]);
-
   const [restored] = useState(readPaneState);
   const [selection, setSelection] = useState<Selection>(readSelection);
   const [chosenView, setServerView] = useState<ServerView>(restored.view);
@@ -334,6 +333,7 @@ export default function RemoteWorkspace() {
               )}
               {overviewView === 'links' && <ShareLinksPanel />}
               {overviewView === 'keys' && <SshKeyPanel />}
+              {overviewView === 'recordings' && <RecordingsView />}
               {overviewView === 'settings' && <RemoteSettingsView />}
             </div>
           )}

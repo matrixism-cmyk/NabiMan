@@ -6,7 +6,7 @@ mod tmux_operations;
 use tmux_operations::write_tmux_conf;
 pub(crate) use tmux_operations::{
     capture_scrollback, client_size, close_tmux_session, create_tmux_session, exact_session,
-    pane_preview, paste_into_pane, rename_tmux_window, tmux, tmux_session_exists,
+    pane_preview, paste_into_pane, pipe_pane_record, rename_tmux_window, tmux, tmux_session_exists,
     tmux_session_state,
 };
 

@@ -19,7 +19,7 @@ export type RailAction =
   | 'status' | 'exec' | 'check' | 'edit' | 'delete';
 
 /** Which view of the fleet overview is showing. */
-export type OverviewView = 'summary' | 'sessions' | 'links' | 'keys' | 'settings';
+export type OverviewView = 'summary' | 'sessions' | 'links' | 'keys' | 'recordings' | 'settings';
 
 const SELECTION_KEY = 'nabiman_remote_selection';
 

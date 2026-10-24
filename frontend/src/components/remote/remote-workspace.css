@@ -282,3 +282,27 @@
 .rw-rail-count { white-space: nowrap; }
 .rw-rail-head .btn { white-space: nowrap; padding: 4px 8px; }
 .rw-rail-head .rw-standalone, .rw-rail-head .rw-rail-fold { padding: 4px 7px; }
+
+/* Session recording: settings, list, and the replay player. */
+.rec-settings { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 14px; }
+.rec-toggle { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); cursor: pointer; }
+.rec-toggle.is-on { border-color: var(--primary); background: rgba(59, 130, 246, 0.08); }
+.rec-toggle input { width: 16px; height: 16px; margin: 2px 0 0; flex: none; }
+.rec-toggle span { display: flex; flex-direction: column; gap: 3px; }
+.rec-toggle small { color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.rec-nums { display: flex; gap: 16px; flex-wrap: wrap; }
+.rec-nums label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); }
+.rec-nums input { width: 140px; }
+.rec-note { font-size: 12px; }
+.rec-list-head { display: flex; align-items: center; gap: 8px; }
+.rec-list-head em { font-style: normal; color: var(--text-secondary); font-size: 13px; }
+.rec-list-head .btn { margin-left: auto; }
+.rec-table .rec-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.rec-live { margin-left: 8px; font-size: 11px; padding: 1px 6px; border-radius: 8px; background: rgba(46, 204, 113, 0.16); color: var(--success); }
+
+.rec-player .modal-content { width: min(96vw, 1000px); }
+.rec-screen { background: #000; border-radius: 6px; padding: 6px; height: min(60vh, 520px); overflow: hidden; }
+.rec-controls { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.rec-seek { flex: 1; }
+.rec-time { font-variant-numeric: tabular-nums; color: var(--text-secondary); font-size: 13px; white-space: nowrap; }
+.rec-speed { width: 72px; }

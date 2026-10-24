@@ -192,7 +192,7 @@ describe('remote workspace', () => {
   it('reaches sessions and the SSH key from the overview', () => {
     renderWorkspace();
     fireEvent.click(itemByName('전체 현황'));
-    fireEvent.click(tabs().getByRole('button', { name: /세션/ }));
+    fireEvent.click(tabs().getByRole('button', { name: /^세션( \d+)?$/ }));
     // A session card shows its name and its address, so "local" appears twice.
     expect(screen.getAllByText('local').length).toBeGreaterThan(0);
     expect(tabs().getByRole('button', { name: 'SSH 키' })).toBeInTheDocument();
@@ -316,7 +316,7 @@ describe('remote workspace', () => {
   it('offers a member session links only once granted', () => {
     renderWorkspace(true, { ...DEFAULT_GRANTS, share_sessions: true });
     expect(tabs().getByRole('button', { name: '공유 링크' })).toBeInTheDocument();
-    fireEvent.click(tabs().getByRole('button', { name: /세션/ }));
+    fireEvent.click(tabs().getByRole('button', { name: /^세션( \d+)?$/ }));
     const links = () => Array.from(document.querySelectorAll('.session-actions button')).filter(b => b.textContent === '🔗');
     expect(links()).toHaveLength(1);
     expect(screen.queryByText('내부 사용자 공유')).toBeNull();

@@ -43,6 +43,7 @@ export default function WorkspaceTabs({
           {overview('sessions', <>{t('remote.sessionsTab')} {allSessions > 0 && <em>{allSessions}</em>}</>)}
           {(sharing.sessions || sharing.files) && overview('links', t('share.panelTab'))}
           {!member && overview('keys', t('remote.sshKey'))}
+          {!member && overview('recordings', t('remote.rec.tab'))}
           {overview('settings', t('common.settings'))}
         </>
       )}

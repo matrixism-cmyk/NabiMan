@@ -204,6 +204,7 @@ fn build_cors() -> Cors {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     terminal::telnet_client::run_if_asked();
+    terminal::recording::run_if_asked();
     if unsafe { libc::prctl(libc::PR_SET_DUMPABLE, 0, 0, 0, 0) } != 0 {
         return Err(std::io::Error::last_os_error());
     }

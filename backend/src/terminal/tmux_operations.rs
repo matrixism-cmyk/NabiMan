@@ -295,6 +295,15 @@ pub(crate) fn paste_into_pane(name: &str, text: &str) {
 
 /// Read back the pane history (ANSI colours included) so a reopened window can
 /// show what scrolled past while it was closed.
+/// Pipes a pane's output to `command` (via tmux pipe-pane), once per session:
+/// `-o` makes it a no-op if a pipe is already running, so reconnecting never
+/// starts a second recorder.
+pub(crate) fn pipe_pane_record(name: &str, command: &str) {
+    let _ = tmux()
+        .args(["pipe-pane", "-O", "-o", "-t", &exact_pane(name), command])
+        .output();
+}
+
 pub(crate) fn capture_scrollback(name: &str, lines: u32) -> Result<String, String> {
     let start = format!("-{}", lines.min(MAX_SCROLLBACK));
     let out = tmux()

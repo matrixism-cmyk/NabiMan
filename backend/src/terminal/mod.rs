@@ -10,6 +10,7 @@ mod handlers;
 mod history;
 mod paste_file;
 mod pty;
+pub mod recording;
 mod registry;
 pub(crate) mod remote_access;
 pub(crate) mod session;
@@ -273,6 +274,9 @@ async fn ws_terminal(
     // fails, so it remains visible and can be retried or explicitly closed.
     *map = candidate;
     persist(&map);
+    if let Some(s) = map.get(&sid) {
+        recording::start(&tmux_name, &sid, &s.owner, &s.owner_id, &s.label, size);
+    }
 
     let (fd, pid) = match attach_tmux(&tmux_name, size) {
         Ok(r) => r,
@@ -360,4 +364,5 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     dictation::config(cfg);
     claude_voice::config(cfg);
     share::config(cfg);
+    recording::config(cfg);
 }
