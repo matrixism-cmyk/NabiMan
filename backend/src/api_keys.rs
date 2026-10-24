@@ -31,7 +31,7 @@ pub struct ApiKey {
     #[serde(default)]
     pub scopes: Vec<String>,
 }
-pub const SCOPES: &[&str] = &["status:read", "servers:read", "tenants:read"];
+pub const SCOPES: &[&str] = &["status:read", "servers:read", "sessions:read", "tenants:read"];
 pub fn new_api_key_store() -> ApiKeyStore {
     Arc::new(Mutex::new(
         Store::open(nabiman_server::data_dir().join("api_keys.json"))
@@ -64,6 +64,7 @@ fn allows(scopes: &[String], method: &str, path: &str) -> bool {
     let scope = match path {
         "/api/server/status" => "status:read",
         "/api/remote-servers" => "servers:read",
+        "/api/terminal/sessions" => "sessions:read",
         "/api/mec/v1/tenants" => "tenants:read",
         _ => {
             let Some(rest) = path.strip_prefix("/api/mec/v1/tenants/") else {

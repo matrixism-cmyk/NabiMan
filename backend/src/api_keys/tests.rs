@@ -61,6 +61,7 @@ fn authorization_is_exact_and_default_deny() {
     for path in [
         "/api/server/status",
         "/api/remote-servers",
+        "/api/terminal/sessions",
         "/api/mec/v1/tenants",
         "/api/mec/v1/tenants/id-1",
         "/api/mec/v1/tenants/id_2/resources",
@@ -78,9 +79,13 @@ fn authorization_is_exact_and_default_deny() {
         "/api/mec/v1/tenants/x/../secrets",
         "/api/mec/v1/tenants/x%2fy/resources",
         "/api/server/status/extra",
+        "/api/terminal/sessions/abc",
     ] {
         assert!(!allows(&scopes, "GET", path));
     }
+    // A scope grants only its own path: status:read cannot read sessions.
+    assert!(!allows(&["status:read".to_string()], "GET", "/api/terminal/sessions"));
+    assert!(allows(&["sessions:read".to_string()], "GET", "/api/terminal/sessions"));
 }
 #[test]
 fn usage_restart_revocation_and_owner_changes() {
