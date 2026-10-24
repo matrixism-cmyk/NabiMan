@@ -35,6 +35,7 @@ const t: T = {
   'remote.console.clip.hint': { ko: '간편: 화면을 클릭해 포커스한 뒤 Ctrl+V 하면 바로 붙여넣습니다(키 입력 방식, 영문 확실). \u201cVM 클립보드로 전송\u201d은 VM에 게스트 연동이 있어야 적용됩니다.', en: 'Tip: click the screen, then Ctrl+V pastes straight in (as keystrokes, ASCII-reliable). \u201cTo VM clipboard\u201d needs guest integration on the VM.', ja: 'ヒント: 画面をクリックして Ctrl+V で直接貼り付け（キー入力方式、ASCII は確実）。\u201cVM クリップボードへ\u201d は VM 側のゲスト連携が必要です。' },
   'remote.console.clip.fromVm': { ko: 'VM에서 복사한 내용', en: 'Copied in the VM', ja: 'VM でコピーした内容' },
   'remote.console.clip.fromVmEmpty': { ko: 'VM 안에서 복사하면 여기에 표시됩니다.', en: 'Copy inside the VM and it shows here.', ja: 'VM 内でコピーするとここに表示されます。' },
+  'remote.console.fullscreen': { ko: '전체화면', en: 'Fullscreen', ja: '全画面' },
   'remote.console.detach': { ko: '분리', en: 'Detach', ja: '分離' },
   'remote.console.notFound': { ko: '콘솔을 찾을 수 없습니다.', en: 'Console not found.', ja: 'コンソールが見つかりません。' },
   'remote.console.access.btn': { ko: '권한', en: 'Access', ja: '権限' },

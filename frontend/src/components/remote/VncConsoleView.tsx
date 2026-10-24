@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import RFB from '@novnc/novnc/lib/rfb.js';
 import { useT } from '../../shared/i18n';
+import { useFullscreen } from '../../shared/ui/useFullscreen';
 import { consoleWsUrl, shareWsUrl } from './vncApi';
 import { typeText } from './vncInput';
 import AccountDictation from '../terminal/dictation/AccountDictation';
@@ -14,7 +15,9 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
 }) {
   const { t } = useT();
   const host = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLDivElement>(null);
   const rfb = useRef<RFB | null>(null);
+  const { full, toggle } = useFullscreen(root);
   const [status, setStatus] = useState<Status>('connecting');
   const [error, setError] = useState('');
   const [scale, setScale] = useState(true);
@@ -96,7 +99,7 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
   };
 
   return (
-    <div className="rw-view rw-console">
+    <div className="rw-view rw-console" ref={root}>
       <div className="rw-console-bar">
         <strong>{label}</strong>
         <span className={`rw-console-state is-${status}`}>{t(`remote.console.${status}`)}</span>
@@ -106,6 +109,7 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
         {status === 'connected' && !share?.viewOnly && <AccountDictation variant="bar" onText={dictate} onKeys={dictateKeys} />}
         {!share?.viewOnly && <button className={`btn btn-secondary btn-sm ${clipOpen ? 'is-active' : ''}`} onClick={openClip} disabled={status !== 'connected'}>{t('remote.console.clip.btn')}</button>}
         {!popout && <button className="btn btn-secondary btn-sm" onClick={() => window.open(`/remote#console/${encodeURIComponent(vm)}`, `vnccon_${vm}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no')}>{t('remote.console.detach')}</button>}
+        <button className="btn btn-secondary btn-sm" onClick={toggle} title={t('remote.console.fullscreen')} aria-label={t('remote.console.fullscreen')} aria-pressed={full}>⛶</button>
         {!share?.viewOnly && <button className="btn btn-secondary btn-sm" onClick={() => { try { rfb.current?.sendCtrlAltDel(); } catch { /* not ready */ } }} disabled={status !== 'connected'}>Ctrl+Alt+Del</button>}
         {status === 'disconnected' && <button className="btn btn-primary btn-sm" onClick={() => setAttempt(a => a + 1)}>{t('remote.console.reconnect')}</button>}
         {canEdit && <button className="btn btn-secondary btn-sm" onClick={onEdit}>{t('common.edit')}</button>}

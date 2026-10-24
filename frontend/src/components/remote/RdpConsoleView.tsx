@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Guacamole from '../../vendor/guacamole-common.js';
 import { useT } from '../../shared/i18n';
+import { useFullscreen } from '../../shared/ui/useFullscreen';
 import { rdpTicket } from './vncApi';
 import AccountDictation from '../terminal/dictation/AccountDictation';
 
@@ -15,8 +16,11 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
 }) {
   const { t } = useT();
   const host = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLDivElement>(null);
   const client = useRef<any>(null);
   const keyboard = useRef<any>(null);
+  const fitRef = useRef<(() => void) | undefined>(undefined);
+  const { full, toggle } = useFullscreen(root, () => fitRef.current?.());
   const [status, setStatus] = useState<Status>('connecting');
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -65,6 +69,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
       display.scale(scale);
     };
     display.onresize = fit;
+    fitRef.current = fit;
 
     c.onstatechange = (state: number) => {
       if (!live) return;
@@ -115,7 +120,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
   }, [target, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="rw-view rw-console">
+    <div className="rw-view rw-console" ref={root}>
       <div className="rw-console-bar">
         <strong>{label}</strong>
         <span className="rw-proto-tag">RDP</span>
@@ -124,6 +129,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
         <span className="rw-console-spacer" />
         {status === 'connected' && !share?.viewOnly && <AccountDictation variant="bar" onText={dictate} onKeys={dictateKeys} />}
         {!popout && <button className="btn btn-secondary btn-sm" onClick={() => window.open(`/remote#rdp/${encodeURIComponent(target)}`, `rdp_${target}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no')}>{t('remote.console.detach')}</button>}
+        <button className="btn btn-secondary btn-sm" onClick={toggle} title={t('remote.console.fullscreen')} aria-label={t('remote.console.fullscreen')} aria-pressed={full}>⛶</button>
         {!share?.viewOnly && <button className="btn btn-secondary btn-sm" onClick={() => { try { const c = client.current; c?.sendKeyEvent(1, 0xffe3); c?.sendKeyEvent(1, 0xffe9); c?.sendKeyEvent(1, 0xffff); c?.sendKeyEvent(0, 0xffff); c?.sendKeyEvent(0, 0xffe9); c?.sendKeyEvent(0, 0xffe3); } catch { /* not ready */ } }} disabled={status !== 'connected'}>Ctrl+Alt+Del</button>}
         {status === 'disconnected' && <button className="btn btn-primary btn-sm" onClick={() => setAttempt(a => a + 1)}>{t('remote.console.reconnect')}</button>}
         {canEdit && <button className="btn btn-secondary btn-sm" onClick={onEdit}>{t('common.edit')}</button>}
