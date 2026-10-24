@@ -60,6 +60,8 @@ const t: T = {
   'remote.console.add': { ko: '+ 콘솔 추가', en: '+ Add console', ja: '+ コンソール追加' },
   'remote.console.deleteConfirm': { ko: "'{label}' 콘솔을 삭제할까요?", en: 'Delete the console "{label}"?', ja: 'コンソール「{label}」を削除しますか？' },
   'remote.console.form.addTitle': { ko: '외부 VNC 콘솔 추가', en: 'Add external VNC console', ja: '外部 VNC コンソール追加' },
+  'remote.console.form.configTitle': { ko: 'VM 콘솔 설정', en: 'Configure VM console', ja: 'VM コンソール設定' },
+  'remote.console.form.builtinIntro': { ko: '내부 VM 콘솔입니다. 이름을 바꾸거나, RDP로 전환해 클립보드·파일·한글을 쓸 수 있습니다(RDP 전환 시 VM의 IP와 로그인 정보 입력). 기본값 VNC는 그대로 두면 됩니다.', en: 'An internal VM console. Rename it, or switch it to RDP for clipboard, files and Korean (enter the VM IP and login for RDP). Leave it on VNC to keep the default.', ja: '内部 VM コンソールです。名前変更や RDP への切替(クリップボード・ファイル・日本語)ができます(RDP は VM の IP とログインが必要)。VNC のままでも使えます。' },
   'remote.console.form.editTitle': { ko: '콘솔 수정', en: 'Edit console', ja: 'コンソール編集' },
   'remote.console.form.intro': { ko: '외부 IP나 도메인의 VNC 화면을 등록합니다. 내부 KubeVirt 콘솔은 자동으로 표시되므로 여기서 등록할 필요가 없습니다.', en: 'Register a VNC screen at an external IP or domain. Internal KubeVirt consoles appear automatically and need no entry here.', ja: '外部 IP やドメインの VNC 画面を登録します。内部 KubeVirt コンソールは自動表示されるため登録不要です。' },
   'remote.console.form.label': { ko: '이름', en: 'Name', ja: '名前' },

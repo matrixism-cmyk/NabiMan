@@ -152,7 +152,7 @@ export default function RemoteWorkspace() {
   const consoleAction = async (c: VmConsole, action: string) => {
     if (action === 'open') { select({ kind: 'console', vm: c.name, label: c.label, builtin: c.builtin }); showWork(); }
     else if (action === 'detach') window.open(`/remote#${c.protocol === 'rdp' ? 'rdp' : 'console'}/${encodeURIComponent(c.name)}`, `con_${c.name}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no');
-    else if (action === 'edit') select({ kind: 'console-form', edit: { id: c.name, label: c.label, host: c.host || '', port: c.port || (c.protocol === 'rdp' ? 3389 : 5900), protocol: c.protocol || 'vnc', user: c.user || '' } });
+    else if (action === 'edit') select({ kind: 'console-form', edit: { id: c.name, label: c.label, host: c.host || '', port: c.port || (c.protocol === 'rdp' ? 3389 : 5900), protocol: c.protocol || 'vnc', user: c.user || '', builtin: Boolean(c.builtin) } });
     else if (action === 'access') setAccessConsole({ key: c.name, label: c.label });
     else if (action === 'share') setShareConsole({ key: c.name, label: c.label });
     else if (action === 'delete') {

@@ -141,6 +141,41 @@ pub fn update(id: &str, label: &str, host: &str, port: u16, protocol: &str, user
     Ok(updated)
 }
 
+/// Set (or clear) an overlay for a built-in console, keyed by its name. An
+/// overlay lets a built-in VM console be renamed or switched to RDP. A plain
+/// VNC overlay with no host removes the overlay (back to the default bridge).
+pub fn upsert_builtin(name: &str, label: &str, protocol: &str, host: &str, port: u16, user: &str, password: Option<&str>) -> Result<Console, String> {
+    let label = label.trim();
+    if label.is_empty() || label.len() > 80 {
+        return Err("콘솔 이름을 1~80자로 입력하세요".into());
+    }
+    let protocol = norm_protocol(protocol)?;
+    let mut list = load();
+    // A default VNC overlay (no host) is the same as no overlay: drop it.
+    if protocol == "vnc" && host.trim().is_empty() {
+        list.retain(|c| c.id != name);
+        let out = Console { id: name.into(), label: label.into(), host: String::new(), port, protocol, user: String::new(), password_enc: String::new() };
+        save(&list)?;
+        return Ok(out);
+    }
+    if protocol == "rdp" && (host.trim().is_empty() || port == 0) {
+        return Err("RDP는 호스트와 포트가 필요합니다".into());
+    }
+    let existing = list.iter().position(|c| c.id == name);
+    let password_enc = match (password, existing.and_then(|i| list.get(i))) {
+        (Some(pw), _) => seal(&protocol, pw)?,
+        (None, Some(cur)) if protocol == "rdp" => cur.password_enc.clone(),
+        _ => String::new(),
+    };
+    let console = Console { id: name.into(), label: label.into(), host: host.trim().into(), port, protocol, user: user.trim().into(), password_enc };
+    match existing {
+        Some(i) => list[i] = console.clone(),
+        None => list.push(console.clone()),
+    }
+    save(&list)?;
+    Ok(console)
+}
+
 pub fn delete(id: &str) -> Result<(), String> {
     let mut list = load();
     let before = list.len();

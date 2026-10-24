@@ -13,18 +13,27 @@ async fn list_consoles(req: HttpRequest) -> HttpResponse {
     let admin = is_admin(&req);
     let uid = crate::auth::verified_user_id(&req).unwrap_or_default();
     let visible = |key: &str| admin || super::vnc_access::allowed(&uid, key);
+    let registry = super::vnc_registry::load();
+    // A built-in console may carry an overlay (keyed by its name) that renames
+    // it or switches it to RDP.
     let mut list: Vec<serde_json::Value> = CONSOLES
         .iter()
         .filter(|(name, _, _)| visible(name))
-        .map(|(name, label, _)| serde_json::json!({ "name": name, "label": label, "protocol": "vnc", "builtin": true }))
+        .map(|(name, label, _)| match registry.iter().find(|c| c.id == *name) {
+            Some(c) => serde_json::json!({ "name": name, "label": c.label, "host": c.host, "port": c.port,
+                "protocol": c.protocol, "user": c.user, "has_password": !c.password_enc.is_empty(), "builtin": true }),
+            None => serde_json::json!({ "name": name, "label": label, "protocol": "vnc", "builtin": true }),
+        })
         .collect();
-    for c in super::vnc_registry::load() {
-        if visible(&c.id) {
-            list.push(serde_json::json!({
-                "name": c.id, "label": c.label, "host": c.host, "port": c.port,
-                "protocol": c.protocol, "user": c.user, "has_password": !c.password_enc.is_empty(), "builtin": false
-            }));
+    for c in &registry {
+        // Overlays on built-ins were merged above; list only the standalone ones.
+        if CONSOLES.iter().any(|(n, _, _)| *n == c.id) || !visible(&c.id) {
+            continue;
         }
+        list.push(serde_json::json!({
+            "name": c.id, "label": c.label, "host": c.host, "port": c.port,
+            "protocol": c.protocol, "user": c.user, "has_password": !c.password_enc.is_empty(), "builtin": false
+        }));
     }
     HttpResponse::Ok().json(ApiResponse::ok(list))
 }
@@ -65,7 +74,13 @@ async fn update_console(req: HttpRequest, id: web::Path<String>, body: web::Json
     if !may_manage_console(&req) {
         return HttpResponse::Forbidden().finish();
     }
-    match super::vnc_registry::update(&id, &body.label, &body.host, body.port, &body.protocol, &body.user, body.password.as_deref()) {
+    let result = if port_for(&id).is_some() {
+        // A built-in console is configured through an overlay, not replaced.
+        super::vnc_registry::upsert_builtin(&id, &body.label, &body.protocol, &body.host, body.port, &body.user, body.password.as_deref())
+    } else {
+        super::vnc_registry::update(&id, &body.label, &body.host, body.port, &body.protocol, &body.user, body.password.as_deref())
+    };
+    match result {
         Ok(c) => HttpResponse::Ok().json(ApiResponse::ok(as_json(c))),
         Err(e) => HttpResponse::BadRequest().json(ApiResponse::<()>::error(&e)),
     }

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useT } from '../../shared/i18n';
 import { createConsole, updateConsole, VmConsole } from './vncApi';
 
-type EditTarget = { id: string; label: string; host: string; port: number; protocol: string; user: string } | null;
+type EditTarget = { id: string; label: string; host: string; port: number; protocol: string; user: string; builtin: boolean } | null;
 
 /** Add or edit an external console: VNC or RDP (RDP carries native clipboard,
  *  files and Korean). Internal KubeVirt consoles are detected automatically. */
@@ -12,7 +12,8 @@ export default function VncConsoleForm({ edit, onSaved, onCancel }: {
   onCancel: () => void;
 }) {
   const { t } = useT();
-  const [protocol, setProtocol] = useState(edit?.protocol || 'rdp');
+  const builtin = Boolean(edit?.builtin);
+  const [protocol, setProtocol] = useState(edit?.protocol || (builtin ? 'vnc' : 'rdp'));
   const [label, setLabel] = useState(edit?.label || '');
   const [host, setHost] = useState(edit?.host || '');
   const [port, setPort] = useState(String(edit?.port || (edit?.protocol === 'vnc' ? 5900 : 3389)));
@@ -29,7 +30,8 @@ export default function VncConsoleForm({ edit, onSaved, onCancel }: {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const p = parseInt(port, 10);
-    if (!label.trim() || !host.trim() || !p) { setError(t('remote.console.form.invalid')); return; }
+    const needHost = !builtin || protocol === 'rdp';
+    if (!label.trim() || (needHost && !host.trim()) || !p) { setError(t('remote.console.form.invalid')); return; }
     setBusy(true); setError('');
     const body = { label: label.trim(), host: host.trim(), port: p, protocol, user: protocol === 'rdp' ? user.trim() : '' };
     const res = edit
@@ -44,7 +46,7 @@ export default function VncConsoleForm({ edit, onSaved, onCancel }: {
     <div className="rw-view rw-view-scroll">
       <div className="rw-section">
         <div className="rw-section-head"><h3>{edit ? t('remote.console.form.editTitle') : t('remote.console.form.addTitle')}</h3></div>
-        <p className="text-secondary">{t('remote.console.form.intro')}</p>
+        <p className="text-secondary">{builtin ? t('remote.console.form.builtinIntro') : t('remote.console.form.intro')}</p>
         <form className="rw-form" onSubmit={submit}>
           <div className="form-group"><label>{t('remote.protocol')} *</label>
             <select className="select-input" value={protocol} onChange={e => changeProto(e.target.value)}>
@@ -53,10 +55,12 @@ export default function VncConsoleForm({ edit, onSaved, onCancel }: {
             </select></div>
           <div className="form-group"><label>{t('remote.console.form.label')} *</label>
             <input className="filter-input" value={label} onChange={e => setLabel(e.target.value)} placeholder="Windows VM" maxLength={80} required /></div>
-          <div className="form-group"><label>{t('remote.console.form.host')} *</label>
-            <input className="filter-input" value={host} onChange={e => setHost(e.target.value)} placeholder="10.0.0.5 / vm.example.com" required /></div>
-          <div className="form-group"><label>{t('remote.console.form.port')} *</label>
-            <input className="filter-input" type="number" min={1} max={65535} value={port} onChange={e => setPort(e.target.value)} required /></div>
+          {(!builtin || protocol === 'rdp') && <>
+            <div className="form-group"><label>{t('remote.console.form.host')} *</label>
+              <input className="filter-input" value={host} onChange={e => setHost(e.target.value)} placeholder="10.0.0.5 / vm.example.com" required /></div>
+            <div className="form-group"><label>{t('remote.console.form.port')} *</label>
+              <input className="filter-input" type="number" min={1} max={65535} value={port} onChange={e => setPort(e.target.value)} required /></div>
+          </>}
           {protocol === 'rdp' && <>
             <div className="form-group"><label>{t('remote.console.form.user')}</label>
               <input className="filter-input" value={user} onChange={e => setUser(e.target.value)} placeholder="Administrator" autoComplete="off" /></div>

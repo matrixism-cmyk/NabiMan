@@ -5,7 +5,7 @@ export type Selection =
   | { kind: 'local' }
   | { kind: 'adhoc' }
   | { kind: 'console'; vm: string; label: string; builtin: boolean }
-  | { kind: 'console-form'; edit: { id: string; label: string; host: string; port: number; protocol: string; user: string } | null }
+  | { kind: 'console-form'; edit: { id: string; label: string; host: string; port: number; protocol: string; user: string; builtin: boolean } | null }
   | { kind: 'server'; id: string };
 
 /**
