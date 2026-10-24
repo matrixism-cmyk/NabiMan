@@ -1,4 +1,4 @@
-import { apiRequest, apiPost } from '../../shared/api/useApi';
+import { apiRequest, apiPost, fetchWithRefresh } from '../../shared/api/useApi';
 
 export interface VmConsole {
   /** For a built-in bridge this is its VM name; for a registered one, its id. */
@@ -74,3 +74,14 @@ export const shareInfo = (token: string) => apiRequest<ShareInfo>(`/api/cshare/$
 
 /** The full share link to hand out. */
 export const shareLink = (token: string) => `${window.location.origin}/cshare/${token}`;
+
+/** A file on a VM console's redirected "NabiMan" drive. */
+export interface DriveFile { name: string; size: number; modified: number }
+
+/** List the files on a VM console's drive (uploads + what the VM copied there). */
+export const listDriveFiles = (target: string) =>
+  apiRequest<DriveFile[]>(`/api/remote/consoles/${encodeURIComponent(target)}/drive`);
+
+/** Fetch one drive file for download (authenticated). */
+export const fetchDriveFile = (target: string, name: string) =>
+  fetchWithRefresh(`/api/remote/consoles/${encodeURIComponent(target)}/drive/${encodeURIComponent(name)}`);

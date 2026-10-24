@@ -3,6 +3,7 @@ import Guacamole from '../../vendor/guacamole-common.js';
 import { useT } from '../../shared/i18n';
 import { useFullscreen } from '../../shared/ui/useFullscreen';
 import { describeFault, reconnectDelay, RECONNECT_MAX } from './consoleFault';
+import RdpDrivePanel from './RdpDrivePanel';
 import { rdpTicket } from './vncApi';
 import AccountDictation from '../terminal/dictation/AccountDictation';
 
@@ -31,6 +32,8 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
   const [attempt, setAttempt] = useState(0);
   const [upload, setUpload] = useState<{ name: string; pct: number; fail?: boolean } | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [driveReady, setDriveReady] = useState(false);
+  const [drivePanel, setDrivePanel] = useState(false);
 
   // Drag a file onto the VM to copy it in, via guacd's redirected drive (it
   // lands on the "NabiMan" drive inside Windows). View-only shares cannot.
@@ -78,7 +81,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
 
   useEffect(() => {
     let live = true;
-    setStatus('connecting'); setError('');
+    setStatus('connecting'); setError(''); setDriveReady(false); setDrivePanel(false);
     const el = host.current;
     if (!el) return undefined;
     const tunnel = new Guacamole.WebSocketTunnel(share ? `api/cshare/${encodeURIComponent(share.token)}/ws` : 'api/remote/rdp');
@@ -143,8 +146,8 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
       reader.ontext = (t2: string) => { text += t2; };
       reader.onend = () => { navigator.clipboard.writeText(text).catch(() => { /* ignore */ }); };
     };
-    // guacd's redirected drive becomes available — keep it for file uploads.
-    c.onfilesystem = (object: any) => { filesystem.current = object; };
+    // guacd's redirected drive becomes available — keep it for file transfer.
+    c.onfilesystem = (object: any) => { filesystem.current = object; if (live) setDriveReady(true); };
 
     const dims = () => `GUAC_WIDTH=${Math.max(el.clientWidth || 1280, 640)}&GUAC_HEIGHT=${Math.max(el.clientHeight || 800, 480)}&GUAC_DPI=96`;
     if (share) {
@@ -191,6 +194,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
         <span className={`rw-console-state is-${status}`}>{t(`remote.console.${status}`)}</span>
         <span className="rw-console-spacer" />
         {status === 'connected' && !share?.viewOnly && <AccountDictation variant="bar" onText={dictate} onKeys={dictateKeys} />}
+        {driveReady && !share && <button className={`btn btn-secondary btn-sm ${drivePanel ? 'is-active' : ''}`} onClick={() => setDrivePanel(d => !d)}>{t('remote.console.drive.files')}</button>}
         {!popout && <button className="btn btn-secondary btn-sm" onClick={() => window.open(`/remote#rdp/${encodeURIComponent(target)}`, `rdp_${target}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no')}>{t('remote.console.detach')}</button>}
         <button className="btn btn-secondary btn-sm" onClick={toggle} title={t('remote.console.fullscreen')} aria-label={t('remote.console.fullscreen')} aria-pressed={full}>⛶</button>
         {!share?.viewOnly && <button className="btn btn-secondary btn-sm" onClick={() => { try { const c = client.current; c?.sendKeyEvent(1, 0xffe3); c?.sendKeyEvent(1, 0xffe9); c?.sendKeyEvent(1, 0xffff); c?.sendKeyEvent(0, 0xffff); c?.sendKeyEvent(0, 0xffe9); c?.sendKeyEvent(0, 0xffe3); } catch { /* not ready */ } }} disabled={status !== 'connected'}>Ctrl+Alt+Del</button>}
@@ -210,6 +214,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
         onDragLeave={() => setDragOver(false)}
       >
         {dragOver && !share?.viewOnly && <div className="rw-rdp-droplayer">{t('remote.console.drive.hint')}</div>}
+        {drivePanel && <RdpDrivePanel target={target} onClose={() => setDrivePanel(false)} />}
         {upload && (
           <div className="rw-rdp-upload">
             {upload.fail

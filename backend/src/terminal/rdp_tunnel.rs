@@ -249,11 +249,11 @@ async fn pump(
         }
     }
     let port = p.port.to_string();
-    // A per-host virtual drive lets the browser drag files into the VM.
-    let drive_root = std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/workspace/var/lib/nabiman".into());
-    let safe_host: String = p.host.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
-    let drive_path = format!("{}/guac-drive/{}", drive_root.trim_end_matches('/'), safe_host);
-    let drive_ok = std::fs::create_dir_all(&drive_path).is_ok(); // guacd makes only one level
+    // A per-host virtual drive lets the browser drag files into the VM and
+    // download them back (see console_drive). guacd's create-drive-path makes
+    // only the last component, so create the whole path here.
+    let drive_path = super::console_drive::drive_dir(&p.host).to_string_lossy().into_owned();
+    let drive_ok = std::fs::create_dir_all(&drive_path).is_ok();
     // Values keyed by the parameter names guacd just listed (args[0] is VERSION).
     let value_for = |name: &str| -> String {
         match name {

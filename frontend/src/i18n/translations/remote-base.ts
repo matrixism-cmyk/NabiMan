@@ -96,6 +96,8 @@ const t: T = {
   'remote.console.disconnected': { ko: '끊김', en: 'Disconnected', ja: '切断' },
   'remote.console.fit': { ko: '화면 맞춤', en: 'Fit', ja: '画面に合わせる' },
   'remote.console.reconnect': { ko: '다시 연결', en: 'Reconnect', ja: '再接続' },
+  'remote.console.drive.files': { ko: '드라이브 파일', en: 'Drive files', ja: 'ドライブファイル' },
+  'remote.console.drive.empty': { ko: '파일이 없습니다. VM에서 NabiMan 드라이브에 복사하면 여기서 내려받을 수 있습니다.', en: 'No files. Copy to the NabiMan drive in the VM to download here.', ja: 'ファイルがありません。VM で NabiMan ドライブにコピーするとここから取得できます。' },
   'remote.console.drive.hint': { ko: '파일을 놓으면 VM으로 전송합니다 (NabiMan 드라이브)', en: 'Drop to copy the file into the VM (NabiMan drive)', ja: 'ドロップで VM にファイルを転送します (NabiMan ドライブ)' },
   'remote.console.drive.sending': { ko: '{name} 전송 중… {pct}%', en: 'Sending {name}… {pct}%', ja: '{name} を転送中… {pct}%' },
   'remote.console.drive.done': { ko: '{name} 전송 완료 — VM의 NabiMan 드라이브를 확인하세요', en: '{name} sent — see the NabiMan drive in the VM', ja: '{name} 転送完了 — VM の NabiMan ドライブを確認してください' },

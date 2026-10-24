@@ -351,3 +351,23 @@
   border-radius: 8px; padding: 7px 14px; font-size: 13px; z-index: 4; max-width: 90%;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.rw-drive-panel {
+  position: absolute; top: 10px; right: 10px; bottom: 10px; width: 290px; max-width: calc(100% - 20px);
+  display: flex; flex-direction: column; z-index: 6;
+  background: rgba(16, 19, 24, 0.97); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px;
+}
+.rw-drive-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+.rw-drive-spacer { flex: 1; }
+.rw-drive-path { display: block; padding: 5px 10px; font-size: 12px; color: #9aa7b4; border-bottom: 1px solid rgba(255, 255, 255, 0.07); overflow: hidden; text-overflow: ellipsis; }
+.rw-drive-list { flex: 1; min-height: 0; overflow: auto; padding: 6px; }
+.rw-drive-list p { padding: 10px; font-size: 13px; }
+.rw-drive-row {
+  display: block; width: 100%; text-align: left; background: transparent; border: 0; color: #e8edf4;
+  padding: 7px 9px; border-radius: 6px; font-size: 13px; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rw-drive-row:hover { background: rgba(255, 255, 255, 0.08); }
+.rw-drive-row:disabled { opacity: 0.6; cursor: default; }
+.rw-drive-row { display: flex; align-items: center; gap: 6px; }
+.rw-drive-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rw-drive-size { color: #9aa7b4; font-size: 12px; flex-shrink: 0; }
