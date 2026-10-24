@@ -11,6 +11,7 @@ import { useTransfers } from './useTransfers';
 import { useDragOut } from './useDragOut';
 import { draggingDesktopFiles, draggingFrom, draggingOwnRows, droppedRows, startDragging, stopDragging, takeDrop } from './sftpDrop';
 import { askAndCopy, useCopies } from './sftpCopy';
+import { useAutoRefresh } from './useAutoRefresh';
 import {
   baseName, isFolder, joinPath, listDir, makeDir, movePath, removePath, SftpEntry, SftpListing, SftpSource, shellQuote,
 } from './sftpApi';
@@ -61,32 +62,34 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
   const fileInput = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const load = useCallback(async (path: string, fallbackHome = false) => {
-    setLoading(true);
-    setError('');
+  // `silent`: a background poll — no spinner, keep the old listing on failure.
+  const load = useCallback(async (path: string, fallbackHome = false, silent = false) => {
+    if (!silent) { setLoading(true); setError(''); }
     try {
       const res = await listDir(source, path);
       if (res.success && res.data) {
         if (res.data.path !== current.current) setSelected(new Set());
         current.current = res.data.path;
         setListing(res.data);
+        setError('');
         write(pathKey, res.data.path);
       } else if (fallbackHome && path) {
-        // The folder remembered from last time is gone: start at home instead.
-        await load('', false);
-        return;
-      } else {
+        await load('', false); // the remembered folder is gone: go home
+      } else if (!silent) {
         setError(res.message || t('common.error'));
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
+      if (!silent) setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [source, pathKey, t]);
 
   useEffect(() => { load(read(pathKey), true); }, [load, pathKey]);
 
+  // Quietly re-read the current folder so outside changes show (useAutoRefresh).
+  const { on: auto, toggle: toggleAuto } = useAutoRefresh(
+    () => load(current.current, false, true), () => editing !== null || menu !== null, 'nabiman_sftp_auto');
   const refresh = useCallback(() => load(current.current), [load]);
   const transfers = useTransfers(source, useCallback((dir: string) => {
     if (dir === current.current) refresh();
@@ -97,7 +100,6 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
   const copies = useCopies(copyScope, useCallback((dir: string) => {
     if (dir === current.current) refresh();
   }, [refresh]));
-
   const dragOut = useDragOut(source);
   const here = listing?.path || '';
   const pathOf = useCallback((name: string) => joinPath(current.current, name), []);
@@ -107,7 +109,6 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
     [listing, showHidden, columns.state.sort],
   );
   const chosen = visible.filter((e) => selected.has(e.name));
-
   const report = (failures: string[], success: string) => {
     if (failures.length) setError(failures.slice(0, 3).join(' · '));
     else setNotice(success);
@@ -116,13 +117,11 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
 
   // Files that can be shown in place, in list order, for stepping through.
   const previewable = useMemo(() => visible.filter((e) => !isFolder(e) && previewOf(e.name)), [visible]);
-
   const open = (entry: SftpEntry) => {
     if (isFolder(entry)) load(pathOf(entry.name));
     else if (previewOf(entry.name)) setPreviewing(entry.name);
     else transfers.download([{ path: pathOf(entry.name) }]);
   };
-
   const moveInto = async (paths: string[], dir: string) => {
     const failures: string[] = [];
     let moved = 0;
@@ -135,7 +134,6 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
     if (moved || failures.length) report(failures, t('sftp.moved', { count: moved, dir }));
     refresh();
   };
-
   const remove = async (entries: SftpEntry[]) => {
     if (!entries.length) return;
     const question = entries.length > 1 ? t('sftp.deleteMany', { count: entries.length })
@@ -304,6 +302,8 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
             title={t('sftp.up')} aria-label={t('sftp.up')}>↰</button>
           <button type="button" onClick={() => load('')} title={t('sftp.home')} aria-label={t('sftp.home')}>⌂</button>
           <button type="button" onClick={refresh} title={t('sftp.refresh')} aria-label={t('sftp.refresh')}>⟳</button>
+          <button type="button" className={`sftp-auto ${auto ? 'is-on' : ''}`} aria-pressed={auto}
+            onClick={toggleAuto} title={t(auto ? 'sftp.autoOn' : 'sftp.autoOff')} aria-label={t('sftp.auto')}>◉</button>
           {writable && (
             <>
               <button type="button" onClick={() => setEditing({ mode: 'new', from: '' })}

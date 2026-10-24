@@ -272,3 +272,27 @@ describe('terminal with files', () => {
     expect(document.querySelector('.rw-split-tab')).toBeTruthy();
   });
 });
+
+
+describe('background monitoring', () => {
+  it('re-reads the current folder on an interval, and a toggle turns it off', async () => {
+    jest.useFakeTimers();
+    try {
+      renderPanel();
+      await screen.findByText('logs');
+      const calls = () => mocked.listDir.mock.calls.filter((c) => c[1] === '' || c[1] === '/home/me').length;
+      const base = calls();
+      // A quiet poll after the interval re-reads the same folder.
+      await act(async () => { jest.advanceTimersByTime(7000); await Promise.resolve(); });
+      expect(calls()).toBe(base + 1);
+      // Turning it off stops the polling.
+      fireEvent.click(screen.getByLabelText('자동 새로고침'));
+      const after = calls();
+      await act(async () => { jest.advanceTimersByTime(21000); await Promise.resolve(); });
+      expect(calls()).toBe(after);
+      expect(localStorage.getItem('nabiman_sftp_auto')).toBe('0');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
