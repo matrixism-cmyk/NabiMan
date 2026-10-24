@@ -20,6 +20,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
   const root = useRef<HTMLDivElement>(null);
   const client = useRef<any>(null);
   const keyboard = useRef<any>(null);
+  const filesystem = useRef<any>(null);
   const fitRef = useRef<(() => void) | undefined>(undefined);
   const resizeRef = useRef<(() => void) | undefined>(undefined);
   const retries = useRef(0);
@@ -28,6 +29,27 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
   const [status, setStatus] = useState<Status>('connecting');
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const [upload, setUpload] = useState<{ name: string; pct: number; fail?: boolean } | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  // Drag a file onto the VM to copy it in, via guacd's redirected drive (it
+  // lands on the "NabiMan" drive inside Windows). View-only shares cannot.
+  const sendFile = (file: File) => {
+    const fs = filesystem.current;
+    if (!fs) { setError(t('remote.console.drive.pending')); return; }
+    const stream = fs.createOutputStream(file.type || 'application/octet-stream', `/${file.name}`);
+    const writer = new Guacamole.BlobWriter(stream);
+    writer.onprogress = (_b: Blob, offset: number) => setUpload({ name: file.name, pct: file.size ? Math.round((offset / file.size) * 100) : 0 });
+    writer.oncomplete = () => { setUpload({ name: file.name, pct: 100 }); window.setTimeout(() => setUpload(null), 2000); };
+    writer.onerror = () => { setUpload({ name: file.name, pct: 0, fail: true }); window.setTimeout(() => setUpload(null), 3000); };
+    setUpload({ name: file.name, pct: 0 });
+    writer.sendBlob(file);
+  };
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault(); setDragOver(false);
+    if (share?.viewOnly) return;
+    for (const f of Array.from(e.dataTransfer.files)) sendFile(f);
+  };
 
   // Keep guacd's clipboard in step with the browser so Ctrl+V inside the VM
   // pastes what was copied locally.
@@ -121,6 +143,8 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
       reader.ontext = (t2: string) => { text += t2; };
       reader.onend = () => { navigator.clipboard.writeText(text).catch(() => { /* ignore */ }); };
     };
+    // guacd's redirected drive becomes available — keep it for file uploads.
+    c.onfilesystem = (object: any) => { filesystem.current = object; };
 
     const dims = () => `GUAC_WIDTH=${Math.max(el.clientWidth || 1280, 640)}&GUAC_HEIGHT=${Math.max(el.clientHeight || 800, 480)}&GUAC_DPI=96`;
     if (share) {
@@ -149,6 +173,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
       live = false;
       if (reconnectTimer.current) window.clearTimeout(reconnectTimer.current);
       if (sizeTimer) window.clearTimeout(sizeTimer);
+      filesystem.current = null;
       el.removeEventListener('mouseenter', pushClipboard);
       window.removeEventListener('focus', pushClipboard);
       try { if (kb) { kb.onkeydown = null; kb.onkeyup = null; } } catch { /* ignore */ }
@@ -176,7 +201,25 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
         {canEdit && <button className="btn btn-danger btn-sm" onClick={onDelete}>{t('common.delete')}</button>}
       </div>
       {error && <p role="alert" className="message rw-console-error" onClick={() => setError('')}>{error}</p>}
-      <div ref={host} className="rw-console-screen rw-rdp-screen" tabIndex={0} />
+      <div
+        ref={host}
+        className={`rw-console-screen rw-rdp-screen ${dragOver ? 'is-dragover' : ''}`}
+        tabIndex={0}
+        onDrop={share?.viewOnly ? undefined : onDrop}
+        onDragOver={share?.viewOnly ? undefined : (e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+      >
+        {dragOver && !share?.viewOnly && <div className="rw-rdp-droplayer">{t('remote.console.drive.hint')}</div>}
+        {upload && (
+          <div className="rw-rdp-upload">
+            {upload.fail
+              ? t('remote.console.drive.failed', { name: upload.name })
+              : upload.pct >= 100
+                ? t('remote.console.drive.done', { name: upload.name })
+                : t('remote.console.drive.sending', { name: upload.name, pct: upload.pct })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

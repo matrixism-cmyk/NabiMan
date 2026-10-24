@@ -216,6 +216,10 @@ async fn pump(
     let tcp = match TcpStream::connect(GUACD).await {
         Ok(t) => t,
         Err(_) => {
+            // guacd unreachable: UPSTREAM_UNAVAILABLE so the browser retries.
+            addr.do_send(FromGuacd::Text(
+                String::from_utf8_lossy(&inst(&["error", "guacd unavailable", "520"])).into_owned(),
+            ));
             addr.do_send(FromGuacd::Closed);
             return;
         }
@@ -245,6 +249,11 @@ async fn pump(
         }
     }
     let port = p.port.to_string();
+    // A per-host virtual drive lets the browser drag files into the VM.
+    let drive_root = std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/workspace/var/lib/nabiman".into());
+    let safe_host: String = p.host.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
+    let drive_path = format!("{}/guac-drive/{}", drive_root.trim_end_matches('/'), safe_host);
+    let drive_ok = std::fs::create_dir_all(&drive_path).is_ok(); // guacd makes only one level
     // Values keyed by the parameter names guacd just listed (args[0] is VERSION).
     let value_for = |name: &str| -> String {
         match name {
@@ -259,6 +268,10 @@ async fn pump(
             "ignore-cert" => "true".into(),
             "resize-method" => "display-update".into(),
             "enable-wallpaper" => "true".into(),
+            "enable-drive" => if drive_ok { "true" } else { "false" }.into(),
+            "drive-name" => "NabiMan".into(),
+            "drive-path" => drive_path.clone(),
+            "create-drive-path" => "false".into(),
             _ => String::new(),
         }
     };
