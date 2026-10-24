@@ -136,6 +136,8 @@ pub fn permitted(user: &NabimanUser, method: &str, path: &str) -> bool {
                 | "/api/terminal/sftp/columns"
                 | "/api/terminal/copies"
                 | "/api/remote-servers"
+                | "/api/remote/consoles"
+                | "/api/remote/console"
         ),
         "POST" => matches!(
             path,

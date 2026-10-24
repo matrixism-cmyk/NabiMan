@@ -208,7 +208,6 @@ export default function TargetRail({
             </button>
           )}
 
-          {!member && <>
           {(consoles.length > 0 || canManageConsoles) && <>
             <div className="rw-rail-label">{t('remote.consoleGroup')}</div>
             {consoles.map(vm => (
@@ -227,6 +226,7 @@ export default function TargetRail({
               </button>
             )}
           </>}
+          {!member && <>
           <div className="rw-rail-label">{t('remote.otherGroup')}</div>
           <button className={`rw-item ${selection.kind === 'local' ? 'is-active' : ''}`}
             title={t(compact ? 'remote.railLongPressHint' : 'remote.railMenuHint')}

@@ -56,11 +56,16 @@ fn may_manage_console(req: &HttpRequest) -> bool {
     matches!(crate::auth::verified_role(req), Some(UserRole::Admin))
 }
 
-/// VM consoles are sensitive internal infrastructure: administrators only.
-/// Operators, viewers and remote-only members never see or open them. Finer
-/// per-console delegation can be added later if some need to be shared.
-fn may_use_console(req: &HttpRequest) -> bool {
+fn is_admin(req: &HttpRequest) -> bool {
     matches!(crate::auth::verified_role(req), Some(UserRole::Admin))
+}
+
+/// VM consoles are sensitive internal infrastructure. An administrator may open
+/// any; anyone else only a console delegated to their account (vnc_access).
+fn may_open(req: &HttpRequest, console: &str) -> bool {
+    is_admin(req)
+        || crate::auth::verified_user_id(req)
+            .is_some_and(|uid| super::vnc_access::allowed(&uid, console))
 }
 
 struct VncConsole {
@@ -251,9 +256,6 @@ async fn ws_console(
     users: web::Data<crate::users::UserStore>,
 ) -> Result<HttpResponse, actix_web::Error> {
     ws::handshake(&req)?;
-    if !may_use_console(&req) {
-        return Ok(HttpResponse::Forbidden().finish());
-    }
     let Some(grant) = crate::stream_access::ConnectionGrant::from_request(
         &req,
         sessions.get_ref().clone(),
@@ -265,6 +267,9 @@ async fn ws_console(
     let Some(vm) = super::parse_query_param(req.query_string(), "vm") else {
         return Ok(HttpResponse::BadRequest().finish());
     };
+    if !may_open(&req, &vm) {
+        return Ok(HttpResponse::Forbidden().finish());
+    }
     let Some(target) = resolve(&vm) else {
         return Ok(HttpResponse::NotFound().finish());
     };
@@ -287,17 +292,20 @@ async fn ws_console(
 /// built-in internal bridges (read-only) and the admin-registered ones.
 #[actix_web::get("/api/remote/consoles")]
 async fn list_consoles(req: HttpRequest) -> HttpResponse {
-    if !may_use_console(&req) {
-        return HttpResponse::Forbidden().finish();
-    }
+    let admin = is_admin(&req);
+    let uid = crate::auth::verified_user_id(&req).unwrap_or_default();
+    let visible = |key: &str| admin || super::vnc_access::allowed(&uid, key);
     let mut list: Vec<serde_json::Value> = CONSOLES
         .iter()
+        .filter(|(name, _, _)| visible(name))
         .map(|(name, label, _)| serde_json::json!({ "name": name, "label": label, "builtin": true }))
         .collect();
     for c in super::vnc_registry::load() {
-        list.push(serde_json::json!({
-            "name": c.id, "label": c.label, "host": c.host, "port": c.port, "builtin": false
-        }));
+        if visible(&c.id) {
+            list.push(serde_json::json!({
+                "name": c.id, "label": c.label, "host": c.host, "port": c.port, "builtin": false
+            }));
+        }
     }
     HttpResponse::Ok().json(ApiResponse::ok(list))
 }
@@ -345,15 +353,47 @@ async fn delete_console(req: HttpRequest, id: web::Path<String>) -> HttpResponse
         return HttpResponse::Forbidden().finish();
     }
     match super::vnc_registry::delete(&id) {
+        Ok(()) => {
+            super::vnc_access::forget(&id);
+            HttpResponse::Ok().json(ApiResponse::ok(()))
+        }
+        Err(e) => HttpResponse::BadRequest().json(ApiResponse::<()>::error(&e)),
+    }
+}
+/// `GET /api/remote/consoles/{key}/access` — who may open this console (admin).
+#[actix_web::get("/api/remote/consoles/{key}/access")]
+async fn get_access(req: HttpRequest, key: web::Path<String>) -> HttpResponse {
+    if !is_admin(&req) {
+        return HttpResponse::Forbidden().finish();
+    }
+    HttpResponse::Ok().json(ApiResponse::ok(super::vnc_access::allowed_users(&key)))
+}
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AccessBody {
+    users: Vec<String>,
+}
+/// `PUT /api/remote/consoles/{key}/access` — set who may open this console (admin).
+#[actix_web::put("/api/remote/consoles/{key}/access")]
+async fn set_access(req: HttpRequest, key: web::Path<String>, body: web::Json<AccessBody>) -> HttpResponse {
+    if !is_admin(&req) {
+        return HttpResponse::Forbidden().finish();
+    }
+    // Only a real console key may carry a grant.
+    if port_for(&key).is_none() && super::vnc_registry::find(&key).is_none() {
+        return HttpResponse::NotFound().finish();
+    }
+    match super::vnc_access::set(&key, body.users.clone()) {
         Ok(()) => HttpResponse::Ok().json(ApiResponse::ok(())),
         Err(e) => HttpResponse::BadRequest().json(ApiResponse::<()>::error(&e)),
     }
 }
-
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(ws_console)
         .service(list_consoles)
         .service(create_console)
         .service(update_console)
-        .service(delete_console);
+        .service(delete_console)
+        .service(get_access)
+        .service(set_access);
 }

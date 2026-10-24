@@ -48,7 +48,7 @@ import './remote-workspace.css';
 export default function RemoteWorkspace() {
   const { t } = useT();
   const member = useMember();
-  const { data: consoles, refetch: refetchConsoles } = useApi<VmConsole[]>(member ? '' : '/api/remote/consoles');
+  const { data: consoles, refetch: refetchConsoles } = useApi<VmConsole[]>('/api/remote/consoles');
   const { data: me } = useApi<{ role: string }>(member ? '' : '/api/users/me');
   const canManageConsoles = me?.role === 'admin';
   const { openTerminal } = useTerminalWindows();
