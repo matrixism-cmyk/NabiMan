@@ -88,6 +88,60 @@ fn guac_opcode(text: &str) -> Option<&str> {
     text.get(dot + 1..dot + 1 + n)
 }
 
+/// Bytes in one UTF-8 character, from its lead byte.
+fn utf8_len(b: u8) -> usize {
+    match b {
+        0x00..=0x7f => 1,
+        0xc0..=0xdf => 2,
+        0xe0..=0xef => 3,
+        _ => 4,
+    }
+}
+
+/// How many leading bytes of `s` form whole Guacamole instructions. The
+/// browser's WebSocketTunnel parses each WebSocket message as complete
+/// instructions and does not buffer a partial one across messages, so NabiMan
+/// must never split an instruction (e.g. a large base64 image) across frames:
+/// it relays up to the last `;` and keeps the rest until more arrives.
+///
+/// Each element is `length.value`, length counted in Unicode characters, with
+/// elements joined by `,` and the instruction ended by `;`. A value may itself
+/// contain `,` or `;`, so boundaries are found by length, not by scanning.
+fn complete_instructions_end(s: &str) -> usize {
+    let bytes = s.as_bytes();
+    let mut complete = 0; // byte offset just past the last ';'
+    let mut i = 0;
+    loop {
+        // Element length: ASCII digits up to the '.'.
+        let mut j = i;
+        while j < bytes.len() && bytes[j].is_ascii_digit() {
+            j += 1;
+        }
+        if j == i || j >= bytes.len() || bytes[j] != b'.' {
+            break; // no digits, or the '.' hasn't arrived yet
+        }
+        let Ok(len) = s[i..j].parse::<usize>() else { break };
+        // Skip the '.' then `len` characters of value.
+        let mut k = j + 1;
+        let mut chars = 0;
+        while k < bytes.len() && chars < len {
+            k += utf8_len(bytes[k]);
+            chars += 1;
+        }
+        if chars < len || k >= bytes.len() {
+            break; // value, or its trailing separator, not fully here yet
+        }
+        let sep = bytes[k];
+        i = k + 1;
+        if sep == b';' {
+            complete = i; // a whole instruction ends here
+        } else if sep != b',' {
+            break; // malformed; stop at the last good boundary
+        }
+    }
+    complete
+}
+
 #[derive(Message)]
 #[rtype(result = "()")]
 enum FromGuacd {
@@ -221,9 +275,10 @@ async fn pump(
         addr.do_send(FromGuacd::Closed);
         return;
     }
-    // Relay. guacd output is UTF-8 text; forward only whole characters.
+    // Relay. guacd speaks UTF-8 Guacamole; forward only whole instructions so
+    // the browser never sees one split across WebSocket messages.
     let mut pending: Vec<u8> = Vec::new();
-    let mut chunk = vec![0u8; 32 * 1024];
+    let mut chunk = vec![0u8; 64 * 1024];
     loop {
         tokio::select! {
             out = rx.recv() => match out {
@@ -234,13 +289,18 @@ async fn pump(
                 Ok(0) | Err(_) => break,
                 Ok(n) => {
                     pending.extend_from_slice(&chunk[..n]);
+                    // Parse only the valid-UTF-8 prefix; a multi-byte character
+                    // straddling the read boundary waits for its rest.
                     let valid = match std::str::from_utf8(&pending) {
                         Ok(_) => pending.len(),
                         Err(e) => e.valid_up_to(),
                     };
-                    if valid > 0 {
-                        let text = String::from_utf8_lossy(&pending[..valid]).to_string();
-                        pending.drain(..valid);
+                    let end = complete_instructions_end(
+                        std::str::from_utf8(&pending[..valid]).unwrap_or(""),
+                    );
+                    if end > 0 {
+                        let text = String::from_utf8_lossy(&pending[..end]).to_string();
+                        pending.drain(..end);
                         addr.do_send(FromGuacd::Text(text));
                     }
                 }

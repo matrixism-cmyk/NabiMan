@@ -238,7 +238,7 @@ export default function TargetRail({
                 onContextMenu={(e) => openMenu(e, { kind: 'console', console: vm })}>
                 <span className="rw-lamp rw-lamp-local" />
                 <span className="rw-item-name">{vm.label}</span>
-                <span className="rw-item-sub">{vm.builtin ? t('remote.consoleHint') : (vm.protocol === 'rdp' ? t('remote.consoleHintRdp') : t('remote.consoleHintExternal'))}</span>
+                <span className="rw-item-sub">{vm.protocol === 'rdp' ? t('remote.consoleHintRdp') : (vm.builtin ? t('remote.consoleHint') : t('remote.consoleHintExternal'))}</span>
               </button>
             ))}
             {canAddConsole && (
