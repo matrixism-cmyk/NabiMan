@@ -335,3 +335,7 @@
 
 .rw-console-toast { position: absolute; top: 56px; left: 50%; transform: translateX(-50%); z-index: 5; background: rgba(46,160,67,.92); color: #fff; padding: 4px 12px; border-radius: 999px; font-size: 12px; pointer-events: none; }
 .rw-console { position: relative; }
+
+.rw-proto-tag { font-size: 10px; font-weight: 700; letter-spacing: .5px; padding: 1px 6px; border-radius: 4px; background: rgba(88,166,255,.18); color: #58a6ff; }
+.rw-rdp-screen { display: flex; align-items: flex-start; justify-content: center; outline: none; }
+.rw-rdp-screen canvas { display: block; }

@@ -9,7 +9,7 @@ const SHARED = ['shared'];
 const REMOTE = ['components/remote', 'components/terminal', 'components/claude'];
 const rules = [
   { name: 'shared', from: SHARED, allowed: SHARED },
-  { name: 'Remote', from: REMOTE, allowed: [...REMOTE, ...SHARED] },
+  { name: 'Remote', from: REMOTE, allowed: [...REMOTE, ...SHARED, 'vendor'] },
 ];
 const SPEC = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*)['"](\.\.?\/[^'"]*)['"]/g;
 

@@ -62,7 +62,7 @@ fn is_admin(req: &HttpRequest) -> bool {
 
 /// VM consoles are sensitive internal infrastructure. An administrator may open
 /// any; anyone else only a console delegated to their account (vnc_access).
-fn may_open(req: &HttpRequest, console: &str) -> bool {
+pub(super) fn may_open(req: &HttpRequest, console: &str) -> bool {
     is_admin(req)
         || crate::auth::verified_user_id(req)
             .is_some_and(|uid| super::vnc_access::allowed(&uid, console))
@@ -147,7 +147,6 @@ impl Handler<FromVm> for VncConsole {
         }
     }
 }
-
 /// Relays the VNC WebSocket between the local websockify bridge and the actor
 /// until either side closes.
 async fn connect_and_pump(
@@ -160,7 +159,6 @@ async fn connect_and_pump(
         Target::RawTcp(host, port) => pump_raw_tcp(&host, port, rx, addr).await,
     }
 }
-
 /// An internal bridge already speaks WebSocket; relay WS frames both ways.
 async fn pump_local_ws(
     port: u16,
@@ -212,7 +210,6 @@ async fn pump_local_ws(
     }
     addr.do_send(FromVm::Closed);
 }
-
 /// An external VNC server is a raw RFB TCP endpoint; relay bytes both ways.
 async fn pump_raw_tcp(
     host: &str,
@@ -245,7 +242,6 @@ async fn pump_raw_tcp(
     }
     addr.do_send(FromVm::Closed);
 }
-
 /// `GET /api/remote/console?vm=<name>&ticket=…` — the VNC WebSocket, admitted
 /// by the same one-use ticket a terminal uses.
 #[actix_web::get("/api/remote/console")]
@@ -287,7 +283,6 @@ async fn ws_console(
     .protocols(&["binary"])
     .start()
 }
-
 /// `GET /api/remote/consoles` — the VM consoles the caller may open: the
 /// built-in internal bridges (read-only) and the admin-registered ones.
 #[actix_web::get("/api/remote/consoles")]
@@ -298,54 +293,60 @@ async fn list_consoles(req: HttpRequest) -> HttpResponse {
     let mut list: Vec<serde_json::Value> = CONSOLES
         .iter()
         .filter(|(name, _, _)| visible(name))
-        .map(|(name, label, _)| serde_json::json!({ "name": name, "label": label, "builtin": true }))
+        .map(|(name, label, _)| serde_json::json!({ "name": name, "label": label, "protocol": "vnc", "builtin": true }))
         .collect();
     for c in super::vnc_registry::load() {
         if visible(&c.id) {
             list.push(serde_json::json!({
-                "name": c.id, "label": c.label, "host": c.host, "port": c.port, "builtin": false
+                "name": c.id, "label": c.label, "host": c.host, "port": c.port,
+                "protocol": c.protocol, "user": c.user, "has_password": !c.password_enc.is_empty(), "builtin": false
             }));
         }
     }
     HttpResponse::Ok().json(ApiResponse::ok(list))
 }
-
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ConsoleBody {
     label: String,
     host: String,
     port: u16,
+    #[serde(default = "vnc_default")]
+    protocol: String,
+    #[serde(default)]
+    user: String,
+    #[serde(default)]
+    password: Option<String>,
 }
-
+fn vnc_default() -> String {
+    "vnc".into()
+}
 fn as_json(c: super::vnc_registry::Console) -> serde_json::Value {
-    serde_json::json!({ "name": c.id, "label": c.label, "host": c.host, "port": c.port, "builtin": false })
+    serde_json::json!({ "name": c.id, "label": c.label, "host": c.host, "port": c.port,
+        "protocol": c.protocol, "user": c.user, "has_password": !c.password_enc.is_empty(), "builtin": false })
 }
-
 /// `POST /api/remote/consoles` — register an external VNC console (admin).
 #[actix_web::post("/api/remote/consoles")]
 async fn create_console(req: HttpRequest, body: web::Json<ConsoleBody>) -> HttpResponse {
     if !may_manage_console(&req) {
         return HttpResponse::Forbidden().finish();
     }
-    match super::vnc_registry::create(&body.label, &body.host, body.port) {
+    match super::vnc_registry::create(&body.label, &body.host, body.port, &body.protocol, &body.user, body.password.as_deref().unwrap_or("")) {
         Ok(c) => HttpResponse::Ok().json(ApiResponse::ok(as_json(c))),
         Err(e) => HttpResponse::BadRequest().json(ApiResponse::<()>::error(&e)),
     }
 }
-
 /// `PUT /api/remote/consoles/{id}` — edit a registered console (admin).
 #[actix_web::put("/api/remote/consoles/{id}")]
 async fn update_console(req: HttpRequest, id: web::Path<String>, body: web::Json<ConsoleBody>) -> HttpResponse {
     if !may_manage_console(&req) {
         return HttpResponse::Forbidden().finish();
     }
-    match super::vnc_registry::update(&id, &body.label, &body.host, body.port) {
+    match super::vnc_registry::update(&id, &body.label, &body.host, body.port, &body.protocol, &body.user, body.password.as_deref()) {
         Ok(c) => HttpResponse::Ok().json(ApiResponse::ok(as_json(c))),
         Err(e) => HttpResponse::BadRequest().json(ApiResponse::<()>::error(&e)),
     }
 }
-
 /// `DELETE /api/remote/consoles/{id}` — remove a registered console (admin).
 #[actix_web::delete("/api/remote/consoles/{id}")]
 async fn delete_console(req: HttpRequest, id: web::Path<String>) -> HttpResponse {

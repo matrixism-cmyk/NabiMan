@@ -12,6 +12,30 @@ pub struct Console {
     pub label: String,
     pub host: String,
     pub port: u16,
+    #[serde(default = "vnc_proto")]
+    pub protocol: String, // "vnc" | "rdp"
+    #[serde(default)]
+    pub user: String,
+    #[serde(default)]
+    pub password_enc: String,
+}
+
+fn vnc_proto() -> String {
+    "vnc".into()
+}
+
+/// The decrypted RDP login for a target, resolved server-side only.
+pub fn rdp_login(id: &str) -> Option<(String, u16, String, String)> {
+    let c = find(id)?;
+    if c.protocol != "rdp" {
+        return None;
+    }
+    let pw = if c.password_enc.is_empty() {
+        String::new()
+    } else {
+        crate::secret_store::decrypt(&c.password_enc).ok()?
+    };
+    Some((c.host, c.port, c.user, pw))
 }
 
 fn file() -> PathBuf {
@@ -59,8 +83,9 @@ fn clean(label: &str, host: &str, port: u16) -> Result<(String, String), String>
     Ok((label.to_string(), host.to_string()))
 }
 
-pub fn create(label: &str, host: &str, port: u16) -> Result<Console, String> {
+pub fn create(label: &str, host: &str, port: u16, protocol: &str, user: &str, password: &str) -> Result<Console, String> {
     let (label, host) = clean(label, host, port)?;
+    let protocol = norm_protocol(protocol)?;
     let mut list = load();
     if list.len() >= 100 {
         return Err("콘솔은 최대 100개까지 등록할 수 있습니다".into());
@@ -70,19 +95,47 @@ pub fn create(label: &str, host: &str, port: u16) -> Result<Console, String> {
         label,
         host,
         port,
+        user: user.trim().to_string(),
+        password_enc: seal(&protocol, password)?,
+        protocol,
     };
     list.push(console.clone());
     save(&list)?;
     Ok(console)
 }
 
-pub fn update(id: &str, label: &str, host: &str, port: u16) -> Result<Console, String> {
+fn norm_protocol(p: &str) -> Result<String, String> {
+    match p {
+        "vnc" | "rdp" => Ok(p.to_string()),
+        "" => Ok("vnc".into()),
+        _ => Err("알 수 없는 프로토콜입니다".into()),
+    }
+}
+
+/// Encrypt a password for RDP; VNC consoles store none.
+fn seal(protocol: &str, password: &str) -> Result<String, String> {
+    if protocol != "rdp" || password.is_empty() {
+        return Ok(String::new());
+    }
+    crate::secret_store::encrypt(password)
+}
+
+pub fn update(id: &str, label: &str, host: &str, port: u16, protocol: &str, user: &str, password: Option<&str>) -> Result<Console, String> {
     let (label, host) = clean(label, host, port)?;
+    let protocol = norm_protocol(protocol)?;
     let mut list = load();
     let entry = list.iter_mut().find(|c| c.id == id).ok_or("콘솔을 찾을 수 없습니다")?;
     entry.label = label;
     entry.host = host;
     entry.port = port;
+    entry.user = user.trim().to_string();
+    // A new password re-seals; None keeps the stored one (unless switching off rdp).
+    if protocol != "rdp" {
+        entry.password_enc.clear();
+    } else if let Some(pw) = password {
+        entry.password_enc = seal(&protocol, pw)?;
+    }
+    entry.protocol = protocol;
     let updated = entry.clone();
     save(&list)?;
     Ok(updated)

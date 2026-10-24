@@ -20,6 +20,7 @@ pub(crate) mod sftp;
 pub mod share;
 pub mod vnc_console;
 pub mod vnc_registry;
+pub mod rdp_tunnel;
 pub mod vnc_access;
 pub mod share_store;
 pub(crate) mod share_ticket;
@@ -369,4 +370,5 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     share::config(cfg);
     recording::config(cfg);
     vnc_console::config(cfg);
+    rdp_tunnel::config(cfg);
 }

@@ -19,7 +19,7 @@ interface Props {
   filter: string;
   checkingAll: boolean;
   localSessions: number;
-  consoles?: { name: string; label: string; builtin: boolean }[];
+  consoles?: { name: string; label: string; builtin: boolean; protocol?: string }[];
   canManageConsoles?: boolean;
   onAddConsole?: () => void;
   sessionsFor: (server: RemoteServer) => number;
@@ -216,7 +216,7 @@ export default function TargetRail({
                 onClick={() => onSelect({ kind: 'console', vm: vm.name, label: vm.label, builtin: vm.builtin })}>
                 <span className="rw-lamp rw-lamp-local" />
                 <span className="rw-item-name">{vm.label}</span>
-                <span className="rw-item-sub">{vm.builtin ? t('remote.consoleHint') : t('remote.consoleHintExternal')}</span>
+                <span className="rw-item-sub">{vm.builtin ? t('remote.consoleHint') : (vm.protocol === 'rdp' ? t('remote.consoleHintRdp') : t('remote.consoleHintExternal'))}</span>
               </button>
             ))}
             {canManageConsoles && (

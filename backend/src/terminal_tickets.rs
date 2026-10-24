@@ -78,6 +78,7 @@ fn valid_query(query: &str) -> bool {
                     | "telnet_port"
                     | "telnet_user"
                     | "vm"
+                    | "target"
                     | "history"
             ) && keys.insert(k)
         })
@@ -220,9 +221,19 @@ async fn issue(
 /// The terminal's way in (registered in `remote.rs`): its WebSockets, and
 /// dictation's, open with a ticket — never with an account token in the URL.
 pub(crate) fn url_pass(req: &ServiceRequest) -> Option<Option<auth::Claims>> {
-    if req.path() != "/api/terminal"
-        && req.path() != "/api/terminal/dictation"
-        && req.path() != "/api/remote/console"
+    let path = req.path();
+    if path == "/api/remote/rdp" {
+        // guacamole-common-js appends display params to the query, so the RDP
+        // ticket is bound to the target alone, not the whole query.
+        if req.query_string().split('&').any(|p| p.starts_with("ticket=")) {
+            let Some(store) = req.app_data::<web::Data<TicketStore>>() else { return Some(None) };
+            return Some(redeem_target(req.request(), store));
+        }
+        return Some(None);
+    }
+    if path != "/api/terminal"
+        && path != "/api/terminal/dictation"
+        && path != "/api/remote/console"
     {
         return None;
     }
@@ -258,6 +269,30 @@ pub(crate) fn redeem(req: &HttpRequest, store: &TicketStore) -> Option<auth::Cla
         .lock()
         .unwrap()
         .consume(token?, &query, origin.as_deref(), Instant::now())
+}
+
+/// Like `redeem`, but binds the ticket to the `target` parameter only — other
+/// query parameters (the viewer's display size, etc.) do not affect admission.
+pub(crate) fn redeem_target(req: &HttpRequest, store: &TicketStore) -> Option<auth::Claims> {
+    let mut token = None;
+    let mut target = None;
+    for part in req.query_string().split('&') {
+        if let Some(t) = part.strip_prefix("ticket=") {
+            if token.replace(t).is_some() {
+                return None;
+            }
+        } else if part.starts_with("target=") {
+            if target.replace(part).is_some() {
+                return None;
+            }
+        }
+    }
+    let query = target?;
+    if !valid_query(query) {
+        return None;
+    }
+    let origin = origin(req).ok()?;
+    store.lock().unwrap().consume(token?, query, origin.as_deref(), Instant::now())
 }
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(issue);
