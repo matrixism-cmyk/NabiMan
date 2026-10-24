@@ -73,10 +73,30 @@ impl RemoteBinding {
             && self.fingerprint == other.fingerprint
             && self.terminal == other.terminal
     }
+    /// A one-off Telnet target typed in the ad-hoc dialog, not a saved server.
+    /// Telnet has no host key to verify, so it is bound to the address alone.
+    pub(crate) fn adhoc_telnet(host: &str, port: u16, user: &str) -> Self {
+        Self {
+            server_id: String::new(),
+            host: host.to_string(),
+            port,
+            user: user.to_string(),
+            auth_method: "none".into(),
+            approval_version: String::new(),
+            public_key: String::new(),
+            fingerprint: String::new(),
+            terminal: "telnet".into(),
+        }
+    }
     pub(crate) fn server_id(&self) -> &str {
         &self.server_id
     }
     pub(crate) fn valid(&self) -> bool {
+        if self.server_id.is_empty() {
+            // An ad-hoc target has no saved server to drift from; only Telnet
+            // may be ad-hoc (SSH/SFTP always bind to a verified saved server).
+            return self.terminal == "telnet";
+        }
         crate::remote_servers::find_server(&self.server_id)
             .ok()
             .flatten()

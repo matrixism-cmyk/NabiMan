@@ -24,6 +24,7 @@ const t: T = {
   'remote.auth.cert': { ko: 'NabiMan 인증서', en: 'NabiMan certificate', ja: 'NabiMan 証明書' },
   'remote.auth.certHint': { ko: '비밀번호를 저장하지 않고, 접속 때마다 짧게 만료되는 인증서로 로그인합니다. 서버에 NabiMan CA 공개키를 먼저 설치해야 합니다(원격 → 개요 → SSH 키).', en: 'Logs in with a short-lived certificate instead of a stored password. Install NabiMan\'s CA public key on the server first (Remote → Overview → SSH key).', ja: 'パスワードを保存せず、毎回短期証明書でログインします。先にサーバーへ NabiMan CA 公開鍵の設置が必要です（リモート→概要→SSH鍵）。' },
   'remote.auth': { ko: '인증', en: 'Auth', ja: '認証' },
+  'remote.protocol': { ko: '프로토콜', en: 'Protocol', ja: 'プロトコル' },
   'remote.tags': { ko: '태그', en: 'Tags', ja: 'タグ' },
   'remote.memo': { ko: '메모', en: 'Memo', ja: 'メモ' },
   'remote.adding': { ko: '추가 중...', en: 'Adding...', ja: '追加中...' },

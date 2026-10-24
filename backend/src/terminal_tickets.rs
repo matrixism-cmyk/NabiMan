@@ -74,6 +74,9 @@ fn valid_query(query: &str) -> bool {
                     | "ssh_host"
                     | "ssh_port"
                     | "ssh_user"
+                    | "telnet_host"
+                    | "telnet_port"
+                    | "telnet_user"
                     | "history"
             ) && keys.insert(k)
         })

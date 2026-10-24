@@ -294,6 +294,8 @@ const t: T = {
   'remote.localShell': { ko: '로컬 셸', en: 'Local shell', ja: 'ローカルシェル' },
   'remote.localShellHint': { ko: 'NabiMan이 실행 중인 서버', en: 'The server NabiMan runs on', ja: 'NabiManが動作しているサーバー' },
   'remote.adhoc': { ko: '임시 접속', en: 'Quick connect', ja: '一時接続' },
+  'remote.adhoc.sshNote': { ko: 'SSH 임시 접속은 보안을 위해 먼저 서버로 등록하고 호스트 키를 승인해야 합니다.', en: 'Ad-hoc SSH still requires the address registered and its host key approved first.', ja: 'アドホック SSH も、先にサーバー登録とホスト鍵の承認が必要です。' },
+  'remote.adhoc.telnetNote': { ko: 'Telnet은 암호화되지 않으며, 등록 없이 어떤 주소로도 바로 접속합니다. 신뢰할 수 있는 내부망에서만 사용하세요.', en: 'Telnet is unencrypted and connects to any address without registration. Use only on a trusted network.', ja: 'Telnet は暗号化されず、登録なしでどのアドレスにも接続します。信頼できる内部網でのみ使用してください。' },
   'remote.adhocHint': {
     ko: '목록에 없는 서버에 저장 없이 한 번 접속합니다.',
     en: 'Connect once to a server that is not in the list, without saving it.',

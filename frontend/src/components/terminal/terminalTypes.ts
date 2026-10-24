@@ -13,6 +13,8 @@ export interface TerminalTarget {
   skipSavedPassword?: boolean;
   /** The saved server has no file access set up: no file panel beside it. */
   noFiles?: boolean;
+  /** Ad-hoc Telnet (no saved server, no host key). */
+  telnet?: boolean;
 }
 
 export type TerminalStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'ended';

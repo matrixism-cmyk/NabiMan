@@ -41,6 +41,10 @@ export function buildTerminalUrl({ settings, target, sessionId, join, cols, rows
     if (target.serverId) {
       url += `&server_id=${encodeURIComponent(target.serverId)}`;
       if (target.skipSavedPassword) url += '&no_saved_password=1';
+    } else if (target.telnet && target.host) {
+      url += `&telnet_host=${encodeURIComponent(target.host)}`;
+      url += `&telnet_port=${encodeURIComponent(String(target.port || 23))}`;
+      if (target.user) url += `&telnet_user=${encodeURIComponent(target.user)}`;
     } else if (target.host) {
       url += `&ssh_host=${encodeURIComponent(target.host)}`;
       url += `&ssh_port=${encodeURIComponent(String(target.port || 22))}`;

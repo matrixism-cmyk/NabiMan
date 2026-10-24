@@ -55,6 +55,15 @@ pub(super) fn build_ssh_command(
             let binding = remote_access::RemoteBinding::from_server(&saved)?;
             let trust = crate::remote_host_trust::shell_options(&saved)?;
             (host, port, user, None, trust, binding, &[][..], Vec::new())
+        } else if let Some(host) = parse_query_param(query, "telnet_host") {
+            // Ad-hoc Telnet: no host key to verify, so any address is allowed —
+            // but not for remote-only members, who use assigned servers only.
+            if member.is_some() {
+                return Err("회원은 임시 접속을 사용할 수 없습니다".into());
+            }
+            let port = parse_query_param(query, "telnet_port").unwrap_or_else(|| "23".into());
+            let user = parse_query_param(query, "telnet_user").unwrap_or_default();
+            return build_adhoc_telnet(&host, &port, &user).map(Some);
         } else {
             return Ok(None);
         };
@@ -172,4 +181,23 @@ fn build_telnet_command(
     }
     let hint = "Telnet은 암호화되지 않습니다. 위의 메시지에서 원인을 확인하세요.";
     Ok((guard(&cmd, "Telnet", hint), format!("telnet:{}@{}:{}", srv.user, srv.host, srv.port), binding))
+}
+
+/// A one-off Telnet connection from the ad-hoc dialog, to any address.
+fn build_adhoc_telnet(
+    host: &str,
+    port_s: &str,
+    user: &str,
+) -> Result<(String, String, remote_access::RemoteBinding), String> {
+    if !validate_ssh_input(host) || (!user.is_empty() && !validate_ssh_input(user)) {
+        return Err("Invalid Telnet params".into());
+    }
+    let port: u16 = port_s.parse().map_err(|_| "Invalid Telnet port")?;
+    let mut cmd = format!("{} --host {} --port {}", telnet_client()?, quote(host), port);
+    if !user.is_empty() {
+        cmd.push_str(&format!(" --user {}", quote(user)));
+    }
+    let hint = "Telnet은 암호화되지 않습니다. 위의 메시지에서 원인을 확인하세요.";
+    let binding = remote_access::RemoteBinding::adhoc_telnet(host, port, user);
+    Ok((guard(&cmd, "Telnet", hint), format!("telnet:{}@{}:{}", user, host, port), binding))
 }

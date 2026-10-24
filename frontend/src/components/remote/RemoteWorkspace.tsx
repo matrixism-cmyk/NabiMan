@@ -69,7 +69,7 @@ export default function RemoteWorkspace() {
   const [filter, setFilter] = useState('');
   const [checkingAll, setCheckingAll] = useState(false);
   const [checkError, setCheckError] = useState('');
-  const [adhocTarget, setAdhocTarget] = useState<{ host: string; port: number; user: string } | null>(null);
+  const [adhocTarget, setAdhocTarget] = useState<{ host: string; port: number; user: string; proto: 'ssh' | 'telnet' } | null>(null);
   const compact = useCompact();
   const { pane, showWork, showList } = useMobilePane(compact, selection.kind !== 'overview');
   const [filesOpen, setFilesOpen] = useState(false);
@@ -115,7 +115,7 @@ export default function RemoteWorkspace() {
 
   const label = selection.kind === 'local' ? 'local'
     : selection.kind === 'server' && selectedServer ? sessionLabel(selectedServer)
-    : selection.kind === 'adhoc' && adhocTarget ? `ssh:${adhocTarget.user}@${adhocTarget.host}:${adhocTarget.port}`
+    : selection.kind === 'adhoc' && adhocTarget ? `${adhocTarget.proto}:${adhocTarget.user}@${adhocTarget.host}:${adhocTarget.port}`
     : null;
 
   const targetSessions = useMemo(() => (label ? sessions.filter(s => s.label === label) : []), [sessions, label]);
@@ -127,13 +127,13 @@ export default function RemoteWorkspace() {
       ? { kind: 'ssh', host: selectedServer.host, port: selectedServer.port, user: selectedServer.user,
           serverId: selectedServer.id, skipSavedPassword: manualPassword, noFiles: !hasFiles(selectedServer) }
     : selection.kind === 'adhoc' && adhocTarget
-      ? { kind: 'ssh', host: adhocTarget.host, port: adhocTarget.port, user: adhocTarget.user }
+      ? { kind: 'ssh', host: adhocTarget.host, port: adhocTarget.port, user: adhocTarget.user, telnet: adhocTarget.proto === 'telnet' }
     : null;
 
   const storageKey = joinSessionId ? `ws_join_${joinSessionId}`
     : selection.kind === 'local' ? 'ws_local'
     : selection.kind === 'server' ? `ws_srv_${selection.id}${manualPassword ? '_manual' : ''}`
-    : selection.kind === 'adhoc' && adhocTarget ? `ws_adhoc_${adhocTarget.user}@${adhocTarget.host}:${adhocTarget.port}`
+    : selection.kind === 'adhoc' && adhocTarget ? `ws_adhoc_${adhocTarget.proto}_${adhocTarget.user}@${adhocTarget.host}:${adhocTarget.port}`
     : '';
 
   // Selecting a target never dials on its own, not even into a running
@@ -362,7 +362,7 @@ export default function RemoteWorkspace() {
           {selection.kind === 'adhoc' && !adhocTarget && (
             <AdhocConnect onConnect={(target) => {
               setAdhocTarget(target);
-              setConnected(prev => new Set(prev).add(`ws_adhoc_${target.user}@${target.host}:${target.port}`));
+              setConnected(prev => new Set(prev).add(`ws_adhoc_${target.proto}_${target.user}@${target.host}:${target.port}`));
             }} />
           )}
 
