@@ -11,7 +11,7 @@ type Status = 'connecting' | 'connected' | 'disconnected';
  *  to and from the VM, natively (no VNC-style keystroke workaround). */
 export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelete, canGrant, onGrant, canShare, onShare, popout, share }: {
   target: string; label: string; canEdit?: boolean; onEdit?: () => void; onDelete?: () => void;
-  canGrant?: boolean; onGrant?: () => void; canShare?: boolean; onShare?: () => void; popout?: boolean; share?: { token: string; viewOnly: boolean };
+  canGrant?: boolean; onGrant?: () => void; canShare?: boolean; onShare?: () => void; popout?: boolean; share?: { token: string; viewOnly: boolean; pw?: string };
 }) {
   const { t } = useT();
   const host = useRef<HTMLDivElement>(null);
@@ -83,7 +83,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
 
     const dims = () => `GUAC_WIDTH=${Math.max(el.clientWidth || 1280, 640)}&GUAC_HEIGHT=${Math.max(el.clientHeight || 800, 480)}&GUAC_DPI=96`;
     if (share) {
-      c.connect(dims());
+      c.connect((share.pw ? `pw=${encodeURIComponent(share.pw)}&` : '') + dims());
     } else {
       rdpTicket(target).then((ticket) => {
         if (!live) return;

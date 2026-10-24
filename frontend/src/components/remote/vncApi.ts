@@ -50,10 +50,10 @@ export async function consoleWsUrl(vm: string, signal?: AbortSignal): Promise<st
   return `${protocol}//${window.location.host}/api/remote/console?${query}&ticket=${ticket}`;
 }
 
-export interface ConsoleShare { token: string; mode: 'view' | 'control'; expires_unix: number }
+export interface ConsoleShare { token: string; mode: 'view' | 'control'; expires_unix: number; needs_password?: boolean }
 
-export const createShare = (consoleKey: string, mode: 'view' | 'control', hours: number) =>
-  apiPost<ConsoleShare>(`/api/remote/consoles/${encodeURIComponent(consoleKey)}/shares`, { mode, hours });
+export const createShare = (consoleKey: string, mode: 'view' | 'control', hours: number, password?: string) =>
+  apiPost<ConsoleShare>(`/api/remote/consoles/${encodeURIComponent(consoleKey)}/shares`, { mode, hours, password });
 
 export const listShares = (consoleKey: string) =>
   apiRequest<ConsoleShare[]>(`/api/remote/consoles/${encodeURIComponent(consoleKey)}/shares`);
@@ -62,12 +62,13 @@ export const revokeShare = (consoleKey: string, token: string) =>
   apiRequest(`/api/remote/consoles/${encodeURIComponent(consoleKey)}/shares/${encodeURIComponent(token)}`, { method: 'DELETE' });
 
 /** The public (no-account) WebSocket URL a share link opens. */
-export function shareWsUrl(token: string): string {
+export function shareWsUrl(token: string, pw?: string): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${protocol}//${window.location.host}/api/cshare/${encodeURIComponent(token)}/ws`;
+  const q = pw ? `?pw=${encodeURIComponent(pw)}` : '';
+  return `${protocol}//${window.location.host}/api/cshare/${encodeURIComponent(token)}/ws${q}`;
 }
 
-export interface ShareInfo { label: string; protocol: 'vnc' | 'rdp'; mode: 'view' | 'control' }
+export interface ShareInfo { label: string; protocol: 'vnc' | 'rdp'; mode: 'view' | 'control'; needs_password?: boolean }
 export const shareInfo = (token: string) => apiRequest<ShareInfo>(`/api/cshare/${encodeURIComponent(token)}`);
 
 /** The full share link to hand out. */

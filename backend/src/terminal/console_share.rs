@@ -11,7 +11,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::ApiResponse;
 
-const MAX_TTL_SECS: u64 = 7 * 24 * 60 * 60;
+const MAX_TTL_SECS: u64 = 30 * 24 * 60 * 60;
+/// Last second of year 9999 — a link that lasts until revoked.
+const PERMANENT_UNIX: u64 = 253_402_300_799;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Share {
@@ -21,6 +23,8 @@ pub struct Share {
     pub owner_id: String,
     pub created_unix: u64,
     pub expires_unix: u64,
+    #[serde(default)]
+    pub password_hash: Option<String>,
 }
 
 /// Who keeps a console connection alive: a signed-in account's access, or a
@@ -71,14 +75,20 @@ fn random_token() -> Option<String> {
     Some(buf.iter().map(|b| format!("{b:02x}")).collect())
 }
 
-pub fn create(console: &str, mode: &str, ttl_secs: u64, owner_id: &str) -> Result<Share, String> {
+pub fn create(console: &str, mode: &str, ttl_secs: u64, password: Option<&str>, owner_id: &str) -> Result<Share, String> {
     let mode = match mode {
         "view" | "control" => mode,
         _ => return Err("보기 전용 또는 조작 허용 중에서 선택하세요".into()),
     };
-    let ttl = ttl_secs.clamp(60, MAX_TTL_SECS);
+    // ttl == 0 means "until revoked".
+    let expires = if ttl_secs == 0 { PERMANENT_UNIX } else { now() + ttl_secs.clamp(60, MAX_TTL_SECS) };
+    let password_hash = match password.map(str::trim).filter(|p| !p.is_empty()) {
+        Some(pw) if pw.len() > 72 => return Err("비밀번호는 72바이트 이하여야 합니다".into()),
+        Some(pw) => Some(bcrypt::hash(pw, 10).map_err(|_| "Cannot hash password")?),
+        None => None,
+    };
     let mut list = load();
-    list.retain(|s| s.expires_unix > now()); // prune expired
+    list.retain(|s| s.expires_unix > now());
     if list.len() >= 200 {
         return Err("공유 링크가 너무 많습니다".into());
     }
@@ -88,7 +98,8 @@ pub fn create(console: &str, mode: &str, ttl_secs: u64, owner_id: &str) -> Resul
         mode: mode.to_string(),
         owner_id: owner_id.to_string(),
         created_unix: now(),
-        expires_unix: now() + ttl,
+        expires_unix: expires,
+        password_hash,
     };
     list.push(share.clone());
     save(&list)?;
@@ -124,6 +135,8 @@ fn may_share(req: &HttpRequest, console: &str) -> bool {
 struct CreateBody {
     mode: String,
     hours: u64,
+    #[serde(default)]
+    password: Option<String>,
 }
 
 /// `POST /api/remote/consoles/{key}/shares` — make a share link (admin).
@@ -134,7 +147,7 @@ async fn create_share(req: HttpRequest, key: web::Path<String>, body: web::Json<
     }
     if super::vnc_console::console_exists(&key) {
         let owner = crate::auth::verified_user_id(&req).unwrap_or_default();
-        match create(&key, &body.mode, body.hours.saturating_mul(3600), &owner) {
+        match create(&key, &body.mode, body.hours.saturating_mul(3600), body.password.as_deref(), &owner) {
             Ok(s) => HttpResponse::Ok().json(ApiResponse::ok(serde_json::json!({
                 "token": s.token, "mode": s.mode, "expires_unix": s.expires_unix
             }))),
@@ -154,7 +167,7 @@ async fn list_shares(req: HttpRequest, key: web::Path<String>) -> HttpResponse {
     let rows: Vec<_> = load()
         .into_iter()
         .filter(|s| s.console == *key && s.expires_unix > now())
-        .map(|s| serde_json::json!({ "token": s.token, "mode": s.mode, "expires_unix": s.expires_unix }))
+        .map(|s| serde_json::json!({ "token": s.token, "mode": s.mode, "expires_unix": s.expires_unix, "needs_password": s.password_hash.is_some() }))
         .collect();
     HttpResponse::Ok().json(ApiResponse::ok(rows))
 }
@@ -180,7 +193,7 @@ async fn share_info(token: web::Path<String>) -> HttpResponse {
     let (label, protocol) = super::vnc_console::console_label_protocol(&share.console)
         .unwrap_or_else(|| (share.console.clone(), "vnc".into()));
     HttpResponse::Ok().json(ApiResponse::ok(serde_json::json!({
-        "label": label, "protocol": protocol, "mode": share.mode
+        "label": label, "protocol": protocol, "mode": share.mode, "needs_password": share.password_hash.is_some()
     })))
 }
 
@@ -195,6 +208,12 @@ async fn share_ws(
     let Some(share) = resolve(&token) else {
         return Ok(HttpResponse::NotFound().finish());
     };
+    if let Some(hash) = &share.password_hash {
+        let pw = super::parse_query_param(req.query_string(), "pw").unwrap_or_default();
+        if pw.is_empty() || !bcrypt::verify(&pw, hash).unwrap_or(false) {
+            return Ok(HttpResponse::Forbidden().finish());
+        }
+    }
     super::vnc_console::open_shared_console(&req, stream, &share.console, share.mode != "control", token.into_inner())
 }
 

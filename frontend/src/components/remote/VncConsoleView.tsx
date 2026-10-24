@@ -10,7 +10,7 @@ type Status = 'connecting' | 'connected' | 'disconnected';
 /** A browser VNC console for an internal VM, over NabiMan's own proxy. noVNC
  *  (RFB) draws into the canvas; the WebSocket is admitted by a one-use ticket. */
 export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, canGrant, onGrant, canShare, onShare, popout, share }: {
-  vm: string; label: string; canEdit?: boolean; onEdit?: () => void; onDelete?: () => void; canGrant?: boolean; onGrant?: () => void; canShare?: boolean; onShare?: () => void; popout?: boolean; share?: { token: string; viewOnly: boolean };
+  vm: string; label: string; canEdit?: boolean; onEdit?: () => void; onDelete?: () => void; canGrant?: boolean; onGrant?: () => void; canShare?: boolean; onShare?: () => void; popout?: boolean; share?: { token: string; viewOnly: boolean; pw?: string };
 }) {
   const { t } = useT();
   const host = useRef<HTMLDivElement>(null);
@@ -30,7 +30,7 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
     setStatus('connecting'); setError('');
     (async () => {
       try {
-        const url = share ? shareWsUrl(share.token) : await consoleWsUrl(vm, controller.signal);
+        const url = share ? shareWsUrl(share.token, share.pw) : await consoleWsUrl(vm, controller.signal);
         if (!live || !host.current) return;
         const client = new RFB(host.current, url, { wsProtocols: ['binary'] });
         client.scaleViewport = scale;
