@@ -7,8 +7,8 @@ type Status = 'connecting' | 'connected' | 'disconnected';
 
 /** A browser VNC console for an internal VM, over NabiMan's own proxy. noVNC
  *  (RFB) draws into the canvas; the WebSocket is admitted by a one-use ticket. */
-export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete }: {
-  vm: string; label: string; canEdit?: boolean; onEdit?: () => void; onDelete?: () => void;
+export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, popout }: {
+  vm: string; label: string; canEdit?: boolean; onEdit?: () => void; onDelete?: () => void; popout?: boolean;
 }) {
   const { t } = useT();
   const host = useRef<HTMLDivElement>(null);
@@ -59,6 +59,7 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete }:
         <span className={`rw-console-state is-${status}`}>{t(`remote.console.${status}`)}</span>
         <span className="rw-console-spacer" />
         <label className="rw-console-toggle"><input type="checkbox" checked={scale} onChange={e => setScale(e.target.checked)} /> {t('remote.console.fit')}</label>
+        {!popout && <button className="btn btn-secondary btn-sm" onClick={() => window.open(`/remote#console/${encodeURIComponent(vm)}`, `vnccon_${vm}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no')}>{t('remote.console.detach')}</button>}
         <button className="btn btn-secondary btn-sm" onClick={() => { try { rfb.current?.sendCtrlAltDel(); } catch { /* not ready */ } }} disabled={status !== 'connected'}>Ctrl+Alt+Del</button>
         {status === 'disconnected' && <button className="btn btn-primary btn-sm" onClick={() => setAttempt(a => a + 1)}>{t('remote.console.reconnect')}</button>}
         {canEdit && <button className="btn btn-secondary btn-sm" onClick={onEdit}>{t('common.edit')}</button>}

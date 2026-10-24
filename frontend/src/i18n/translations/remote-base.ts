@@ -25,6 +25,8 @@ const t: T = {
   'remote.auth.certHint': { ko: '비밀번호를 저장하지 않고, 접속 때마다 짧게 만료되는 인증서로 로그인합니다. 서버에 NabiMan CA 공개키를 먼저 설치해야 합니다(원격 → 개요 → SSH 키).', en: 'Logs in with a short-lived certificate instead of a stored password. Install NabiMan\'s CA public key on the server first (Remote → Overview → SSH key).', ja: 'パスワードを保存せず、毎回短期証明書でログインします。先にサーバーへ NabiMan CA 公開鍵の設置が必要です（リモート→概要→SSH鍵）。' },
   'remote.auth': { ko: '인증', en: 'Auth', ja: '認証' },
   'remote.consoleHintExternal': { ko: '외부 VNC (호스트/도메인)', en: 'External VNC (host/domain)', ja: '外部 VNC (ホスト/ドメイン)' },
+  'remote.console.detach': { ko: '분리', en: 'Detach', ja: '分離' },
+  'remote.console.notFound': { ko: '콘솔을 찾을 수 없습니다.', en: 'Console not found.', ja: 'コンソールが見つかりません。' },
   'remote.console.add': { ko: '+ 콘솔 추가', en: '+ Add console', ja: '+ コンソール追加' },
   'remote.console.deleteConfirm': { ko: "'{label}' 콘솔을 삭제할까요?", en: 'Delete the console "{label}"?', ja: 'コンソール「{label}」を削除しますか？' },
   'remote.console.form.addTitle': { ko: '외부 VNC 콘솔 추가', en: 'Add external VNC console', ja: '外部 VNC コンソール追加' },

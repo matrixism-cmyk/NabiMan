@@ -15,6 +15,7 @@ import IdleWarning from './components/IdleWarning';
 import { useIdleLogout } from './shared/auth/useIdleLogout';
 import { useChromeHidden } from './shared/ui/useChromeHidden';
 import RemoteShell, { isStandaloneRemote } from './components/remote/RemoteShell';
+import ConsolePopout, { isConsolePopout } from './components/remote/ConsolePopout';
 import { DEFAULT_GRANTS } from './components/remote/member';
 import CommandPalette from './components/CommandPalette';
 import LanguageSelector from './shared/ui/LanguageSelector';
@@ -206,6 +207,12 @@ function App() {
       <button className="btn btn-secondary" onClick={handleLogout}>{t('app.logout')}</button>
     </div>
   </main>;
+
+  if (isConsolePopout()) {
+    return currentUser.role === 'admin'
+      ? <ConsolePopout />
+      : <div className="panel loading">{t('mfa.policyGate')}</div>;
+  }
 
   if (standalone || member) return (
     <TerminalSettingsProvider key={currentUser.username} enabled={currentUser.role === 'admin' || member}>
