@@ -19,6 +19,7 @@ mod settings;
 pub(crate) mod sftp;
 pub mod share;
 pub mod vnc_console;
+pub mod vnc_registry;
 pub mod share_store;
 pub(crate) mod share_ticket;
 pub mod telnet_client;

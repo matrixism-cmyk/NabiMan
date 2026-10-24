@@ -18,7 +18,8 @@ import SessionsView, { SessionInfo } from './SessionsView';
 import TargetSessionsView from './TargetSessionsView';
 import TargetRail from './TargetRail';
 import AdhocConnect from './AdhocConnect';
-import VncConsoleView from './VncConsoleView';
+import ConsoleArea from './ConsoleArea';
+import { VmConsole } from './vncApi';
 import TerminalWithFiles, { filesScope } from './TerminalWithFiles';
 import RemoteSettingsView from './RemoteSettingsView';
 import RecordingsView from './RecordingsView';
@@ -47,7 +48,9 @@ import './remote-workspace.css';
 export default function RemoteWorkspace() {
   const { t } = useT();
   const member = useMember();
-  const { data: consoles } = useApi<{ name: string; label: string }[]>(member ? '' : '/api/remote/consoles');
+  const { data: consoles, refetch: refetchConsoles } = useApi<VmConsole[]>(member ? '' : '/api/remote/consoles');
+  const { data: me } = useApi<{ role: string }>(member ? '' : '/api/users/me');
+  const canManageConsoles = me?.role === 'admin';
   const { openTerminal } = useTerminalWindows();
   const viewRef = useRef<TerminalViewHandle>(null);
   const { data: serverData, refetch: refetchServers } = useApi<RemoteServer[]>('/api/remote-servers', 30000);
@@ -236,6 +239,8 @@ export default function RemoteWorkspace() {
         checkingAll={checkingAll}
         localSessions={localCount}
         consoles={consoles || []}
+        canManageConsoles={canManageConsoles}
+        onAddConsole={() => select({ kind: 'console-form', edit: null })}
         sessionsFor={countFor}
         onSelect={(next) => { select(next); showWork(); }}
         onAction={(target, action) => {
@@ -245,7 +250,6 @@ export default function RemoteWorkspace() {
         onFilter={setFilter}
         onCheckAll={checkAll}
       />
-
       <section className="rw-work">
         <header className="rw-head">
           <div className="rw-head-title">
@@ -260,11 +264,9 @@ export default function RemoteWorkspace() {
             )}
             {selectedServer?.tags.map(tag => <span key={tag} className="tag-badge">{tag}</span>)}
           </div>
-
           <WorkspaceTabs selection={selection} server={selectedServer} overviewView={overviewView}
             onOverviewView={setOverviewView} serverView={serverView} onServerView={setServerView}
             allSessions={sessions.length} liveCount={liveCount} />
-
           <WorkspaceActions compact={compact} viewRef={viewRef}
             terminal={showTerminalPane && terminalVisible ? {
               status: termStatus, sessionId: currentSessionId,
@@ -277,7 +279,6 @@ export default function RemoteWorkspace() {
             files={compact && showTerminalPane && terminalVisible && filesScope(terminalTarget)
               ? { open: filesOpen, toggle: () => setFilesOpen(o => !o) } : undefined} />
         </header>
-
         {checkError && <div role="alert" className="message">{checkError}</div>}
         <div className="rw-body">
           {/* The terminal stays mounted while other views are open, so switching
@@ -301,7 +302,6 @@ export default function RemoteWorkspace() {
               {compact && <MobileKeyBar handle={viewRef} disabled={termStatus !== 'connected'} />}
             </div>
           )}
-
           {!showTerminalPane && terminalVisible && terminalTarget && (
             <div className="rw-view rw-connect">
               <div className="rw-connect-card">
@@ -324,7 +324,6 @@ export default function RemoteWorkspace() {
               </div>
             </div>
           )}
-
           {selection.kind === 'overview' && (
             <div className="rw-view rw-view-scroll">
               {overviewView === 'summary' && <MultiServerDashboard />}
@@ -364,8 +363,9 @@ export default function RemoteWorkspace() {
               setConnected(prev => new Set(prev).add(`ws_adhoc_${target.proto}_${target.user}@${target.host}:${target.port}`));
             }} />
           )}
-          {selection.kind === 'console' && (
-            <VncConsoleView vm={selection.vm} label={selection.label} />
+          {(selection.kind === 'console' || selection.kind === 'console-form') && (
+            <ConsoleArea selection={selection} consoles={consoles || []} canManage={canManageConsoles}
+              onSelect={select} onChanged={refetchConsoles} />
           )}
           {isServerTarget && selectedServer && serverView === 'files' && <FilesView server={selectedServer} />}
           {isServerTarget && selectedServer && serverView === 'status' && (
