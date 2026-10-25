@@ -4,6 +4,8 @@ import { useT } from '../../shared/i18n';
 import { useFullscreen } from '../../shared/ui/useFullscreen';
 import { useChromeHidden } from '../../shared/ui/useChromeHidden';
 import { describeFault, reconnectDelay, RECONNECT_MAX } from './consoleFault';
+import { useConsoleView, consoleDictationProps } from './consoleView';
+import ConsoleSettingsModal from './ConsoleSettingsModal';
 import RdpDrivePanel from './RdpDrivePanel';
 import { rdpTicket } from './vncApi';
 import AccountDictation from '../terminal/dictation/AccountDictation';
@@ -36,6 +38,8 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
   const [dragOver, setDragOver] = useState(false);
   const [driveReady, setDriveReady] = useState(false);
   const [drivePanel, setDrivePanel] = useState(false);
+  const [cview, setCview] = useConsoleView();
+  const [showSettings, setShowSettings] = useState(false);
 
   // Drag a file onto the VM to copy it in, via guacd's redirected drive (it
   // lands on the "NabiMan" drive inside Windows). View-only shares cannot.
@@ -199,11 +203,12 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
         {share?.viewOnly && <span className="rw-proto-tag">{t('remote.console.share.viewOnly')}</span>}
         <span className={`rw-console-state is-${status}`}>{t(`remote.console.${status}`)}</span>
         <span className="rw-console-spacer" />
-        {status === 'connected' && !share?.viewOnly && <AccountDictation variant="bar" onText={dictate} onKeys={dictateKeys} />}
+        {status === 'connected' && !share?.viewOnly && <AccountDictation variant="bar" onText={dictate} onKeys={dictateKeys} {...consoleDictationProps(cview)} />}
         {driveReady && !share && <button className={`btn btn-secondary btn-sm ${drivePanel ? 'is-active' : ''}`} onClick={() => setDrivePanel(d => !d)}>{t('remote.console.drive.files')}</button>}
         {!popout && <button className="btn btn-secondary btn-sm" onClick={() => window.open(`/remote#rdp/${encodeURIComponent(target)}`, `rdp_${target}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no')}>{t('remote.console.detach')}</button>}
         <button className="btn btn-secondary btn-sm" onClick={toggle} title={t('remote.console.fullscreen')} aria-label={t('remote.console.fullscreen')} aria-pressed={full}>⛶</button>
         <button className="btn btn-secondary btn-sm" onClick={() => setFolded(true)} title={t('app.hideChrome')} aria-label={t('app.hideChrome')}>▴</button>
+        {!share && <button className="btn btn-secondary btn-sm" onClick={() => setShowSettings(true)} title={t('remote.console.settings')} aria-label={t('remote.console.settings')}>⚙</button>}
         {!share?.viewOnly && <button className="btn btn-secondary btn-sm" onClick={() => { try { const c = client.current; c?.sendKeyEvent(1, 0xffe3); c?.sendKeyEvent(1, 0xffe9); c?.sendKeyEvent(1, 0xffff); c?.sendKeyEvent(0, 0xffff); c?.sendKeyEvent(0, 0xffe9); c?.sendKeyEvent(0, 0xffe3); } catch { /* not ready */ } }} disabled={status !== 'connected'}>Ctrl+Alt+Del</button>}
         {status === 'disconnected' && <button className="btn btn-primary btn-sm" onClick={() => { retries.current = 0; setAttempt(a => a + 1); }}>{t('remote.console.reconnect')}</button>}
         {canEdit && <button className="btn btn-secondary btn-sm" onClick={onEdit}>{t('common.edit')}</button>}
@@ -232,6 +237,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
           </div>
         )}
       </div>
+      {showSettings && <ConsoleSettingsModal view={cview} onChange={setCview} onClose={() => setShowSettings(false)} />}
     </div>
   );
 }

@@ -152,6 +152,8 @@ export default function RemoteWorkspace() {
   const consoleAction = async (c: VmConsole, action: string) => {
     if (action === 'open') { select({ kind: 'console', vm: c.name, label: c.label, builtin: c.builtin }); showWork(); }
     else if (action === 'detach') window.open(`/remote#${c.protocol === 'rdp' ? 'rdp' : 'console'}/${encodeURIComponent(c.name)}`, `con_${c.name}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no');
+    // A new connection opens its own window, so a multi-user VM can hold several.
+    else if (action === 'newSession') window.open(`/remote#${c.protocol === 'rdp' ? 'rdp' : 'console'}/${encodeURIComponent(c.name)}`, `con_${c.name}_${Date.now()}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no');
     else if (action === 'edit') select({ kind: 'console-form', edit: { id: c.name, label: c.label, host: c.host || '', port: c.port || (c.protocol === 'rdp' ? 3389 : 5900), protocol: c.protocol || 'vnc', user: c.user || '', builtin: Boolean(c.builtin) } });
     else if (action === 'access') setAccessConsole({ key: c.name, label: c.label });
     else if (action === 'share') setShareConsole({ key: c.name, label: c.label });
@@ -263,17 +265,21 @@ export default function RemoteWorkspace() {
           <WorkspaceTabs selection={selection} server={selectedServer} overviewView={overviewView}
             onOverviewView={setOverviewView} serverView={serverView} onServerView={setServerView}
             allSessions={sessions.length} liveCount={liveCount} />
-          <WorkspaceActions compact={compact} viewRef={viewRef}
-            terminal={showTerminalPane && terminalVisible ? {
-              status: termStatus, sessionId: currentSessionId,
-              sessionName: sessions.find(s => s.id === currentSessionId)?.title || '',
-            } : null}
-            onRenamed={refetchSessions} onNewSession={() => viewRef.current?.newSession()} onDetach={detach}
-            onShareSession={() => { setShareTarget(currentSessionId); setShowShare(true); }}
-            onShareFiles={serverView === 'files' && selectedServer ? () => setShareFiles(true) : undefined}
-            onSettings={() => setShowSettings(true)}
-            files={compact && showTerminalPane && terminalVisible && filesScope(terminalTarget)
-              ? { open: filesOpen, toggle: () => setFilesOpen(o => !o) } : undefined} />
+          {/* A VM console carries its own bar (settings, share, …), so the
+              header's actions — just a lone ⚙ there — are left off for it. */}
+          {selection.kind !== 'console' && selection.kind !== 'console-form' && (
+            <WorkspaceActions compact={compact} viewRef={viewRef}
+              terminal={showTerminalPane && terminalVisible ? {
+                status: termStatus, sessionId: currentSessionId,
+                sessionName: sessions.find(s => s.id === currentSessionId)?.title || '',
+              } : null}
+              onRenamed={refetchSessions} onNewSession={() => viewRef.current?.newSession()} onDetach={detach}
+              onShareSession={() => { setShareTarget(currentSessionId); setShowShare(true); }}
+              onShareFiles={serverView === 'files' && selectedServer ? () => setShareFiles(true) : undefined}
+              onSettings={() => setShowSettings(true)}
+              files={compact && showTerminalPane && terminalVisible && filesScope(terminalTarget)
+                ? { open: filesOpen, toggle: () => setFilesOpen(o => !o) } : undefined} />
+          )}
         </header>
         {checkError && <div role="alert" className="message">{checkError}</div>}
         <div className="rw-body">

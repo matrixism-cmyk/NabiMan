@@ -36,6 +36,8 @@ const t: T = {
   'remote.console.clip.fromVm': { ko: 'VM에서 복사한 내용', en: 'Copied in the VM', ja: 'VM でコピーした内容' },
   'remote.console.clip.fromVmEmpty': { ko: 'VM 안에서 복사하면 여기에 표시됩니다.', en: 'Copy inside the VM and it shows here.', ja: 'VM 内でコピーするとここに表示されます。' },
   'remote.console.fullscreen': { ko: '전체화면', en: 'Fullscreen', ja: '全画面' },
+  'remote.console.newSession': { ko: '새 연결', en: 'New connection', ja: '新しい接続' },
+  'remote.console.settings': { ko: '콘솔 설정', en: 'Console settings', ja: 'コンソール設定' },
   'remote.console.detach': { ko: '분리', en: 'Detach', ja: '分離' },
   'remote.console.notFound': { ko: '콘솔을 찾을 수 없습니다.', en: 'Console not found.', ja: 'コンソールが見つかりません。' },
   'remote.console.access.btn': { ko: '권한', en: 'Access', ja: '権限' },

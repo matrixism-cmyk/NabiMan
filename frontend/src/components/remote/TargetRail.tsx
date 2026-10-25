@@ -88,6 +88,7 @@ export default function TargetRail({
       const act = (a: string) => () => onConsoleAction?.(c, a);
       const items: RailMenuItem[] = [
         { key: 'open', icon: '▶', label: t('remote.menuConnect'), onSelect: act('open') },
+        { key: 'newSession', icon: '＋', label: t('remote.console.newSession'), onSelect: act('newSession') },
         { key: 'detach', icon: '⧉', label: t('remote.console.detach'), onSelect: act('detach') },
       ];
       items.push({ key: 'share', icon: '↗', label: t('remote.console.share.btn'), separated: true, onSelect: act('share') });
