@@ -25,6 +25,7 @@ pub mod vnc_access;
 pub mod console_share;
 mod console_handlers;
 pub mod console_drive;
+pub mod console_creds;
 pub mod share_store;
 pub(crate) mod share_ticket;
 pub mod telnet_client;
@@ -376,4 +377,5 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     rdp_tunnel::config(cfg);
     console_share::config(cfg);
     console_drive::config(cfg);
+    console_creds::config(cfg);
 }

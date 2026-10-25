@@ -18,6 +18,14 @@ export default function ConsoleSettingsModal({ view, onChange, onClose }: {
   return (
     <Modal className="share-dialog" onClose={onClose} title={t('remote.console.settings')}>
       <div className="form-group">
+        <label>
+          <input type="checkbox" checked={view.auto_reconnect !== false}
+            onChange={(e) => onChange({ ...view, auto_reconnect: e.target.checked })} />{' '}
+          {t('remote.console.keepalive')}
+        </label>
+        <small className="text-secondary">{t('remote.console.keepaliveHint')}</small>
+      </div>
+      <div className="form-group">
         <label htmlFor="console-pause">{t('dictation.pause')}</label>
         <PauseField id="console-pause" value={view.dictation_pause_ms ?? 1500}
           onChange={(ms) => onChange({ ...view, dictation_pause_ms: ms })} />

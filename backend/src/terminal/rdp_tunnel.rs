@@ -1,8 +1,7 @@
-//! RDP consoles in the browser, via guacd (Apache Guacamole daemon on
-//! 127.0.0.1:4822). NabiMan performs the Guacamole handshake with guacd,
-//! injecting the RDP login server-side (the password never reaches the
-//! browser), then relays the protocol to the browser's guacamole-common-js.
-//! RDP carries clipboard, files and Korean input natively.
+//! RDP consoles in the browser via guacd (127.0.0.1:4822): NabiMan does the
+//! Guacamole handshake, injects the RDP login server-side (password never
+//! reaches the browser), then relays the protocol to guacamole-common-js —
+//! clipboard, files and Korean input all native.
 
 use std::time::{Duration, Instant};
 
@@ -104,9 +103,8 @@ fn utf8_len(b: u8) -> usize {
 /// must never split an instruction (e.g. a large base64 image) across frames:
 /// it relays up to the last `;` and keeps the rest until more arrives.
 ///
-/// Each element is `length.value`, length counted in Unicode characters, with
-/// elements joined by `,` and the instruction ended by `;`. A value may itself
-/// contain `,` or `;`, so boundaries are found by length, not by scanning.
+/// Elements are `length.value` (length in characters) joined by `,`, ended by
+/// `;`; a value may contain `,`/`;`, so boundaries come from length, not scanning.
 fn complete_instructions_end(s: &str) -> usize {
     let bytes = s.as_bytes();
     let mut complete = 0; // byte offset just past the last ';'
@@ -249,9 +247,8 @@ async fn pump(
         }
     }
     let port = p.port.to_string();
-    // A per-host virtual drive lets the browser drag files into the VM and
-    // download them back (see console_drive). guacd's create-drive-path makes
-    // only the last component, so create the whole path here.
+    // A per-host virtual drive for drag-in/download (see console_drive); make
+    // the whole path (guacd's create-drive-path makes only one level).
     let drive_path = super::console_drive::drive_dir(&p.host).to_string_lossy().into_owned();
     let drive_ok = std::fs::create_dir_all(&drive_path).is_ok();
     // Values keyed by the parameter names guacd just listed (args[0] is VERSION).
@@ -302,8 +299,7 @@ async fn pump(
                 Ok(0) | Err(_) => break,
                 Ok(n) => {
                     pending.extend_from_slice(&chunk[..n]);
-                    // Parse only the valid-UTF-8 prefix; a multi-byte character
-                    // straddling the read boundary waits for its rest.
+                    // Parse only the valid-UTF-8 prefix; a split char waits.
                     let valid = match std::str::from_utf8(&pending) {
                         Ok(_) => pending.len(),
                         Err(e) => e.valid_up_to(),
@@ -354,6 +350,10 @@ async fn ws_rdp(
     }
     let Some((host, port, user, password)) = super::vnc_registry::rdp_login(&target) else {
         return Ok(HttpResponse::NotFound().finish());
+    };
+    // Alternate per-session credentials (a multi-user VM under another account).
+    let Some((user, password)) = super::console_creds::resolve(query, &target, user, password) else {
+        return Ok(HttpResponse::Unauthorized().finish());
     };
     let dims = |k: &str, d: u32| q(query, k).and_then(|v| v.parse().ok()).filter(|n| *n > 0 && *n <= 8000).unwrap_or(d);
     let params = RdpParams {

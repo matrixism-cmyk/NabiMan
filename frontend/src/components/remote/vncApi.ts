@@ -85,3 +85,11 @@ export const listDriveFiles = (target: string) =>
 /** Fetch one drive file for download (authenticated). */
 export const fetchDriveFile = (target: string, name: string) =>
   fetchWithRefresh(`/api/remote/consoles/${encodeURIComponent(target)}/drive/${encodeURIComponent(name)}`);
+
+/** Stash alternate credentials for one console connect (multi-user VM); returns
+ *  a one-use token the WebSocket redeems. Password is never stored. */
+export async function consoleCreds(target: string, user: string, password: string): Promise<string> {
+  const r = await apiPost<{ token: string }>('/api/remote/console-creds', { target, user, password });
+  if (r.success && r.data) return r.data.token;
+  throw new Error(r.message || 'credentials rejected');
+}

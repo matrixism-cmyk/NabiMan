@@ -3,7 +3,7 @@ import RFB from '@novnc/novnc/lib/rfb.js';
 import { useT } from '../../shared/i18n';
 import { useFullscreen } from '../../shared/ui/useFullscreen';
 import { useChromeHidden } from '../../shared/ui/useChromeHidden';
-import { useConsoleView, consoleDictationProps } from './consoleView';
+import { useConsoleView, consoleDictationProps, keepAlive } from './consoleView';
 import ConsoleSettingsModal from './ConsoleSettingsModal';
 import { describeFault, reconnectDelay, RECONNECT_MAX } from './consoleFault';
 import { consoleWsUrl, shareWsUrl } from './vncApi';
@@ -26,6 +26,8 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
   const { full, toggle } = useFullscreen(root);
   const [folded, setFolded] = useChromeHidden();
   const [cview, setCview] = useConsoleView();
+  const keepaliveRef = useRef(true);
+  keepaliveRef.current = keepAlive(cview);
   const [showSettings, setShowSettings] = useState(false);
   const [status, setStatus] = useState<Status>('connecting');
   const [error, setError] = useState('');
@@ -48,7 +50,7 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
       if (!live || failed) return;
       failed = true;
       const { message, retry } = describeFault(t, fault);
-      if (retry && retries.current < RECONNECT_MAX) {
+      if (retry && retries.current < RECONNECT_MAX && keepaliveRef.current) {
         const n = ++retries.current;
         setStatus('connecting');
         setError(t('remote.console.reconnecting', { n, max: RECONNECT_MAX }));

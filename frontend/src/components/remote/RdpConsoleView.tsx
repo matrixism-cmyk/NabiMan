@@ -4,10 +4,11 @@ import { useT } from '../../shared/i18n';
 import { useFullscreen } from '../../shared/ui/useFullscreen';
 import { useChromeHidden } from '../../shared/ui/useChromeHidden';
 import { describeFault, reconnectDelay, RECONNECT_MAX } from './consoleFault';
-import { useConsoleView, consoleDictationProps } from './consoleView';
+import { useConsoleView, consoleDictationProps, keepAlive } from './consoleView';
 import ConsoleSettingsModal from './ConsoleSettingsModal';
+import ConsoleAltUserModal from './ConsoleAltUserModal';
 import RdpDrivePanel from './RdpDrivePanel';
-import { rdpTicket } from './vncApi';
+import { rdpTicket, consoleCreds } from './vncApi';
 import AccountDictation from '../terminal/dictation/AccountDictation';
 
 type Status = 'connecting' | 'connected' | 'disconnected';
@@ -39,7 +40,13 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
   const [driveReady, setDriveReady] = useState(false);
   const [drivePanel, setDrivePanel] = useState(false);
   const [cview, setCview] = useConsoleView();
+  const keepaliveRef = useRef(true);
+  keepaliveRef.current = keepAlive(cview);
   const [showSettings, setShowSettings] = useState(false);
+  // Alternate account for this window (multi-user VM); held in memory only.
+  const altCreds = useRef<{ user: string; password: string } | null>(null);
+  const [altUser, setAltUser] = useState<string | null>(null);
+  const [askUser, setAskUser] = useState(false);
 
   // Drag a file onto the VM to copy it in, via guacd's redirected drive (it
   // lands on the "NabiMan" drive inside Windows). View-only shares cannot.
@@ -129,7 +136,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
       if (!live || failed) return;
       failed = true;
       const { message, retry } = describeFault(t, fault);
-      if (retry && retries.current < RECONNECT_MAX) {
+      if (retry && retries.current < RECONNECT_MAX && keepaliveRef.current) {
         const n = ++retries.current;
         setStatus('connecting');
         setError(t('remote.console.reconnecting', { n, max: RECONNECT_MAX }));
@@ -159,10 +166,16 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
     if (share) {
       c.connect((share.pw ? `pw=${encodeURIComponent(share.pw)}&` : '') + dims());
     } else {
-      rdpTicket(target).then((ticket) => {
-        if (!live) return;
-        c.connect(`target=${encodeURIComponent(target)}&ticket=${ticket}&${dims()}`);
-      }).catch((e) => fail({ message: e instanceof Error ? e.message : undefined }));
+      (async () => {
+        try {
+          const ticket = await rdpTicket(target);
+          // An alternate account issues a one-use creds token for this connect.
+          const alt = altCreds.current;
+          const creds = alt ? `&creds=${await consoleCreds(target, alt.user, alt.password)}` : '';
+          if (!live) return;
+          c.connect(`target=${encodeURIComponent(target)}&ticket=${ticket}&${dims()}${creds}`);
+        } catch (e) { fail({ message: e instanceof Error ? e.message : undefined }); }
+      })();
     }
 
     // Input (skipped entirely for a view-only share).
@@ -200,6 +213,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
       <div className="rw-console-bar">
         <strong>{label}</strong>
         <span className="rw-proto-tag">RDP</span>
+        {altUser && <span className="rw-proto-tag">{t('remote.console.altUserActive', { user: altUser })}</span>}
         {share?.viewOnly && <span className="rw-proto-tag">{t('remote.console.share.viewOnly')}</span>}
         <span className={`rw-console-state is-${status}`}>{t(`remote.console.${status}`)}</span>
         <span className="rw-console-spacer" />
@@ -208,6 +222,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
         {!popout && <button className="btn btn-secondary btn-sm" onClick={() => window.open(`/remote#rdp/${encodeURIComponent(target)}`, `rdp_${target}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no')}>{t('remote.console.detach')}</button>}
         <button className="btn btn-secondary btn-sm" onClick={toggle} title={t('remote.console.fullscreen')} aria-label={t('remote.console.fullscreen')} aria-pressed={full}>⛶</button>
         <button className="btn btn-secondary btn-sm" onClick={() => setFolded(true)} title={t('app.hideChrome')} aria-label={t('app.hideChrome')}>▴</button>
+        {!share && <button className="btn btn-secondary btn-sm" onClick={() => setAskUser(true)} title={t('remote.console.altUser')} aria-label={t('remote.console.altUser')}>👤</button>}
         {!share && <button className="btn btn-secondary btn-sm" onClick={() => setShowSettings(true)} title={t('remote.console.settings')} aria-label={t('remote.console.settings')}>⚙</button>}
         {!share?.viewOnly && <button className="btn btn-secondary btn-sm" onClick={() => { try { const c = client.current; c?.sendKeyEvent(1, 0xffe3); c?.sendKeyEvent(1, 0xffe9); c?.sendKeyEvent(1, 0xffff); c?.sendKeyEvent(0, 0xffff); c?.sendKeyEvent(0, 0xffe9); c?.sendKeyEvent(0, 0xffe3); } catch { /* not ready */ } }} disabled={status !== 'connected'}>Ctrl+Alt+Del</button>}
         {status === 'disconnected' && <button className="btn btn-primary btn-sm" onClick={() => { retries.current = 0; setAttempt(a => a + 1); }}>{t('remote.console.reconnect')}</button>}
@@ -238,6 +253,10 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
         )}
       </div>
       {showSettings && <ConsoleSettingsModal view={cview} onChange={setCview} onClose={() => setShowSettings(false)} />}
+      {askUser && (
+        <ConsoleAltUserModal onClose={() => setAskUser(false)}
+          onConnect={(u, p) => { altCreds.current = { user: u, password: p }; setAltUser(u); setAskUser(false); retries.current = 0; setAttempt(a => a + 1); }} />
+      )}
     </div>
   );
 }

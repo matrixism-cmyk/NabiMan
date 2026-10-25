@@ -8,7 +8,13 @@ import { useCallback, useState } from 'react';
 export interface ConsoleViewPrefs {
   dictation_pause_ms?: number;
   dictation_auto_enter?: boolean;
+  /** Keep the view connected: reconnect automatically on an unexpected drop
+   *  (default on). The VM's own desktop session persists regardless. */
+  auto_reconnect?: boolean;
 }
+
+/** Whether the view should auto-reconnect (the default when unset). */
+export const keepAlive = (view: ConsoleViewPrefs): boolean => view.auto_reconnect !== false;
 
 const KEY = 'nabiman_console_view';
 
