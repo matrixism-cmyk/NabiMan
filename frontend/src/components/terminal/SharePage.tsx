@@ -9,6 +9,7 @@ import { openShareDictation } from './dictation/sockets';
 import { shareSource } from '../remote/sftp/sftpApi';
 import { useT } from '../../shared/i18n';
 import { useFullscreen } from '../../shared/ui/useFullscreen';
+import { useChromeHidden } from '../../shared/ui/useChromeHidden';
 import './terminal-windows.css';
 
 /**
@@ -23,6 +24,7 @@ function SharePageContent({ token }: { token: string }) {
   const viewRef = useRef<TerminalViewHandle>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const { toggle: toggleFull } = useFullscreen(pageRef);
+  const [folded, setFolded] = useChromeHidden();
   const [info, setInfo] = useState<ShareInfo | null>(null);
   const [error, setError] = useState('');
   const [password, setPassword] = useState('');
@@ -158,7 +160,11 @@ function SharePageContent({ token }: { token: string }) {
   }
 
   return (
-    <div className="share-page" ref={pageRef}>
+    <div className={`share-page ${folded ? 'is-folded' : ''}`} ref={pageRef}>
+      {folded && (
+        <button type="button" className="chrome-handle" onClick={() => setFolded(false)}
+          title={t('app.showChrome')} aria-label={t('app.showChrome')}>▾</button>
+      )}
       <header className="share-head">
         <strong>{t('share.headTitle')}</strong>
         <code>{info.label}</code>
@@ -182,6 +188,8 @@ function SharePageContent({ token }: { token: string }) {
         </button>
         <button className="btn btn-secondary btn-sm" title={t('remote.console.fullscreen')} aria-label={t('remote.console.fullscreen')}
           onClick={toggleFull}>⛶</button>
+        <button className="btn btn-secondary btn-sm" title={t('app.hideChrome')} aria-label={t('app.hideChrome')}
+          onClick={() => setFolded(true)}>▴</button>
         <button className="btn btn-secondary btn-sm" title={t('share.viewSettings')} aria-label={t('share.viewSettings')}
           onClick={() => setShowView(true)}>⚙</button>
       </header>

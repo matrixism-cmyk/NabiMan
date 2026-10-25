@@ -337,6 +337,7 @@
 .rw-console { position: relative; }
 
 .rw-proto-tag { font-size: 10px; font-weight: 700; letter-spacing: .5px; padding: 1px 6px; border-radius: 4px; background: rgba(88,166,255,.18); color: #58a6ff; }
+.rw-console.is-folded .rw-console-bar { display: none; }
 .rw-rdp-screen { position: relative; display: flex; align-items: flex-start; justify-content: center; outline: none; }
 .rw-rdp-screen canvas { display: block; }
 .rw-rdp-screen.is-dragover { outline: 2px dashed var(--accent, #4a9eff); outline-offset: -6px; }

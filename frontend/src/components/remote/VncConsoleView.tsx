@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import RFB from '@novnc/novnc/lib/rfb.js';
 import { useT } from '../../shared/i18n';
 import { useFullscreen } from '../../shared/ui/useFullscreen';
+import { useChromeHidden } from '../../shared/ui/useChromeHidden';
 import { describeFault, reconnectDelay, RECONNECT_MAX } from './consoleFault';
 import { consoleWsUrl, shareWsUrl } from './vncApi';
 import { typeText } from './vncInput';
@@ -21,6 +22,7 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
   const retries = useRef(0);
   const reconnectTimer = useRef<number | undefined>(undefined);
   const { full, toggle } = useFullscreen(root);
+  const [folded, setFolded] = useChromeHidden();
   const [status, setStatus] = useState<Status>('connecting');
   const [error, setError] = useState('');
   const [scale, setScale] = useState(true);
@@ -118,7 +120,11 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
   };
 
   return (
-    <div className="rw-view rw-console" ref={root}>
+    <div className={`rw-view rw-console ${folded ? 'is-folded' : ''}`} ref={root}>
+      {folded && popout && (
+        <button type="button" className="chrome-handle" onClick={() => setFolded(false)}
+          title={t('app.showChrome')} aria-label={t('app.showChrome')}>▾</button>
+      )}
       <div className="rw-console-bar">
         <strong>{label}</strong>
         <span className={`rw-console-state is-${status}`}>{t(`remote.console.${status}`)}</span>
@@ -129,6 +135,7 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
         {!share?.viewOnly && <button className={`btn btn-secondary btn-sm ${clipOpen ? 'is-active' : ''}`} onClick={openClip} disabled={status !== 'connected'}>{t('remote.console.clip.btn')}</button>}
         {!popout && <button className="btn btn-secondary btn-sm" onClick={() => window.open(`/remote#console/${encodeURIComponent(vm)}`, `vnccon_${vm}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no')}>{t('remote.console.detach')}</button>}
         <button className="btn btn-secondary btn-sm" onClick={toggle} title={t('remote.console.fullscreen')} aria-label={t('remote.console.fullscreen')} aria-pressed={full}>⛶</button>
+        <button className="btn btn-secondary btn-sm" onClick={() => setFolded(true)} title={t('app.hideChrome')} aria-label={t('app.hideChrome')}>▴</button>
         {!share?.viewOnly && <button className="btn btn-secondary btn-sm" onClick={() => { try { rfb.current?.sendCtrlAltDel(); } catch { /* not ready */ } }} disabled={status !== 'connected'}>Ctrl+Alt+Del</button>}
         {status === 'disconnected' && <button className="btn btn-primary btn-sm" onClick={() => { retries.current = 0; setAttempt(a => a + 1); }}>{t('remote.console.reconnect')}</button>}
         {canEdit && <button className="btn btn-secondary btn-sm" onClick={onEdit}>{t('common.edit')}</button>}

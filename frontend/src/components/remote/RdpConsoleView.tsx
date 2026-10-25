@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Guacamole from '../../vendor/guacamole-common.js';
 import { useT } from '../../shared/i18n';
 import { useFullscreen } from '../../shared/ui/useFullscreen';
+import { useChromeHidden } from '../../shared/ui/useChromeHidden';
 import { describeFault, reconnectDelay, RECONNECT_MAX } from './consoleFault';
 import RdpDrivePanel from './RdpDrivePanel';
 import { rdpTicket } from './vncApi';
@@ -27,6 +28,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
   const retries = useRef(0);
   const reconnectTimer = useRef<number | undefined>(undefined);
   const { full, toggle } = useFullscreen(root, () => { fitRef.current?.(); resizeRef.current?.(); });
+  const [folded, setFolded] = useChromeHidden();
   const [status, setStatus] = useState<Status>('connecting');
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -186,7 +188,11 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
   }, [target, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="rw-view rw-console" ref={root}>
+    <div className={`rw-view rw-console ${folded ? 'is-folded' : ''}`} ref={root}>
+      {folded && popout && (
+        <button type="button" className="chrome-handle" onClick={() => setFolded(false)}
+          title={t('app.showChrome')} aria-label={t('app.showChrome')}>▾</button>
+      )}
       <div className="rw-console-bar">
         <strong>{label}</strong>
         <span className="rw-proto-tag">RDP</span>
@@ -197,6 +203,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
         {driveReady && !share && <button className={`btn btn-secondary btn-sm ${drivePanel ? 'is-active' : ''}`} onClick={() => setDrivePanel(d => !d)}>{t('remote.console.drive.files')}</button>}
         {!popout && <button className="btn btn-secondary btn-sm" onClick={() => window.open(`/remote#rdp/${encodeURIComponent(target)}`, `rdp_${target}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no')}>{t('remote.console.detach')}</button>}
         <button className="btn btn-secondary btn-sm" onClick={toggle} title={t('remote.console.fullscreen')} aria-label={t('remote.console.fullscreen')} aria-pressed={full}>⛶</button>
+        <button className="btn btn-secondary btn-sm" onClick={() => setFolded(true)} title={t('app.hideChrome')} aria-label={t('app.hideChrome')}>▴</button>
         {!share?.viewOnly && <button className="btn btn-secondary btn-sm" onClick={() => { try { const c = client.current; c?.sendKeyEvent(1, 0xffe3); c?.sendKeyEvent(1, 0xffe9); c?.sendKeyEvent(1, 0xffff); c?.sendKeyEvent(0, 0xffff); c?.sendKeyEvent(0, 0xffe9); c?.sendKeyEvent(0, 0xffe3); } catch { /* not ready */ } }} disabled={status !== 'connected'}>Ctrl+Alt+Del</button>}
         {status === 'disconnected' && <button className="btn btn-primary btn-sm" onClick={() => { retries.current = 0; setAttempt(a => a + 1); }}>{t('remote.console.reconnect')}</button>}
         {canEdit && <button className="btn btn-secondary btn-sm" onClick={onEdit}>{t('common.edit')}</button>}

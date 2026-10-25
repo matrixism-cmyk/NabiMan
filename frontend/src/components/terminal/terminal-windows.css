@@ -271,6 +271,8 @@
 .share-head strong { font-size: 14px; }
 .share-head code { font-size: 12px; color: var(--text-secondary); }
 .share-head-spacer { flex: 1; }
+.share-page.is-folded .share-head { display: none; }
+.share-page.is-folded .share-body { padding: 0; }
 .share-body { flex: 1; min-height: 0; padding: 6px; }
 .share-body-files { display: flex; }
 .share-body-files > * { flex: 1; min-width: 0; }
