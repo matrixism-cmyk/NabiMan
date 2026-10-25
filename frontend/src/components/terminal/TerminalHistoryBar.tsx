@@ -54,6 +54,17 @@ export default function TerminalHistoryBar({ position, connected, controlsId, on
     dragRef.current = null;
     setPreview(null);
   }, [disabled, position?.pane]);
+  // Hold the clicked position until the server's report catches up, so the
+  // thumb lands where it was clicked instead of flashing back to the old spot.
+  useEffect(() => {
+    if (preview === null) return undefined;
+    if (position && Math.abs(position.offset - preview) <= Math.max(2, rows)) {
+      setPreview(null);
+      return undefined;
+    }
+    const timer = setTimeout(() => setPreview(null), 1500);
+    return () => clearTimeout(timer);
+  }, [position, preview, rows]);
 
   const flush = () => {
     const next = pendingRef.current;
@@ -75,7 +86,8 @@ export default function TerminalHistoryBar({ position, connected, controlsId, on
     if (dragRef.current?.pointer !== event.pointerId) return;
     flush();
     dragRef.current = null;
-    setPreview(null);
+    // Keep the preview until the server confirms (the effect clears it), so the
+    // thumb stays where it was clicked rather than snapping back first.
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
 

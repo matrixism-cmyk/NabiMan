@@ -7,6 +7,7 @@ import { applyTerminalFont } from './terminalFonts';
 import TerminalStatusPill from './TerminalStatusPill';
 import { HistoryPosition } from './TerminalHistoryBar';
 import TerminalHistoryControls from './TerminalHistoryControls';
+import TerminalLocalScrollbar from './TerminalLocalScrollbar';
 import { useScreenBuffer } from './useScreenBuffer';
 import { buildTerminalUrl, ticketedTerminalUrl, ticketedShareUrl } from './terminalUrl';
 import { bufKey, markEnded, paneEnded, readStored, sidKey, storedSessionId, writeStored } from './terminalStorage';
@@ -385,10 +386,12 @@ const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function 
   };
 
   return (
-    <div className={`terminal-view ${share ? '' : 'terminal-view-with-history'}`}>
+    <div className="terminal-view terminal-view-with-history">
       <div id={screenId} ref={containerRef} className="terminal-view-screen" />
-      {!share && <TerminalHistoryControls screenId={screenId} position={historyPosition}
-        connected={status === 'connected'} termRef={termRef} wsRef={wsRef} />}
+      {share
+        ? <TerminalLocalScrollbar termRef={termRef} />
+        : <TerminalHistoryControls screenId={screenId} position={historyPosition}
+          connected={status === 'connected'} termRef={termRef} wsRef={wsRef} />}
       <TerminalStatusPill status={status} onRetry={retry} />
     </div>
   );
