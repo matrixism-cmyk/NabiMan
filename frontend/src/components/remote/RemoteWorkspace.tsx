@@ -26,6 +26,7 @@ import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import TerminalWithFiles, { filesScope } from './TerminalWithFiles';
 import RemoteSettingsView from './RemoteSettingsView';
 import RecordingsView from './RecordingsView';
+import SerialView from './SerialView';
 import WorkspaceActions from './WorkspaceActions';
 import { useCompact, useFullScreenPane, useMobilePane } from './useCompact';
 import WorkspaceTabs, { viewFor } from './WorkspaceTabs';
@@ -264,7 +265,7 @@ export default function RemoteWorkspace() {
           </div>
           <WorkspaceTabs selection={selection} server={selectedServer} overviewView={overviewView}
             onOverviewView={setOverviewView} serverView={serverView} onServerView={setServerView}
-            allSessions={sessions.length} liveCount={liveCount} />
+            allSessions={sessions.length} liveCount={liveCount} serial={canManageConsoles} />
           {/* A VM console carries its own bar (settings, share, …), so the
               header's actions — just a lone ⚙ there — are left off for it. */}
           {selection.kind !== 'console' && selection.kind !== 'console-form' && (
@@ -337,6 +338,7 @@ export default function RemoteWorkspace() {
               {overviewView === 'links' && <ShareLinksPanel />}
               {overviewView === 'keys' && <SshKeyPanel />}
               {overviewView === 'recordings' && <RecordingsView />}
+              {overviewView === 'serial' && <SerialView />}
               {overviewView === 'settings' && <RemoteSettingsView />}
             </div>
           )}

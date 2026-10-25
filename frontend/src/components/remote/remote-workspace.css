@@ -372,3 +372,8 @@
 .rw-drive-row { display: flex; align-items: center; gap: 6px; }
 .rw-drive-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rw-drive-size { color: #9aa7b4; font-size: 12px; flex-shrink: 0; }
+.serial-monitor {
+  background: #0b0d10; color: #cfe3d0; border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px; margin: 0; max-height: 46vh; overflow: auto; white-space: pre-wrap; word-break: break-all;
+  font-family: ui-monospace, "D2Coding", monospace; font-size: 12.5px; line-height: 1.45;
+}

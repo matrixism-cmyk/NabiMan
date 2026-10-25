@@ -93,3 +93,14 @@ export async function consoleCreds(target: string, user: string, password: strin
   if (r.success && r.data) return r.data.token;
   throw new Error(r.message || 'credentials rejected');
 }
+
+/** A one-use ticket for the serial bridge WebSocket (admin). */
+export async function serialTicket(name: string): Promise<string> {
+  const response = await apiRequest<{ ticket: string; expires_in_seconds: number }>('/api/terminal/tickets', {
+    method: 'POST', body: JSON.stringify({ query: `serial=${name}` }),
+  });
+  if (!response.success || !response.data) throw new Error(response.message || 'serial denied');
+  const { ticket } = response.data;
+  if (!/^[0-9a-f]{64}$/.test(ticket)) throw new Error('invalid serial ticket');
+  return ticket;
+}

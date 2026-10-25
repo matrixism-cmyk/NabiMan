@@ -10,6 +10,7 @@ interface Props {
   server?: RemoteServer;
   overviewView: OverviewView;
   onOverviewView: (view: OverviewView) => void;
+  serial?: boolean;
   serverView: ServerView;
   onServerView: (view: ServerView) => void;
   /** Sessions anywhere, and live ones on this target. */
@@ -23,7 +24,7 @@ interface Props {
  * files are all it offers, one-off commands when it has an SSH shell.
  */
 export default function WorkspaceTabs({
-  selection, server, overviewView, onOverviewView, serverView, onServerView, allSessions, liveCount,
+  selection, server, overviewView, onOverviewView, serverView, onServerView, allSessions, liveCount, serial,
 }: Props) {
   const { t } = useT();
   const member = useMember();
@@ -44,6 +45,7 @@ export default function WorkspaceTabs({
           {(sharing.sessions || sharing.files) && overview('links', t('share.panelTab'))}
           {!member && overview('keys', t('remote.sshKey'))}
           {!member && overview('recordings', t('remote.rec.tab'))}
+          {serial && overview('serial', t('remote.serialTab'))}
           {overview('settings', t('common.settings'))}
         </>
       )}

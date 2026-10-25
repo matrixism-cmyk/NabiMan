@@ -5,6 +5,22 @@ type T = Record<string, Record<Lang, string>>;
 // translations: servers, the SSH key, terminals. Remote's own, so it can go
 // with Remote.
 const t: T = {
+  'remote.serialTab': { ko: '시리얼', en: 'Serial', ja: 'シリアル' },
+  'serial.intro': { ko: '내 PC(브라우저)에 꽂힌 시리얼 장치(ESP32 등)를 서버로 연결합니다. 연결하면 서버의 도구(arduino-cli·esptool·모니터)와 서버에서 실행 중인 Claude가 아래 경로로 이 장치에 접근할 수 있습니다. (Chrome/Edge만 지원)', en: 'Bridge a serial device on your own PC (an ESP32, etc.) to the server. Once connected, the server tools — and the server-side Claude — reach it at the path below. (Chrome/Edge only.)', ja: '自分の PC のシリアル機器（ESP32 など）をサーバーに接続します。接続後、サーバーのツールと Claude が下記パスでアクセスできます。（Chrome/Edge のみ）' },
+  'serial.unsupported': { ko: '이 브라우저는 Web Serial을 지원하지 않습니다. Chrome이나 Edge(데스크톱)에서 열어주세요.', en: 'This browser has no Web Serial. Use desktop Chrome or Edge.', ja: 'このブラウザは Web Serial 非対応です。デスクトップの Chrome/Edge をご利用ください。' },
+  'serial.wsError': { ko: '서버 연결 오류', en: 'Server connection error', ja: 'サーバー接続エラー' },
+  'serial.name': { ko: '장치 이름', en: 'Device name', ja: 'デバイス名' },
+  'serial.baud': { ko: '보드레이트', en: 'Baud rate', ja: 'ボーレート' },
+  'serial.connect': { ko: '포트 선택·연결', en: 'Choose port & connect', ja: 'ポート選択・接続' },
+  'serial.disconnect': { ko: '연결 해제', en: 'Disconnect', ja: '切断' },
+  'serial.reset': { ko: '보드 리셋', en: 'Reset board', ja: 'ボードをリセット' },
+  'serial.resetHint': { ko: 'DTR/RTS로 ESP32를 리셋합니다.', en: 'Pulse DTR/RTS to reset an ESP32.', ja: 'DTR/RTS で ESP32 をリセットします。' },
+  'serial.status.idle': { ko: '연결 안 됨', en: 'Not connected', ja: '未接続' },
+  'serial.status.connecting': { ko: '연결 중…', en: 'Connecting…', ja: '接続中…' },
+  'serial.status.connected': { ko: '연결됨', en: 'Connected', ja: '接続済み' },
+  'serial.pathLabel': { ko: '서버 경로 (서버 도구/Claude가 이 포트를 엽니다):', en: 'Server path (open this from server tools / Claude):', ja: 'サーバーパス（サーバーのツール/Claude が開きます）:' },
+  'serial.pathHint': { ko: '예: arduino-cli monitor -p <경로> -c baudrate=115200  또는  esptool.py --port <경로> ...  (경로를 서버 Claude에게 알려주세요)', en: 'e.g. arduino-cli monitor -p <path> -c baudrate=115200, or esptool.py --port <path> … (give the path to the server-side Claude)', ja: '例: arduino-cli monitor -p <パス> …（パスをサーバー側 Claude に渡してください）' },
+  'serial.monitor': { ko: '모니터 (장치 출력)', en: 'Monitor (device output)', ja: 'モニター（デバイス出力）' },
   'remote.title': { ko: '원격 서버', en: 'Remote Servers', ja: 'リモートサーバー' },
   'remote.total': { ko: '총', en: 'total', ja: '合計' },
   'remote.addServer': { ko: '+ 서버 추가', en: '+ Add Server', ja: '+ サーバー追加' },

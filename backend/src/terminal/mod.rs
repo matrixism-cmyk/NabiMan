@@ -26,6 +26,7 @@ pub mod console_share;
 mod console_handlers;
 pub mod console_drive;
 pub mod console_creds;
+pub mod serial_bridge;
 pub mod share_store;
 pub(crate) mod share_ticket;
 pub mod telnet_client;
@@ -378,4 +379,5 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     console_share::config(cfg);
     console_drive::config(cfg);
     console_creds::config(cfg);
+    serial_bridge::config(cfg);
 }

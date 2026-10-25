@@ -79,6 +79,7 @@ fn valid_query(query: &str) -> bool {
                     | "telnet_user"
                     | "vm"
                     | "target"
+                    | "serial"
                     | "history"
             ) && keys.insert(k)
         })
@@ -234,6 +235,7 @@ pub(crate) fn url_pass(req: &ServiceRequest) -> Option<Option<auth::Claims>> {
     if path != "/api/terminal"
         && path != "/api/terminal/dictation"
         && path != "/api/remote/console"
+        && path != "/api/remote/serial"
     {
         return None;
     }
