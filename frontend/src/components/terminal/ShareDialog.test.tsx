@@ -48,7 +48,8 @@ test('Escape closes the dialog even after focus leaves a removed control', async
 test('defaults to read-only for 24 hours and identifies links requiring reissue', async () => {
   request.mockResolvedValue({ success: true, data: [{ ...link, usable: false }] });
   setup();
-  expect(screen.getByRole('checkbox')).toBeChecked();
+  expect(screen.getByRole('checkbox', { name: '읽기 전용' })).toBeChecked();
+  expect(screen.getByRole('checkbox', { name: '전체화면으로 열기' })).not.toBeChecked();
   expect(screen.getByRole('button', { name: '24시간' })).toHaveClass('btn-primary');
   expect(await screen.findByText('사용 불가 · 필요 시 재발급')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '복사' })).toBeDisabled();

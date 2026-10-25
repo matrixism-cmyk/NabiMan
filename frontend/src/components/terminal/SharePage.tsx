@@ -25,6 +25,9 @@ function SharePageContent({ token }: { token: string }) {
   const pageRef = useRef<HTMLDivElement>(null);
   const { toggle: toggleFull } = useFullscreen(pageRef);
   const [folded, setFolded] = useChromeHidden();
+  // A "#full" link opens maximized, and goes true fullscreen on the visitor's
+  // first interaction (the browser blocks fullscreen without a gesture).
+  const wantsFull = useRef(typeof window !== 'undefined' && /full/.test(window.location.hash));
   const [info, setInfo] = useState<ShareInfo | null>(null);
   const [error, setError] = useState('');
   const [password, setPassword] = useState('');
@@ -71,6 +74,21 @@ function SharePageContent({ token }: { token: string }) {
     return () => controller.abort();
   }, [load]);
   useEffect(() => () => { submitController.current?.abort(); passwordRef.current = ''; prepared.current = null; }, []);
+  useEffect(() => {
+    if (!wantsFull.current || !authorized) return undefined;
+    setFolded(true);
+    let done = false;
+    const go = () => {
+      if (done) return;
+      done = true;
+      window.removeEventListener('pointerdown', go);
+      window.removeEventListener('keydown', go);
+      toggleFull();
+    };
+    window.addEventListener('pointerdown', go);
+    window.addEventListener('keydown', go);
+    return () => { window.removeEventListener('pointerdown', go); window.removeEventListener('keydown', go); };
+  }, [authorized, setFolded, toggleFull]);
 
   const acquireTicket = useCallback(async (query: string, signal?: AbortSignal) => {
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');

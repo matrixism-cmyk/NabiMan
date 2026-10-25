@@ -80,6 +80,7 @@ export default function ShareDialog({ sessionId = '', serverId = '', sessionLabe
   const [expiry, setExpiry] = useState(maxSecs && maxSecs < 24 * 3600 ? expiries[expiries.length - 1].secs : 24 * 3600);
   const [password, setPassword] = useState('');
   const [readOnly, setReadOnly] = useState(true);
+  const [fullscreen, setFullscreen] = useState(false);
   // A files link is nothing without files: it starts on browsing.
   const filesOnly = Boolean(serverId);
   const [files, setFiles] = useState<ShareFiles>(filesOnly ? 'read' : 'none');
@@ -128,10 +129,14 @@ export default function ShareDialog({ sessionId = '', serverId = '', sessionLabe
     load();
   };
 
+  // A "#full" fragment (never sent to the server) tells the share page to open
+  // maximized and go fullscreen on the visitor's first interaction.
+  const withFull = (url: string) => (fullscreen ? `${url}#full` : url);
   const copy = (token: string) => {
-    navigator.clipboard.writeText(shareUrl(token))
+    const url = withFull(shareUrl(token));
+    navigator.clipboard.writeText(url)
       .then(() => setMessage(t('share.copied')))
-      .catch(() => setMessage(shareUrl(token)));
+      .catch(() => setMessage(url));
   };
 
   return (
@@ -175,6 +180,16 @@ export default function ShareDialog({ sessionId = '', serverId = '', sessionLabe
           </div>
         )}
 
+        {!filesOnly && (
+          <div className="form-group">
+            <label>
+              <input type="checkbox" checked={fullscreen} onChange={(e) => setFullscreen(e.target.checked)} />{' '}
+              {t('share.fullscreen')}
+            </label>
+            <small className="text-secondary">{t('share.fullscreenHint')}</small>
+          </div>
+        )}
+
         {filesGranted && <div className="form-group">
           <label id={`${titleId}-files`}>{t('share.files')}</label>
           <div className="filter-row" role="radiogroup" aria-labelledby={`${titleId}-files`}>
@@ -207,7 +222,7 @@ export default function ShareDialog({ sessionId = '', serverId = '', sessionLabe
                 {links.map((link) => (
                   <tr key={link.token}>
                     <td>{created?.token === link.token
-                      ? <input className="filter-input" aria-label={t('share.linkReady')} readOnly value={shareUrl(link.token)} onFocus={(e) => e.target.select()} />
+                      ? <input className="filter-input" aria-label={t('share.linkReady')} readOnly value={withFull(shareUrl(link.token))} onFocus={(e) => e.target.select()} />
                       : <code>/share/{link.token.slice(0, 8)}…</code>}</td>
                     <td>{formatExpiry(link.expires_unix, t)}</td>
                     <td>

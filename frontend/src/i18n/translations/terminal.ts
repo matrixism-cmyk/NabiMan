@@ -210,6 +210,8 @@ const t: T = {
     ja: '設定すると、リンクを開いた人はこのパスワードを入力する必要があります。',
   },
   'share.readOnly': { ko: '읽기 전용', en: 'Read-only', ja: '読み取り専用' },
+  'share.fullscreen': { ko: '전체화면으로 열기', en: 'Open in fullscreen', ja: '全画面で開く' },
+  'share.fullscreenHint': { ko: '링크를 연 사람 화면이 꽉 차게 열립니다. (진짜 전체화면은 브라우저 정책상 첫 클릭에서 전환됩니다)', en: 'The visitor opens maximized; true fullscreen kicks in on their first click (browser policy).', ja: '訪問者は最大化で開きます。本当の全画面は最初のクリックで有効化されます（ブラウザの仕様）。' },
   'share.readOnlyHint': {
     ko: '화면만 보여주고 입력은 막습니다. 작업을 보여주기만 할 때 쓰세요.',
     en: 'They watch the screen but cannot type. Use it to show work in progress.',
