@@ -30,7 +30,7 @@ export default function SftpTransfers({ rows, onCancel, onClear }: Props) {
             <span className="sftp-transfer-dir" aria-hidden="true">{row.direction === 'up' ? '↑' : row.direction === 'copy' ? '⇄' : '↓'}</span>
             <span className="sftp-transfer-name">{row.name}</span>
             <span className="sftp-transfer-state">
-              {row.status === 'running' && (percent !== null ? `${percent}%` : formatSize(row.loaded))}
+              {row.status === 'running' && (percent !== null ? `${percent}%` : row.message ? `${row.message} · ${formatSize(row.loaded)}` : formatSize(row.loaded))}
               {row.status === 'running' && row.rate && (
                 // Changes twice a second: kept out of what a screen reader announces.
                 <span className="sftp-transfer-rate" aria-hidden="true">

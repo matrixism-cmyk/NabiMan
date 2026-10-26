@@ -26,32 +26,36 @@ export async function pickSaveDir(): Promise<DirHandle | null> {
 }
 
 export interface TreeFile { rel: string; path: string; size: number }
-export interface Tree { files: TreeFile[]; dirs: string[]; truncated: boolean }
+/** One server folder's contents, with paths relative to the folder being saved. */
+export interface Level { rel: string; files: TreeFile[]; dirs: string[]; truncated: boolean }
 
 /**
- * Everything under a server folder, with paths relative to it. Links to
- * folders are not followed (they could loop back on themselves).
+ * Walks a server folder breadth-first, handing over each folder as soon as it
+ * is read, so saving starts at once instead of after the whole tree is listed
+ * (a tree with thousands of folders takes minutes to list). Links to folders
+ * are not followed (they could loop back on themselves).
  */
-export async function listTree(src: SftpSource, root: string): Promise<Tree> {
-  const tree: Tree = { files: [], dirs: [], truncated: false };
+export async function walkFolder(
+  src: SftpSource, root: string, onLevel: (level: Level) => Promise<void>, stop: () => boolean,
+): Promise<void> {
   const queue: { path: string; rel: string }[] = [{ path: root, rel: '' }];
-  while (queue.length) {
+  while (queue.length && !stop()) {
     const { path, rel } = queue.shift()!;
     const res = await listDir(src, path);
     if (!res.success || !res.data) throw new Error(res.message || path);
-    if (res.data.truncated) tree.truncated = true;
+    const level: Level = { rel, files: [], dirs: [], truncated: res.data.truncated };
     for (const e of res.data.entries) {
       const childRel = rel ? `${rel}/${e.name}` : e.name;
       const childPath = joinPath(path, e.name);
       if (e.kind === 'dir') {
-        tree.dirs.push(childRel);
+        level.dirs.push(childRel);
         queue.push({ path: childPath, rel: childRel });
       } else if (e.kind === 'file' || (e.kind === 'link' && !e.to_dir)) {
-        tree.files.push({ rel: childRel, path: childPath, size: e.size });
+        level.files.push({ rel: childRel, path: childPath, size: e.size });
       }
     }
+    await onLevel(level);
   }
-  return tree;
 }
 
 /** The handle for `rel` (a/b/c) under `base`, creating folders on the way. */

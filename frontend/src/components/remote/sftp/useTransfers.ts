@@ -3,7 +3,7 @@ import { useT } from '../../../shared/i18n';
 import { Dropped } from './sftpDrop';
 import { baseName, joinPath, makeDir, saveFile, SftpSource, Transfer, uploadFile } from './sftpApi';
 import { RateState, startRate, updateRate } from './transferRate';
-import { canSaveFolder, dirAt, listTree, pickSaveDir, saveInto } from './folderSave';
+import { canSaveFolder, dirAt, pickSaveDir, saveInto, walkFolder } from './folderSave';
 import { confirmDialog } from '../../../shared/ui/ConfirmDialog';
 
 export interface TransferRow {
@@ -150,28 +150,37 @@ export function useTransfers(source: SftpSource, onUploaded: (dir: string) => vo
         running.current.set(job.id, { promise: new Promise(() => undefined), abort: () => ctl.abort() } as Transfer);
         patch(job.id, { status: 'running', message: t('sftp.saveFolderListing') });
         try {
-          const tree = await listTree(source, job.path);
-          patch(job.id, { total: tree.files.reduce((sum, f) => sum + f.size, 0) });
           const root = await dirAt(base, baseName(job.path));
-          for (const dir of tree.dirs) await dirAt(root, dir);
           let loaded = 0;
+          let saved = 0;
           let failed = 0;
-          for (let i = 0; i < tree.files.length; i++) {
-            const file = tree.files[i];
-            if (ctl.signal.aborted) break;
-            patch(job.id, { message: t('sftp.saveFolderProgress', { n: i + 1, m: tree.files.length }), detail: file.rel });
-            try {
-              await saveInto(source, root, file, ctl.signal, (n) => { loaded += n; patch(job.id, { loaded }); });
-            } catch {
-              if (ctl.signal.aborted) break;
-              failed += 1;
+          let folders = 0;
+          let truncated = false;
+          // Each folder's files are saved as soon as it is read, so progress shows at once.
+          await walkFolder(source, job.path, async (level) => {
+            folders += 1;
+            truncated = truncated || level.truncated;
+            for (const dir of level.dirs) await dirAt(root, dir); // empty folders too
+            // No total: it grows as folders are read, so a percentage would mislead.
+            patch(job.id, { message: t('sftp.saveFolderWalking', { saved, folders }) });
+            for (const file of level.files) {
+              if (ctl.signal.aborted) return;
+              patch(job.id, { detail: file.rel });
+              try {
+                await saveInto(source, root, file, ctl.signal, (n) => { loaded += n; patch(job.id, { loaded }); });
+                saved += 1;
+              } catch {
+                if (ctl.signal.aborted) return;
+                failed += 1;
+              }
+              patch(job.id, { message: t('sftp.saveFolderWalking', { saved, folders }) });
             }
-          }
-          const m = tree.files.length;
+          }, () => ctl.signal.aborted);
+          const m = saved + failed;
           patch(job.id, ctl.signal.aborted ? { status: 'cancelled' }
             : failed ? { status: 'failed', message: t('sftp.saveFolderPartial', { failed, m }) }
               : { status: 'done', detail: undefined,
-                message: t(tree.truncated ? 'sftp.saveFolderTruncated' : 'sftp.saveFolderDone', { m }) });
+                message: t(truncated ? 'sftp.saveFolderTruncated' : 'sftp.saveFolderDone', { m: saved }) });
         } catch {
           patch(job.id, ctl.signal.aborted ? { status: 'cancelled' } : { status: 'failed', message: t('sftp.downloadFailed') });
         } finally {
