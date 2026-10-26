@@ -27,13 +27,20 @@ export async function pickSaveDir(): Promise<DirHandle | null> {
 
 export interface TreeFile { rel: string; path: string; size: number }
 /** One server folder's contents, with paths relative to the folder being saved. */
-export interface Level { rel: string; files: TreeFile[]; dirs: string[]; truncated: boolean }
+export interface Level { rel: string; files: TreeFile[]; dirs: string[]; skipped: number; truncated: boolean }
+
+/**
+ * Folders a package manager or interpreter rebuilds (a Python venv alone can be
+ * 30,000 files): saving them file by file takes hours and is of no use on the
+ * other machine. They are left out; the ZIP download still has everything.
+ */
+export const REBUILT = new Set(['node_modules', '.venv', 'venv', '__pycache__', '.mypy_cache', '.pytest_cache', '.tox']);
 
 /**
  * Walks a server folder breadth-first, handing over each folder as soon as it
  * is read, so saving starts at once instead of after the whole tree is listed
  * (a tree with thousands of folders takes minutes to list). Links to folders
- * are not followed (they could loop back on themselves).
+ * are not followed (they could loop back on themselves), and REBUILT folders are skipped.
  */
 export async function walkFolder(
   src: SftpSource, root: string, onLevel: (level: Level) => Promise<void>, stop: () => boolean,
@@ -43,11 +50,13 @@ export async function walkFolder(
     const { path, rel } = queue.shift()!;
     const res = await listDir(src, path);
     if (!res.success || !res.data) throw new Error(res.message || path);
-    const level: Level = { rel, files: [], dirs: [], truncated: res.data.truncated };
+    const level: Level = { rel, files: [], dirs: [], skipped: 0, truncated: res.data.truncated };
     for (const e of res.data.entries) {
       const childRel = rel ? `${rel}/${e.name}` : e.name;
       const childPath = joinPath(path, e.name);
-      if (e.kind === 'dir') {
+      if (e.kind === 'dir' && REBUILT.has(e.name)) {
+        level.skipped += 1;
+      } else if (e.kind === 'dir') {
         level.dirs.push(childRel);
         queue.push({ path: childPath, rel: childRel });
       } else if (e.kind === 'file' || (e.kind === 'link' && !e.to_dir)) {

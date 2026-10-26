@@ -159,10 +159,12 @@ export function useTransfers(source: SftpSource, onUploaded: (dir: string) => vo
           let failed = 0;
           let folders = 0;
           let truncated = false;
+          let skipped = 0;
           // Each folder's files are saved as soon as it is read, so progress shows at once.
           await walkFolder(source, job.path, async (level) => {
             folders += 1;
             truncated = truncated || level.truncated;
+            skipped += level.skipped;
             for (const dir of level.dirs) await dirAt(root, dir); // empty folders too
             // No total: it grows as folders are read, so a percentage would mislead.
             patch(job.id, { message: t('sftp.saveFolderWalking', { saved, folders }) });
@@ -187,7 +189,8 @@ export function useTransfers(source: SftpSource, onUploaded: (dir: string) => vo
           patch(job.id, ctl.signal.aborted ? { status: 'cancelled' }
             : failed ? { status: 'failed', message: t('sftp.saveFolderPartial', { failed, m }) }
               : { status: 'done', detail: undefined,
-                message: t(truncated ? 'sftp.saveFolderTruncated' : 'sftp.saveFolderDone', { m: saved }) });
+                message: t(truncated ? 'sftp.saveFolderTruncated' : 'sftp.saveFolderDone', { m: saved })
+                  + (skipped ? ` · ${t('sftp.saveFolderSkipped', { n: skipped })}` : '') });
         } catch {
           patch(job.id, ctl.signal.aborted ? { status: 'cancelled' } : { status: 'failed', message: t('sftp.downloadFailed') });
         } finally {

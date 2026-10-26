@@ -27,6 +27,7 @@ const t: T = {
   'sftp.saveFolder': { ko: '폴더째 내려받기 (내 PC에 폴더로)', en: 'Download as a folder', ja: 'フォルダーのままダウンロード' },
   'sftp.saveFolderHere': { ko: '이 폴더를 폴더째 내려받기', en: 'Download this folder as a folder', ja: 'このフォルダーをフォルダーのままダウンロード' },
   'sftp.saveFolderPickHint': { ko: '저장 위치를 고르지 않았습니다. Chrome은 다운로드·바탕화면·문서·홈 폴더나 드라이브 최상위 자체는 막으니, 그 안에 새 폴더를 만들어 선택하세요.', en: 'No folder chosen. Chrome refuses top-level folders (Downloads, Desktop, Documents, home, a drive root) themselves — make a new folder inside one and pick that.', ja: '保存先が選ばれていません。Chrome はダウンロード・デスクトップ・書類・ホーム・ドライブ直下そのものは拒否します。その中に新しいフォルダーを作って選んでください。' },
+  'sftp.saveFolderSkipped': { ko: '.venv·node_modules 등 {n}개 폴더 제외 (전부 필요하면 ZIP으로)', en: '{n} rebuildable folders (.venv, node_modules…) left out — use the ZIP for everything', ja: '.venv・node_modules など {n} フォルダーを除外（全部なら ZIP で）' },
   'sftp.saveFolderListing': { ko: '폴더 목록 읽는 중…', en: 'Reading the folder…', ja: 'フォルダーを読み込み中…' },
   'sftp.saveFolderWalking': { ko: '파일 {saved}개 저장 · 폴더 {folders}개 읽음', en: '{saved} files saved · {folders} folders read', ja: 'ファイル {saved} 件保存 · フォルダー {folders} 件読み込み' },
   'sftp.saveFolderProgress': { ko: '파일 {n}/{m}', en: 'File {n}/{m}', ja: 'ファイル {n}/{m}' },
