@@ -19,6 +19,7 @@ const t: T = {
   'sftp.autoOff': { ko: '자동 새로고침 꺼짐 — 켜려면 누르세요', en: 'Auto-refresh off — click to turn on', ja: '自動更新オフ — クリックでオン' },
   'sftp.newFolder': { ko: '새 폴더', en: 'New folder', ja: '新しいフォルダー' },
   'sftp.upload': { ko: '파일 올리기', en: 'Upload files', ja: 'ファイルをアップロード' },
+  'sftp.uploadFolder': { ko: '폴더 올리기 (하위 폴더 포함)', en: 'Upload a folder (with subfolders)', ja: 'フォルダーをアップロード（サブフォルダー含む）' },
   'sftp.showHidden': { ko: '숨김 파일 보기', en: 'Show hidden files', ja: '隠しファイルを表示' },
   'sftp.hideHidden': { ko: '숨김 파일 감추기', en: 'Hide hidden files', ja: '隠しファイルを非表示' },
   'sftp.open': { ko: '열기', en: 'Open', ja: '開く' },

@@ -12,6 +12,7 @@ import { useDragOut } from './useDragOut';
 import { draggingDesktopFiles, draggingFrom, draggingOwnRows, droppedRows, startDragging, stopDragging, takeDrop } from './sftpDrop';
 import { askAndCopy, useCopies } from './sftpCopy';
 import { useAutoRefresh } from './useAutoRefresh';
+import { useUploadPickers } from './useUploadPickers';
 import {
   baseName, isFolder, joinPath, listDir, makeDir, movePath, removePath, SftpEntry, SftpListing, SftpSource, shellQuote,
 } from './sftpApi';
@@ -59,7 +60,6 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
   const [previewing, setPreviewing] = useState<string | null>(null);
   const anchor = useRef<string | null>(null);
   const current = useRef('');
-  const fileInput = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   // `silent`: a background poll — no spinner, keep the old listing on failure.
@@ -102,6 +102,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
   }, [refresh]));
   const dragOut = useDragOut(source);
   const here = listing?.path || '';
+  const pickers = useUploadPickers((dropped) => transfers.upload(here, dropped));
   const pathOf = useCallback((name: string) => joinPath(current.current, name), []);
   const columns = useColumns(source);
   const visible = useMemo(
@@ -252,7 +253,8 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
       return [
         ...(writable ? [
           { key: 'mkdir', label: t('sftp.newFolder'), icon: '＋', onSelect: () => setEditing({ mode: 'new', from: '' }) },
-          { key: 'upload', label: t('sftp.upload'), icon: '↑', onSelect: () => fileInput.current?.click() },
+          { key: 'upload', label: t('sftp.upload'), icon: '↑', onSelect: pickers.pickFiles },
+          { key: 'uploadFolder', label: t('sftp.uploadFolder'), icon: '⇪', onSelect: pickers.pickFolder },
         ] : []),
         { key: 'refresh', label: t('sftp.refresh'), icon: '⟳', onSelect: refresh },
         { key: 'hidden', label: showHidden ? t('sftp.hideHidden') : t('sftp.showHidden'), icon: '◌', separated: true,
@@ -308,8 +310,8 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
             <>
               <button type="button" onClick={() => setEditing({ mode: 'new', from: '' })}
                 title={t('sftp.newFolder')} aria-label={t('sftp.newFolder')}>＋</button>
-              <button type="button" onClick={() => fileInput.current?.click()}
-                title={t('sftp.upload')} aria-label={t('sftp.upload')}>↑</button>
+              <button type="button" onClick={pickers.pickFiles} title={t('sftp.upload')} aria-label={t('sftp.upload')}>↑</button>
+              <button type="button" onClick={pickers.pickFolder} title={t('sftp.uploadFolder')} aria-label={t('sftp.uploadFolder')}>⇪</button>
             </>
           )}
           <button type="button" className={showHidden ? 'is-on' : ''} onClick={toggleHidden}
@@ -369,11 +371,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
         onCancel={(id) => (typeof id === 'string' ? copies.cancel(id) : transfers.cancel(id))}
         onClear={() => { transfers.clearFinished(); copies.clearFinished(); }} />
       {chosen.length > 1 && <p className="sftp-hint">{t('sftp.selected', { count: chosen.length })}</p>}
-      <input ref={fileInput} type="file" multiple hidden onChange={(e) => {
-        const files = Array.from(e.target.files || []);
-        if (files.length) transfers.upload(here, { files: files.map((file) => ({ rel: file.name, file })), dirs: [] });
-        e.target.value = '';
-      }} />
+      {pickers.inputs}
       {menu && (
         <RailContextMenu x={menu.x} y={menu.y} opener={menu.opener}
           title={menu.entry ? (chosen.length > 1 ? t('sftp.selected', { count: chosen.length }) : menu.entry.name) : here}
