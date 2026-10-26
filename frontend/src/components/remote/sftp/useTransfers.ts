@@ -3,6 +3,7 @@ import { useT } from '../../../shared/i18n';
 import { Dropped } from './sftpDrop';
 import { baseName, joinPath, makeDir, saveFile, SftpSource, Transfer, uploadFile } from './sftpApi';
 import { RateState, startRate, updateRate } from './transferRate';
+import { canSaveFolder, dirAt, listTree, pickSaveDir, saveInto } from './folderSave';
 import { confirmDialog } from '../../../shared/ui/ConfirmDialog';
 
 export interface TransferRow {
@@ -128,6 +129,54 @@ export function useTransfers(source: SftpSource, onUploaded: (dir: string) => vo
     });
   }, [add, enqueue, patch, source, t]);
 
+  /**
+   * Folders saved as folders on this computer (Chrome/Edge): pick where, then
+   * each file streams into the same subfolder, one progress row per folder.
+   * Browsers without a folder picker get the ZIP instead.
+   */
+  const saveFolder = useCallback(async (paths: string[]) => {
+    if (!canSaveFolder()) { download(paths.map((path) => ({ path, folder: true }))); return; }
+    const base = await pickSaveDir(); // the first await, so it is still the click
+    if (!base) return;
+    const jobs = paths.map((path) => ({ path, id: add(`${baseName(path)}/`, 'down', 0) }));
+    enqueue(async () => {
+      for (const job of jobs) {
+        if (cancelled.current.has(job.id)) continue;
+        const ctl = new AbortController();
+        running.current.set(job.id, { promise: new Promise(() => undefined), abort: () => ctl.abort() } as Transfer);
+        patch(job.id, { status: 'running', message: t('sftp.saveFolderListing') });
+        try {
+          const tree = await listTree(source, job.path);
+          patch(job.id, { total: tree.files.reduce((sum, f) => sum + f.size, 0) });
+          const root = await dirAt(base, baseName(job.path));
+          for (const dir of tree.dirs) await dirAt(root, dir);
+          let loaded = 0;
+          let failed = 0;
+          for (let i = 0; i < tree.files.length; i++) {
+            const file = tree.files[i];
+            if (ctl.signal.aborted) break;
+            patch(job.id, { message: t('sftp.saveFolderProgress', { n: i + 1, m: tree.files.length }), detail: file.rel });
+            try {
+              await saveInto(source, root, file, ctl.signal, (n) => { loaded += n; patch(job.id, { loaded }); });
+            } catch {
+              if (ctl.signal.aborted) break;
+              failed += 1;
+            }
+          }
+          const m = tree.files.length;
+          patch(job.id, ctl.signal.aborted ? { status: 'cancelled' }
+            : failed ? { status: 'failed', message: t('sftp.saveFolderPartial', { failed, m }) }
+              : { status: 'done', detail: undefined,
+                message: t(tree.truncated ? 'sftp.saveFolderTruncated' : 'sftp.saveFolderDone', { m }) });
+        } catch {
+          patch(job.id, ctl.signal.aborted ? { status: 'cancelled' } : { status: 'failed', message: t('sftp.downloadFailed') });
+        } finally {
+          running.current.delete(job.id);
+        }
+      }
+    });
+  }, [add, download, enqueue, patch, source, t]);
+
   const cancel = useCallback((id: number) => {
     cancelled.current.add(id);
     const transfer = running.current.get(id);
@@ -139,5 +188,5 @@ export function useTransfers(source: SftpSource, onUploaded: (dir: string) => vo
     setRows((list) => list.filter((r) => r.status === 'waiting' || r.status === 'running'));
   }, []);
 
-  return { rows, upload, download, cancel, clearFinished };
+  return { rows, upload, download, saveFolder, cancel, clearFinished };
 }

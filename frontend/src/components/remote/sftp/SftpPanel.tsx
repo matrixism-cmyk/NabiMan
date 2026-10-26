@@ -256,9 +256,10 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
           { key: 'upload', label: t('sftp.upload'), icon: '↑', onSelect: pickers.pickFiles },
           { key: 'uploadFolder', label: t('sftp.uploadFolder'), icon: '⇪', onSelect: pickers.pickFolder },
         ] : []),
+        // The open folder itself, as a folder (not the filesystem root: far too much).
+        ...(here && here !== '/' ? [{ key: 'saveHere', label: t('sftp.saveFolderHere'), icon: '⇩', onSelect: () => { transfers.saveFolder([here]); } }] : []),
         { key: 'refresh', label: t('sftp.refresh'), icon: '⟳', onSelect: refresh },
-        { key: 'hidden', label: showHidden ? t('sftp.hideHidden') : t('sftp.showHidden'), icon: '◌', separated: true,
-          onSelect: () => toggleHidden() },
+        { key: 'hidden', label: showHidden ? t('sftp.hideHidden') : t('sftp.showHidden'), icon: '◌', separated: true, onSelect: toggleHidden },
       ];
     }
     const targets = selected.has(entry.name) ? chosen : [entry];
@@ -271,9 +272,10 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
       single && isFolder(entry)
         ? { key: 'open', label: t('sftp.open'), icon: '📂', onSelect: () => open(entry) }
         : { key: 'download', label: t('sftp.download'), icon: '↓', onSelect: () => transfers.download(saving) },
-      ...(single && isFolder(entry)
-        ? [{ key: 'zip', label: t('sftp.downloadFolder'), icon: '↓', onSelect: () => transfers.download(saving) }]
-        : []),
+      ...(single && isFolder(entry) ? [
+        { key: 'saveFolder', label: t('sftp.saveFolder'), icon: '⇩', onSelect: () => { transfers.saveFolder([pathOf(entry.name)]); } },
+        { key: 'zip', label: t('sftp.downloadFolder'), icon: '↓', onSelect: () => transfers.download(saving) },
+      ] : []),
       ...(onInsert ? [{ key: 'insert', label: t('sftp.insertPath'), icon: '⌨', onSelect: () => onInsert(`${quoted(targets)} `) }] : []),
       { key: 'copy', label: t('sftp.copyPath'), icon: '⧉',
         onSelect: () => { navigator.clipboard?.writeText(quoted(targets)).catch(() => undefined); } },
@@ -322,7 +324,8 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
           )}
         </div>
       </div>
-      <nav className="sftp-crumbs" aria-label={t('sftp.location')}>
+      <nav className="sftp-crumbs" aria-label={t('sftp.location')} title={t('sftp.crumbsMenuHint')}
+        onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY, opener: e.currentTarget }); }}>
         {crumbs.map((c, i) => (
           <button type="button" key={c.path}
             className={`${i === crumbs.length - 1 ? 'is-here' : ''} ${dropOn === c.path ? 'is-drop' : ''}`}

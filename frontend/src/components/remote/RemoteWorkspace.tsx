@@ -19,10 +19,8 @@ import TargetSessionsView from './TargetSessionsView';
 import TargetRail from './TargetRail';
 import AdhocConnect from './AdhocConnect';
 import ConsoleArea from './ConsoleArea';
-import ConsoleAccessModal from './ConsoleAccessModal';
-import ConsoleShareModal from './ConsoleShareModal';
-import { deleteConsole, VmConsole } from './vncApi';
-import { confirmDialog } from '../../shared/ui/ConfirmDialog';
+import { VmConsole } from './vncApi';
+import { useConsoleActions } from './useConsoleActions';
 import TerminalWithFiles, { filesScope } from './TerminalWithFiles';
 import RemoteSettingsView from './RemoteSettingsView';
 import RecordingsView from './RecordingsView';
@@ -54,8 +52,6 @@ export default function RemoteWorkspace() {
   const { data: consoles, refetch: refetchConsoles } = useApi<VmConsole[]>('/api/remote/consoles');
   const { data: me } = useApi<{ role: string }>('/api/users/me');
   const canManageConsoles = me?.role === 'admin';
-  const [accessConsole, setAccessConsole] = useState<{ key: string; label: string } | null>(null);
-  const [shareConsole, setShareConsole] = useState<{ key: string; label: string } | null>(null);
   const { openTerminal } = useTerminalWindows();
   const viewRef = useRef<TerminalViewHandle>(null);
   const { data: serverData, refetch: refetchServers } = useApi<RemoteServer[]>('/api/remote-servers', 30000);
@@ -150,20 +146,7 @@ export default function RemoteWorkspace() {
     servers, selection, select, joinSessionId, manualPassword, connected, setConnected,
     setServerView, viewRef, openTerminal, refetchSessions, refetchServers, setError: setCheckError,
   });
-  const consoleAction = async (c: VmConsole, action: string) => {
-    if (action === 'open') { select({ kind: 'console', vm: c.name, label: c.label, builtin: c.builtin }); showWork(); }
-    else if (action === 'detach') window.open(`/remote#${c.protocol === 'rdp' ? 'rdp' : 'console'}/${encodeURIComponent(c.name)}`, `con_${c.name}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no');
-    // A new connection opens its own window, so a multi-user VM can hold several.
-    else if (action === 'newSession') window.open(`/remote#${c.protocol === 'rdp' ? 'rdp' : 'console'}/${encodeURIComponent(c.name)}`, `con_${c.name}_${Date.now()}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no');
-    else if (action === 'edit') select({ kind: 'console-form', edit: { id: c.name, label: c.label, host: c.host || '', port: c.port || (c.protocol === 'rdp' ? 3389 : 5900), protocol: c.protocol || 'vnc', user: c.user || '', builtin: Boolean(c.builtin) } });
-    else if (action === 'access') setAccessConsole({ key: c.name, label: c.label });
-    else if (action === 'share') setShareConsole({ key: c.name, label: c.label });
-    else if (action === 'delete') {
-      if (!(await confirmDialog({ message: t('remote.console.deleteConfirm', { label: c.label }), danger: true, confirmLabel: t('common.delete') }))) return;
-      await deleteConsole(c.name); await refetchConsoles();
-      if (selection.kind === 'console' && selection.vm === c.name) select({ kind: 'overview' });
-    }
-  };
+  const consoleMenu = useConsoleActions({ select, showWork, selection, refetch: refetchConsoles });
   const detach = () => {
     if (!terminalTarget) return;
     const title = selection.kind === 'server' && selectedServer ? selectedServer.name
@@ -239,7 +222,7 @@ export default function RemoteWorkspace() {
         canManageConsoles={canManageConsoles}
         canAddConsole={me?.role === 'admin' || me?.role === 'remote'}
         onAddConsole={() => select({ kind: 'console-form', edit: null })}
-        onConsoleAction={consoleAction}
+        onConsoleAction={consoleMenu.act}
         sessionsFor={countFor}
         onSelect={(next) => { select(next); showWork(); }}
         onAction={(target, action) => {
@@ -370,11 +353,9 @@ export default function RemoteWorkspace() {
           {(selection.kind === 'console' || selection.kind === 'console-form') && (
             <ConsoleArea selection={selection} consoles={consoles || []} canManage={canManageConsoles}
               onSelect={select} onChanged={refetchConsoles}
-              onAccess={(key, label) => setAccessConsole({ key, label })}
-              onShare={(key, label) => setShareConsole({ key, label })} />
+              onAccess={consoleMenu.openAccess} onShare={consoleMenu.openShare} />
           )}
-          {accessConsole && <ConsoleAccessModal console={accessConsole.key} label={accessConsole.label} onClose={() => setAccessConsole(null)} />}
-          {shareConsole && <ConsoleShareModal console={shareConsole.key} label={shareConsole.label} onClose={() => setShareConsole(null)} />}
+          {consoleMenu.modals}
           {isServerTarget && selectedServer && serverView === 'files' && <FilesView server={selectedServer} />}
           {isServerTarget && selectedServer && serverView === 'status' && (
             <div className="rw-view rw-view-scroll"><ServerStatusView server={selectedServer} /></div>
