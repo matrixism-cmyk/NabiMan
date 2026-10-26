@@ -26,6 +26,7 @@ const t: T = {
   'sftp.download': { ko: '내려받기', en: 'Download', ja: 'ダウンロード' },
   'sftp.saveFolder': { ko: '폴더째 내려받기 (내 PC에 폴더로)', en: 'Download as a folder', ja: 'フォルダーのままダウンロード' },
   'sftp.saveFolderHere': { ko: '이 폴더를 폴더째 내려받기', en: 'Download this folder as a folder', ja: 'このフォルダーをフォルダーのままダウンロード' },
+  'sftp.saveFolderPickHint': { ko: '저장 위치를 고르지 않았습니다. Chrome은 다운로드·바탕화면·문서·홈 폴더나 드라이브 최상위 자체는 막으니, 그 안에 새 폴더를 만들어 선택하세요.', en: 'No folder chosen. Chrome refuses top-level folders (Downloads, Desktop, Documents, home, a drive root) themselves — make a new folder inside one and pick that.', ja: '保存先が選ばれていません。Chrome はダウンロード・デスクトップ・書類・ホーム・ドライブ直下そのものは拒否します。その中に新しいフォルダーを作って選んでください。' },
   'sftp.saveFolderListing': { ko: '폴더 목록 읽는 중…', en: 'Reading the folder…', ja: 'フォルダーを読み込み中…' },
   'sftp.saveFolderProgress': { ko: '파일 {n}/{m}', en: 'File {n}/{m}', ja: 'ファイル {n}/{m}' },
   'sftp.saveFolderDone': { ko: '파일 {m}개 저장 완료', en: '{m} files saved', ja: '{m} 件保存しました' },

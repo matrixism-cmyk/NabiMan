@@ -137,7 +137,11 @@ export function useTransfers(source: SftpSource, onUploaded: (dir: string) => vo
   const saveFolder = useCallback(async (paths: string[]) => {
     if (!canSaveFolder()) { download(paths.map((path) => ({ path, folder: true }))); return; }
     const base = await pickSaveDir(); // the first await, so it is still the click
-    if (!base) return;
+    if (!base) {
+      // Cancelled — or Chrome refused a protected top-level folder; say how to pick one it allows.
+      patch(add(t('sftp.saveFolder'), 'down', 0), { status: 'cancelled', message: t('sftp.saveFolderPickHint') });
+      return;
+    }
     const jobs = paths.map((path) => ({ path, id: add(`${baseName(path)}/`, 'down', 0) }));
     enqueue(async () => {
       for (const job of jobs) {

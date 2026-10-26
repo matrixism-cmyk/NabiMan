@@ -17,7 +17,9 @@ export const canSaveFolder = (): boolean =>
 export async function pickSaveDir(): Promise<DirHandle | null> {
   try {
     const picker = (window as unknown as { showDirectoryPicker: (o: object) => Promise<DirHandle> }).showDirectoryPicker;
-    return await picker({ mode: 'readwrite', id: 'nabiman-sftp-save' });
+    // Start in Downloads: Chrome refuses the top-level folders themselves
+    // (Downloads, Desktop, home, a drive root), but any folder inside them works.
+    return await picker({ mode: 'readwrite', id: 'nabiman-sftp-save', startIn: 'downloads' });
   } catch {
     return null;
   }
