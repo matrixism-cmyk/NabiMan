@@ -6,6 +6,9 @@ import { RateState, startRate, updateRate } from './transferRate';
 import { canSaveFolder, dirAt, pickSaveDir, saveInto, walkFolder } from './folderSave';
 import { confirmDialog } from '../../../shared/ui/ConfirmDialog';
 
+/** Files saved at once when saving a folder as a folder. */
+const SAVE_PARALLEL = 6;
+
 export interface TransferRow {
   /** A number for this panel's own transfers, a string for a copy between servers. */
   id: number | string;
@@ -163,18 +166,22 @@ export function useTransfers(source: SftpSource, onUploaded: (dir: string) => vo
             for (const dir of level.dirs) await dirAt(root, dir); // empty folders too
             // No total: it grows as folders are read, so a percentage would mislead.
             patch(job.id, { message: t('sftp.saveFolderWalking', { saved, folders }) });
-            for (const file of level.files) {
-              if (ctl.signal.aborted) return;
-              patch(job.id, { detail: file.rel });
-              try {
-                await saveInto(source, root, file, ctl.signal, (n) => { loaded += n; patch(job.id, { loaded }); });
-                saved += 1;
-              } catch {
-                if (ctl.signal.aborted) return;
-                failed += 1;
+            // A few files at a time: each one is two round trips (link, then fetch),
+            // so one-by-one leaves the line idle on a folder of small files.
+            const queue = level.files.slice();
+            const worker = async () => {
+              for (let file = queue.shift(); file && !ctl.signal.aborted; file = queue.shift()) {
+                patch(job.id, { detail: file.rel });
+                try {
+                  await saveInto(source, root, file, ctl.signal, (n) => { loaded += n; patch(job.id, { loaded }); });
+                  saved += 1;
+                } catch {
+                  if (!ctl.signal.aborted) failed += 1;
+                }
+                patch(job.id, { message: t('sftp.saveFolderWalking', { saved, folders }) });
               }
-              patch(job.id, { message: t('sftp.saveFolderWalking', { saved, folders }) });
-            }
+            };
+            await Promise.all(Array.from({ length: SAVE_PARALLEL }, worker));
           }, () => ctl.signal.aborted);
           const m = saved + failed;
           patch(job.id, ctl.signal.aborted ? { status: 'cancelled' }
