@@ -9,6 +9,8 @@ const ROW: { label: string; keysym: number }[] = [
   { label: 'Esc', keysym: KEY.ESCAPE }, { label: 'Tab', keysym: KEY.TAB }, { label: 'Win', keysym: KEY.WIN },
   { label: '←', keysym: KEY.LEFT }, { label: '↑', keysym: KEY.UP }, { label: '↓', keysym: KEY.DOWN }, { label: '→', keysym: KEY.RIGHT },
   { label: 'Home', keysym: KEY.HOME }, { label: 'End', keysym: KEY.END }, { label: 'Del', keysym: KEY.DELETE },
+  // A phone has no Caps Lock, and a VM left with it on types a password in capitals.
+  { label: 'Caps', keysym: KEY.CAPS },
 ];
 
 /**

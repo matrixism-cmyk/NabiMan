@@ -12,6 +12,14 @@ function fakeClient() {
   };
 }
 
+/** Lets every queued step and its waits run (this jest has no runAllTimersAsync). */
+async function settle() {
+  for (let i = 0; i < 20; i += 1) {
+    jest.advanceTimersByTime(500);
+    for (let j = 0; j < 5; j += 1) await Promise.resolve();
+  }
+}
+
 describe('rdpTypist', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
@@ -21,20 +29,20 @@ describe('rdpTypist', () => {
     const typist = rdpTypist(() => client);
     typist.text('hello 안녕');
     typist.keys('\r');
-    await jest.runAllTimersAsync();
+    await settle();
     expect(log).toEqual(['clip:hello 안녕', 'ffe3↓', '76↓', '76↑', 'ffe3↑', 'ff0d↓', 'ff0d↑']);
   });
 
   it('takes back characters with Backspace', async () => {
     const { log, client } = fakeClient();
     rdpTypist(() => client).keys('\x7f\x7f');
-    await jest.runAllTimersAsync();
+    await settle();
     expect(log).toEqual(['ff08↓', 'ff08↑', 'ff08↓', 'ff08↑']);
   });
 
   it('does nothing without a connection', async () => {
     const typist = rdpTypist(() => null);
     typist.text('x');
-    await jest.runAllTimersAsync();
+    await settle();
   });
 });

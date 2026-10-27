@@ -8,7 +8,7 @@
 export const KEY = {
   BACKSPACE: 0xff08, TAB: 0xff09, ENTER: 0xff0d, ESCAPE: 0xff1b, DELETE: 0xffff,
   HOME: 0xff50, LEFT: 0xff51, UP: 0xff52, RIGHT: 0xff53, DOWN: 0xff54, END: 0xff57,
-  CTRL: 0xffe3, ALT: 0xffe9, WIN: 0xffeb,
+  CTRL: 0xffe3, ALT: 0xffe9, WIN: 0xffeb, CAPS: 0xffe5,
 };
 
 /** The X11 keysym for a typed character: Latin-1 as is, the rest as Unicode keysyms. */
