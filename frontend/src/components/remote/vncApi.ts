@@ -69,7 +69,11 @@ export function shareWsUrl(token: string, pw?: string): string {
   return `${protocol}//${window.location.host}/api/cshare/${encodeURIComponent(token)}/ws${q}`;
 }
 
-export interface ShareInfo { label: string; protocol: 'vnc' | 'rdp'; mode: 'view' | 'control'; needs_password?: boolean }
+export interface ShareInfo {
+  label: string; protocol: 'vnc' | 'rdp'; mode: 'view' | 'control'; needs_password?: boolean;
+  /** Whether the visitor may dictate into the VM, and the server's dictation settings. */
+  dictation?: boolean; dictation_pause_ms?: number; dictation_auto_enter?: boolean;
+}
 export const shareInfo = (token: string) => apiRequest<ShareInfo>(`/api/cshare/${encodeURIComponent(token)}`);
 
 /** The full share link to hand out. */

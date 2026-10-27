@@ -323,6 +323,12 @@ fn q(query: &str, key: &str) -> Option<String> {
     super::parse_query_param(query, key)
 }
 
+/// The display the page asks for (its window, or the fixed size it chose): width, height, DPI.
+fn display_size(query: &str) -> (u32, u32, u32) {
+    let dims = |k: &str, d: u32| q(query, k).and_then(|v| v.parse().ok()).filter(|n| *n > 0 && *n <= 8000).unwrap_or(d);
+    (dims("GUAC_WIDTH", 1280), dims("GUAC_HEIGHT", 800), dims("GUAC_DPI", 96))
+}
+
 /// `GET /api/remote/rdp?target=<id>&ticket=…` (+ guacamole display params) —
 /// the RDP console WebSocket.
 #[actix_web::get("/api/remote/rdp")]
@@ -355,16 +361,8 @@ async fn ws_rdp(
     let Some((user, password)) = super::console_creds::resolve(query, &target, user, password) else {
         return Ok(HttpResponse::Unauthorized().finish());
     };
-    let dims = |k: &str, d: u32| q(query, k).and_then(|v| v.parse().ok()).filter(|n| *n > 0 && *n <= 8000).unwrap_or(d);
-    let params = RdpParams {
-        host,
-        port,
-        user,
-        password,
-        width: dims("GUAC_WIDTH", 1280),
-        height: dims("GUAC_HEIGHT", 800),
-        dpi: dims("GUAC_DPI", 96),
-    };
+    let (width, height, dpi) = display_size(query);
+    let params = RdpParams { host, port, user, password, width, height, dpi };
     ws::WsResponseBuilder::new(
         RdpConsole { params, started: Instant::now(), to_guacd: None, life: super::console_share::Lifeline::Account(grant), view_only: false },
         &req,
@@ -385,7 +383,8 @@ pub(super) fn open_shared_rdp(
     let Some((host, port, user, password)) = super::vnc_registry::rdp_login(console) else {
         return Ok(HttpResponse::NotFound().finish());
     };
-    let params = RdpParams { host, port, user, password, width: 1280, height: 800, dpi: 96 };
+    let (width, height, dpi) = display_size(req.query_string());
+    let params = RdpParams { host, port, user, password, width, height, dpi };
     ws::WsResponseBuilder::new(
         RdpConsole { params, started: Instant::now(), to_guacd: None, life: super::console_share::Lifeline::Share(token), view_only },
         req,

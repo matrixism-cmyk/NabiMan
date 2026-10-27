@@ -184,16 +184,32 @@ async fn revoke_share(req: HttpRequest, path: web::Path<(String, String)>) -> Ht
     }
 }
 
+/// Whether the request carries the link's password, when it has one.
+pub(super) fn password_ok(share: &Share, req: &HttpRequest) -> bool {
+    let Some(hash) = &share.password_hash else { return true };
+    let pw = super::parse_query_param(req.query_string(), "pw").unwrap_or_default();
+    !pw.is_empty() && bcrypt::verify(&pw, hash).unwrap_or(false)
+}
+
+/// Whether a link's visitor may dictate into the VM: the link is live, lets
+/// them control it, and its owner may dictate.
+pub(super) fn dictates(token: &str, users: &crate::users::UserStore) -> bool {
+    resolve(token).is_some_and(|s| s.mode == "control" && super::share::account_dictates(users, &s.owner_id))
+}
+
 /// `GET /api/cshare/{token}` — public: what this link opens (no secrets).
 #[actix_web::get("/api/cshare/{token}")]
-async fn share_info(token: web::Path<String>) -> HttpResponse {
+async fn share_info(token: web::Path<String>, users: web::Data<crate::users::UserStore>) -> HttpResponse {
     let Some(share) = resolve(&token) else {
         return HttpResponse::NotFound().finish();
     };
     let (label, protocol) = super::vnc_console::console_label_protocol(&share.console)
         .unwrap_or_else(|| (share.console.clone(), "vnc".into()));
+    let voice = super::dictation::load();
     HttpResponse::Ok().json(ApiResponse::ok(serde_json::json!({
-        "label": label, "protocol": protocol, "mode": share.mode, "needs_password": share.password_hash.is_some()
+        "label": label, "protocol": protocol, "mode": share.mode, "needs_password": share.password_hash.is_some(),
+        "dictation": voice.key().is_some() && dictates(&token, &users),
+        "dictation_pause_ms": voice.endpoint_ms(), "dictation_auto_enter": voice.auto_enter(),
     })))
 }
 
@@ -208,11 +224,8 @@ async fn share_ws(
     let Some(share) = resolve(&token) else {
         return Ok(HttpResponse::NotFound().finish());
     };
-    if let Some(hash) = &share.password_hash {
-        let pw = super::parse_query_param(req.query_string(), "pw").unwrap_or_default();
-        if pw.is_empty() || !bcrypt::verify(&pw, hash).unwrap_or(false) {
-            return Ok(HttpResponse::Forbidden().finish());
-        }
+    if !password_ok(&share, &req) {
+        return Ok(HttpResponse::Forbidden().finish());
     }
     super::vnc_console::open_shared_console(&req, stream, &share.console, share.mode != "control", token.into_inner())
 }

@@ -5,12 +5,13 @@ import { useFullscreen } from '../../shared/ui/useFullscreen';
 import { useChromeHidden } from '../../shared/ui/useChromeHidden';
 import { remoteKey, ALT_R } from './rdpKeys';
 import { describeFault, reconnectDelay, RECONNECT_MAX } from './consoleFault';
-import { useConsoleView, consoleDictationProps, keepAlive } from './consoleView';
+import { useConsoleView, keepAlive, fixedSize, ConsoleShare } from './consoleView';
 import ConsoleSettingsModal from './ConsoleSettingsModal';
+import ConsoleDictation from './ConsoleDictation';
+import { useConsoleKeyboard } from './ConsoleKeyboard';
 import ConsoleAltUserModal from './ConsoleAltUserModal';
 import RdpDrivePanel from './RdpDrivePanel';
 import { rdpTicket, consoleCreds } from './vncApi';
-import AccountDictation from '../terminal/dictation/AccountDictation';
 
 type Status = 'connecting' | 'connected' | 'disconnected';
 
@@ -19,7 +20,7 @@ type Status = 'connecting' | 'connected' | 'disconnected';
  *  to and from the VM, natively (no VNC-style keystroke workaround). */
 export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelete, canGrant, onGrant, canShare, onShare, popout, share }: {
   target: string; label: string; canEdit?: boolean; onEdit?: () => void; onDelete?: () => void;
-  canGrant?: boolean; onGrant?: () => void; canShare?: boolean; onShare?: () => void; popout?: boolean; share?: { token: string; viewOnly: boolean; pw?: string };
+  canGrant?: boolean; onGrant?: () => void; canShare?: boolean; onShare?: () => void; popout?: boolean; share?: ConsoleShare;
 }) {
   const { t } = useT();
   const host = useRef<HTMLDivElement>(null);
@@ -43,6 +44,8 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
   const [cview, setCview] = useConsoleView();
   const keepaliveRef = useRef(true);
   keepaliveRef.current = keepAlive(cview);
+  const fixed = fixedSize(cview);
+  const fixedKey = fixed ? `${fixed.w}x${fixed.h}` : '';
   const [showSettings, setShowSettings] = useState(false);
   // Alternate account for this window (multi-user VM); held in memory only.
   const altCreds = useRef<{ user: string; password: string } | null>(null);
@@ -120,6 +123,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
     // storms; guacd's resize then triggers fit().
     let sizeTimer: number | undefined;
     const pushSize = () => {
+      if (fixed) return;
       if (sizeTimer) window.clearTimeout(sizeTimer);
       sizeTimer = window.setTimeout(() => {
         const w = Math.max(el.clientWidth, 640), h = Math.max(el.clientHeight, 480);
@@ -163,7 +167,8 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
     // guacd's redirected drive becomes available — keep it for file transfer.
     c.onfilesystem = (object: any) => { filesystem.current = object; if (live) setDriveReady(true); };
 
-    const dims = () => `GUAC_WIDTH=${Math.max(el.clientWidth || 1280, 640)}&GUAC_HEIGHT=${Math.max(el.clientHeight || 800, 480)}&GUAC_DPI=96`;
+    const dims = () => (fixed ? `GUAC_WIDTH=${fixed.w}&GUAC_HEIGHT=${fixed.h}&GUAC_DPI=96`
+      : `GUAC_WIDTH=${Math.max(el.clientWidth || 1280, 640)}&GUAC_HEIGHT=${Math.max(el.clientHeight || 800, 480)}&GUAC_DPI=96`);
     if (share) {
       c.connect((share.pw ? `pw=${encodeURIComponent(share.pw)}&` : '') + dims());
     } else {
@@ -184,8 +189,17 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
     // Input (skipped entirely for a view-only share).
     let kb: any = null;
     if (!share?.viewOnly) {
+      // Pointer positions are on the scaled screen; the VM wants its own pixels.
+      const send = (s: any) => {
+        const k = display.getScale() || 1;
+        c.sendMouseState(new Guacamole.Mouse.State(s.x / k, s.y / k, s.left, s.middle, s.right, s.up, s.down));
+      };
       const mouse = new Guacamole.Mouse(display.getElement());
-      mouse.onmousedown = mouse.onmouseup = mouse.onmousemove = (state: any) => c.sendMouseState(state);
+      mouse.onmousedown = mouse.onmouseup = mouse.onmousemove = send;
+      // Guacamole.Mouse ignores touches, so a phone gets its own: tap where you
+      // touch (long press: right click), or a touchpad that moves the pointer.
+      const touch = cview.touch === 'pad' ? new Guacamole.Mouse.Touchpad(display.getElement()) : new Guacamole.Mouse.Touchscreen(display.getElement());
+      touch.onmousedown = touch.onmouseup = touch.onmousemove = send;
       // Guacamole.Mouse cancels mousedown, which also stops the browser from
       // focusing the screen — so keys went nowhere. Focus it on every press.
       el.addEventListener('mousedown', focusScreen, true);
@@ -213,7 +227,12 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
       try { c.disconnect(); } catch { /* already gone */ }
       client.current = null; keyboard.current = null;
     };
-  }, [target, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [target, attempt, fixedKey, cview.touch]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const kbd = useConsoleKeyboard({
+    enabled: status === 'connected' && !share?.viewOnly,
+    send: (keysym, down) => { try { client.current?.sendKeyEvent(down ? 1 : 0, keysym); } catch { /* not ready */ } },
+  });
 
   return (
     <div className={`rw-view rw-console ${folded ? 'is-folded' : ''}`} ref={root}>
@@ -228,13 +247,14 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
         {share?.viewOnly && <span className="rw-proto-tag">{t('remote.console.share.viewOnly')}</span>}
         <span className={`rw-console-state is-${status}`}>{t(`remote.console.${status}`)}</span>
         <span className="rw-console-spacer" />
-        {status === 'connected' && !share?.viewOnly && <AccountDictation variant="bar" onText={dictate} onKeys={dictateKeys} {...consoleDictationProps(cview)} />}
+        {status === 'connected' && !share?.viewOnly && <ConsoleDictation share={share} view={cview} onText={dictate} onKeys={dictateKeys} />}
+        {kbd.button}
         {driveReady && !share && <button className={`btn btn-secondary btn-sm ${drivePanel ? 'is-active' : ''}`} onClick={() => setDrivePanel(d => !d)}>{t('remote.console.drive.files')}</button>}
         {!popout && <button className="btn btn-secondary btn-sm" onClick={() => window.open(`/remote#rdp/${encodeURIComponent(target)}`, `rdp_${target}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no')}>{t('remote.console.detach')}</button>}
         <button className="btn btn-secondary btn-sm" onClick={toggle} title={t('remote.console.fullscreen')} aria-label={t('remote.console.fullscreen')} aria-pressed={full}>⛶</button>
         <button className="btn btn-secondary btn-sm" onClick={() => setFolded(true)} title={t('app.hideChrome')} aria-label={t('app.hideChrome')}>▴</button>
         {!share && <button className="btn btn-secondary btn-sm" onClick={() => setAskUser(true)} title={t('remote.console.altUser')} aria-label={t('remote.console.altUser')}>👤</button>}
-        {!share && <button className="btn btn-secondary btn-sm" onClick={() => setShowSettings(true)} title={t('remote.console.settings')} aria-label={t('remote.console.settings')}>⚙</button>}
+        <button className="btn btn-secondary btn-sm" onClick={() => setShowSettings(true)} title={t('remote.console.settings')} aria-label={t('remote.console.settings')}>⚙</button>
         {!share?.viewOnly && <button className="btn btn-secondary btn-sm" title={t('remote.console.hangulHint')}
           onClick={() => { try { client.current?.sendKeyEvent(1, ALT_R); client.current?.sendKeyEvent(0, ALT_R); } catch { /* not ready */ } }} disabled={status !== 'connected'}>{t('remote.console.hangul')}</button>}
         {!share?.viewOnly && <button className="btn btn-secondary btn-sm" onClick={() => { try { const c = client.current; c?.sendKeyEvent(1, 0xffe3); c?.sendKeyEvent(1, 0xffe9); c?.sendKeyEvent(1, 0xffff); c?.sendKeyEvent(0, 0xffff); c?.sendKeyEvent(0, 0xffe9); c?.sendKeyEvent(0, 0xffe3); } catch { /* not ready */ } }} disabled={status !== 'connected'}>Ctrl+Alt+Del</button>}
@@ -265,7 +285,8 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
           </div>
         )}
       </div>
-      {showSettings && <ConsoleSettingsModal view={cview} onChange={setCview} onClose={() => setShowSettings(false)} />}
+      {kbd.panel}
+      {showSettings && <ConsoleSettingsModal view={cview} onChange={setCview} onClose={() => setShowSettings(false)} rdp share={share} />}
       {askUser && (
         <ConsoleAltUserModal onClose={() => setAskUser(false)}
           onConnect={(u, p) => { altCreds.current = { user: u, password: p }; setAltUser(u); setAskUser(false); retries.current = 0; setAttempt(a => a + 1); }} />

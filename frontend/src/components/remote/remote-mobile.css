@@ -109,3 +109,19 @@ body.rw-fullscreen { overflow: hidden; }
 /* Full screen means above the app's header: the content area must not trap it below. */
 body.rw-fullscreen .main-content { z-index: auto; }
 .rw-compact .rw-view-scroll .btn-group .btn { min-height: 38px; }
+
+/* A VM console's phone keyboard: a hidden text box the phone types into, and a row of keys it lacks */
+.rw-console-keys { position: relative; flex: 0 0 auto; }
+.rw-console-keybox {
+  /* At the top, so a phone has no reason to scroll the page to show it. */
+  position: fixed; left: 0; top: 0; width: 1px; height: 1px; padding: 0; border: 0;
+  opacity: 0; resize: none; font-size: 16px; /* 16px: iOS zooms into a smaller field */
+}
+.rw-console-keyrow {
+  display: flex; gap: 6px; padding: 6px 8px; overflow-x: auto; border-top: 1px solid var(--border);
+  background: var(--bg-secondary, rgba(127,127,127,.06)); -webkit-overflow-scrolling: touch;
+}
+.rw-console-keyrow.is-lifted { position: fixed; left: 0; right: 0; z-index: 30; }
+.rw-console-keyrow .btn { flex: 0 0 auto; min-width: 44px; min-height: 36px; }
+.rw-console-keyrow .btn.is-active { background: var(--accent, #4a9eff); color: #fff; }
+.console-settings select { max-width: 100%; }

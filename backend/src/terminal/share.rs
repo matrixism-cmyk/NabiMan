@@ -19,7 +19,7 @@ use management::{create_share, list_shares, revoke_share};
 mod files;
 #[path = "share_accounts.rs"]
 mod accounts;
-pub(crate) use accounts::{links_of, owner_dictates, revoke_links_of};
+pub(crate) use accounts::{account_dictates, links_of, owner_dictates, revoke_links_of};
 use files::{create_files_share, files_link_alive};
 pub(crate) use files::files_link_server;
 #[cfg(test)]

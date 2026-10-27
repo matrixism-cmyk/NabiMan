@@ -22,6 +22,12 @@ export async function openShareDictation(
   return new WebSocket(`${wsBase()}/api/share/${encodeURIComponent(token)}/dictation?${QUERY}&ticket=${ticket}`);
 }
 
+/** A VM console share link's visitor's dictation, with the link's password if it has one. */
+export function openConsoleShareDictation(token: string, pw?: string): Promise<WebSocket> {
+  const pass = pw ? `&pw=${encodeURIComponent(pw)}` : '';
+  return Promise.resolve(new WebSocket(`${wsBase()}/api/cshare/${encodeURIComponent(token)}/dictation?${QUERY}${pass}`));
+}
+
 export interface DictationSetup {
   available: boolean;
   /** How long a pause ends what was said; 0: only "엔터" does. */

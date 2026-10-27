@@ -3,6 +3,7 @@ import { useT } from '../../shared/i18n';
 import VncConsoleView from './VncConsoleView';
 import RdpConsoleView from './RdpConsoleView';
 import { shareInfo, ShareInfo } from './vncApi';
+import type { ConsoleShare } from './consoleView';
 
 /** The page a console share link opens (`/cshare/<token>`): no account, just the
  *  one console, view-only or control as the link was made, behind a password if
@@ -35,7 +36,11 @@ export default function ConsoleSharePage({ token }: { token: string }) {
     );
   }
 
-  const share = { token, viewOnly: info.mode !== 'control', pw: info.needs_password ? pw : undefined };
+  const viewOnly = info.mode !== 'control';
+  const share: ConsoleShare = {
+    token, viewOnly, pw: info.needs_password ? pw : undefined,
+    dictation: info.dictation && !viewOnly ? { pause_ms: info.dictation_pause_ms ?? 1500, auto_enter: Boolean(info.dictation_auto_enter) } : null,
+  };
   return (
     <div className="rw-console-popout">
       {info.protocol === 'rdp'

@@ -43,6 +43,8 @@ enum Admission {
     Account(ConnectionGrant),
     /// A share link's visitor: the link must stay live, as it was, and writable.
     Share { link: Box<ShareLink>, shares: ShareStore, users: UserStore },
+    /// A VM console share link's visitor: the link must stay live and allow control.
+    ConsoleShare { token: String, users: UserStore },
 }
 
 impl Admission {
@@ -53,6 +55,7 @@ impl Admission {
                 .is_some_and(|now| {
                     now.same_authorization(link) && !now.read_only && crate::terminal::share::owner_dictates(users, &now)
                 }),
+            Admission::ConsoleShare { token, users } => crate::terminal::console_share::dictates(token, users),
         }
     }
 }
@@ -310,6 +313,28 @@ pub(super) async fn start_shared(
     }
     let grant = Admission::Share { link: Box::new(link), shares: shares.get_ref().clone(), users: users.get_ref().clone() };
     begin(grant, &req, stream)
+}
+
+/// `GET /api/cshare/{token}/dictation?purpose=dictation[&pw=…]`: a VM console
+/// share link's visitor, with the link's password if it has one, through a link
+/// that lets them control the VM.
+pub(super) async fn start_console_shared(
+    req: HttpRequest,
+    path: web::Path<String>,
+    stream: web::Payload,
+    users: web::Data<UserStore>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let token = path.into_inner();
+    if !dictation_query(&req) {
+        return Ok(HttpResponse::BadRequest().finish());
+    }
+    let Some(share) = crate::terminal::console_share::resolve(&token) else {
+        return Ok(HttpResponse::NotFound().finish());
+    };
+    if !crate::terminal::console_share::password_ok(&share, &req) || !crate::terminal::console_share::dictates(&token, &users) {
+        return Ok(HttpResponse::Forbidden().finish());
+    }
+    begin(Admission::ConsoleShare { token, users: users.get_ref().clone() }, &req, stream)
 }
 
 #[cfg(test)]

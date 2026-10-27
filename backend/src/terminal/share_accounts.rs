@@ -4,8 +4,14 @@ use super::*;
 
 /// Whether the visitor of a link may dictate: only when its owner may.
 pub(crate) fn owner_dictates(users: &UserStore, link: &ShareLink) -> bool {
+    account_dictates(users, &link.owner_id)
+}
+
+/// Whether an account may dictate (and so may the visitors of its links):
+/// any account but a remote member without the dictation permission.
+pub(crate) fn account_dictates(users: &UserStore, owner_id: &str) -> bool {
     users.lock().is_ok_and(|all| {
-        all.iter().any(|u| u.id == link.owner_id && (!crate::member_servers::is_member(u) || u.remote_permissions.dictation))
+        all.iter().any(|u| u.id == owner_id && (!crate::member_servers::is_member(u) || u.remote_permissions.dictation))
     })
 }
 

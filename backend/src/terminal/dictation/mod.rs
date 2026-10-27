@@ -271,6 +271,8 @@ pub(crate) fn config(cfg: &mut web::ServiceConfig) {
     cfg.route("/api/terminal/dictation", web::get().to(bridge::start))
         // Public: checked against the share link in `start_shared`.
         .route("/api/share/{token}/dictation", web::get().to(bridge::start_shared))
+        // Public: checked against the console share link in `start_console_shared`.
+        .route("/api/cshare/{token}/dictation", web::get().to(bridge::start_console_shared))
         .route("/api/terminal/dictation/settings", web::get().to(get_settings))
         .route("/api/terminal/dictation/settings", web::put().to(put_settings))
         .route("/api/terminal/dictation/test", web::post().to(test))
