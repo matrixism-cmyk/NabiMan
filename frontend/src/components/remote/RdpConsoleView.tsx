@@ -14,6 +14,7 @@ import RdpDrivePanel from './RdpDrivePanel';
 import { rdpTicket, consoleCreds } from './vncApi';
 import { rdpTypist } from './rdpTypist';
 import { saveBlob } from './consoleDownload';
+import { rdpZoom } from './rdpZoom';
 
 type Status = 'connecting' | 'connected' | 'disconnected';
 
@@ -26,6 +27,9 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
 }) {
   const { t } = useT();
   const host = useRef<HTMLDivElement>(null);
+  const stage = useRef<HTMLDivElement>(null);
+  const zoomer = useRef<ReturnType<typeof rdpZoom> | null>(null);
+  const [zoom, setZoom] = useState(1);
   const root = useRef<HTMLDivElement>(null);
   const client = useRef<any>(null);
   const keyboard = useRef<any>(null);
@@ -92,20 +96,24 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
     let live = true;
     setStatus('connecting'); setError(''); setDriveReady(false); setDrivePanel(false);
     const el = host.current;
-    if (!el) return undefined;
+    const st = stage.current;
+    if (!el || !st) return undefined;
     const tunnel = new Guacamole.WebSocketTunnel(share ? `api/cshare/${encodeURIComponent(share.token)}/ws` : 'api/remote/rdp');
     const c = new Guacamole.Client(tunnel);
     client.current = c;
     const display = c.getDisplay();
-    el.innerHTML = '';
-    el.appendChild(display.getElement());
+    st.innerHTML = '';
+    st.appendChild(display.getElement());
 
-    const fit = () => {
-      const w = display.getWidth(), h = display.getHeight();
-      if (!w || !h) return;
-      const scale = Math.min(el.clientWidth / w, el.clientHeight / h, 1);
-      display.scale(scale);
-    };
+    // Fitted whole, or as far as two fingers zoomed in (rdpZoom).
+    let touch: any = null;
+    setZoom(1);
+    const zoomed = rdpZoom({
+      stage: st, display, pinchOnly: cview.touch === 'pad', onZoom: (z) => { if (live) setZoom(z); },
+      onRescale: (ratio) => { if (cview.touch === 'pad' && touch) { touch.currentState.x *= ratio; touch.currentState.y *= ratio; } },
+    });
+    zoomer.current = zoomed;
+    const fit = zoomed.fit;
     display.onresize = fit;
     fitRef.current = fit;
 
@@ -193,12 +201,15 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
         const k = display.getScale() || 1;
         c.sendMouseState(new Guacamole.Mouse.State(s.x / k, s.y / k, s.left, s.middle, s.right, s.up, s.down));
       };
+      // A touchpad's pointer can leave a zoomed-in view; the view goes after it.
+      const sendPad = (s: any) => { send(s); zoomed.follow(s.x, s.y); };
       const mouse = new Guacamole.Mouse(display.getElement());
       mouse.onmousedown = mouse.onmouseup = mouse.onmousemove = send;
       // Guacamole.Mouse ignores touches, so a phone gets its own: tap where you
       // touch (long press: right click), or a touchpad that moves the pointer.
-      const touch = cview.touch === 'pad' ? new Guacamole.Mouse.Touchpad(display.getElement()) : new Guacamole.Mouse.Touchscreen(display.getElement());
-      touch.onmousedown = touch.onmouseup = touch.onmousemove = send;
+      touch = cview.touch === 'pad' ? new Guacamole.Mouse.Touchpad(display.getElement()) : new Guacamole.Mouse.Touchscreen(display.getElement());
+      touch.onmousedown = touch.onmouseup = send;
+      touch.onmousemove = cview.touch === 'pad' ? sendPad : send;
       // Guacamole.Mouse cancels mousedown, which also stops the browser from
       // focusing the screen — so keys went nowhere. Focus it on every press.
       el.addEventListener('mousedown', focusScreen, true);
@@ -219,6 +230,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
       if (reconnectTimer.current) window.clearTimeout(reconnectTimer.current);
       if (sizeTimer) window.clearTimeout(sizeTimer);
       filesystem.current = null;
+      zoomed.detach(); zoomer.current = null;
       el.removeEventListener('mousedown', focusScreen, true);
       el.removeEventListener('mouseenter', pushClipboard);
       window.removeEventListener('focus', pushClipboard);
@@ -274,6 +286,12 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
         onDragOver={share?.viewOnly ? undefined : (e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
       >
+        <div ref={stage} className="rw-rdp-stage" />
+        {zoom > 1 && (
+          <button type="button" className="rw-rdp-zoom" onClick={() => zoomer.current?.reset()} title={t('remote.console.zoomHint')}>
+            {t('remote.console.zoomFit', { pct: Math.round(zoom * 100) })}
+          </button>
+        )}
         {dragOver && !share?.viewOnly && <div className="rw-rdp-droplayer">{t('remote.console.drive.hint')}</div>}
         {drivePanel && <RdpDrivePanel target={target} onClose={() => setDrivePanel(false)} />}
         {upload && (

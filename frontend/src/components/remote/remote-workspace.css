@@ -340,6 +340,13 @@
 .rw-console.is-folded .rw-console-bar { display: none; }
 .rw-rdp-screen { position: relative; display: flex; align-items: flex-start; justify-content: center; outline: none; }
 .rw-rdp-screen canvas { display: block; }
+/* The screen's own scrolling box: fitted, or zoomed in by two fingers (rdpZoom). */
+.rw-rdp-stage { position: absolute; inset: 0; overflow: hidden; display: flex; align-items: flex-start; touch-action: none; }
+.rw-rdp-stage > div { flex: none; margin: 0 auto; }
+.rw-rdp-zoom {
+  position: absolute; left: 8px; top: 8px; z-index: 2; padding: 4px 10px; border-radius: 14px; font-size: 12px;
+  background: rgba(10, 13, 18, 0.8); color: #e8edf4; border: 1px solid rgba(255, 255, 255, 0.2); cursor: pointer;
+}
 .rw-rdp-screen.is-dragover { outline: 2px dashed var(--accent, #4a9eff); outline-offset: -6px; }
 .rw-rdp-droplayer {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
