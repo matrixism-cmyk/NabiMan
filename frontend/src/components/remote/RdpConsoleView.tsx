@@ -147,7 +147,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
     };
     c.onstatechange = (state: number) => {
       if (!live) return;
-      if (state === 3) { retries.current = 0; setStatus('connected'); setError(''); fit(); }
+      if (state === 3) { retries.current = 0; setStatus('connected'); setError(''); fit(); if (!share?.viewOnly) el.focus({ preventScroll: true }); }
       else if (state === 5) fail();
     };
     c.onerror = (err: { code?: number; message?: string }) => fail(err);
@@ -178,11 +178,16 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
       })();
     }
 
+    const focusScreen = () => { if (document.activeElement !== el) el.focus({ preventScroll: true }); };
+
     // Input (skipped entirely for a view-only share).
     let kb: any = null;
     if (!share?.viewOnly) {
       const mouse = new Guacamole.Mouse(display.getElement());
       mouse.onmousedown = mouse.onmouseup = mouse.onmousemove = (state: any) => c.sendMouseState(state);
+      // Guacamole.Mouse cancels mousedown, which also stops the browser from
+      // focusing the screen — so keys went nowhere. Focus it on every press.
+      el.addEventListener('mousedown', focusScreen, true);
       kb = new Guacamole.Keyboard(el);
       kb.onkeydown = (keysym: number) => c.sendKeyEvent(1, keysym);
       kb.onkeyup = (keysym: number) => c.sendKeyEvent(0, keysym);
@@ -196,6 +201,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
       if (reconnectTimer.current) window.clearTimeout(reconnectTimer.current);
       if (sizeTimer) window.clearTimeout(sizeTimer);
       filesystem.current = null;
+      el.removeEventListener('mousedown', focusScreen, true);
       el.removeEventListener('mouseenter', pushClipboard);
       window.removeEventListener('focus', pushClipboard);
       try { if (kb) { kb.onkeydown = null; kb.onkeyup = null; } } catch { /* ignore */ }
