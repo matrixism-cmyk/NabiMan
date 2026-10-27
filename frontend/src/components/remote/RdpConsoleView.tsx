@@ -98,7 +98,8 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
     const el = host.current;
     const st = stage.current;
     if (!el || !st) return undefined;
-    const tunnel = new Guacamole.WebSocketTunnel(share ? `api/cshare/${encodeURIComponent(share.token)}/ws` : 'api/remote/rdp');
+    // From the site root: relative, a share page (/cshare/<token>) reached /cshare/api/….
+    const tunnel = new Guacamole.WebSocketTunnel(share ? `/api/cshare/${encodeURIComponent(share.token)}/ws` : '/api/remote/rdp');
     const c = new Guacamole.Client(tunnel);
     client.current = c;
     const display = c.getDisplay();

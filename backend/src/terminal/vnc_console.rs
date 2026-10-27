@@ -63,11 +63,14 @@ pub(super) fn console_exists(key: &str) -> bool {
 }
 
 /// A console's display label and protocol ("vnc"|"rdp"), for share pages.
+/// A registered console overlaid on a built-in one (winsrv2022 as RDP) is what
+/// the console list shows and what its owner shares, so it decides; taking the
+/// built-in first sent share links to the VM's VNC screen instead of its RDP.
 pub(super) fn console_label_protocol(key: &str) -> Option<(String, String)> {
-    if let Some((_, label, _)) = CONSOLES.iter().find(|(n, _, _)| *n == key) {
-        return Some(((*label).to_string(), "vnc".into()));
+    if let Some(c) = super::vnc_registry::find(key) {
+        return Some((c.label, c.protocol));
     }
-    super::vnc_registry::find(key).map(|c| (c.label, c.protocol))
+    CONSOLES.iter().find(|(n, _, _)| *n == key).map(|(_, label, _)| ((*label).to_string(), "vnc".into()))
 }
 
 /// Opens a console for a share link (no account): VNC here, RDP via guacd.

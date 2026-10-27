@@ -9,7 +9,7 @@ import ConsoleDictation from './ConsoleDictation';
 import { useConsoleKeyboard } from './ConsoleKeyboard';
 import { describeFault, reconnectDelay, RECONNECT_MAX } from './consoleFault';
 import { consoleWsUrl, shareWsUrl } from './vncApi';
-import { typeText } from './vncInput';
+import { sendKeysym, typeText } from './vncInput';
 
 type Status = 'connecting' | 'connected' | 'disconnected';
 
@@ -117,18 +117,11 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
 
   // Voice dictation typed into the VM (ASCII reliable; Hangul limited on VNC).
   const dictate = (text: string) => { if (rfb.current) typeText(rfb.current, text); };
-  const dictateKeys = (keys: string) => {
-    const r = rfb.current; if (!r) return;
-    for (const ch of keys) {
-      if (ch === '\r' || ch === '\n') r.sendKey(0xff0d, null);
-      else if (ch === '\x7f' || ch === '\b') r.sendKey(0xff08, null);
-      else { const cp = ch.codePointAt(0) ?? 0; if (cp) r.sendKey(cp < 0x100 ? cp : 0x01000000 + cp, null); }
-    }
-  };
+  const dictateKeys = (keys: string) => { if (rfb.current) typeText(rfb.current, keys); };
 
   const kbd = useConsoleKeyboard({
     enabled: status === 'connected' && !share?.viewOnly,
-    send: (keysym, down) => { try { rfb.current?.sendKey(keysym, null, down); } catch { /* not ready */ } },
+    send: (keysym, down) => { try { if (rfb.current) sendKeysym(rfb.current, keysym, down); } catch { /* not ready */ } },
   });
 
   return (
