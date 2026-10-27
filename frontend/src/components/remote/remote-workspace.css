@@ -377,3 +377,14 @@
   padding: 10px; margin: 0; max-height: 46vh; overflow: auto; white-space: pre-wrap; word-break: break-all;
   font-family: ui-monospace, "D2Coding", monospace; font-size: 12.5px; line-height: 1.45;
 }
+
+/* Serial devices attached to a session (SessionDevicesDialog). */
+.serial-dev-dialog { width: min(640px, calc(100vw - 32px)); }
+.serial-dev { display: flex; flex-direction: column; gap: 12px; }
+.serial-dev-item { border: 1px solid var(--border); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.serial-dev-item.is-other { opacity: 0.85; }
+.serial-dev-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.serial-dev-path { flex: 1; min-width: 0; font-family: monospace; }
+.serial-dev-tail { max-height: 7.5em; margin: 0; }
+.serial-dev-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.serial-dev-add { display: flex; flex-direction: column; gap: 6px; }

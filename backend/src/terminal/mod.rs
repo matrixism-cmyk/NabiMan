@@ -27,6 +27,7 @@ mod console_handlers;
 pub mod console_drive;
 pub mod console_creds;
 pub mod serial_bridge;
+mod serial_sessions;
 pub mod share_store;
 pub(crate) mod share_ticket;
 pub mod telnet_client;

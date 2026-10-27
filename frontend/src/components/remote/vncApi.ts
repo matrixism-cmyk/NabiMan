@@ -104,3 +104,14 @@ export async function serialTicket(name: string): Promise<string> {
   if (!/^[0-9a-f]{64}$/.test(ticket)) throw new Error('invalid serial ticket');
   return ticket;
 }
+
+/** A ticket for attaching a serial device `name` to terminal session `sid` (`/api/terminal/serial`). */
+export async function sessionSerialTicket(sid: string, name: string): Promise<string> {
+  const response = await apiRequest<{ ticket: string; expires_in_seconds: number }>('/api/terminal/tickets', {
+    method: 'POST', body: JSON.stringify({ query: `session_id=${sid}&serial=${name}` }),
+  });
+  if (!response.success || !response.data) throw new Error(response.message || 'serial denied');
+  const { ticket } = response.data;
+  if (!/^[0-9a-f]{64}$/.test(ticket)) throw new Error('invalid serial ticket');
+  return ticket;
+}

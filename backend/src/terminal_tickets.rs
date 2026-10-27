@@ -236,6 +236,7 @@ pub(crate) fn url_pass(req: &ServiceRequest) -> Option<Option<auth::Claims>> {
         && path != "/api/terminal/dictation"
         && path != "/api/remote/console"
         && path != "/api/remote/serial"
+        && path != "/api/terminal/serial"
     {
         return None;
     }

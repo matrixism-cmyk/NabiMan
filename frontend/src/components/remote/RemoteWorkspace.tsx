@@ -25,6 +25,7 @@ import TerminalWithFiles, { filesScope } from './TerminalWithFiles';
 import RemoteSettingsView from './RemoteSettingsView';
 import RecordingsView from './RecordingsView';
 import SerialView from './SerialView';
+import { useSerialWorkspace } from './useSerialWorkspace';
 import WorkspaceActions from './WorkspaceActions';
 import { useCompact, useFullScreenPane, useMobilePane } from './useCompact';
 import WorkspaceTabs, { viewFor } from './WorkspaceTabs';
@@ -194,6 +195,7 @@ export default function RemoteWorkspace() {
   // "This pane" is the pane mounted for this target, even kept behind the list.
   const currentSessionId = showTerminalPane ? paneSessions[storageKey] || '' : '';
   useEffect(() => { if (currentSessionId) refetchSessions(); }, [currentSessionId, refetchSessions]);
+  useSerialWorkspace(canManageConsoles, t, sessionData);
   const settings = useSessionTerminalSettings(currentSessionId || undefined);
   const terminalVisible = (hasSessionsView && serverView === 'terminal')
     || (selection.kind === 'adhoc' && Boolean(adhocTarget));
@@ -261,6 +263,7 @@ export default function RemoteWorkspace() {
               onShareSession={() => { setShareTarget(currentSessionId); setShowShare(true); }}
               onShareFiles={serverView === 'files' && selectedServer ? () => setShareFiles(true) : undefined}
               onSettings={() => setShowSettings(true)}
+              serialDevices={canManageConsoles && sessions.find(s => s.id === currentSessionId)?.label === 'local'}
               files={compact && showTerminalPane && terminalVisible && filesScope(terminalTarget)
                 ? { open: filesOpen, toggle: () => setFilesOpen(o => !o) } : undefined} />
           )}

@@ -6,6 +6,7 @@ import AccountDictation from '../terminal/dictation/AccountDictation';
 import { useVoiceReply } from '../terminal/dictation/useVoiceReply';
 import Modal from '../../shared/ui/Modal';
 import { useSharing } from './member';
+import SessionDevicesDialog, { useSessionDeviceCount } from './SessionDevicesDialog';
 
 interface Props {
   compact: boolean;
@@ -21,6 +22,8 @@ interface Props {
   onSettings: () => void;
   /** On a phone, the file panel opens over the terminal from here. */
   files?: { open: boolean; toggle: () => void };
+  /** Serial devices can be attached to this terminal's session. */
+  serialDevices?: boolean;
 }
 
 /**
@@ -36,6 +39,13 @@ export default function WorkspaceActions(props: Props) {
   const sharing = granted.sessions;
   const shareFiles = granted.files ? props.onShareFiles : undefined;
   const [sheet, setSheet] = useState(false);
+  const [devicesOpen, setDevicesOpen] = useState(false);
+  const deviceCount = useSessionDeviceCount(terminal?.sessionId || undefined);
+  const devicesOn = !!(props.serialDevices && terminal?.sessionId);
+  const devicesDialog = devicesOpen && devicesOn && (
+    <SessionDevicesDialog sessionId={terminal!.sessionId} sessionName={terminal!.sessionName} onClose={() => setDevicesOpen(false)} />
+  );
+  const devicesLabel = `🔌 ${t('serial.dev.button')}${deviceCount ? ` ${deviceCount}` : ''}`;
   const statusText = (s: TerminalStatus) => (s === 'connected' ? t('terminal.connected')
     : s === 'reconnecting' ? t('terminal.reconnecting')
     : s === 'ended' ? t('terminal.sessionEnded') : t('terminal.disconnected'));
@@ -65,10 +75,14 @@ export default function WorkspaceActions(props: Props) {
                   🔗 {t('share.button')}
                 </button>
               )}
+              {devicesOn && (
+                <button className="btn btn-secondary btn-sm" onClick={() => setDevicesOpen(true)}>{devicesLabel}</button>
+              )}
             </>)}
           </>
         )}
         <button className="btn btn-secondary btn-sm" onClick={props.onSettings} title={t('terminal.settings')}>⚙</button>
+        {devicesDialog}
       </div>
     );
   }
@@ -102,6 +116,9 @@ export default function WorkspaceActions(props: Props) {
                 {terminal.sessionId && sharing && (
                   <button type="button" className="rw-sheet-item" onClick={run(props.onShareSession)}>🔗 {t('share.button')}</button>
                 )}
+                {devicesOn && (
+                  <button type="button" className="rw-sheet-item" onClick={run(() => setDevicesOpen(true))}>{devicesLabel}</button>
+                )}
               </>
             )}
             {shareFiles && (
@@ -112,6 +129,7 @@ export default function WorkspaceActions(props: Props) {
           </div>
         </Modal>
       )}
+      {devicesDialog}
     </div>
   );
 }
