@@ -62,3 +62,18 @@ test('fit and actual size toggle by button or F', async () => {
   fireEvent.keyDown(screen.getByRole('dialog'), { key: 'f' });
   expect(document.querySelector('.preview-image.is-fit')).toBeTruthy();
 });
+
+test('the folder being re-read neither fetches the file again nor moves to another', async () => {
+  const { rerender } = ui([file('a.png'), file('b.jpg')], 'b.jpg');
+  await screen.findByRole('img', { name: 'b.jpg' });
+  // What the panel's background refresh hands over: new objects, and a file new in the list.
+  rerender(<I18nProvider><PreviewDialog source={source} dir="/srv/pics" files={[file('0.png'), file('a.png'), file('b.jpg')]}
+    start="b.jpg" onDownload={jest.fn()} onClose={jest.fn()} /></I18nProvider>);
+  expect(await screen.findByRole('img', { name: 'b.jpg' })).toBeInTheDocument();
+  expect(screen.getByText(/3 \/ 3/)).toBeInTheDocument();
+  expect(download).toHaveBeenCalledTimes(1);
+  // Changed on the server: fetched again.
+  rerender(<I18nProvider><PreviewDialog source={source} dir="/srv/pics" files={[file('0.png'), file('a.png'), file('b.jpg', 2000)]}
+    start="b.jpg" onDownload={jest.fn()} onClose={jest.fn()} /></I18nProvider>);
+  await waitFor(() => expect(download).toHaveBeenCalledTimes(2));
+});

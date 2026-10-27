@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '../../../../shared/i18n';
 import Modal from '../../../../shared/ui/Modal';
 import { downloadFile, formatSize, SftpEntry, SftpSource, streamLink } from '../sftpApi';
@@ -45,7 +45,9 @@ const readWrap = () => { try { return localStorage.getItem(WRAP_KEY) === '1'; } 
  */
 export default function PreviewDialog({ source, dir, files, start, onDownload, onClose }: Props) {
   const { t } = useT();
-  const [at, setAt] = useState(() => Math.max(0, files.findIndex((f) => f.name === start)));
+  // The file shown is followed by name: the panel re-reads the folder every
+  // few seconds, which brings new entries and can move this one in the list.
+  const [name, setName] = useState(start);
   const [load, setLoad] = useState<Load>({ state: 'loading', loaded: 0, total: 0 });
   const [fit, setFit] = useState(true);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
@@ -55,8 +57,16 @@ export default function PreviewDialog({ source, dir, files, start, onDownload, o
   const [copied, setCopied] = useState(false);
   const [pages, setPages] = useState<number | null>(null);
   const [facts, setFacts] = useState('');
-  const entry = files[at];
-  const spec = useMemo(() => (entry ? previewOf(entry.name) : null), [entry]);
+  const found = files.findIndex((f) => f.name === name);
+  const at = Math.max(0, found);
+  // A file deleted while shown stays on screen as it was.
+  const shown = useRef<SftpEntry | undefined>(undefined);
+  if (found >= 0) shown.current = files[found];
+  const entry = shown.current || files[0];
+  const shownName = entry?.name;
+  const spec = useMemo(() => (shownName ? previewOf(shownName) : null), [shownName]);
+  // Fetched again only when the file itself changes, not each time the folder is re-read.
+  const stamp = entry ? `${entry.name}\0${entry.size}\0${entry.mtime}` : '';
 
   useEffect(() => {
     if (!entry || !spec) return undefined;
@@ -85,10 +95,11 @@ export default function PreviewDialog({ source, dir, files, start, onDownload, o
       else setLoad({ state: 'failed', message: r.message || t('common.error') });
     });
     return () => { live = false; transfer.abort(); };
-  }, [entry, spec, source, dir, t]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `stamp` stands for `entry`
+  }, [stamp, spec, source, dir, t]);
 
   if (!entry || !spec) return null;
-  const step = (by: number) => setAt((i) => (i + by + files.length) % files.length);
+  const step = (by: number) => setName(files[(at + by + files.length) % files.length].name);
   const many = files.length > 1;
 
   const key = (e: React.KeyboardEvent) => {
@@ -97,8 +108,8 @@ export default function PreviewDialog({ source, dir, files, start, onDownload, o
     if (e.target instanceof HTMLMediaElement && e.key !== 'Escape') return false;
     if (e.key === 'ArrowRight' && many) { step(1); return true; }
     if (e.key === 'ArrowLeft' && many) { step(-1); return true; }
-    if (e.key === 'Home' && many) { setAt(0); return true; }
-    if (e.key === 'End' && many) { setAt(files.length - 1); return true; }
+    if (e.key === 'Home' && many) { setName(files[0].name); return true; }
+    if (e.key === 'End' && many) { setName(files[files.length - 1].name); return true; }
     if (spec.kind === 'image' && (e.key.toLowerCase() === 'f' || e.key === ' ')) { setFit((f) => !f); return true; }
     if (spec.kind === 'text' && e.key.toLowerCase() === 'w' && !e.ctrlKey && !e.metaKey) { setWrap(!wrap); return true; }
     return false;
