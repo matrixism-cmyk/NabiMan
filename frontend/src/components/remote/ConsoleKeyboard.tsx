@@ -17,7 +17,12 @@ const ROW: { label: string; keysym: number }[] = [
  * the phone's keyboard; what is typed there goes to the VM as keystrokes, and
  * a row of keys the phone lacks sits under the screen while it is up.
  */
-export function useConsoleKeyboard({ send, enabled }: { send: (keysym: number, down: boolean) => void; enabled: boolean }) {
+export function useConsoleKeyboard({ send, enabled, keysym = charKeysym }: {
+  send: (keysym: number, down: boolean) => void;
+  enabled: boolean;
+  /** The keysym for a typed character (RDP sends every one as Unicode). */
+  keysym?: (cp: number) => number;
+}) {
   const { t } = useT();
   const touch = useMemo(TOUCH, []);
   const box = useRef<HTMLTextAreaElement>(null);
@@ -52,7 +57,12 @@ export function useConsoleKeyboard({ send, enabled }: { send: (keysym: number, d
     const el = box.current; if (!el) return;
     const { back, add } = inputDiff(last.current, el.value);
     for (let i = 0; i < back; i += 1) tap(KEY.BACKSPACE);
-    for (const ch of add) tap(ch === '\n' ? KEY.ENTER : charKeysym(ch.codePointAt(0) ?? 0));
+    for (const ch of add) {
+      const cp = ch.codePointAt(0) ?? 0;
+      // With Ctrl or Alt held it is a shortcut (Ctrl+C), which wants the plain key.
+      const held = modsRef.current.ctrl || modsRef.current.alt;
+      tap(ch === '\n' ? KEY.ENTER : held ? charKeysym(cp) : keysym(cp));
+    }
     // A finished line starts the box afresh; so does a long one, to keep the comparison short.
     if (add.includes('\n') || el.value.length > 200) clear(); else last.current = el.value;
   };

@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useT } from '../../shared/i18n';
 import { DriveFile, fetchDriveFile, listDriveFiles } from './vncApi';
+import { saveBlob } from './consoleDownload';
+
+/** How often the open panel looks at the drive again. */
+const REFRESH_MS = 3000;
 
 const fmtSize = (n: number) =>
   (n < 1024 ? `${n} B` : n < 1048576 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toFixed(1)} MB`);
@@ -9,7 +13,8 @@ const fmtSize = (n: number) =>
  * Browse and download the VM's redirected "NabiMan" drive. The drive is a host
  * directory guacd shares into Windows: drag-and-drop uploads land there, and a
  * file the user copies onto that drive in the VM shows up here to download.
- * Read server-side (NabiMan lists the directory), not back over RDPDR.
+ * Read server-side (NabiMan lists the directory), not back over RDPDR, and
+ * looked at again every few seconds while open, so a copy shows up by itself.
  */
 export default function RdpDrivePanel({ target, onClose }: { target: string; onClose: () => void }) {
   const { t } = useT();
@@ -17,21 +22,21 @@ export default function RdpDrivePanel({ target, onClose }: { target: string; onC
   const [busy, setBusy] = useState('');
 
   const reload = useCallback(() => {
-    setFiles(null);
-    listDriveFiles(target).then((r) => setFiles(r.success && r.data ? r.data : [])).catch(() => setFiles([]));
+    listDriveFiles(target).then((r) => { if (r.success && r.data) setFiles(r.data); else setFiles((f) => f || []); })
+      .catch(() => setFiles((f) => f || []));
   }, [target]);
-  useEffect(reload, [reload]);
+  useEffect(() => {
+    reload();
+    const timer = window.setInterval(() => { if (!document.hidden) reload(); }, REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [reload]);
 
   const download = async (name: string) => {
     setBusy(name);
     try {
       const res = await fetchDriveFile(target, name);
       if (!res.ok) throw new Error('download failed');
-      const url = URL.createObjectURL(await res.blob());
-      const a = document.createElement('a');
-      a.href = url; a.download = name;
-      document.body.appendChild(a); a.click(); a.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 10000);
+      saveBlob(await res.blob(), name);
     } catch { /* ignore */ } finally { setBusy(''); }
   };
 
@@ -54,6 +59,7 @@ export default function RdpDrivePanel({ target, onClose }: { target: string; onC
           </button>
         ))}
       </div>
+      <p className="rw-drive-note">{t('remote.console.drive.downloadNote')}</p>
     </div>
   );
 }

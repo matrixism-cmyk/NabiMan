@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Guacamole from '../../vendor/guacamole-common.js';
 import { useT } from '../../shared/i18n';
 import { useFullscreen } from '../../shared/ui/useFullscreen';
@@ -12,6 +12,8 @@ import { useConsoleKeyboard } from './ConsoleKeyboard';
 import ConsoleAltUserModal from './ConsoleAltUserModal';
 import RdpDrivePanel from './RdpDrivePanel';
 import { rdpTicket, consoleCreds } from './vncApi';
+import { rdpTypist } from './rdpTypist';
+import { saveBlob } from './consoleDownload';
 
 type Status = 'connecting' | 'connected' | 'disconnected';
 
@@ -37,7 +39,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
   const [status, setStatus] = useState<Status>('connecting');
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
-  const [upload, setUpload] = useState<{ name: string; pct: number; fail?: boolean } | null>(null);
+  const [upload, setUpload] = useState<{ name: string; pct: number; fail?: boolean; got?: boolean } | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [driveReady, setDriveReady] = useState(false);
   const [drivePanel, setDrivePanel] = useState(false);
@@ -83,18 +85,8 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
     }).catch(() => { /* no permission */ });
   };
 
-  // Voice dictation typed into the VM. RDP accepts Unicode keystrokes, so Hangul
-  // works too (unlike VNC).
-  const key = (c: any, cp: number) => { const ks = cp < 0x100 ? cp : 0x01000000 + cp; c.sendKeyEvent(1, ks); c.sendKeyEvent(0, ks); };
-  const dictate = (text: string) => { const c = client.current; if (!c) return; for (const ch of text) { const cp = ch.codePointAt(0) ?? 0; if (cp) key(c, cp); } };
-  const dictateKeys = (keys: string) => {
-    const c = client.current; if (!c) return;
-    for (const ch of keys) {
-      if (ch === '\r' || ch === '\n') { c.sendKeyEvent(1, 0xff0d); c.sendKeyEvent(0, 0xff0d); }
-      else if (ch === '\x7f' || ch === '\b') { c.sendKeyEvent(1, 0xff08); c.sendKeyEvent(0, 0xff08); }
-      else { const cp = ch.codePointAt(0) ?? 0; if (cp) key(c, cp); }
-    }
-  };
+  // Voice dictation into the VM, pasted so the VM's 한/영 mode cannot garble it.
+  const typist = useMemo(() => rdpTypist(() => client.current), []);
 
   useEffect(() => {
     let live = true;
@@ -166,6 +158,13 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
     };
     // guacd's redirected drive becomes available — keep it for file transfer.
     c.onfilesystem = (object: any) => { filesystem.current = object; if (live) setDriveReady(true); };
+    // A file the VM puts in the drive's Download folder: guacd sends it here to save.
+    c.onfile = (stream: any, mimetype: string, filename: string) => {
+      if (share?.viewOnly) { stream.sendAck('Refused', 0x0303); return; }
+      const reader = new Guacamole.BlobReader(stream, mimetype);
+      reader.onend = () => { saveBlob(reader.getBlob(), filename); if (live) setUpload({ name: filename, pct: 100, got: true }); window.setTimeout(() => setUpload(null), 3000); };
+      stream.sendAck('Ready', 0);
+    };
 
     const dims = () => (fixed ? `GUAC_WIDTH=${fixed.w}&GUAC_HEIGHT=${fixed.h}&GUAC_DPI=96`
       : `GUAC_WIDTH=${Math.max(el.clientWidth || 1280, 640)}&GUAC_HEIGHT=${Math.max(el.clientHeight || 800, 480)}&GUAC_DPI=96`);
@@ -231,6 +230,8 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
 
   const kbd = useConsoleKeyboard({
     enabled: status === 'connected' && !share?.viewOnly,
+    // As Unicode, so letters stay letters while the VM is in 한글 mode.
+    keysym: (cp) => 0x01000000 + cp,
     send: (keysym, down) => { try { client.current?.sendKeyEvent(down ? 1 : 0, keysym); } catch { /* not ready */ } },
   });
 
@@ -247,7 +248,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
         {share?.viewOnly && <span className="rw-proto-tag">{t('remote.console.share.viewOnly')}</span>}
         <span className={`rw-console-state is-${status}`}>{t(`remote.console.${status}`)}</span>
         <span className="rw-console-spacer" />
-        {status === 'connected' && !share?.viewOnly && <ConsoleDictation share={share} view={cview} onText={dictate} onKeys={dictateKeys} />}
+        {status === 'connected' && !share?.viewOnly && <ConsoleDictation share={share} view={cview} onText={typist.text} onKeys={typist.keys} />}
         {kbd.button}
         {driveReady && !share && <button className={`btn btn-secondary btn-sm ${drivePanel ? 'is-active' : ''}`} onClick={() => setDrivePanel(d => !d)}>{t('remote.console.drive.files')}</button>}
         {!popout && <button className="btn btn-secondary btn-sm" onClick={() => window.open(`/remote#rdp/${encodeURIComponent(target)}`, `rdp_${target}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no')}>{t('remote.console.detach')}</button>}
@@ -277,7 +278,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
         {drivePanel && <RdpDrivePanel target={target} onClose={() => setDrivePanel(false)} />}
         {upload && (
           <div className="rw-rdp-upload">
-            {upload.fail
+            {upload.got ? t('remote.console.drive.received', { name: upload.name }) : upload.fail
               ? t('remote.console.drive.failed', { name: upload.name })
               : upload.pct >= 100
                 ? t('remote.console.drive.done', { name: upload.name })

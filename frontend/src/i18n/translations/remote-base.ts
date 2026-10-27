@@ -154,6 +154,8 @@ const t: T = {
   'remote.console.reconnect': { ko: '다시 연결', en: 'Reconnect', ja: '再接続' },
   'remote.console.hangul': { ko: '한/영', en: 'Han/Eng', ja: 'ハン/英' },
   'remote.console.hangulHint': { ko: '원격 Windows의 한/영 전환 (오른쪽 Alt로 전달). 키보드의 한/영 키도 같은 키로 보냅니다.', en: 'Toggle Korean/English on the remote Windows (sent as right Alt). The keyboard’s 한/영 key is sent the same way.', ja: 'リモート Windows の韓/英切替（右 Alt として送信）。キーボードの 한/영 キーも同様に送ります。' },
+  'remote.console.drive.downloadNote': { ko: 'VM 안의 NabiMan 드라이브에 있는 "Download" 폴더에 파일을 넣으면 이 브라우저로 바로 내려받아집니다. 그 밖의 파일은 여기 목록에서 눌러 내려받습니다(목록은 3초마다 새로 고침).', en: 'Put a file in the "Download" folder of the NabiMan drive inside the VM and this browser downloads it straight away. Other files on the drive are listed here to download (the list refreshes every 3 s).', ja: 'VM 内の NabiMan ドライブの「Download」フォルダーにファイルを入れると、このブラウザーにすぐダウンロードされます。それ以外のファイルはここの一覧から押してダウンロードします（一覧は3秒ごとに更新）。' },
+  'remote.console.drive.received': { ko: 'VM에서 받음: {name}', en: 'Received from the VM: {name}', ja: 'VM から受信: {name}' },
   'remote.console.drive.files': { ko: '드라이브 파일', en: 'Drive files', ja: 'ドライブファイル' },
   'remote.console.drive.empty': { ko: '파일이 없습니다. VM에서 NabiMan 드라이브에 복사하면 여기서 내려받을 수 있습니다.', en: 'No files. Copy to the NabiMan drive in the VM to download here.', ja: 'ファイルがありません。VM で NabiMan ドライブにコピーするとここから取得できます。' },
   'remote.console.drive.hint': { ko: '파일을 놓으면 VM으로 전송합니다 (NabiMan 드라이브)', en: 'Drop to copy the file into the VM (NabiMan drive)', ja: 'ドロップで VM にファイルを転送します (NabiMan ドライブ)' },
