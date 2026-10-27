@@ -127,6 +127,8 @@ const t: T = {
   'remote.console.disconnected': { ko: '끊김', en: 'Disconnected', ja: '切断' },
   'remote.console.fit': { ko: '화면 맞춤', en: 'Fit', ja: '画面に合わせる' },
   'remote.console.reconnect': { ko: '다시 연결', en: 'Reconnect', ja: '再接続' },
+  'remote.console.hangul': { ko: '한/영', en: 'Han/Eng', ja: 'ハン/英' },
+  'remote.console.hangulHint': { ko: '원격 Windows의 한/영 전환 (오른쪽 Alt로 전달). 키보드의 한/영 키도 같은 키로 보냅니다.', en: 'Toggle Korean/English on the remote Windows (sent as right Alt). The keyboard’s 한/영 key is sent the same way.', ja: 'リモート Windows の韓/英切替（右 Alt として送信）。キーボードの 한/영 キーも同様に送ります。' },
   'remote.console.drive.files': { ko: '드라이브 파일', en: 'Drive files', ja: 'ドライブファイル' },
   'remote.console.drive.empty': { ko: '파일이 없습니다. VM에서 NabiMan 드라이브에 복사하면 여기서 내려받을 수 있습니다.', en: 'No files. Copy to the NabiMan drive in the VM to download here.', ja: 'ファイルがありません。VM で NabiMan ドライブにコピーするとここから取得できます。' },
   'remote.console.drive.hint': { ko: '파일을 놓으면 VM으로 전송합니다 (NabiMan 드라이브)', en: 'Drop to copy the file into the VM (NabiMan drive)', ja: 'ドロップで VM にファイルを転送します (NabiMan ドライブ)' },

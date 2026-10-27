@@ -3,6 +3,7 @@ import Guacamole from '../../vendor/guacamole-common.js';
 import { useT } from '../../shared/i18n';
 import { useFullscreen } from '../../shared/ui/useFullscreen';
 import { useChromeHidden } from '../../shared/ui/useChromeHidden';
+import { remoteKey, ALT_R } from './rdpKeys';
 import { describeFault, reconnectDelay, RECONNECT_MAX } from './consoleFault';
 import { useConsoleView, consoleDictationProps, keepAlive } from './consoleView';
 import ConsoleSettingsModal from './ConsoleSettingsModal';
@@ -189,8 +190,12 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
       // focusing the screen — so keys went nowhere. Focus it on every press.
       el.addEventListener('mousedown', focusScreen, true);
       kb = new Guacamole.Keyboard(el);
-      kb.onkeydown = (keysym: number) => c.sendKeyEvent(1, keysym);
-      kb.onkeyup = (keysym: number) => c.sendKeyEvent(0, keysym);
+      kb.onkeydown = (keysym: number) => {
+        const out = remoteKey(keysym);
+        c.sendKeyEvent(1, out.keysym);
+        if (out.tap) c.sendKeyEvent(0, out.keysym);
+      };
+      kb.onkeyup = (keysym: number) => { const out = remoteKey(keysym); if (!out.tap) c.sendKeyEvent(0, out.keysym); };
       keyboard.current = kb;
       el.addEventListener('mouseenter', pushClipboard);
       window.addEventListener('focus', pushClipboard);
@@ -230,6 +235,8 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
         <button className="btn btn-secondary btn-sm" onClick={() => setFolded(true)} title={t('app.hideChrome')} aria-label={t('app.hideChrome')}>▴</button>
         {!share && <button className="btn btn-secondary btn-sm" onClick={() => setAskUser(true)} title={t('remote.console.altUser')} aria-label={t('remote.console.altUser')}>👤</button>}
         {!share && <button className="btn btn-secondary btn-sm" onClick={() => setShowSettings(true)} title={t('remote.console.settings')} aria-label={t('remote.console.settings')}>⚙</button>}
+        {!share?.viewOnly && <button className="btn btn-secondary btn-sm" title={t('remote.console.hangulHint')}
+          onClick={() => { try { client.current?.sendKeyEvent(1, ALT_R); client.current?.sendKeyEvent(0, ALT_R); } catch { /* not ready */ } }} disabled={status !== 'connected'}>{t('remote.console.hangul')}</button>}
         {!share?.viewOnly && <button className="btn btn-secondary btn-sm" onClick={() => { try { const c = client.current; c?.sendKeyEvent(1, 0xffe3); c?.sendKeyEvent(1, 0xffe9); c?.sendKeyEvent(1, 0xffff); c?.sendKeyEvent(0, 0xffff); c?.sendKeyEvent(0, 0xffe9); c?.sendKeyEvent(0, 0xffe3); } catch { /* not ready */ } }} disabled={status !== 'connected'}>Ctrl+Alt+Del</button>}
         {status === 'disconnected' && <button className="btn btn-primary btn-sm" onClick={() => { retries.current = 0; setAttempt(a => a + 1); }}>{t('remote.console.reconnect')}</button>}
         {canEdit && <button className="btn btn-secondary btn-sm" onClick={onEdit}>{t('common.edit')}</button>}
