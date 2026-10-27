@@ -121,6 +121,7 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
 
   const kbd = useConsoleKeyboard({
     enabled: status === 'connected' && !share?.viewOnly,
+    screen: host,
     send: (keysym, down) => { try { if (rfb.current) sendKeysym(rfb.current, keysym, down); } catch { /* not ready */ } },
   });
 

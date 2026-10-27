@@ -27,10 +27,17 @@ const ECHO = 16;
  * typed a wrong password with no sign of it. The row shows what was typed,
  * and 🔒 swaps the box for a password box: phones then bring up a plain
  * English keyboard without capitals, corrections or suggestions.
+ *
+ * ⌨ is a mode, on until it is pressed again. A tap on the screen (to click
+ * into a text field) used to put the keyboard away, as the screen took the
+ * focus; now the focus comes straight back, and a tap brings the keyboard
+ * back up when the phone put it away.
  */
-export function useConsoleKeyboard({ send, enabled, keysym = charKeysym }: {
+export function useConsoleKeyboard({ send, enabled, keysym = charKeysym, screen }: {
   send: (keysym: number, down: boolean) => void;
   enabled: boolean;
+  /** The VM's screen, whose taps keep the keyboard up. */
+  screen?: React.RefObject<HTMLElement | null>;
   /** The keysym for a typed character (RDP sends every one as Unicode). */
   keysym?: (cp: number) => number;
 }) {
@@ -42,6 +49,8 @@ export function useConsoleKeyboard({ send, enabled, keysym = charKeysym }: {
   const [typed, setTyped] = useState('');
   const last = useRef('');
   const [open, setOpen] = useState(false);
+  // Whether the phone's keyboard is up (one of the boxes has the focus).
+  const [up, setUp] = useState(false);
   const [mods, setMods] = useState({ ctrl: false, alt: false });
   const modsRef = useRef(mods);
   modsRef.current = mods;
@@ -50,13 +59,27 @@ export function useConsoleKeyboard({ send, enabled, keysym = charKeysym }: {
   const [lift, setLift] = useState(0);
   useEffect(() => {
     const vv = window.visualViewport;
-    if (!open || !vv) { setLift(0); return undefined; }
+    if (!open || !up || !vv) { setLift(0); return undefined; }
     const place = () => setLift(Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)));
     place();
     vv.addEventListener('resize', place);
     vv.addEventListener('scroll', place);
     return () => { vv.removeEventListener('resize', place); vv.removeEventListener('scroll', place); };
-  }, [open]);
+  }, [open, up]);
+
+  useEffect(() => {
+    const el = screen?.current;
+    if (!open || !el) return undefined;
+    const raise = (e: Event) => {
+      if (e.type === 'touchend' && (e as TouchEvent).touches.length) return;
+      const target = secret ? secretBox.current : box.current;
+      // In the tap itself, or a phone will not raise its keyboard.
+      if (target && document.activeElement !== target) target.focus({ preventScroll: true });
+    };
+    el.addEventListener('touchend', raise, true);
+    el.addEventListener('focusin', raise, true);
+    return () => { el.removeEventListener('touchend', raise, true); el.removeEventListener('focusin', raise, true); };
+  }, [open, secret, screen]);
 
   const tap = (keysym: number) => {
     const held = [modsRef.current.ctrl && KEY.CTRL, modsRef.current.alt && KEY.ALT].filter(Boolean) as number[];
@@ -93,16 +116,18 @@ export function useConsoleKeyboard({ send, enabled, keysym = charKeysym }: {
     else if (e.key === 'Backspace' && !e.currentTarget.value) { e.preventDefault(); tap(KEY.BACKSPACE); }
   };
   const toggle = () => {
-    if (open) { (secret ? secretBox : box).current?.blur(); setOpen(false); return; }
-    clear(); setSecret(false);
+    if (open && up) { (secret ? secretBox : box).current?.blur(); setOpen(false); return; }
+    // On, but the phone put its keyboard away: ⌨ brings it back.
+    if (!open) { clear(); setSecret(false); }
     // Focus inside the tap itself, or a phone will not raise its keyboard.
-    box.current?.focus({ preventScroll: true });
+    (open && secret ? secretBox : box).current?.focus({ preventScroll: true });
     setOpen(true);
   };
   // Keep the box focused (and the keyboard up) when a key on the row is pressed.
   const keep = (e: React.PointerEvent) => e.preventDefault();
   // Moving between the two boxes is not putting the keyboard away.
-  const blur = (e: React.FocusEvent) => { if (e.relatedTarget !== box.current && e.relatedTarget !== secretBox.current) setOpen(false); };
+  const blur = (e: React.FocusEvent) => { if (e.relatedTarget !== box.current && e.relatedTarget !== secretBox.current) setUp(false); };
+  const focus = () => setUp(true);
   const flip = () => {
     const next = !secret;
     clear(); setSecret(next);
@@ -118,9 +143,9 @@ export function useConsoleKeyboard({ send, enabled, keysym = charKeysym }: {
   const panel = shown ? (
     <div className={`rw-console-keys ${open ? 'is-open' : ''}`}>
       <textarea ref={box} className="rw-console-keybox" aria-label={t('remote.console.keyboard')} autoCapitalize="off" autoComplete="off"
-        autoCorrect="off" spellCheck={false} onInput={onInput} onKeyDown={onKeyDown} onBlur={blur} />
+        autoCorrect="off" spellCheck={false} onInput={onInput} onKeyDown={onKeyDown} onFocus={focus} onBlur={blur} />
       <input ref={secretBox} type="password" className="rw-console-keybox" aria-label={t('remote.console.secret')} autoComplete="off"
-        autoCapitalize="off" autoCorrect="off" spellCheck={false} onInput={onInput} onKeyDown={onKeyDown} onBlur={blur} />
+        autoCapitalize="off" autoCorrect="off" spellCheck={false} onInput={onInput} onKeyDown={onKeyDown} onFocus={focus} onBlur={blur} />
       {open && (
         <div className={`rw-console-keyrow ${lift > 0 ? 'is-lifted' : ''}`} style={lift > 0 ? { bottom: lift } : undefined}>
           <span className="rw-console-typed" aria-live="polite" title={t('remote.console.typedHint')}>

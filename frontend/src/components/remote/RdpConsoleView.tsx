@@ -114,6 +114,10 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
       onRescale: (ratio) => { if (cview.touch === 'pad' && touch) { touch.currentState.x *= ratio; touch.currentState.y *= ratio; } },
     });
     zoomer.current = zoomed;
+    // A phone's screen is taller than the desktop fitted into it; a tap on the
+    // empty space below is nothing, rather than the browser focusing the page there.
+    const offScreen = (e: TouchEvent) => { if (e.target === st) e.preventDefault(); };
+    st.addEventListener('touchstart', offScreen, { passive: false });
     const fit = zoomed.fit;
     display.onresize = fit;
     fitRef.current = fit;
@@ -232,6 +236,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
       if (sizeTimer) window.clearTimeout(sizeTimer);
       filesystem.current = null;
       zoomed.detach(); zoomer.current = null;
+      st.removeEventListener('touchstart', offScreen);
       el.removeEventListener('mousedown', focusScreen, true);
       el.removeEventListener('mouseenter', pushClipboard);
       window.removeEventListener('focus', pushClipboard);
@@ -243,6 +248,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
 
   const kbd = useConsoleKeyboard({
     enabled: status === 'connected' && !share?.viewOnly,
+    screen: host,
     // As Unicode, so letters stay letters while the VM is in 한글 mode.
     keysym: (cp) => 0x01000000 + cp,
     send: (keysym, down) => { try { client.current?.sendKeyEvent(down ? 1 : 0, keysym); } catch { /* not ready */ } },
