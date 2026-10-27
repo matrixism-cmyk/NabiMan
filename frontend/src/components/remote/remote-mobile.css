@@ -124,4 +124,9 @@ body.rw-fullscreen .main-content { z-index: auto; }
 .rw-console-keyrow.is-lifted { position: fixed; left: 0; right: 0; z-index: 30; }
 .rw-console-keyrow .btn { flex: 0 0 auto; min-width: 44px; min-height: 36px; }
 .rw-console-keyrow .btn.is-active { background: var(--accent, #4a9eff); color: #fff; }
+.rw-console-typed {
+  flex: 0 0 auto; align-self: center; min-width: 3em; max-width: 11em; overflow: hidden; white-space: pre;
+  padding: 4px 8px; border-radius: 6px; background: var(--bg-primary, #0b0d10); color: var(--text-primary); font: 14px ui-monospace, monospace;
+}
+.rw-console-typed:empty::before { content: '…'; color: var(--text-secondary); }
 .console-settings select { max-width: 100%; }

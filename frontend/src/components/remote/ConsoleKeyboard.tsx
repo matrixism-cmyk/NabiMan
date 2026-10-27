@@ -13,11 +13,20 @@ const ROW: { label: string; keysym: number }[] = [
   { label: 'Caps', keysym: KEY.CAPS },
 ];
 
+/** What was typed shows at the start of the row, the last this many characters. */
+const ECHO = 16;
+
 /**
  * A phone's keyboard for a VM console. A touch screen has no key events to
  * catch on the screen itself, so ⌨ focuses a hidden text box, which brings up
  * the phone's keyboard; what is typed there goes to the VM as keystrokes, and
  * a row of keys the phone lacks sits under the screen while it is up.
+ *
+ * The box itself cannot be seen, and a VM's password field shows only dots,
+ * so a phone keyboard left in 한글 mode (or capitalizing the first letter)
+ * typed a wrong password with no sign of it. The row shows what was typed,
+ * and 🔒 swaps the box for a password box: phones then bring up a plain
+ * English keyboard without capitals, corrections or suggestions.
  */
 export function useConsoleKeyboard({ send, enabled, keysym = charKeysym }: {
   send: (keysym: number, down: boolean) => void;
@@ -28,6 +37,9 @@ export function useConsoleKeyboard({ send, enabled, keysym = charKeysym }: {
   const { t } = useT();
   const touch = useMemo(TOUCH, []);
   const box = useRef<HTMLTextAreaElement>(null);
+  const secretBox = useRef<HTMLInputElement>(null);
+  const [secret, setSecret] = useState(false);
+  const [typed, setTyped] = useState('');
   const last = useRef('');
   const [open, setOpen] = useState(false);
   const [mods, setMods] = useState({ ctrl: false, alt: false });
@@ -53,10 +65,14 @@ export function useConsoleKeyboard({ send, enabled, keysym = charKeysym }: {
     held.reverse().forEach((m) => send(m, false));
     if (held.length) setMods({ ctrl: false, alt: false });
   };
-  const clear = () => { if (box.current) box.current.value = ''; last.current = ''; };
+  const clear = () => {
+    if (box.current) box.current.value = '';
+    if (secretBox.current) secretBox.current.value = '';
+    last.current = ''; setTyped('');
+  };
 
-  const onInput = () => {
-    const el = box.current; if (!el) return;
+  const onInput = (e: React.FormEvent<HTMLTextAreaElement | HTMLInputElement>) => {
+    const el = e.currentTarget;
     const { back, add } = inputDiff(last.current, el.value);
     for (let i = 0; i < back; i += 1) tap(KEY.BACKSPACE);
     for (const ch of add) {
@@ -66,9 +82,9 @@ export function useConsoleKeyboard({ send, enabled, keysym = charKeysym }: {
       tap(ch === '\n' ? KEY.ENTER : held ? charKeysym(cp) : keysym(cp));
     }
     // A finished line starts the box afresh; so does a long one, to keep the comparison short.
-    if (add.includes('\n') || el.value.length > 200) clear(); else last.current = el.value;
+    if (add.includes('\n') || el.value.length > 200) clear(); else { last.current = el.value; setTyped(el.value); }
   };
-  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
     if (e.nativeEvent.isComposing) return;
     const named = NAMED[e.key];
     if (named) { e.preventDefault(); tap(named); }
@@ -77,14 +93,22 @@ export function useConsoleKeyboard({ send, enabled, keysym = charKeysym }: {
     else if (e.key === 'Backspace' && !e.currentTarget.value) { e.preventDefault(); tap(KEY.BACKSPACE); }
   };
   const toggle = () => {
-    if (open) { box.current?.blur(); setOpen(false); return; }
-    clear();
+    if (open) { (secret ? secretBox : box).current?.blur(); setOpen(false); return; }
+    clear(); setSecret(false);
     // Focus inside the tap itself, or a phone will not raise its keyboard.
     box.current?.focus({ preventScroll: true });
     setOpen(true);
   };
   // Keep the box focused (and the keyboard up) when a key on the row is pressed.
   const keep = (e: React.PointerEvent) => e.preventDefault();
+  // Moving between the two boxes is not putting the keyboard away.
+  const blur = (e: React.FocusEvent) => { if (e.relatedTarget !== box.current && e.relatedTarget !== secretBox.current) setOpen(false); };
+  const flip = () => {
+    const next = !secret;
+    clear(); setSecret(next);
+    // In the tap itself, so the phone swaps keyboards instead of closing it.
+    (next ? secretBox : box).current?.focus({ preventScroll: true });
+  };
 
   const shown = enabled && touch;
   const button = shown ? (
@@ -94,9 +118,16 @@ export function useConsoleKeyboard({ send, enabled, keysym = charKeysym }: {
   const panel = shown ? (
     <div className={`rw-console-keys ${open ? 'is-open' : ''}`}>
       <textarea ref={box} className="rw-console-keybox" aria-label={t('remote.console.keyboard')} autoCapitalize="off" autoComplete="off"
-        autoCorrect="off" spellCheck={false} onInput={onInput} onKeyDown={onKeyDown} onBlur={() => setOpen(false)} />
+        autoCorrect="off" spellCheck={false} onInput={onInput} onKeyDown={onKeyDown} onBlur={blur} />
+      <input ref={secretBox} type="password" className="rw-console-keybox" aria-label={t('remote.console.secret')} autoComplete="off"
+        autoCapitalize="off" autoCorrect="off" spellCheck={false} onInput={onInput} onKeyDown={onKeyDown} onBlur={blur} />
       {open && (
         <div className={`rw-console-keyrow ${lift > 0 ? 'is-lifted' : ''}`} style={lift > 0 ? { bottom: lift } : undefined}>
+          <span className="rw-console-typed" aria-live="polite" title={t('remote.console.typedHint')}>
+            {secret ? '●'.repeat(Math.min(Array.from(typed).length, ECHO)) : Array.from(typed).slice(-ECHO).join('')}
+          </span>
+          <button type="button" className={`btn btn-secondary btn-sm ${secret ? 'is-active' : ''}`} onPointerDown={keep} onClick={flip}
+            aria-pressed={secret} title={t('remote.console.secretHint')}>🔒 {t('remote.console.secret')}</button>
           {(['ctrl', 'alt'] as const).map((m) => (
             <button key={m} type="button" className={`btn btn-secondary btn-sm ${mods[m] ? 'is-active' : ''}`} onPointerDown={keep}
               aria-pressed={mods[m]} onClick={() => setMods((cur) => ({ ...cur, [m]: !cur[m] }))}>{m === 'ctrl' ? 'Ctrl' : 'Alt'}</button>
