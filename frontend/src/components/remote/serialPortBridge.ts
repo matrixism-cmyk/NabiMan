@@ -56,6 +56,8 @@ export interface BridgeOptions {
   /** A fresh, ticketed WebSocket URL for each dial. */
   url: () => Promise<string>;
   onChange: () => void;
+  /** Web Locks name: one tab of this browser bridges the device, as the server takes one socket for it. */
+  lock?: string;
 }
 
 export class PortBridge {
@@ -72,6 +74,8 @@ export class PortBridge {
   private reattachTimer: ReturnType<typeof setInterval> | null = null;
   private redialTimer: ReturnType<typeof setTimeout> | null = null;
   private redials = 0;
+  private unlock: (() => void) | null = null;
+  private lockWait: AbortController | null = null;
 
   constructor(readonly opts: BridgeOptions) { this.device = opts.device; }
 
@@ -84,10 +88,17 @@ export class PortBridge {
   /** Bridge a port the operator just chose (already through `requestPort`). */
   async startWith(chosen: any) {
     this.set({ status: 'connecting', error: null });
+    this.running = true;
+    if (!(await this.hold(false))) {
+      this.running = false;
+      this.set({ status: 'idle', error: { key: 'serial.dev.otherTabBusy' } });
+      return false;
+    }
     try {
       await this.openPort(chosen);
     } catch (e) {
-      this.set({ status: 'idle', error: { key: 'serial.raw', vars: { text: errText(e) } } });
+      await this.stop();
+      this.set({ error: { key: 'serial.raw', vars: { text: errText(e) } } });
       return false;
     }
     this.begin();
@@ -97,8 +108,40 @@ export class PortBridge {
   /** Bridge the remembered board again without a picker (page load, after a server restart). */
   async resume() {
     if (this.running || !serialSupported()) return;
+    this.running = true;
+    this.set({ status: 'connecting', error: null });
+    if (!(await this.hold(true))) return;
+    this.stuck(null);
     this.begin();
     await this.reattach(false);
+  }
+
+  /**
+   * Take the device's lock, so that a second tab of the same session does not
+   * fight the first for the server's one socket (and for the port). Without
+   * `wait` a held lock is a refusal; with it the tab waits its turn, saying
+   * so, and takes over when the other tab closes. Resolves to whether to go on.
+   */
+  private hold(wait: boolean): Promise<boolean> {
+    const locks = (navigator as any).locks;
+    const name = this.opts.lock;
+    if (!name || !locks) return Promise.resolve(true);
+    return new Promise((done) => {
+      const keep = () => {
+        // Granted after a stop: let it go at once.
+        if (!this.running) { done(false); return undefined; }
+        done(true);
+        return new Promise<void>((r) => { this.unlock = r; });
+      };
+      locks.request(name, { ifAvailable: true }, (held: unknown) => {
+        if (held) return keep();
+        if (!wait) { done(false); return undefined; }
+        this.stuck({ key: 'serial.dev.otherTab' });
+        this.lockWait = new AbortController();
+        locks.request(name, { signal: this.lockWait.signal }, keep).catch(() => done(false));
+        return undefined;
+      }).catch(() => done(true));
+    });
   }
 
   private begin() {
@@ -122,7 +165,10 @@ export class PortBridge {
     try { this.writer?.releaseLock(); } catch { /* ignore */ }
     this.reader = this.writer = this.pumping = null;
     try { await p?.close(); } catch { /* ignore */ }
-    this.set({ status: 'idle', socketUp: false, portUp: false, path: '' });
+    // The port is closed, so a tab waiting its turn can open it.
+    this.lockWait?.abort(); this.unlock?.();
+    this.lockWait = null; this.unlock = null;
+    this.set({ status: 'idle', socketUp: false, portUp: false, path: '', stuck: null });
   }
 
   /** A board the operator chose again in the picker (its grant was lost, say): open it now. */

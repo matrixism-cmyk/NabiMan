@@ -55,6 +55,7 @@ function make(sid: string, name: string, baud: number, device: string) {
       return `${window.location.origin.replace('http', 'ws')}/api/terminal/serial?session_id=${sid}&serial=${name}&ticket=${ticket}`;
     },
     onChange: changed,
+    lock: `nabiman-serial:${keyOf(sid, name)}`,
   });
   bridges.set(keyOf(sid, name), { sid, name, baud, bridge });
   return bridge;

@@ -92,7 +92,7 @@ export default function SessionDevicesDialog({ sessionId, sessionName, onClose }
                 </div>
               )}
               {d.error && <p role="alert" className="message">{noticeText(d.error)}</p>}
-              {state === 'waiting' && d.stuck && <p role="alert" className="message">{noticeText(d.stuck)}</p>}
+              {state !== 'connected' && d.stuck && <p role="alert" className="message">{noticeText(d.stuck)}</p>}
               {tail.trim() && <pre className="serial-monitor serial-dev-tail">{tail}</pre>}
             </section>
           );

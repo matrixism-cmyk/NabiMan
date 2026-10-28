@@ -124,3 +124,45 @@ test('a board that cannot be opened again says why, and can be chosen again', as
   expect(await devices.repick('pty_5', 'esp32')).toBeNull();
   expect(devices.getDevices()[0]).toEqual(expect.objectContaining({ portUp: true, stuck: null }));
 });
+
+/** navigator.locks, enough for one lock name at a time. */
+function fakeLocks() {
+  let held = false;
+  const queue: (() => void)[] = [];
+  return {
+    async request(_name: string, opts: { ifAvailable?: boolean; signal?: AbortSignal }, cb: (l: unknown) => unknown) {
+      if (held) {
+        if (opts.ifAvailable) return cb(null);
+        await new Promise<void>((go, no) => {
+          queue.push(go);
+          opts.signal?.addEventListener('abort', () => { queue.splice(queue.indexOf(go), 1); no(new Error('AbortError')); });
+        });
+      }
+      held = true;
+      try { return await cb({}); } finally { held = false; queue.shift()?.(); }
+    },
+  };
+}
+
+test('a second tab of the same session waits for the first instead of fighting it for the device', async () => {
+  const locks = fakeLocks();
+  (navigator as any).locks = locks;
+  try {
+    let closeOtherTab: () => void = () => {};
+    void locks.request('nabiman-serial:pty_5/esp32', {}, () => new Promise<void>((r) => { closeOtherTab = r; }));
+    localStorage.setItem('nabiman_serial_devices', JSON.stringify({ pty_5: [{ name: 'esp32', baud: 115200, device: '12346:4097' }] }));
+    devices.resumeSession('pty_5');
+    await flush(); await flush();
+    expect(FakeSocket.all).toHaveLength(0);
+    expect(ports[0].open).not.toHaveBeenCalled();
+    expect(devices.getDevices()[0].stuck).toEqual({ key: 'serial.dev.otherTab' });
+
+    closeOtherTab();
+    await flush(); await flush(); await flush();
+    expect(ports[0].open).toHaveBeenCalled();
+    expect(FakeSocket.all).toHaveLength(1);
+    expect(devices.getDevices()[0].stuck).toBeNull();
+  } finally {
+    delete (navigator as any).locks;
+  }
+});

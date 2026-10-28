@@ -31,6 +31,8 @@ const t: T = {
   'serial.dev.repick': { ko: '보드 다시 선택', en: 'Choose the board again', ja: 'ボードを選び直す' },
   'serial.dev.notGranted': { ko: '이 브라우저가 쓸 수 있는 포트 중에 이 보드가 없습니다. 빠져 있거나, 다시 꽂으면서 사용 권한이 풀렸습니다 — 「보드 다시 선택」을 눌러 주세요.', en: 'This board is not among the ports this browser may use: unplugged, or its permission went when it was plugged back in. Press “Choose the board again”.', ja: 'このブラウザが使えるポートにこのボードがありません。抜けているか、挿し直しで権限が外れました — 「ボードを選び直す」を押してください。' },
   'serial.dev.openFailed': { ko: '보드를 열 수 없습니다: {text} — 다른 탭이나 프로그램(시리얼 모니터 등)이 이 포트를 쓰고 있지 않은지 확인하세요.', en: 'Cannot open the board: {text} — check that no other tab or program (a serial monitor, say) holds the port.', ja: 'ボードを開けません: {text} — 他のタブやプログラム（シリアルモニター等）がポートを使っていないか確認してください。' },
+  'serial.dev.otherTab': { ko: '이 브라우저의 다른 탭이 이 장치를 연결하고 있습니다. 그 탭을 닫으면 이 탭이 이어받습니다.', en: 'Another tab of this browser is bridging this device. Close that tab and this one takes over.', ja: 'このブラウザの別のタブがこのデバイスを接続中です。そのタブを閉じると、このタブが引き継ぎます。' },
+  'serial.dev.otherTabBusy': { ko: '이 브라우저의 다른 탭이 같은 이름의 장치를 이미 연결하고 있습니다. 그 탭을 닫거나 다른 이름을 쓰세요.', en: 'Another tab of this browser already bridges a device by this name. Close that tab or pick another name.', ja: 'このブラウザの別のタブが同じ名前のデバイスを接続中です。そのタブを閉じるか、別の名前にしてください。' },
   'serial.dev.detach': { ko: '해제', en: 'Detach', ja: '切断' },
   'serial.dev.attachedBy': { ko: '{who} 님이 연결함', en: 'attached by {who}', ja: '{who} さんが接続' },
   'serial.dev.hint': { ko: '이름은 이 세션 안에서만 겹치지 않으면 됩니다 (영문 소문자·숫자·-·_). 같은 기종 보드 여러 개는 재연결 때 서로 바뀔 수 있습니다.', en: 'Names only need to be unique within this session (a-z, 0-9, -, _). Several boards of the same model may swap on reconnect.', ja: '名前はこのセッション内で重複しなければよい（英小文字・数字・-・_）。同じ機種のボードが複数あると再接続時に入れ替わることがあります。' },
