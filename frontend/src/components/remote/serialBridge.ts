@@ -23,7 +23,7 @@ function save(s: Saved | null) {
   try { if (s) localStorage.setItem(SAVED, JSON.stringify(s)); else localStorage.removeItem(SAVED); } catch { /* private mode */ }
 }
 
-const IDLE: BridgeState = { status: 'idle', socketUp: false, portUp: false, path: '', error: null, log: '' };
+const IDLE: BridgeState = { status: 'idle', socketUp: false, portUp: false, path: '', error: null, stuck: null, log: '' };
 let bridge: PortBridge | null = null;
 let cfg: Saved | null = null;
 /** What the tab shows while no bridge runs: idle, perhaps with why the last start failed. */

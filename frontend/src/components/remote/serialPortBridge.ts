@@ -18,6 +18,8 @@ export interface BridgeState {
   portUp: boolean;
   path: string;
   error: Notice | null;
+  /** Why the board cannot be opened again, while waiting for it. */
+  stuck: Notice | null;
   log: string;
 }
 
@@ -57,7 +59,9 @@ export interface BridgeOptions {
 }
 
 export class PortBridge {
-  state: BridgeState = { status: 'idle', socketUp: false, portUp: false, path: '', error: null, log: '' };
+  state: BridgeState = { status: 'idle', socketUp: false, portUp: false, path: '', error: null, stuck: null, log: '' };
+  /** `portKey` of the board; a board chosen again (`adopt`) replaces it. */
+  device: string;
   private port: any = null;
   private reader: any = null;
   private writer: any = null;
@@ -69,9 +73,11 @@ export class PortBridge {
   private redialTimer: ReturnType<typeof setTimeout> | null = null;
   private redials = 0;
 
-  constructor(readonly opts: BridgeOptions) {}
+  constructor(readonly opts: BridgeOptions) { this.device = opts.device; }
 
   private set(patch: Partial<BridgeState>) { this.state = { ...this.state, ...patch }; this.opts.onChange(); }
+  /** Says why the board is not back, only when that changes (reattach runs every second). */
+  private stuck(n: Notice | null) { if (JSON.stringify(n) !== JSON.stringify(this.state.stuck)) this.set({ stuck: n }); }
   private append(s: string) { this.set({ log: (this.state.log.length > 20000 ? this.state.log.slice(-16000) : this.state.log) + s }); }
   private note(n: Notice) { this.append(`\r\n[${noticeText(n)}]\r\n`); }
 
@@ -117,6 +123,15 @@ export class PortBridge {
     this.reader = this.writer = this.pumping = null;
     try { await p?.close(); } catch { /* ignore */ }
     this.set({ status: 'idle', socketUp: false, portUp: false, path: '' });
+  }
+
+  /** A board the operator chose again in the picker (its grant was lost, say): open it now. */
+  async adopt(chosen: any) {
+    if (this.port) return;
+    this.device = portKey(chosen);
+    await this.openPort(chosen);
+    this.stuck(null);
+    this.note({ key: 'serial.portBack' });
   }
 
   reset() { return this.lines(RESET); }
@@ -170,7 +185,7 @@ export class PortBridge {
     }
     this.port = p;
     this.writer = p.writable.getWriter();
-    this.set({ portUp: true });
+    this.set({ portUp: true, stuck: null });
     this.pumping = this.pump(p);
   }
 
@@ -179,15 +194,18 @@ export class PortBridge {
     if (!this.running || this.port || this.reattaching) return;
     this.reattaching = true;
     try {
-      const ports: any[] = await serialApi().getPorts();
+      const ports: any[] = (await serialApi().getPorts()).filter((p: any) => portKey(p) === this.device);
+      let why = '';
       for (const p of ports) {
-        if (portKey(p) !== this.opts.device || p.readable) continue;
+        if (p.readable) continue;
         try {
           await this.openPort(p);
           if (announce) this.note({ key: 'serial.portBack' });
           return;
-        } catch { /* still enumerating, or held by another app — next tick */ }
+        } catch (e) { why = errText(e); /* still enumerating, or held by another app — next tick */ }
       }
+      // Not among the ports this page may use: unplugged, or the grant went with it.
+      this.stuck(!ports.length ? { key: 'serial.dev.notGranted' } : why ? { key: 'serial.dev.openFailed', vars: { text: why } } : null);
     } catch { /* ignore */ } finally {
       this.reattaching = false;
     }

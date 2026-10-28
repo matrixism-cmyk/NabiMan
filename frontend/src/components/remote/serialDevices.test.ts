@@ -105,3 +105,22 @@ test('a server signal drives the lines one at a time and is answered', async () 
   expect(ports[0].signals).toEqual([{ dataTerminalReady: false }, { requestToSend: true }, { requestToSend: false }]);
   expect(socket.sent).toContain(JSON.stringify({ ack: 'reset' }));
 });
+
+test('a board that cannot be opened again says why, and can be chosen again', async () => {
+  localStorage.setItem('nabiman_serial_devices', JSON.stringify({ pty_5: [{ name: 'esp32', baud: 115200, device: '12346:4097' }] }));
+  const granted = ports;
+  ports = [];                                   // plugged back in, and the grant went with it
+  devices.resumeSession('pty_5');
+  await flush(); await flush();
+  expect(devices.getDevices()[0]).toEqual(expect.objectContaining({ portUp: false, stuck: { key: 'serial.dev.notGranted' } }));
+
+  ports = [fakePort()];                         // listed, but held by another program
+  ports[0].open.mockRejectedValueOnce(new Error('Failed to open serial port.'));
+  await new Promise((r) => setTimeout(r, 1100));
+  expect(devices.getDevices()[0].stuck).toEqual({ key: 'serial.dev.openFailed', vars: { text: 'Failed to open serial port.' } });
+
+  ports = granted;
+  (navigator as any).serial.getPorts = jest.fn(async () => []);
+  expect(await devices.repick('pty_5', 'esp32')).toBeNull();
+  expect(devices.getDevices()[0]).toEqual(expect.objectContaining({ portUp: true, stuck: null }));
+});

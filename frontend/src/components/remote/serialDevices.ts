@@ -118,6 +118,21 @@ export function pruneSessions(alive: Set<string>) {
   remember((all) => { for (const sid of Object.keys(all)) if (!alive.has(sid)) delete all[sid]; });
 }
 
+/** Choose the board again in the picker for a device waiting for it (its grant was lost, say). */
+export async function repick(sid: string, name: string): Promise<Notice | null> {
+  const entry = bridges.get(keyOf(sid, name));
+  if (!entry) return null;
+  try {
+    await entry.bridge.adopt(await serialApi().requestPort());
+  } catch (e) {
+    return { key: 'serial.raw', vars: { text: errText(e) } };
+  }
+  const device = entry.bridge.device;
+  remember((all) => { all[sid] = (all[sid] || []).map((d) => (d.name === name ? { ...d, device } : d)); });
+  changed();
+  return null;
+}
+
 const bridgeOf = (sid: string, name: string) => bridges.get(keyOf(sid, name))?.bridge;
 export const reset = (sid: string, name: string) => bridgeOf(sid, name)?.reset() ?? Promise.resolve();
 export const bootloader = (sid: string, name: string) => bridgeOf(sid, name)?.bootloader() ?? Promise.resolve();

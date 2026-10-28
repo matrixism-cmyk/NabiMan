@@ -82,6 +82,7 @@ export default function SessionDevicesDialog({ sessionId, sessionName, onClose }
                   <button className="btn btn-secondary btn-sm" onClick={run(() => devices.reset(sessionId, d.name))} title={t('serial.resetHint')}>{t('serial.reset')}</button>
                   <button className="btn btn-secondary btn-sm" onClick={run(() => devices.bootloader(sessionId, d.name))} title={t('serial.bootloaderHint')}>{t('serial.bootloader')}</button>
                 </>}
+                {state === 'waiting' && <button className="btn btn-secondary btn-sm" onClick={() => void devices.repick(sessionId, d.name).then((why) => why && setError(why))}>{t('serial.dev.repick')}</button>}
                 <button className="btn btn-danger btn-sm" onClick={() => void devices.detach(sessionId, d.name)}>{t('serial.dev.detach')}</button>
               </div>
               {d.path && (
@@ -91,6 +92,7 @@ export default function SessionDevicesDialog({ sessionId, sessionName, onClose }
                 </div>
               )}
               {d.error && <p role="alert" className="message">{noticeText(d.error)}</p>}
+              {state === 'waiting' && d.stuck && <p role="alert" className="message">{noticeText(d.stuck)}</p>}
               {tail.trim() && <pre className="serial-monitor serial-dev-tail">{tail}</pre>}
             </section>
           );
