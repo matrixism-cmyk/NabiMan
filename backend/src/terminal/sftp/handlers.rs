@@ -110,7 +110,7 @@ pub(super) struct LinkBody {
     stream: bool,
 }
 
-/// A URL for `path` that the browser can fetch on its own: single-use, for a
+/// A URL for `path` that the browser can fetch on its own: short-lived, for a
 /// drag onto the desktop, or with `stream`, for a player's range requests.
 pub(super) async fn link(req: HttpRequest, b: web::Json<LinkBody>) -> HttpResponse {
     let t = tryr!(resolve(&req));

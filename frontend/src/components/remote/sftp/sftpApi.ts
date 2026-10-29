@@ -148,7 +148,7 @@ export function removePath(src: SftpSource, path: string) {
   return request<number>(src, '/delete', { method: 'POST', body: JSON.stringify({ path }) });
 }
 
-/** A single-use URL the browser can fetch on its own, for a drag onto the desktop. */
+/** A short-lived URL the browser can fetch on its own, for a drag onto the desktop. */
 /** A URL a player (or a ranged fetch) can read the file through, for a while. */
 export async function streamLink(src: SftpSource, path: string): Promise<string> {
   const res = await request<{ url: string }>(src, '/link', { method: 'POST', body: JSON.stringify({ path, stream: true }) });
@@ -301,7 +301,7 @@ export function downloadFile(
 }
 
 /**
- * Saves a file through the browser's own downloader, from a single-use link:
+ * Saves a file through the browser's own downloader, from a short-lived link:
  * it streams to disk with the browser's progress and pause, whatever the size,
  * instead of being held in the page's memory first.
  */

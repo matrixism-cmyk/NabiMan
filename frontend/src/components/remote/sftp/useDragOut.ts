@@ -10,7 +10,7 @@ const DWELL_MS = 250;
  * Dragging a file out of the browser onto the desktop saves it — in Chromium
  * browsers, through a `DownloadURL` set when the drag starts. That has to
  * happen synchronously and the browser fetches the URL without our sign-in
- * header, so a single-use link is fetched ahead of time: when the pointer
+ * header, so a short-lived link is fetched ahead of time: when the pointer
  * rests on a row, or presses it. A folder's link fetches it as a ZIP archive.
  */
 export function useDragOut(source: SftpSource) {

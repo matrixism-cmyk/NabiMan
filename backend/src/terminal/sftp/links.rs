@@ -4,7 +4,10 @@
 //! The browser saves a file dropped outside the window by fetching a URL on
 //! its own, without the page's Authorization header. So the page asks for a
 //! link first: a random ticket bound to the signed-in session, one server and
-//! one exact path, good for one fetch within a few minutes. Redeeming it only
+//! one exact path, good for a few minutes until its first fetch and for a
+//! minute after it: a browser or a download manager taking the download over
+//! fetches the URL again, and a spent link handed it an error saved as
+//! `download.json` instead of the file. Redeeming it only
 //! stands in for the header — the session must still be live, and every
 //! permission check that follows runs as usual.
 //!
@@ -24,6 +27,8 @@ use crate::auth::Claims;
 const TTL: Duration = Duration::from_secs(5 * 60);
 const STREAM_TTL: Duration = Duration::from_secs(2 * 3600);
 const CAPACITY: usize = 4096;
+/// How long a download link stays good after its first fetch.
+const REFETCH: Duration = Duration::from_secs(60);
 
 /// Whose link it is: a signed-in session, or a share link's visitor.
 pub(crate) enum Owner {
@@ -38,6 +43,18 @@ struct Link {
     expires: Instant,
     /// A stream link: kept after use, until it expires.
     reusable: bool,
+    /// A download link fetched once: it expires `REFETCH` after that.
+    used: bool,
+}
+
+impl Link {
+    /// A download link's first fetch starts its short second life.
+    fn spend(&mut self) {
+        if !self.reusable && !self.used {
+            self.used = true;
+            self.expires = self.expires.min(Instant::now() + REFETCH);
+        }
+    }
 }
 
 fn store() -> &'static Mutex<HashMap<String, Link>> {
@@ -54,7 +71,7 @@ pub(crate) fn ttl_secs() -> u64 {
     TTL.as_secs()
 }
 
-/// A new single-use ticket for `scope` (a server id, `local`, or a share
+/// A new short-lived download ticket for `scope` (a server id, `local`, or a share
 /// token) and `path`.
 pub(crate) fn issue(owner: Owner, scope: &str, path: &str) -> Result<String, String> {
     issue_kind(owner, scope, path, false)
@@ -83,7 +100,7 @@ fn issue_kind(owner: Owner, scope: &str, path: &str, reusable: bool) -> Result<S
     }
     map.insert(
         digest(&ticket),
-        Link { owner, scope: scope.into(), path: path.into(), expires: now + if reusable { STREAM_TTL } else { TTL }, reusable },
+        Link { owner, scope: scope.into(), path: path.into(), expires: now + if reusable { STREAM_TTL } else { TTL }, reusable, used: false },
     );
     Ok(ticket)
 }
@@ -113,19 +130,16 @@ pub(crate) fn redeem(method: &str, path: &str, query: &str) -> Option<Option<Cla
     }
     let mut map = store().lock().unwrap_or_else(|e| e.into_inner());
     let key = digest(ticket);
-    // Each kind of link opens only its own route. A download link is spent
-    // whatever happens; a stream link stays for the next range.
-    let link = match map.get(&key) {
-        Some(l) if l.reusable && stream => map.get(&key)?,
-        Some(l) if !l.reusable => {
-            let spent = map.remove(&key)?;
-            if stream {
-                return Some(None);
-            }
-            return Some(admit(&spent, scope, &params));
+    // Each kind of link opens only its own route; a download link tried on
+    // the stream route is gone. A stream link stays for the next range.
+    let Some(link) = map.get_mut(&key) else { return Some(None) };
+    if link.reusable != stream {
+        if !link.reusable {
+            map.remove(&key);
         }
-        _ => return Some(None),
-    };
+        return Some(None);
+    }
+    link.spend();
     Some(admit(link, scope, &params))
 }
 
@@ -140,19 +154,24 @@ fn admit(link: &Link, scope: &str, params: &HashMap<String, String>) -> Option<C
 }
 
 /// For a share visitor's download or stream: whether `ticket` was issued to
-/// the share `token` for exactly `path`, for this route. A download link is
-/// spent either way; a stream link stays for the next range.
+/// the share `token` for exactly `path`, for this route. A download link
+/// lasts a minute after its first fetch; a stream link stays for the next range.
 pub(crate) fn redeem_share(token: &str, path: &str, ticket: &str, stream: bool) -> bool {
     let mut map = store().lock().unwrap_or_else(|e| e.into_inner());
     let key = digest(ticket);
     let fits = |l: &Link| {
         l.expires > Instant::now() && l.scope == token && l.path == path && matches!(&l.owner, Owner::Share(t) if t == token)
     };
-    match map.get(&key) {
-        Some(l) if l.reusable => stream && fits(l),
-        Some(_) => map.remove(&key).is_some_and(|l| !stream && fits(&l)),
-        None => false,
+    let Some(link) = map.get_mut(&key) else { return false };
+    if link.reusable {
+        return stream && fits(link);
     }
+    if stream {
+        map.remove(&key);
+        return false;
+    }
+    link.spend();
+    fits(link)
 }
 
 fn web_params(query: &str) -> HashMap<String, String> {
@@ -169,13 +188,23 @@ mod tests {
         Claims { sub: "admin".into(), role: "admin".into(), exp: 0, iat: 0, sid: "s1".into() }
     }
 
+    /// What a minute's wait does to a link already fetched.
+    fn age(ticket: &str) {
+        let mut map = store().lock().unwrap();
+        let link = map.get_mut(&digest(ticket)).unwrap();
+        assert!(link.used && link.expires <= Instant::now() + REFETCH);
+        link.expires = Instant::now();
+    }
+
     #[test]
-    fn a_link_opens_one_file_once() {
+    fn a_link_opens_one_file_for_a_minute_after_its_first_fetch() {
         let ticket = issue(Owner::Session(claims()), "srv_1", "/home/me/a b.txt").unwrap();
         let path = "/api/terminal/sftp/srv_1/download";
         let query = format!("path=%2Fhome%2Fme%2Fa%20b.txt&ticket={ticket}");
         assert!(matches!(redeem("GET", path, &query), Some(Some(c)) if c.sid == "s1"));
-        // Spent.
+        // A download manager taking over fetches it again.
+        assert!(matches!(redeem("GET", path, &query), Some(Some(_))));
+        age(&ticket);
         assert!(matches!(redeem("GET", path, &query), Some(None)));
     }
 
@@ -200,7 +229,9 @@ mod tests {
         assert!(!redeem_share(&token, "/etc/passwd", &ticket, false));
         let ticket = issue(Owner::Share(token.clone()), &token, "/etc/hosts").unwrap();
         assert!(redeem_share(&token, "/etc/hosts", &ticket, false));
-        assert!(!redeem_share(&token, "/etc/hosts", &ticket, false), "single use");
+        assert!(redeem_share(&token, "/etc/hosts", &ticket, false), "fetched again");
+        age(&ticket);
+        assert!(!redeem_share(&token, "/etc/hosts", &ticket, false), "spent a minute later");
         let stream = issue_stream(Owner::Share(token.clone()), &token, "/m.mp4").unwrap();
         assert!(redeem_share(&token, "/m.mp4", &stream, true));
         assert!(redeem_share(&token, "/m.mp4", &stream, true), "every range");
