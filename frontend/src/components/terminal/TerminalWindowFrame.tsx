@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import TerminalView, { TerminalStatus, TerminalViewHandle } from './TerminalView';
 import TerminalWithFiles from '../remote/TerminalWithFiles';
 import { useSessionTerminalSettings } from './sessionSettings';
@@ -29,20 +29,25 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
   // "음성으로 대답해줘": this window's answer, read aloud.
   const reply = useVoiceReply(viewRef, sessionId || undefined);
   const [showShare, setShowShare] = useState(false);
-  const [sessionName, setSessionName] = useState('');
+  const [sessionName, setName] = useState('');
+  // The taskbar tells windows apart by it, so the window manager keeps a copy.
+  const setSessionName = useCallback((name: string) => {
+    setName(name);
+    onUpdate(win.id, { sessionName: name });
+  }, [onUpdate, win.id]);
   const [showSettings, setShowSettings] = useState(false);
   const settings = useSessionTerminalSettings(sessionId || undefined);
 
   // The window knows its session only by id; look its name up once attached.
   useEffect(() => {
-    setSessionName('');
+    setName('');
     if (!sessionId) return;
     let live = true;
     apiRequest<SessionInfo[]>('/api/terminal/sessions')
       .then(res => { if (live && res.success) setSessionName(res.data?.find(s => s.id === sessionId)?.title || ''); })
       .catch(() => { /* the name stays blank; renaming still works */ });
     return () => { live = false; };
-  }, [sessionId]);
+  }, [sessionId, setSessionName]);
 
   const beginDrag = (e: React.PointerEvent) => {
     // Pointer-down on a title-bar button must not start a drag: capturing the

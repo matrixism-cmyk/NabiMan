@@ -9,7 +9,10 @@ jest.mock('./TerminalView', () => {
   const react = require('react');
   return {
     __esModule: true,
-    default: react.forwardRef(function FakeTerminalView() {
+    default: react.forwardRef(function FakeTerminalView(props: { onSessionId?: (id: string) => void }) {
+      // Set by a test that needs the window attached to a session.
+      const sid = (globalThis as any).fakeSessionId;
+      react.useEffect(() => { if (sid) props.onSessionId?.(sid); }, [sid]);
       return react.createElement('div', { 'data-testid': 'fake-terminal' });
     }),
     forgetTerminalStorage: jest.fn(),
@@ -21,7 +24,10 @@ jest.mock('./TerminalView', () => {
 // A plain function, not jest.fn(): CRA resets mock implementations between
 // tests, which would make the settings provider await `undefined`.
 jest.mock('../../shared/api/useApi', () => ({
-  apiRequest: () => Promise.resolve({ success: true, data: null, message: '' }),
+  apiRequest: (path: string) => Promise.resolve({
+    success: true, message: '',
+    data: path === '/api/terminal/sessions' ? [{ id: 'pty_named', title: '빌드 서버' }] : null,
+  }),
 }));
 
 function Opener() {
@@ -51,11 +57,19 @@ function openWindow() {
 }
 
 beforeEach(() => {
+  delete (globalThis as any).fakeSessionId;
   localStorage.clear();
   window.confirm = jest.fn(() => true);
 });
 
 describe('terminal windows', () => {
+  it('shows a renamed session\'s name after the title in the taskbar', async () => {
+    (globalThis as any).fakeSessionId = 'pty_named';
+    renderDesktop();
+    openWindow();
+    await waitFor(() => expect(document.querySelector('.term-taskbar-item')).toHaveTextContent('web-1 - 빌드 서버'));
+  });
+
   it('opens a window for a server', () => {
     renderDesktop();
     const win = openWindow();

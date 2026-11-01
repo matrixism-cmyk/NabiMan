@@ -274,7 +274,7 @@ function TerminalWindowLayer({
             onClick={() => onFocus(win.id)}
             title={win.subtitle}
           >
-            {win.minimized ? '▣ ' : '▪ '}{win.title}
+            {win.minimized ? '▣ ' : '▪ '}{win.title}{win.sessionName ? ` - ${win.sessionName}` : ''}
           </button>
         ))}
         <span className="term-taskbar-spacer" />

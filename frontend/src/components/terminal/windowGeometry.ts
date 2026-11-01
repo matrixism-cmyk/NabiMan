@@ -6,6 +6,8 @@ export interface TermWindow {
   id: string;
   title: string;
   subtitle: string;
+  /** The session's own name, once it has one: the taskbar shows it after the title. */
+  sessionName?: string;
   target: TerminalTarget;
   x: number;
   y: number;
