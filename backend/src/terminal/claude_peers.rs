@@ -54,6 +54,10 @@ pub(crate) struct ClaudePeer {
 #[derive(Default, Clone, Debug)]
 pub(crate) struct Seen {
     pub claude: Vec<ClaudePeer>,
+    /// The tmux sessions its Claude has handed work to lately (see `claude_links`).
+    pub leads: Vec<String>,
+    /// It leads others and none leads it.
+    pub orchestrator: bool,
 }
 
 impl Seen {
@@ -124,6 +128,7 @@ fn scan() -> HashMap<String, Seen> {
         })
         .collect();
     let refs = refs(&found.iter().map(|(r, _)| r.sock.as_str()).collect::<Vec<_>>());
+    link(&found, &mut seen);
     for ((rec, tmux_name), reference) in found.into_iter().zip(refs) {
         let name = if rec.name.is_empty() { base_name(&rec.cwd) } else { rec.name.clone() };
         let peer = ClaudePeer {
@@ -138,6 +143,35 @@ fn scan() -> HashMap<String, Seen> {
         entry.claude.sort_by(|a, b| a.address.cmp(&b.address));
     }
     seen
+}
+
+/// Who has been handing work to whom among the sessions found.
+fn link(found: &[(Record, String)], seen: &mut HashMap<String, Seen>) {
+    let place: HashMap<&str, &str> = found.iter().map(|(r, t)| (r.sock.as_str(), t.as_str())).collect();
+    let transcripts: Vec<(PathBuf, &str)> = found
+        .iter()
+        .filter_map(|(r, t)| {
+            let dir = r.file.parent()?.parent()?;
+            Some((super::claude_links::transcript_of(dir, &r.cwd, &r.session_id)?, t.as_str()))
+        })
+        .collect();
+    let paths: Vec<PathBuf> = transcripts.iter().map(|(p, _)| p.clone()).collect();
+    let now = super::session::now_unix();
+    let got = super::claude_links::received(&paths, now);
+    let mut messages = Vec::new();
+    for (path, to) in &transcripts {
+        for (sock, at) in got.get(path).into_iter().flatten() {
+            if let Some(from) = place.get(sock.as_str()) {
+                messages.push((from.to_string(), to.to_string(), *at));
+            }
+        }
+    }
+    let links = super::claude_links::links(&messages, now);
+    for (from, to) in links.leads {
+        let entry = seen.entry(from.clone()).or_default();
+        entry.orchestrator = links.orchestrators.contains(&from);
+        entry.leads = to;
+    }
 }
 
 /// Every account's `~/.claude/sessions/*.json`, at most `MAX_FILES` of them.
@@ -177,8 +211,11 @@ struct Record {
     name: String,
     cwd: String,
     busy: bool,
+    session_id: String,
     /// Who wrote the file.
     uid: u32,
+    /// The record's own path, under the account's `.claude` folder.
+    file: PathBuf,
 }
 
 fn read_record(path: &Path) -> Option<Record> {
@@ -189,10 +226,10 @@ fn read_record(path: &Path) -> Option<Record> {
     }
     let mut text = String::new();
     file.take(MAX_FILE).read_to_string(&mut text).ok()?;
-    parse_record(&text, meta.uid())
+    parse_record(&text, meta.uid(), path)
 }
 
-fn parse_record(text: &str, uid: u32) -> Option<Record> {
+fn parse_record(text: &str, uid: u32, file: &Path) -> Option<Record> {
     let v: serde_json::Value = serde_json::from_str(text).ok()?;
     let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
     let rec = Record {
@@ -202,7 +239,9 @@ fn parse_record(text: &str, uid: u32) -> Option<Record> {
         name: clip(&s("name"), 80),
         cwd: clip(&s("cwd"), 300),
         busy: s("status") == "busy",
+        session_id: s("sessionId"),
         uid,
+        file: file.to_path_buf(),
     };
     (!rec.sock.is_empty() && !rec.proc_start.is_empty()).then_some(rec)
 }
@@ -317,10 +356,10 @@ mod tests {
     #[test]
     fn a_record_needs_a_socket_and_start_time() {
         let text = r#"{"pid":7,"procStart":"99","messagingSocketPath":"/s","name":"x\u001b[31m","cwd":"/w","status":"busy"}"#;
-        let rec = parse_record(text, 1000).unwrap();
+        let rec = parse_record(text, 1000, Path::new("/h/.claude/sessions/7.json")).unwrap();
         assert_eq!(rec.name, "x[31m");
         assert!(rec.busy);
-        assert_eq!(parse_record(r#"{"pid":7,"procStart":"99"}"#, 0), None);
+        assert_eq!(parse_record(r#"{"pid":7,"procStart":"99"}"#, 0, Path::new("/x")), None);
     }
 
     #[test]

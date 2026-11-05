@@ -50,3 +50,39 @@
   .session-card.is-working, .claude-addr-chip.is-busy .claude-addr-dot, .session-work-badge::before { animation: none; }
   .session-card.is-working { box-shadow: 0 0 0 2px var(--success); }
 }
+
+/* ── Who hands work to whom ───────────────────────────────────────────── */
+.session-grid { position: relative; }
+.session-links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 2; }
+.session-link {
+  fill: none; stroke: var(--danger); stroke-width: 2; stroke-dasharray: 7 6; opacity: 0.9;
+  animation: session-link-flow 0.9s linear infinite;
+}
+.session-link.is-sub { stroke: var(--warning); }
+.session-link-head { fill: var(--danger); }
+.session-link-head.is-sub { fill: var(--warning); }
+@keyframes session-link-flow { to { stroke-dashoffset: -13; } }
+
+.session-card.is-orchestrator {
+  border-color: var(--danger);
+  animation: session-orchestrating 1.2s ease-in-out infinite;
+}
+@keyframes session-orchestrating {
+  0%, 100% { box-shadow: 0 0 0 1px var(--danger), 0 0 12px color-mix(in srgb, var(--danger) 60%, transparent); }
+  50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 25%, transparent), 0 0 0 transparent; }
+}
+.session-work-badge.is-orchestrator {
+  color: var(--danger); border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+.session-work-badge.is-orchestrator::before { background: var(--danger); }
+.session-work-badge.is-orchestrator.is-still::before { animation: none; }
+.session-work-badge.is-led {
+  color: var(--text-secondary); border-color: var(--border); background: transparent;
+}
+.session-work-badge.is-led::before { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .session-link, .session-card.is-orchestrator { animation: none; }
+  .session-card.is-orchestrator { box-shadow: 0 0 0 2px var(--danger); }
+}

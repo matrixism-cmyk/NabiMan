@@ -59,3 +59,23 @@ it('a screen that changed since the last refresh glows, and an unchanged one doe
   expect(screen.getByText('출력 중')).toBeInTheDocument();
   expect(card()).not.toHaveClass('is-working');
 });
+
+it('the orchestrator blinks red and an arrow runs to each session it handed work to',()=>{
+  localStorage.setItem('nabiman_lang','ko');
+  const peer=(name:string)=>[{name,ref:'abcdef',address:`${name} [abcdef]`,cwd:'/w',busy:false}];
+  const art:SessionInfo={...session,id:'pty_art',title:'artisland',state:'alive',busy:true,claude:peer('artisland-bd'),orchestrator:true,directs:['pty_nabi','pty_mpcf','pty_gone']};
+  const nabi:SessionInfo={...session,id:'pty_nabi',title:'nabiman',state:'alive',busy:true,claude:peer('nabiman-13')};
+  const mpcf:SessionInfo={...session,id:'pty_mpcf',title:'mpcf',state:'alive',claude:peer('mpcf-18')};
+  const { container } = render(<I18nProvider><SessionsView sessions={[art,nabi,mpcf]}
+    onRefresh={jest.fn()} onAttach={jest.fn()} onPopOut={jest.fn()}/></I18nProvider>);
+  const card=(id:string)=>container.querySelector(`[data-session-id="${id}"]`);
+  expect(card('pty_art')).toHaveClass('is-orchestrator');
+  expect(card('pty_art')).not.toHaveClass('is-working');
+  expect(screen.getByText('오케스트레이터 → 2')).toBeInTheDocument();
+  // A worker keeps its own green and says who it works for.
+  expect(card('pty_nabi')).toHaveClass('is-working');
+  expect(screen.getAllByText('← artisland-bd')).toHaveLength(2);
+  // Only sessions on this list are joined.
+  expect(Array.from(container.querySelectorAll('.session-link')).map((p)=>p.getAttribute('data-link')).sort())
+    .toEqual(['pty_art>pty_mpcf','pty_art>pty_nabi']);
+});

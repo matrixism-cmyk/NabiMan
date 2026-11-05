@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { apiPost, apiRequest } from '../../shared/api/useApi';
 import ClaudeAddress, { ClaudePeer } from '../terminal/ClaudeAddress';
+import SessionLinks, { SessionLink } from './SessionLinks';
 import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useGrants, useMember, useSharing } from './member';
@@ -17,6 +18,10 @@ export interface SessionInfo {
   claude?: ClaudePeer[];
   /** A Claude session in it is working on a turn. */
   busy?: boolean;
+  /** Sessions its Claude has lately handed work to, by id. */
+  directs?: string[];
+  /** Its Claude hands out work here and takes it from none. */
+  orchestrator?: boolean;
 }
 
 /** How long a changed screen counts as output just now: a little over one refresh. */
@@ -74,6 +79,18 @@ export default function SessionsView({
   const [draft, setDraft] = useState('');
   const [message, setMessage] = useState('');
   const recentOutput = useScreenChanges(sessions);
+  // A state, not a ref: the arrows redraw once the grid is there.
+  const [grid, setGrid] = useState<HTMLDivElement | null>(null);
+  const shown = new Set(sessions.map((s) => s.id));
+  const links: SessionLink[] = sessions.flatMap((s) => (s.directs || [])
+    .filter((to) => shown.has(to))
+    .map((to) => ({ from: s.id, to, orchestrator: !!s.orchestrator })));
+  const leader = new Map<string, SessionInfo>();
+  for (const l of links) {
+    const from = sessions.find((s) => s.id === l.from);
+    if (from && (!leader.has(l.to) || from.orchestrator)) leader.set(l.to, from);
+  }
+  const nameOf = (s: SessionInfo) => s.claude?.[0]?.name || s.title || s.label;
 
   const startRename = (session: SessionInfo) => {
     setRenaming(session.id);
@@ -135,17 +152,22 @@ export default function SessionsView({
       </div>
 
       {message && <div role="alert" className="message">{message}</div>}
-      <div className="session-grid">
+      <div className="session-grid" ref={setGrid}>
+        <SessionLinks grid={grid} links={links} />
         {sessions.map(session => {
           const state = session.state === undefined ? (session.alive ? 'alive' : 'ended') :
             ['alive', 'ended', 'unknown', 'blocked'].includes(session.state) ? session.state : 'unknown';
           const attachable = session.alive && state === 'alive';
-          // Claude at work blinks; any other screen that just changed glows.
-          const working = attachable && !!session.busy;
-          const output = attachable && !working && recentOutput(session.id);
+          // The orchestrator blinks red; Claude at work blinks green; any
+          // other screen that just changed glows.
+          const directs = links.filter((l) => l.from === session.id).length;
+          const orchestrating = attachable && !!session.orchestrator && directs > 0;
+          const working = attachable && !orchestrating && !!session.busy;
+          const output = attachable && !orchestrating && !working && recentOutput(session.id);
+          const ledBy = attachable ? leader.get(session.id) : undefined;
           return (
-          <div key={session.id}
-            className={`session-card ${session.id === currentSessionId ? 'is-current' : ''} ${working ? 'is-working' : ''} ${output ? 'is-output' : ''}`}>
+          <div key={session.id} data-session-id={session.id}
+            className={`session-card ${session.id === currentSessionId ? 'is-current' : ''} ${orchestrating ? 'is-orchestrator' : ''} ${working ? 'is-working' : ''} ${output ? 'is-output' : ''}`}>
             <div className="session-card-head">
               {renaming === session.id ? (
                 <form className="session-rename" onSubmit={(e) => { e.preventDefault(); saveRename(session); }}>
@@ -163,6 +185,16 @@ export default function SessionsView({
                   <button className="session-rename-btn" title={t('terminal.rename')} onClick={() => startRename(session)}>✎</button>
                   {state !== 'alive' && <span className="status-badge down">{t(state === 'unknown' ? 'terminal.sessionUnknown' : state === 'blocked' ? 'terminal.sessionBlocked' : 'share.ended')}</span>}
                   {session.id === currentSessionId && <span className="status-badge up">{t('terminal.thisPane')}</span>}
+                  {orchestrating && (
+                    <span className={`session-work-badge is-orchestrator ${session.busy ? '' : 'is-still'}`} title={t('claudePeer.orchestratorHint')}>
+                      {t('claudePeer.orchestrator', { count: directs })}
+                    </span>
+                  )}
+                  {ledBy && (
+                    <span className="session-work-badge is-led" title={t('claudePeer.ledHint', { name: nameOf(ledBy) })}>
+                      {t('claudePeer.led', { name: nameOf(ledBy) })}
+                    </span>
+                  )}
                   {working && <span className="session-work-badge" title={t('claudePeer.workingHint')}>{t('claudePeer.working')}</span>}
                   {output && <span className="session-work-badge is-output" title={t('claudePeer.outputHint')}>{t('claudePeer.output')}</span>}
                 </>

@@ -35,6 +35,10 @@ struct SessionInfo {
     claude: Vec<super::claude_peers::ClaudePeer>,
     /// A Claude session in it is working on a turn.
     busy: bool,
+    /// Sessions in this list its Claude has lately handed work to.
+    directs: Vec<String>,
+    /// Its Claude leads others here and is led by none.
+    orchestrator: bool,
 }
 
 #[derive(serde::Serialize)]
@@ -58,9 +62,14 @@ async fn list_sessions(
     let seen = super::claude_peers::look();
     let map = store.lock().unwrap();
     let now = now_unix();
-    let mut list: Vec<SessionInfo> = map
+    let visible: Vec<(&String, &TmuxSession)> = map
         .iter()
         .filter(|(_, s)| super::session::visible_to(s, &user_id, &users))
+        .collect();
+    // Links are shown only between sessions this account sees.
+    let id_of: HashMap<&str, &str> = visible.iter().map(|(id, s)| (s.tmux_name.as_str(), id.as_str())).collect();
+    let mut list: Vec<SessionInfo> = visible
+        .into_iter()
         .map(|(id, s)| {
             let state = if !super::remote_access::allowed(s) {
                 "blocked"
@@ -73,6 +82,9 @@ async fn list_sessions(
             };
             let alive = state == "alive";
             let here = seen.get(&s.tmux_name).filter(|_| alive);
+            let directs: Vec<String> = here
+                .map(|h| h.leads.iter().filter_map(|t| id_of.get(t.as_str())).map(|i| i.to_string()).collect())
+                .unwrap_or_default();
             SessionInfo {
                 id: id.clone(),
                 label: s.label.clone(),
@@ -93,6 +105,8 @@ async fn list_sessions(
                 },
                 claude: here.map(|h| h.claude.clone()).unwrap_or_default(),
                 busy: here.is_some_and(|h| h.busy()),
+                orchestrator: here.is_some_and(|h| h.orchestrator) && !directs.is_empty(),
+                directs,
             }
         })
         .collect();
