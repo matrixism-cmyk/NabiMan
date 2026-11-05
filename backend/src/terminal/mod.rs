@@ -5,6 +5,7 @@ mod ssh_command;
 use ssh_command::build_ssh_command;
 
 mod claude_links;
+mod claude_start;
 mod claude_peers;
 mod claude_voice;
 mod dictation;
@@ -218,6 +219,15 @@ async fn ws_terminal(
             // browser could only read as "connection lost" and keep retrying.
             Err(e) => return ws::start(NoticeSocket::new(&e), &req, stream),
         };
+    // A local session may start straight into Claude Code (as a user, in a
+    // directory); never a remote one, and never for a remote-only member.
+    let start = match claude_start::from_query(query) {
+        Ok(Some(_)) if shell_cmd.is_some() || member.is_some() => {
+            return ws::start(NoticeSocket::new("Claude Code 시작은 이 서버의 로컬 세션에서만 됩니다"), &req, stream)
+        }
+        Ok(start) => start,
+        Err(e) => return ws::start(NoticeSocket::new(&e), &req, stream),
+    };
 
     if !grant.valid() || remote_binding.as_ref().is_some_and(|b| !b.valid()) {
         return Ok(HttpResponse::Forbidden().finish());
@@ -258,7 +268,7 @@ async fn ws_terminal(
             timeout_secs,
             scrollback,
             keepalive,
-            title: String::new(),
+            title: start.as_ref().map(|s| s.title.clone()).unwrap_or_default(),
         },
     ) {
         Ok(candidate) => candidate,
@@ -277,7 +287,8 @@ async fn ws_terminal(
         return Ok(HttpResponse::Forbidden().finish());
     }
     let size = parse_size(query);
-    if let Err(e) = create_tmux_session(&tmux_name, shell_cmd.as_deref(), scrollback, size) {
+    let start_cmd = start.as_ref().map(claude_start::command);
+    if let Err(e) = create_tmux_session(&tmux_name, shell_cmd.as_deref().or(start_cmd.as_deref()), scrollback, size) {
         return Ok(HttpResponse::InternalServerError().json(
             crate::models::ApiResponse::<()>::error(&format!("tmux: {}", e)),
         ));
@@ -372,6 +383,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(ws_terminal);
     handlers::configure(cfg);
     session_order::configure(cfg);
+    claude_start::configure(cfg);
     paste_file::config(cfg);
     session_settings::config(cfg);
     sftp::config(cfg);

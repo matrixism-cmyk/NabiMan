@@ -113,3 +113,14 @@
   animation: none; box-shadow: none;
   border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
 }
+
+/* Starting a session straight into Claude Code. */
+.claude-start { width: min(560px, calc(100vw - 32px)); }
+.claude-start-form { display: flex; flex-direction: column; gap: 12px; }
+.claude-start-form > label { display: flex; flex-direction: column; gap: 4px; }
+.claude-start-form > label > span { font-weight: 600; font-size: 0.9em; }
+.claude-start-form > label.claude-start-check { flex-direction: row; align-items: center; gap: 8px; }
+.claude-start-form > label.claude-start-check > span { font-weight: normal; }
+.claude-start-preview { margin: 0; padding: 8px 10px; border-radius: 6px; background: var(--bg-secondary, rgba(127,127,127,.12)); overflow-wrap: anywhere; font-size: 0.85em; }
+.claude-start-form > label.claude-start-check > input { width: auto; flex: none; margin: 0; }
+.claude-start-form > label.claude-start-check > span { flex: 1; text-align: left; }

@@ -37,6 +37,13 @@ export function buildTerminalUrl({ settings, target, sessionId, join, cols, rows
   // An explicit join must attach to *that* session or report it gone; only a
   // remembered id may quietly fall back to starting a fresh session.
   if (sessionId && join) url += '&join=1';
+  // Only a brand new local session starts Claude Code; rejoining never reruns it.
+  if (target.kind === 'local' && target.start && !sessionId) {
+    const st = target.start;
+    url += `&start_user=${encodeURIComponent(st.user)}&start_dir=${encodeURIComponent(st.dir)}`;
+    if (st.title) url += `&start_title=${encodeURIComponent(st.title)}`;
+    url += `&claude_skip=${st.skipPermissions ? 1 : 0}&claude_continue=${st.resume ? 1 : 0}`;
+  }
   if (target.kind === 'ssh') {
     if (target.serverId) {
       url += `&server_id=${encodeURIComponent(target.serverId)}`;

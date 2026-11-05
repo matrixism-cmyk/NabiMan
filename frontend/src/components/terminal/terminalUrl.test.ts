@@ -50,3 +50,15 @@ it('rejects cross-origin, another share and embedded reusable credentials', asyn
   for (const url of ['ws://other.example/api/share/one/ws', `ws://${window.location.host}/api/share/two/ws`, `ws://${window.location.host}/api/share/one/ws?ticket=old`, `ws://${window.location.host}/api/share/one/ws?token=jwt`]) await expect(ticketedShareUrl(url, share)).rejects.toThrow();
   expect(share.acquireTicket).not.toHaveBeenCalled();
 });
+
+it('starts Claude Code only when opening a new local session, never on rejoin', () => {
+  const start = { user: 'nabi', dir: '/workspace/나비 man', skipPermissions: true, resume: true, title: '나비' };
+  const fresh = buildTerminalUrl({ settings: DEFAULT_TERMINAL_SETTINGS, target: { kind: 'local', start }, sessionId: '', join: false, cols: 80, rows: 24 });
+  expect(fresh).toContain('&start_user=nabi&start_dir=%2Fworkspace%2F%EB%82%98%EB%B9%84%20man');
+  expect(fresh).toContain('&start_title=%EB%82%98%EB%B9%84');
+  expect(fresh).toContain('&claude_skip=1&claude_continue=1');
+  expect(/^[\x21-\x7e]+$/.test(fresh)).toBe(true);
+  const rejoin = buildTerminalUrl({ settings: DEFAULT_TERMINAL_SETTINGS, target: { kind: 'local', start }, sessionId: 'pty_1', join: true, cols: 80, rows: 24 });
+  expect(rejoin).not.toContain('start_');
+  expect(rejoin).not.toContain('claude_');
+});

@@ -81,6 +81,11 @@ fn valid_query(query: &str) -> bool {
                     | "target"
                     | "serial"
                     | "history"
+                    | "start_user"
+                    | "start_dir"
+                    | "start_title"
+                    | "claude_skip"
+                    | "claude_continue"
             ) && keys.insert(k)
         })
 }

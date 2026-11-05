@@ -15,6 +15,20 @@ export interface TerminalTarget {
   noFiles?: boolean;
   /** Ad-hoc Telnet (no saved server, no host key). */
   telnet?: boolean;
+  /** A new local session starts straight into Claude Code with this. */
+  start?: ClaudeStart;
+}
+
+/** How a new local session starts Claude Code: as whom, where, with what. */
+export interface ClaudeStart {
+  user: string;
+  dir: string;
+  /** `--dangerously-skip-permissions` */
+  skipPermissions: boolean;
+  /** `-c`: carry on with the last conversation in that directory. */
+  resume: boolean;
+  /** The session's name in the list. */
+  title?: string;
 }
 
 export type TerminalStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'ended';

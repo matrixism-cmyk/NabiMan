@@ -72,7 +72,7 @@ pub(crate) fn transcript_of(claude_dir: &Path, cwd: &str, session_id: &str) -> O
 
 /// How Claude Code names a project's folder: the working folder with every
 /// character but letters and digits turned into `-`.
-fn folder_name(cwd: &str) -> String {
+pub(crate) fn folder_name(cwd: &str) -> String {
     cwd.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '-' }).collect()
 }
 
@@ -337,11 +337,11 @@ mod tests {
         catch_up(&path, &mut tail).unwrap();
         assert_eq!(tail.got.iter().map(|g| g.0.as_str()).collect::<Vec<_>>(), vec!["/a", "/b"]);
         // In the background: the first look may come back before the reading is done.
-        let _ = received(&[path.clone()]);
+        let _ = received(std::slice::from_ref(&path));
         let mut got = Vec::new();
         for _ in 0..200 {
             std::thread::sleep(std::time::Duration::from_millis(10));
-            got = received(&[path.clone()]).remove(&path).unwrap_or_default();
+            got = received(std::slice::from_ref(&path)).remove(&path).unwrap_or_default();
             if got.len() == 2 {
                 break;
             }

@@ -15,6 +15,7 @@ import MultiServerDashboard from './MultiServerDashboard';
 import ServerForm from './ServerForm';
 import { ServerStatusView, ServerExecView, ServerSettingsView } from './ServerDetail';
 import SessionsView, { SessionInfo } from './SessionsView';
+import ClaudeStartDialog from './ClaudeStartDialog';
 import TargetSessionsView from './TargetSessionsView';
 import TargetRail from './TargetRail';
 import AdhocConnect from './AdhocConnect';
@@ -71,6 +72,7 @@ export default function RemoteWorkspace() {
   const [termStatus, setTermStatus] = useState<TerminalStatus>('connecting');
   const [showSettings, setShowSettings] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [showClaudeStart, setShowClaudeStart] = useState(false);
   const [shareTarget, setShareTarget] = useState('');
   const [shareFiles, setShareFiles] = useState(false);
   const [filter, setFilter] = useState('');
@@ -319,7 +321,19 @@ export default function RemoteWorkspace() {
               {overviewView === 'sessions' && (
                 <SessionsView sessions={sessions} currentSessionId={currentSessionId}
                   onRefresh={refetchSessions} onAttach={attachSession} onPopOut={popOutSession}
-                  onShare={(session) => { setShareTarget(session.id); setShowShare(true); }} />
+                  onShare={(session) => { setShareTarget(session.id); setShowShare(true); }}
+                  actions={member ? undefined : (
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowClaudeStart(true)} title={t('claudeStart.buttonHint')}>
+                      {t('claudeStart.button')}
+                    </button>
+                  )} />
+              )}
+              {showClaudeStart && (
+                <ClaudeStartDialog onClose={() => setShowClaudeStart(false)} onStart={(start) => {
+                  setShowClaudeStart(false);
+                  openTerminal({ kind: 'local', start }, { title: start.title || t('remote.localShell') });
+                  window.setTimeout(refetchSessions, 1500);
+                }} />
               )}
               {overviewView === 'links' && <ShareLinksPanel />}
               {overviewView === 'keys' && <SshKeyPanel />}
