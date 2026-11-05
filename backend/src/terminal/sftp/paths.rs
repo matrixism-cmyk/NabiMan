@@ -83,7 +83,7 @@ pub(crate) fn disposition(name: &str) -> String {
     format!("attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}")
 }
 
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Debug, PartialEq, Clone)]
 pub(crate) struct Entry {
     pub name: String,
     /// `dir`, `file`, `link` or `other`.

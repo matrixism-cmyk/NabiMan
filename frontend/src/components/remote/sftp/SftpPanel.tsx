@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '../../../shared/i18n';
-import RailContextMenu, { RailMenuItem } from '../RailContextMenu';
+import RailContextMenu from '../RailContextMenu';
 import AttrsDialog from './AttrsDialog';
+import PropertiesDialog from './PropertiesDialog';
+import { sftpMenu } from './sftpMenu';
 import PreviewDialog from './preview/PreviewDialog';
 import { previewOf } from './preview/previewKinds';
 import SftpList, { Editing } from './SftpList';
@@ -57,6 +59,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
   const [editing, setEditing] = useState<Editing | null>(null);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [attrsFor, setAttrsFor] = useState<SftpEntry[] | null>(null);
+  const [propsFor, setPropsFor] = useState<string[] | null>(null);
   const [previewing, setPreviewing] = useState<string | null>(null);
   const anchor = useRef<string | null>(null);
   const current = useRef('');
@@ -248,46 +251,12 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
     }
   };
 
-  const menuItems = (entry?: SftpEntry): RailMenuItem[] => {
-    if (!entry) {
-      return [
-        ...(writable ? [
-          { key: 'mkdir', label: t('sftp.newFolder'), icon: '＋', onSelect: () => setEditing({ mode: 'new', from: '' }) },
-          { key: 'upload', label: t('sftp.upload'), icon: '↑', onSelect: pickers.pickFiles },
-          { key: 'uploadFolder', label: t('sftp.uploadFolder'), icon: '⇪', onSelect: pickers.pickFolder },
-        ] : []),
-        // The open folder itself, as a folder (not the filesystem root: far too much).
-        ...(here && here !== '/' ? [{ key: 'saveHere', label: t('sftp.saveFolderHere'), icon: '⇩', onSelect: () => { transfers.saveFolder([here]); } }] : []),
-        { key: 'refresh', label: t('sftp.refresh'), icon: '⟳', onSelect: refresh },
-        { key: 'hidden', label: showHidden ? t('sftp.hideHidden') : t('sftp.showHidden'), icon: '◌', separated: true, onSelect: toggleHidden },
-      ];
-    }
-    const targets = selected.has(entry.name) ? chosen : [entry];
-    const saving = targets.map((e) => ({ path: pathOf(e.name), folder: isFolder(e) }));
-    const single = targets.length === 1;
-    return [
-      ...(single && !isFolder(entry) && previewOf(entry.name)
-        ? [{ key: 'preview', label: t('sftp.preview'), icon: '👁', onSelect: () => setPreviewing(entry.name) }]
-        : []),
-      single && isFolder(entry)
-        ? { key: 'open', label: t('sftp.open'), icon: '📂', onSelect: () => open(entry) }
-        : { key: 'download', label: t('sftp.download'), icon: '↓', onSelect: () => transfers.download(saving) },
-      ...(single && isFolder(entry) ? [
-        { key: 'saveFolder', label: t('sftp.saveFolder'), icon: '⇩', onSelect: () => { transfers.saveFolder([pathOf(entry.name)]); } },
-        { key: 'zip', label: t('sftp.downloadFolder'), icon: '↓', onSelect: () => transfers.download(saving) },
-      ] : []),
-      ...(onInsert ? [{ key: 'insert', label: t('sftp.insertPath'), icon: '⌨', onSelect: () => onInsert(`${quoted(targets)} `) }] : []),
-      { key: 'copy', label: t('sftp.copyPath'), icon: '⧉',
-        onSelect: () => { navigator.clipboard?.writeText(quoted(targets)).catch(() => undefined); } },
-      ...(writable ? [
-        { key: 'rename', label: t('sftp.rename'), icon: '✎', disabled: !single,
-          onSelect: () => setEditing({ mode: 'rename', from: entry.name }) },
-        ...(listing?.attrs ? [{ key: 'attrs', label: t('sftp.attrs'), icon: '🔐', onSelect: () => setAttrsFor(targets) }] : []),
-        { key: 'delete', label: t('common.delete'), icon: '🗑', danger: true, separated: true,
-          onSelect: () => remove(targets) },
-      ] : []),
-    ];
-  };
+  const menuItems = (entry?: SftpEntry) => sftpMenu({
+    t, writable, here, chosen, selected, showHidden, canAttrs: Boolean(listing?.attrs), pathOf, quoted, onInsert,
+    edit: setEditing, pickFiles: pickers.pickFiles, pickFolder: pickers.pickFolder, saveFolder: transfers.saveFolder,
+    download: transfers.download, refresh, toggleHidden, preview: setPreviewing, open, attrs: setAttrsFor,
+    properties: setPropsFor, remove,
+  }, entry);
 
   const toggleHidden = () => setShowHidden((v) => { write('nabiman_sftp_hidden', v ? '0' : '1'); return !v; });
 
@@ -385,9 +354,14 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
           onDownload={(e) => transfers.download([{ path: pathOf(e.name) }])}
           onClose={() => { setPreviewing(null); listRef.current?.focus(); }} />
       )}
+      {propsFor && (
+        <PropertiesDialog source={source} paths={propsFor} onClose={() => setPropsFor(null)}
+          onAttrs={writable && listing?.attrs ? (items) => { setPropsFor(null); setAttrsFor(items); } : undefined} />
+      )}
       {attrsFor && listing?.attrs && (
         <AttrsDialog source={source} caps={listing.attrs} onClose={() => setAttrsFor(null)}
-          targets={attrsFor.map((entry) => ({ entry, path: pathOf(entry.name) }))}
+          // Entries from the properties dialog carry their own path (the open folder itself, say).
+          targets={attrsFor.map((entry) => ({ entry, path: 'path' in entry && typeof entry.path === 'string' ? entry.path : pathOf(entry.name) }))}
           onDone={(r) => {
             setAttrsFor(null);
             report(r.failed.map((f) => `${baseName(f.path)}: ${f.message}`),

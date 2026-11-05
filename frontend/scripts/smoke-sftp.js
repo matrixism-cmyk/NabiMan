@@ -124,12 +124,16 @@ const check = (name, ok, detail = '') => {
   const linkUrl = downloadUrl.split(':').slice(2).join(':');
   check('a file dragged out carries a desktop download', downloadUrl.startsWith('application/octet-stream:hello.txt:http'),
     downloadUrl.slice(0, 60));
-  // The browser fetches it without the page's sign-in, and only once.
+  // The browser fetches it without the page's sign-in; fetched again soon
+  // after (a download manager taking over), it still hands over the file,
+  // not an error saved as download.json. It lapses a minute after (links.rs).
   const first = await fetch(linkUrl);
   const firstBody = await first.text();
   const again = await fetch(linkUrl);
-  check('the link downloads once without a sign-in, then is spent',
-    first.status === 200 && firstBody === 'hello from the browser\n' && again.status === 401, `${first.status} → ${again.status}`);
+  const againBody = await again.text();
+  check('the link downloads without a sign-in, and again right after',
+    first.status === 200 && firstBody === 'hello from the browser\n' && again.status === 200 && againBody === firstBody,
+    `${first.status} → ${again.status}`);
 
   // 5. Up through the ".." row, then delete the folder with its contents.
   await page.dblclick('.sftp-row.is-up');

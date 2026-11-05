@@ -9,6 +9,7 @@
 //! does.
 
 mod attrs;
+mod checksum;
 mod columns;
 mod copy;
 mod copy_run;
@@ -21,6 +22,8 @@ mod parts;
 mod paths;
 mod pool;
 mod stream;
+mod usage;
+mod usage_walk;
 pub(crate) mod share_keys;
 mod zip;
 
@@ -209,6 +212,8 @@ fn routes(prefix: &str) -> actix_web::Scope {
         .route("/rename", web::post().to(handlers::rename))
         .route("/delete", web::post().to(handlers::delete))
         .route("/attrs", web::post().to(attrs::change))
+        .route("/usage", web::post().to(usage::usage))
+        .route("/checksum", web::post().to(checksum::checksum))
 }
 
 pub(crate) fn config(cfg: &mut web::ServiceConfig) {

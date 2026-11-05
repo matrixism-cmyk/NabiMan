@@ -5,6 +5,7 @@ import SftpPanel from './SftpPanel';
 import TerminalWithFiles from '../TerminalWithFiles';
 import { SFTP_MIME } from './sftpDrop';
 import * as api from './sftpApi';
+import * as usageApi from './sftpUsage';
 
 jest.mock('./sftpApi', () => {
   const actual = jest.requireActual('./sftpApi');
@@ -14,6 +15,8 @@ jest.mock('./sftpApi', () => {
     uploadFile: jest.fn(), downloadFile: jest.fn(), downloadLink: jest.fn(), saveFile: jest.fn(),
   };
 });
+
+jest.mock('./sftpUsage', () => ({ ...jest.requireActual('./sftpUsage'), usage: jest.fn(), checksum: jest.fn() }));
 
 const mocked = api as jest.Mocked<typeof api>;
 const SRV = expect.objectContaining({ base: '/api/terminal/sftp/srv_1' });
@@ -146,6 +149,26 @@ describe('SFTP panel', () => {
     fireEvent.dragStart(row('logs'), { dataTransfer: folderDrag });
     expect(folderDrag.setData).toHaveBeenCalledWith('DownloadURL',
       'application/octet-stream:logs.zip:https://man.example/api/terminal/sftp/srv_1/download-folder?path=y&ticket=u');
+  });
+
+  it('shows a folder\'s properties from its menu, and the open folder\'s from the empty space', async () => {
+    const usage = usageApi.usage as jest.Mock;
+    usage.mockImplementation((_src, paths: string[], onLine) => {
+      onLine({ items: paths.map((path) => ({ ...HOME.entries[0], name: api.baseName(path), path })), inside: { dirs: 1, files: 2, links: 0, other: 0, hidden: 1 } });
+      onLine({ count: { dirs: 3, files: 40, links: 0, other: 0, bytes: 5000, unreadable: 0 }, done: true, capped: null, how: 'walk' });
+      return Promise.resolve('');
+    });
+    renderPanel();
+    await screen.findByText('logs');
+    fireEvent.contextMenu(row('logs'));
+    fireEvent.click(screen.getByRole('menuitem', { name: '속성' }));
+    expect(await screen.findByText('/home/me/logs')).toBeInTheDocument();
+    expect(usage).toHaveBeenLastCalledWith(SRV, ['/home/me/logs'], expect.any(Function), expect.anything());
+    expect(screen.getByText(/폴더 3개 · 파일 40개/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }));
+    fireEvent.contextMenu(document.querySelector('.sftp-body')!);
+    fireEvent.click(screen.getByRole('menuitem', { name: '이 폴더 속성' }));
+    await waitFor(() => expect(usage).toHaveBeenLastCalledWith(SRV, ['/home/me'], expect.any(Function), expect.anything()));
   });
 
   it('downloads a folder as a ZIP from its menu', async () => {

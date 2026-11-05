@@ -184,6 +184,15 @@ impl Fs {
         }
     }
 
+    /// Where a link points, as written in it; FTP cannot tell.
+    pub async fn read_link(&self, path: &str) -> Option<String> {
+        match self {
+            Fs::Remote(c) => c.sftp.read_link(path).await.ok(),
+            Fs::Ftp(_) => None,
+            Fs::Local => tokio::fs::read_link(path).await.ok().map(|p| p.to_string_lossy().into_owned()),
+        }
+    }
+
     pub async fn exists(&self, path: &str) -> bool {
         self.lstat(path).await.is_ok()
     }

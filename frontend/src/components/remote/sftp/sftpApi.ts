@@ -67,7 +67,7 @@ export function modeString(mode: number): string {
   return bits.join('');
 }
 
-const API_BASE = process.env.REACT_APP_API_URL || '';
+export const API_BASE = process.env.REACT_APP_API_URL || '';
 const token = () => sessionStorage.getItem('nabiman_token') || '';
 
 /**

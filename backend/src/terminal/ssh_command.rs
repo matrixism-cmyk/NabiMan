@@ -152,7 +152,7 @@ fn telnet_client() -> Result<String, String> {
     Ok(format!("{} {}", quote(&exe), super::telnet_client::SUBCOMMAND))
 }
 
-fn quote(arg: &str) -> String {
+pub(crate) fn quote(arg: &str) -> String {
     format!("'{}'", arg.replace('\'', "'\\''"))
 }
 
