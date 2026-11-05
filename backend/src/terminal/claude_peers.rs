@@ -157,7 +157,7 @@ fn link(found: &[(Record, String)], seen: &mut HashMap<String, Seen>) {
         .collect();
     let paths: Vec<PathBuf> = transcripts.iter().map(|(p, _)| p.clone()).collect();
     let now = super::session::now_unix();
-    let got = super::claude_links::received(&paths, now);
+    let got = super::claude_links::received(&paths);
     let mut messages = Vec::new();
     for (path, to) in &transcripts {
         for (sock, at) in got.get(path).into_iter().flatten() {
@@ -180,7 +180,7 @@ fn session_files() -> Vec<PathBuf> {
     if let Ok(passwd) = fs::read_to_string("/etc/passwd") {
         for line in passwd.lines() {
             let f: Vec<&str> = line.split(':').collect();
-            if f.len() >= 6 && f[2].parse::<u32>().is_ok_and(|uid| uid >= 1000 && uid < 65534) {
+            if f.len() >= 6 && f[2].parse::<u32>().is_ok_and(|uid| (1000..65534).contains(&uid)) {
                 homes.push(PathBuf::from(f[5]));
             }
         }

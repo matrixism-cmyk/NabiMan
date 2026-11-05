@@ -1,7 +1,8 @@
 import React, { useLayoutEffect, useState } from 'react';
 
 /** One session handing work to another, by session id. */
-export interface SessionLink { from: string; to: string; orchestrator: boolean }
+/** One session handing work to another, by session id; `live` while either end is working. */
+export interface SessionLink { from: string; to: string; orchestrator: boolean; live: boolean }
 
 interface Props {
   /** The grid holding the cards; each card carries `data-session-id`. */
@@ -11,7 +12,7 @@ interface Props {
   layout?: string;
 }
 
-interface Drawn { key: string; d: string; orchestrator: boolean }
+interface Drawn { key: string; d: string; orchestrator: boolean; live: boolean }
 
 /** Where the line from a box's centre towards a point leaves the box, a little outside it. */
 function exit(r: DOMRect, x: number, y: number, gap = 4) {
@@ -39,7 +40,7 @@ function draw(grid: HTMLDivElement, links: SessionLink[]): Drawn[] {
     const bend = 0.12;
     const mx = (x1 + x2) / 2 - (y2 - y1) * bend;
     const my = (y1 + y2) / 2 + (x2 - x1) * bend;
-    out.push({ key: `${l.from}>${l.to}`, d: `M${x1.toFixed(1)},${y1.toFixed(1)} Q${mx.toFixed(1)},${my.toFixed(1)} ${x2.toFixed(1)},${y2.toFixed(1)}`, orchestrator: l.orchestrator });
+    out.push({ key: `${l.from}>${l.to}`, d: `M${x1.toFixed(1)},${y1.toFixed(1)} Q${mx.toFixed(1)},${my.toFixed(1)} ${x2.toFixed(1)},${y2.toFixed(1)}`, orchestrator: l.orchestrator, live: l.live });
   }
   return out;
 }
@@ -50,7 +51,7 @@ function draw(grid: HTMLDivElement, links: SessionLink[]): Drawn[] {
  */
 export default function SessionLinks({ grid, links, layout }: Props) {
   const [drawn, setDrawn] = useState<Drawn[]>([]);
-  const signature = links.map((l) => `${l.from}>${l.to}:${l.orchestrator}`).join(',');
+  const signature = links.map((l) => `${l.from}>${l.to}:${l.orchestrator}:${l.live}`).join(',');
 
   useLayoutEffect(() => {
     const el = grid;
@@ -77,7 +78,7 @@ export default function SessionLinks({ grid, links, layout }: Props) {
         </marker>
       </defs>
       {drawn.map((l) => (
-        <path key={l.key} d={l.d} data-link={l.key} className={`session-link ${l.orchestrator ? '' : 'is-sub'}`}
+        <path key={l.key} d={l.d} data-link={l.key} className={`session-link ${l.orchestrator ? '' : 'is-sub'} ${l.live ? '' : 'is-faint'}`}
           markerEnd={`url(#session-link-head${l.orchestrator ? '' : '-sub'})`} />
       ))}
     </svg>

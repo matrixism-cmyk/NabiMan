@@ -103,3 +103,23 @@ it('the handle moves a tile with the arrow keys and saves the order; the sort ca
   fireEvent.change(sort,{target:{value:'name'}});
   expect(order()).toEqual(['pty_a','pty_b']);
 });
+
+it('when the orchestrator and its workers are waiting, the arrows fade and it stops blinking',()=>{
+  localStorage.setItem('nabiman_lang','ko');
+  const peer=(name:string)=>[{name,ref:'abcdef',address:`${name} [abcdef]`,cwd:'/w',busy:false}];
+  const art:SessionInfo={...session,id:'pty_art',title:'artisland',state:'alive',busy:false,claude:peer('artisland-bd'),orchestrator:true,directs:['pty_nabi','pty_mpcf']};
+  const nabi:SessionInfo={...session,id:'pty_nabi',title:'nabiman',state:'alive',busy:true,claude:peer('nabiman-13')};
+  const mpcf:SessionInfo={...session,id:'pty_mpcf',title:'mpcf',state:'alive',claude:peer('mpcf-18')};
+  const view=(list:SessionInfo[])=>(<I18nProvider><SessionsView sessions={list} onRefresh={jest.fn()} onAttach={jest.fn()} onPopOut={jest.fn()}/></I18nProvider>);
+  const { container, rerender } = render(view([art,nabi,mpcf]));
+  const link=(k:string)=>container.querySelector(`[data-link="${k}"]`);
+  const card=()=>container.querySelector('[data-session-id="pty_art"]');
+  // nabiman still works on what it was handed: that arrow stays, the idle one fades.
+  expect(link('pty_art>pty_nabi')).not.toHaveClass('is-faint');
+  expect(link('pty_art>pty_mpcf')).toHaveClass('is-faint');
+  expect(card()).not.toHaveClass('is-resting');
+  rerender(view([art,{...nabi,busy:false},mpcf]));
+  expect(link('pty_art>pty_nabi')).toHaveClass('is-faint');
+  expect(card()).toHaveClass('is-orchestrator');
+  expect(card()).toHaveClass('is-resting');
+});

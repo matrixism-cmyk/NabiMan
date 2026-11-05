@@ -3055,6 +3055,7 @@ dependencies = [
  "k8s-openapi",
  "kube",
  "libc",
+ "memchr",
  "nix 0.29.0",
  "rand 0.10.3",
  "rand 0.8.8",

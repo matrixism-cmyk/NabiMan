@@ -106,3 +106,10 @@
   background: var(--surface-alt); color: var(--text); border: 1px solid var(--border);
   border-radius: 6px; padding: 4px 8px; font-size: 12px;
 }
+
+/* Work handed over is done for now: the arrows fade and the orchestrator stops blinking. */
+.session-link.is-faint { opacity: 0.22; animation: none; }
+.session-card.is-orchestrator.is-resting {
+  animation: none; box-shadow: none;
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}

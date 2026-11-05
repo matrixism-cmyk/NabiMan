@@ -115,9 +115,11 @@ export default function SessionsView({
   // A state, not a ref: the arrows redraw once the grid is there.
   const [grid, setGrid] = useState<HTMLDivElement | null>(null);
   const shown = new Set(sessions.map((s) => s.id));
+  const busy = new Set(sessions.filter((s) => s.busy).map((s) => s.id));
+  // Once both ends are waiting, the work handed over is done for now: the arrow fades.
   const links: SessionLink[] = sessions.flatMap((s) => (s.directs || [])
     .filter((to) => shown.has(to))
-    .map((to) => ({ from: s.id, to, orchestrator: !!s.orchestrator })));
+    .map((to) => ({ from: s.id, to, orchestrator: !!s.orchestrator, live: busy.has(s.id) || busy.has(to) })));
   const leader = new Map<string, SessionInfo>();
   for (const l of links) {
     const from = sessions.find((s) => s.id === l.from);
@@ -200,12 +202,14 @@ export default function SessionsView({
           // other screen that just changed glows.
           const directs = links.filter((l) => l.from === session.id).length;
           const orchestrating = attachable && !!session.orchestrator && directs > 0;
+          // It blinks while it or any session it handed work to is working.
+          const resting = orchestrating && !links.some((l) => l.from === session.id && l.live);
           const working = attachable && !orchestrating && !!session.busy;
           const output = attachable && !orchestrating && !working && recentOutput(session.id);
           const ledBy = attachable ? leader.get(session.id) : undefined;
           return (
           <div key={session.id} data-session-id={session.id}
-            className={`session-card ${session.id === currentSessionId ? 'is-current' : ''} ${orchestrating ? 'is-orchestrator' : ''} ${working ? 'is-working' : ''} ${output ? 'is-output' : ''} ${drag?.id === session.id ? 'is-dragging' : ''} ${drag?.over === session.id ? (drag.after ? 'drop-after' : 'drop-before') : ''}`}>
+            className={`session-card ${session.id === currentSessionId ? 'is-current' : ''} ${orchestrating ? 'is-orchestrator' : ''} ${resting ? 'is-resting' : ''} ${working ? 'is-working' : ''} ${output ? 'is-output' : ''} ${drag?.id === session.id ? 'is-dragging' : ''} ${drag?.over === session.id ? (drag.after ? 'drop-after' : 'drop-before') : ''}`}>
             <div className="session-card-head">
               {renaming === session.id ? (
                 <form className="session-rename" onSubmit={(e) => { e.preventDefault(); saveRename(session); }}>
