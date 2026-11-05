@@ -24,6 +24,16 @@ const t: T = {
   'claudePeer.led': { ko: '← {name}', en: '← {name}', ja: '← {name}' },
   'claudePeer.ledHint': { ko: '{name}에게서 일을 받아 하고 있습니다.', en: 'Working on what {name} handed over.', ja: '{name} から任された作業をしています。' },
   'claudePeer.outputHint': { ko: '방금 화면 내용이 바뀌었습니다.', en: 'The screen changed just now.', ja: '画面が今変わりました。' },
+  'sessionOrder.label': { ko: '세션 정렬', en: 'Sort sessions', ja: 'セッションの並び順' },
+  'sessionOrder.hint': { ko: '타일 순서를 고릅니다. 타일 왼쪽 위 ⠿ 손잡이를 끌어 옮기면 "직접 정렬"로 저장됩니다.', en: 'How the tiles are ordered. Drag a tile by its ⠿ handle to set your own order.', ja: 'タイルの並び順です。⠿ をドラッグすると「手動」で保存されます。' },
+  'sessionOrder.custom': { ko: '직접 정렬', en: 'My order', ja: '手動' },
+  'sessionOrder.newest': { ko: '최근 만든 순', en: 'Newest first', ja: '新しい順' },
+  'sessionOrder.oldest': { ko: '오래된 순', en: 'Oldest first', ja: '古い順' },
+  'sessionOrder.name': { ko: '이름순', en: 'By name', ja: '名前順' },
+  'sessionOrder.active': { ko: '작업 중 먼저', en: 'Working first', ja: '作業中を先に' },
+  'sessionOrder.handle': { ko: '{name} 옮기기', en: 'Move {name}', ja: '{name} を移動' },
+  'sessionOrder.handleHint': { ko: '끌어서 순서를 바꿉니다. 화살표 키로도 옮길 수 있습니다.', en: 'Drag to reorder; the arrow keys move it too.', ja: 'ドラッグで並べ替えます。矢印キーでも移動できます。' },
+  'sessionOrder.saveFailed': { ko: '순서를 저장하지 못했습니다. 새로고침하면 이전 순서로 돌아갈 수 있습니다.', en: 'The order could not be saved; a reload may bring back the old one.', ja: '並び順を保存できませんでした。再読み込みで元に戻ることがあります。' },
 };
 
 export default t;

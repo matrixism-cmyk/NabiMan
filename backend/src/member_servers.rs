@@ -129,6 +129,7 @@ pub fn permitted(user: &NabimanUser, method: &str, path: &str) -> bool {
                 | "/api/app-settings"
                 | "/api/terminal"
                 | "/api/terminal/sessions"
+                | "/api/terminal/session-order"
                 | "/api/terminal/settings"
                 | "/api/terminal/dictation"
                 | "/api/terminal/dictation/settings"
@@ -153,7 +154,10 @@ pub fn permitted(user: &NabimanUser, method: &str, path: &str) -> bool {
                 | "/api/remote-servers"
                 | "/api/remote/consoles"
         ),
-        "PUT" => matches!(path, "/api/terminal/settings" | "/api/terminal/sftp/columns"),
+        "PUT" => matches!(
+            path,
+            "/api/terminal/settings" | "/api/terminal/sftp/columns" | "/api/terminal/session-order"
+        ),
         _ => false,
     };
     if fixed {

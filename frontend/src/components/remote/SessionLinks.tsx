@@ -7,6 +7,8 @@ interface Props {
   /** The grid holding the cards; each card carries `data-session-id`. */
   grid: HTMLDivElement | null;
   links: SessionLink[];
+  /** Changes whenever the cards move, so the arrows follow. */
+  layout?: string;
 }
 
 interface Drawn { key: string; d: string; orchestrator: boolean }
@@ -46,7 +48,7 @@ function draw(grid: HTMLDivElement, links: SessionLink[]): Drawn[] {
  * Dashed arrows over the session cards, from a session handing out work to
  * each session it handed work to; the dashes run the way the work goes.
  */
-export default function SessionLinks({ grid, links }: Props) {
+export default function SessionLinks({ grid, links, layout }: Props) {
   const [drawn, setDrawn] = useState<Drawn[]>([]);
   const signature = links.map((l) => `${l.from}>${l.to}:${l.orchestrator}`).join(',');
 
@@ -61,7 +63,7 @@ export default function SessionLinks({ grid, links }: Props) {
     return () => { watch?.disconnect(); window.removeEventListener('resize', redraw); };
     // `signature` stands for `links`, which is rebuilt on every refresh.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grid, signature]);
+  }, [grid, signature, layout]);
 
   if (drawn.length === 0) return null;
   return (

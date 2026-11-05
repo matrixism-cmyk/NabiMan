@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { apiPost, apiRequest } from '../../shared/api/useApi';
 import ClaudeAddress, { ClaudePeer } from '../terminal/ClaudeAddress';
 import SessionLinks, { SessionLink } from './SessionLinks';
+import { arrange, moved, ORDER_MODES, OrderMode, useSessionOrder } from './sessionOrder';
 import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useGrants, useMember, useSharing } from './member';
@@ -79,6 +80,38 @@ export default function SessionsView({
   const [draft, setDraft] = useState('');
   const [message, setMessage] = useState('');
   const recentOutput = useScreenChanges(sessions);
+  // The account's own order, or a sort; dragging a tile by its handle sets the order.
+  const { order, save: saveOrder, error: orderError } = useSessionOrder();
+  const shownInOrder = arrange(sessions, order);
+  const shownIds = shownInOrder.map((s) => s.id);
+  const [drag, setDrag] = useState<{ id: string; over: string | null; after: boolean } | null>(null);
+  const place = (id: string, before: string | null) => {
+    saveOrder({ mode: 'custom', ids: moved(order.mode === 'custom' ? order.ids : [], shownIds, id, before) });
+  };
+  const dragOver = (e: React.PointerEvent) => {
+    if (!drag) return;
+    const card = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>('[data-session-id]');
+    const over = card?.dataset.sessionId;
+    if (!card || !over || over === drag.id) { if (drag.over) setDrag({ ...drag, over: null }); return; }
+    const r = card.getBoundingClientRect();
+    const after = e.clientX > r.left + r.width / 2;
+    if (over !== drag.over || after !== drag.after) setDrag({ ...drag, over, after });
+  };
+  const drop = () => {
+    if (drag?.over) {
+      const rest = shownIds.filter((x) => x !== drag.id);
+      const i = rest.indexOf(drag.over);
+      place(drag.id, drag.after ? rest[i + 1] ?? null : drag.over);
+    }
+    setDrag(null);
+  };
+  // The handle moves its tile with the arrow keys too.
+  const nudge = (e: React.KeyboardEvent, id: string) => {
+    const i = shownIds.indexOf(id);
+    if (e.key === 'Escape' && drag) { setDrag(null); return; }
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowUp') && i > 0) { e.preventDefault(); place(id, shownIds[i - 1]); }
+    if ((e.key === 'ArrowRight' || e.key === 'ArrowDown') && i < shownIds.length - 1) { e.preventDefault(); place(id, shownIds[i + 2] ?? null); }
+  };
   // A state, not a ref: the arrows redraw once the grid is there.
   const [grid, setGrid] = useState<HTMLDivElement | null>(null);
   const shown = new Set(sessions.map((s) => s.id));
@@ -147,14 +180,19 @@ export default function SessionsView({
         <h3>{heading}</h3>
         <div className="btn-group">
           {actions}
+          <select className="session-sort" aria-label={t('sessionOrder.label')} title={t('sessionOrder.hint')} value={order.mode}
+            onChange={(e) => saveOrder({ ...order, mode: e.target.value as OrderMode })}>
+            {ORDER_MODES.map((m) => <option key={m} value={m}>{t(`sessionOrder.${m}`)}</option>)}
+          </select>
           <button className="btn btn-secondary btn-sm" onClick={onRefresh}>{t('common.refresh')}</button>
         </div>
       </div>
 
       {message && <div role="alert" className="message">{message}</div>}
+      {orderError && <div role="alert" className="message">{t('sessionOrder.saveFailed')}</div>}
       <div className="session-grid" ref={setGrid}>
-        <SessionLinks grid={grid} links={links} />
-        {sessions.map(session => {
+        <SessionLinks grid={grid} links={links} layout={shownIds.join(',')} />
+        {shownInOrder.map(session => {
           const state = session.state === undefined ? (session.alive ? 'alive' : 'ended') :
             ['alive', 'ended', 'unknown', 'blocked'].includes(session.state) ? session.state : 'unknown';
           const attachable = session.alive && state === 'alive';
@@ -167,7 +205,7 @@ export default function SessionsView({
           const ledBy = attachable ? leader.get(session.id) : undefined;
           return (
           <div key={session.id} data-session-id={session.id}
-            className={`session-card ${session.id === currentSessionId ? 'is-current' : ''} ${orchestrating ? 'is-orchestrator' : ''} ${working ? 'is-working' : ''} ${output ? 'is-output' : ''}`}>
+            className={`session-card ${session.id === currentSessionId ? 'is-current' : ''} ${orchestrating ? 'is-orchestrator' : ''} ${working ? 'is-working' : ''} ${output ? 'is-output' : ''} ${drag?.id === session.id ? 'is-dragging' : ''} ${drag?.over === session.id ? (drag.after ? 'drop-after' : 'drop-before') : ''}`}>
             <div className="session-card-head">
               {renaming === session.id ? (
                 <form className="session-rename" onSubmit={(e) => { e.preventDefault(); saveRename(session); }}>
@@ -181,6 +219,16 @@ export default function SessionsView({
                 </form>
               ) : (
                 <>
+                  <button type="button" className="session-drag-handle" aria-label={t('sessionOrder.handle', { name: session.title || session.label })}
+                    title={t('sessionOrder.handleHint')}
+                    onPointerDown={(e) => {
+                      if (e.button > 0) return;
+                      e.preventDefault();
+                      e.currentTarget.setPointerCapture?.(e.pointerId);
+                      setDrag({ id: session.id, over: null, after: false });
+                    }}
+                    onPointerMove={dragOver} onPointerUp={drop} onPointerCancel={() => setDrag(null)}
+                    onKeyDown={(e) => nudge(e, session.id)}>⠿</button>
                   <strong className="session-name">{session.title || session.label}</strong>
                   <button className="session-rename-btn" title={t('terminal.rename')} onClick={() => startRename(session)}>✎</button>
                   {state !== 'alive' && <span className="status-badge down">{t(state === 'unknown' ? 'terminal.sessionUnknown' : state === 'blocked' ? 'terminal.sessionBlocked' : 'share.ended')}</span>}

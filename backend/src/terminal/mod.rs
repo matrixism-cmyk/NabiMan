@@ -16,6 +16,7 @@ pub mod recording;
 mod registry;
 pub(crate) mod remote_access;
 pub(crate) mod session;
+mod session_order;
 mod session_settings;
 mod settings;
 pub(crate) mod sftp;
@@ -370,6 +371,7 @@ fn validate_ssh_input(s: &str) -> bool {
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(ws_terminal);
     handlers::configure(cfg);
+    session_order::configure(cfg);
     paste_file::config(cfg);
     session_settings::config(cfg);
     sftp::config(cfg);

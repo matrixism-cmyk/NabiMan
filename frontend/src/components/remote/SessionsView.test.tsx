@@ -30,11 +30,14 @@ it('preserves attach behavior for a confirmed live session',()=>{
 
 it('reports an uncertain network outcome without retrying termination',async()=>{
   jest.spyOn(window,'confirm').mockReturnValue(true);
-  (apiRequest as jest.Mock).mockRejectedValueOnce(new Error('Connection closed'));
+  const req=apiRequest as jest.Mock;
+  req.mockImplementation((path:string,opts?:RequestInit)=>opts?.method==='DELETE'
+    ?Promise.reject(new Error('Connection closed')):Promise.resolve({success:true,data:{mode:'newest',ids:[]}}));
   setup({...session,state:'alive'});
   fireEvent.click(screen.getByRole('button',{name:'세션 종료'}));
   await waitFor(()=>expect(screen.getByRole('alert')).toHaveTextContent('요청 결과를 확인하지 못했습니다'));
-  expect(apiRequest).toHaveBeenCalledTimes(1);
+  expect(req.mock.calls.filter(([,opts])=>opts?.method==='DELETE')).toHaveLength(1);
+  req.mockReset();
   jest.restoreAllMocks();
 });
 
@@ -78,4 +81,25 @@ it('the orchestrator blinks red and an arrow runs to each session it handed work
   // Only sessions on this list are joined.
   expect(Array.from(container.querySelectorAll('.session-link')).map((p)=>p.getAttribute('data-link')).sort())
     .toEqual(['pty_art>pty_mpcf','pty_art>pty_nabi']);
+});
+
+it('the handle moves a tile with the arrow keys and saves the order; the sort can be chosen',async()=>{
+  localStorage.setItem('nabiman_lang','ko');
+  const req=apiRequest as jest.Mock;
+  req.mockReset();
+  req.mockImplementation((path:string,opts?:RequestInit)=>Promise.resolve(opts?.method==='PUT'
+    ?{success:true,data:JSON.parse(String(opts.body))}:{success:true,data:{mode:'newest',ids:[]}}));
+  const a:SessionInfo={...session,id:'pty_a',title:'가',age_secs:1,state:'alive'};
+  const b:SessionInfo={...session,id:'pty_b',title:'나',age_secs:2,state:'alive'};
+  const { container } = render(<I18nProvider><SessionsView sessions={[a,b]} onRefresh={jest.fn()} onAttach={jest.fn()} onPopOut={jest.fn()}/></I18nProvider>);
+  const order=()=>Array.from(container.querySelectorAll('[data-session-id]')).map((c)=>c.getAttribute('data-session-id'));
+  await waitFor(()=>expect(req).toHaveBeenCalledWith('/api/terminal/session-order'));
+  expect(order()).toEqual(['pty_a','pty_b']);
+  fireEvent.keyDown(screen.getByRole('button',{name:'나 옮기기'}),{key:'ArrowLeft'});
+  expect(order()).toEqual(['pty_b','pty_a']);
+  expect(req).toHaveBeenCalledWith('/api/terminal/session-order',{method:'PUT',body:JSON.stringify({mode:'custom',ids:['pty_b','pty_a']})});
+  const sort=screen.getByRole('combobox',{name:'세션 정렬'});
+  expect(sort).toHaveValue('custom');
+  fireEvent.change(sort,{target:{value:'name'}});
+  expect(order()).toEqual(['pty_a','pty_b']);
 });

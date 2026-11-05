@@ -86,3 +86,23 @@
   .session-link, .session-card.is-orchestrator { animation: none; }
   .session-card.is-orchestrator { box-shadow: 0 0 0 2px var(--danger); }
 }
+
+/* ── Moving tiles ─────────────────────────────────────────────────────── */
+.session-drag-handle {
+  background: none; border: 1px solid transparent; border-radius: 4px; cursor: grab;
+  color: var(--text-secondary); font-size: 14px; line-height: 1; padding: 2px 4px; touch-action: none;
+}
+.session-drag-handle:hover, .session-drag-handle:focus-visible { color: var(--text); border-color: var(--border); }
+.session-drag-handle:active { cursor: grabbing; }
+.session-card.is-dragging { opacity: 0.45; }
+/* A bar in the gap where the tile will land; not a shadow, which the blinking uses. */
+.session-card { position: relative; }
+.session-card.drop-before::before, .session-card.drop-after::before {
+  content: ''; position: absolute; top: 6px; bottom: 6px; width: 4px; border-radius: 2px; background: var(--primary);
+}
+.session-card.drop-before::before { left: -8px; }
+.session-card.drop-after::before { right: -8px; }
+.session-sort {
+  background: var(--surface-alt); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 8px; font-size: 12px;
+}
