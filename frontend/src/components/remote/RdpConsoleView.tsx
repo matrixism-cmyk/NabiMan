@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Guacamole from '../../vendor/guacamole-common.js';
+import { sendWhenOpen } from './rdpUpload';
 import { useT } from '../../shared/i18n';
 import { useFullscreen } from '../../shared/ui/useFullscreen';
 import { useChromeHidden } from '../../shared/ui/useChromeHidden';
@@ -64,12 +65,13 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
     const fs = filesystem.current;
     if (!fs) { setError(t('remote.console.drive.pending')); return; }
     const stream = fs.createOutputStream(file.type || 'application/octet-stream', `/${file.name}`);
-    const writer = new Guacamole.BlobWriter(stream);
-    writer.onprogress = (_b: Blob, offset: number) => setUpload({ name: file.name, pct: file.size ? Math.round((offset / file.size) * 100) : 0 });
-    writer.oncomplete = () => { setUpload({ name: file.name, pct: 100 }); window.setTimeout(() => setUpload(null), 2000); };
-    writer.onerror = () => { setUpload({ name: file.name, pct: 0, fail: true }); window.setTimeout(() => setUpload(null), 3000); };
+    const failed = () => { setUpload({ name: file.name, pct: 0, fail: true }); window.setTimeout(() => setUpload(null), 3000); };
     setUpload({ name: file.name, pct: 0 });
-    writer.sendBlob(file);
+    sendWhenOpen(stream, file, {
+      progress: (offset) => setUpload({ name: file.name, pct: file.size ? Math.round((offset / file.size) * 100) : 0 }),
+      done: () => { setUpload({ name: file.name, pct: 100 }); window.setTimeout(() => setUpload(null), 2000); },
+      failed,
+    });
   };
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault(); setDragOver(false);
