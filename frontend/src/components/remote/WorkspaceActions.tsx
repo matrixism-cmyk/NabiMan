@@ -2,6 +2,7 @@ import React, { RefObject, useState } from 'react';
 import { useT } from '../../shared/i18n';
 import type { TerminalStatus, TerminalViewHandle } from '../terminal/TerminalView';
 import SessionNameEdit from '../terminal/SessionNameEdit';
+import ClaudeAddress, { useClaudePeers } from '../terminal/ClaudeAddress';
 import AccountDictation from '../terminal/dictation/AccountDictation';
 import { useVoiceReply } from '../terminal/dictation/useVoiceReply';
 import Modal from '../../shared/ui/Modal';
@@ -41,6 +42,7 @@ export default function WorkspaceActions(props: Props) {
   const [sheet, setSheet] = useState(false);
   const [devicesOpen, setDevicesOpen] = useState(false);
   const deviceCount = useSessionDeviceCount(terminal?.sessionId || undefined);
+  const claude = useClaudePeers(terminal?.sessionId || undefined);
   const devicesOn = !!(props.serialDevices && terminal?.sessionId);
   const devicesDialog = devicesOpen && devicesOn && (
     <SessionDevicesDialog sessionId={terminal!.sessionId} sessionName={terminal!.sessionName} onClose={() => setDevicesOpen(false)} />
@@ -70,6 +72,7 @@ export default function WorkspaceActions(props: Props) {
             <button className="btn btn-secondary btn-sm" onClick={props.onDetach} title={t('remote.detachHint')}>⧉ {t('remote.detach')}</button>
             {terminal.sessionId && (<>
               <SessionNameEdit sessionId={terminal.sessionId} onRenamed={props.onRenamed} name={terminal.sessionName} />
+              <ClaudeAddress peers={claude} />
               {sharing && (
                 <button className="btn btn-secondary btn-sm" onClick={props.onShareSession} title={t('share.hint')}>
                   🔗 {t('share.button')}
@@ -112,6 +115,7 @@ export default function WorkspaceActions(props: Props) {
                     <SessionNameEdit sessionId={terminal.sessionId} onRenamed={props.onRenamed} name={terminal.sessionName} />
                   </div>
                 )}
+                <ClaudeAddress variant="card" peers={claude} />
                 <button type="button" className="rw-sheet-item" onClick={run(props.onNewSession)}>＋ {t('terminal.newSession')}</button>
                 {terminal.sessionId && sharing && (
                   <button type="button" className="rw-sheet-item" onClick={run(props.onShareSession)}>🔗 {t('share.button')}</button>

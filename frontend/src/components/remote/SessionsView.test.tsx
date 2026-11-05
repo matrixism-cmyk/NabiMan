@@ -37,3 +37,25 @@ it('reports an uncertain network outcome without retrying termination',async()=>
   expect(apiRequest).toHaveBeenCalledTimes(1);
   jest.restoreAllMocks();
 });
+
+it('a session whose Claude is working blinks, with its address to copy',()=>{
+  const { container } = render(<I18nProvider><SessionsView sessions={[{...session,state:'alive',busy:true,
+    claude:[{name:'nabiman-13',ref:'df126b',address:'nabiman-13 [df126b]',cwd:'/workspace/nabiman',busy:true}]}]}
+    onRefresh={jest.fn()} onAttach={jest.fn()} onPopOut={jest.fn()}/></I18nProvider>);
+  expect(container.querySelector('.session-card')).toHaveClass('is-working');
+  expect(screen.getByText('Claude 작업 중')).toBeInTheDocument();
+  expect(screen.getByRole('button',{name:'Claude 세션 주소 nabiman-13 [df126b] 복사'})).toBeInTheDocument();
+});
+
+it('a screen that changed since the last refresh glows, and an unchanged one does not',()=>{
+  localStorage.setItem('nabiman_lang','ko');
+  const view=(preview:string)=>(<I18nProvider><SessionsView sessions={[{...session,state:'alive',preview}]}
+    onRefresh={jest.fn()} onAttach={jest.fn()} onPopOut={jest.fn()}/></I18nProvider>);
+  const { container, rerender } = render(view('$ make'));
+  const card=()=>container.querySelector('.session-card');
+  expect(card()).not.toHaveClass('is-output');
+  rerender(view('$ make\nbuilding…'));
+  expect(card()).toHaveClass('is-output');
+  expect(screen.getByText('출력 중')).toBeInTheDocument();
+  expect(card()).not.toHaveClass('is-working');
+});

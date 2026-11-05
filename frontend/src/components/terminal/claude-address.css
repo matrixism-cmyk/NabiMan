@@ -1,0 +1,52 @@
+/* ── The Claude session address in a terminal's header ────────────────── */
+.claude-addr { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+.claude-addr-chip {
+  display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 100%;
+  padding: 2px 8px; border-radius: 999px; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--success) 45%, var(--border));
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  color: var(--text); font: inherit; font-size: 12px; line-height: 1.5;
+}
+.claude-addr-chip:hover { border-color: var(--success); }
+.claude-addr-chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.claude-addr-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-secondary); flex: none; }
+.claude-addr-chip.is-busy .claude-addr-dot { background: var(--success); animation: claude-addr-pulse 1.2s ease-in-out infinite; }
+.claude-addr-name { font-weight: 600; white-space: nowrap; }
+.claude-addr-ref { font-family: source-code-pro, Menlo, Monaco, Consolas, monospace; color: var(--text-secondary); }
+.claude-addr-cwd {
+  color: var(--text-secondary); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  min-width: 0; max-width: 260px;
+}
+.claude-addr-copy { color: var(--text-secondary); font-size: 11px; white-space: nowrap; }
+.claude-addr-bar .claude-addr-chip { padding: 0 6px; font-size: 11px; }
+.claude-addr-card { width: 100%; }
+.claude-addr-card .claude-addr-cwd { max-width: none; flex: 1; }
+
+@keyframes claude-addr-pulse { 50% { opacity: 0.3; } }
+
+/* ── A session at work stands out in the list ─────────────────────────── */
+.session-card.is-working {
+  border-color: var(--success);
+  animation: session-working 1.6s ease-in-out infinite;
+}
+.session-card.is-output { border-color: color-mix(in srgb, var(--success) 60%, var(--border)); }
+@keyframes session-working {
+  0%, 100% { box-shadow: 0 0 0 1px var(--success), 0 0 10px color-mix(in srgb, var(--success) 55%, transparent); }
+  50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--success) 25%, transparent), 0 0 0 transparent; }
+}
+.session-work-badge {
+  display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px;
+  font-size: 11px; color: var(--success);
+  border: 1px solid color-mix(in srgb, var(--success) 50%, transparent);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+}
+.session-work-badge::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--success);
+  animation: claude-addr-pulse 1.2s ease-in-out infinite;
+}
+.session-work-badge.is-output::before { animation: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .session-card.is-working, .claude-addr-chip.is-busy .claude-addr-dot, .session-work-badge::before { animation: none; }
+  .session-card.is-working { box-shadow: 0 0 0 2px var(--success); }
+}

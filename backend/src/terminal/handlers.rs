@@ -31,6 +31,16 @@ struct SessionInfo {
     title: String,
     /// The last lines on screen, for a thumbnail in the list.
     preview: String,
+    /// Claude Code sessions running in it, with the address others message them by.
+    claude: Vec<super::claude_peers::ClaudePeer>,
+    /// A Claude session in it is working on a turn.
+    busy: bool,
+}
+
+#[derive(serde::Serialize)]
+struct ClaudeInfo {
+    claude: Vec<super::claude_peers::ClaudePeer>,
+    busy: bool,
 }
 
 /// How many lines of the screen the list carries per session.
@@ -44,6 +54,8 @@ async fn list_sessions(
     users: web::Data<crate::users::UserStore>,
 ) -> HttpResponse {
     let user_id = crate::auth::verified_user_id(&req).unwrap_or_default();
+    // Before the lock: it asks tmux and reads /proc.
+    let seen = super::claude_peers::look();
     let map = store.lock().unwrap();
     let now = now_unix();
     let mut list: Vec<SessionInfo> = map
@@ -60,6 +72,7 @@ async fn list_sessions(
                 }
             };
             let alive = state == "alive";
+            let here = seen.get(&s.tmux_name).filter(|_| alive);
             SessionInfo {
                 id: id.clone(),
                 label: s.label.clone(),
@@ -78,6 +91,8 @@ async fn list_sessions(
                 } else {
                     String::new()
                 },
+                claude: here.map(|h| h.claude.clone()).unwrap_or_default(),
+                busy: here.is_some_and(|h| h.busy()),
             }
         })
         .collect();
@@ -363,6 +378,38 @@ async fn get_scrollback(
     }
 }
 
+/// `GET …/sessions/{id}/claude`: the Claude sessions in one session, for its header.
+async fn session_claude(
+    path: web::Path<String>,
+    store: web::Data<PtyStore>,
+    req: HttpRequest,
+    users: web::Data<crate::users::UserStore>,
+) -> HttpResponse {
+    let id = path.into_inner();
+    let user_id = crate::auth::verified_user_id(&req).unwrap_or_default();
+    let tmux_name = {
+        let map = store.lock().unwrap();
+        match map.get(&id) {
+            Some(s)
+                if super::session::visible_to(s, &user_id, &users)
+                    && super::remote_access::allowed(s) =>
+            {
+                s.tmux_name.clone()
+            }
+            _ => {
+                return HttpResponse::Ok()
+                    .json(crate::models::ApiResponse::<()>::error("Session not found"))
+            }
+        }
+    };
+    let seen = super::claude_peers::look();
+    let here = seen.get(&tmux_name);
+    HttpResponse::Ok().json(crate::models::ApiResponse::ok(ClaudeInfo {
+        claude: here.map(|h| h.claude.clone()).unwrap_or_default(),
+        busy: here.is_some_and(|h| h.busy()),
+    }))
+}
+
 pub(crate) fn extract_username_header(req: &HttpRequest) -> String {
     crate::auth::extract_username(req).unwrap_or_default()
 }
@@ -395,5 +442,9 @@ pub(crate) fn configure(cfg: &mut web::ServiceConfig) {
         .route(
             "/api/terminal/sessions/{id}/scrollback",
             web::get().to(get_scrollback),
+        )
+        .route(
+            "/api/terminal/sessions/{id}/claude",
+            web::get().to(session_claude),
         );
 }

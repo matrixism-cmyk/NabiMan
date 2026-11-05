@@ -23,6 +23,7 @@ import sftp from './sftp';
 import remoteProtocols from './remote-protocols';
 import remoteBase from './remote-base';
 import claude from './claude';
+import claudePeer from './claude-peer';
 
 export type { Lang };
 export { LANG_LABELS } from '../../shared/i18n';
@@ -51,6 +52,7 @@ const translations: Translations = {
   ...remoteBase,
   ...sftp,
   ...claude,
+  ...claudePeer,
   ...remoteProtocols,
 };
 

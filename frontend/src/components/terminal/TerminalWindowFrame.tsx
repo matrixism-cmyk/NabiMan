@@ -6,6 +6,7 @@ import TerminalSettingsModal from './TerminalSettingsModal';
 import { useT } from '../../shared/i18n';
 import ShareDialog from './ShareDialog';
 import SessionNameEdit from './SessionNameEdit';
+import ClaudeAddress, { useClaudePeers } from './ClaudeAddress';
 import { apiRequest } from '../../shared/api/useApi';
 import type { SessionInfo } from '../remote/SessionsView';
 import { clamp, MIN_H, MIN_W, TASKBAR_H, TermWindow } from './windowGeometry';
@@ -37,6 +38,7 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
   }, [onUpdate, win.id]);
   const [showSettings, setShowSettings] = useState(false);
   const settings = useSessionTerminalSettings(sessionId || undefined);
+  const claude = useClaudePeers(sessionId || undefined);
 
   // The window knows its session only by id; look its name up once attached.
   useEffect(() => {
@@ -144,6 +146,7 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
         {sessionId && (
           <SessionNameEdit variant="bar" sessionId={sessionId} name={sessionName} onRenamed={setSessionName} />
         )}
+        <ClaudeAddress variant="bar" peers={claude} />
         <span className="term-window-sub">{win.subtitle}</span>
         <span className="term-window-actions">
           <AccountDictation variant="bar" sessionId={sessionId || undefined} onText={(text) => viewRef.current?.insertText(text)}

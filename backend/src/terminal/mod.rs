@@ -4,6 +4,7 @@
 mod ssh_command;
 use ssh_command::build_ssh_command;
 
+mod claude_peers;
 mod claude_voice;
 mod dictation;
 mod handlers;

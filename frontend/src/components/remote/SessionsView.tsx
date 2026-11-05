@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { apiPost, apiRequest } from '../../shared/api/useApi';
+import ClaudeAddress, { ClaudePeer } from '../terminal/ClaudeAddress';
 import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useGrants, useMember, useSharing } from './member';
@@ -12,6 +13,30 @@ export interface SessionInfo {
   title: string;
   /** The last lines on screen, for the thumbnail. */
   preview: string;
+  /** Claude Code sessions running in it. */
+  claude?: ClaudePeer[];
+  /** A Claude session in it is working on a turn. */
+  busy?: boolean;
+}
+
+/** How long a changed screen counts as output just now: a little over one refresh. */
+const OUTPUT_MS = 11000;
+
+/**
+ * Which sessions' screens changed lately, seen by comparing each refresh's
+ * preview with the one before: a shell at work, a build, a log being followed.
+ */
+function useScreenChanges(sessions: SessionInfo[]): (id: string) => boolean {
+  const seen = useRef(new Map<string, { preview: string; changed: number }>());
+  const now = Date.now();
+  const next = new Map<string, { preview: string; changed: number }>();
+  for (const s of sessions) {
+    const before = seen.current.get(s.id);
+    const changed = before && before.preview !== s.preview && s.preview ? now : (before?.changed ?? 0);
+    next.set(s.id, { preview: s.preview, changed });
+  }
+  seen.current = next;
+  return (id) => now - (next.get(id)?.changed ?? 0) < OUTPUT_MS;
 }
 
 function formatAge(secs: number): string {
@@ -48,6 +73,7 @@ export default function SessionsView({
   const [renaming, setRenaming] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [message, setMessage] = useState('');
+  const recentOutput = useScreenChanges(sessions);
 
   const startRename = (session: SessionInfo) => {
     setRenaming(session.id);
@@ -114,8 +140,12 @@ export default function SessionsView({
           const state = session.state === undefined ? (session.alive ? 'alive' : 'ended') :
             ['alive', 'ended', 'unknown', 'blocked'].includes(session.state) ? session.state : 'unknown';
           const attachable = session.alive && state === 'alive';
+          // Claude at work blinks; any other screen that just changed glows.
+          const working = attachable && !!session.busy;
+          const output = attachable && !working && recentOutput(session.id);
           return (
-          <div key={session.id} className={`session-card ${session.id === currentSessionId ? 'is-current' : ''}`}>
+          <div key={session.id}
+            className={`session-card ${session.id === currentSessionId ? 'is-current' : ''} ${working ? 'is-working' : ''} ${output ? 'is-output' : ''}`}>
             <div className="session-card-head">
               {renaming === session.id ? (
                 <form className="session-rename" onSubmit={(e) => { e.preventDefault(); saveRename(session); }}>
@@ -133,11 +163,14 @@ export default function SessionsView({
                   <button className="session-rename-btn" title={t('terminal.rename')} onClick={() => startRename(session)}>✎</button>
                   {state !== 'alive' && <span className="status-badge down">{t(state === 'unknown' ? 'terminal.sessionUnknown' : state === 'blocked' ? 'terminal.sessionBlocked' : 'share.ended')}</span>}
                   {session.id === currentSessionId && <span className="status-badge up">{t('terminal.thisPane')}</span>}
+                  {working && <span className="session-work-badge" title={t('claudePeer.workingHint')}>{t('claudePeer.working')}</span>}
+                  {output && <span className="session-work-badge is-output" title={t('claudePeer.outputHint')}>{t('claudePeer.output')}</span>}
                 </>
               )}
             </div>
 
             <code className="session-label">{session.label}</code>
+            {attachable && <ClaudeAddress variant="card" peers={session.claude || []} />}
 
             <pre className="session-preview" title={t('terminal.previewHint')}>
               {session.preview || t('terminal.noPreview')}
