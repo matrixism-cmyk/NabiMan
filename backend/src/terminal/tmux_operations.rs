@@ -70,6 +70,11 @@ pub(super) fn tmux_conf_body(scrollback: u32) -> String {
     // copy-mode instead of the shell — so a click of either button leaves it
     // again, which is also what makes a right-click paste land.
     //
+    // terminal-features is reset before it is added to: this file is sourced
+    // again for every new session, and an append alone grew the list by one
+    // line each time. `hyperlinks` lets OSC 8 links (Claude Code prints them
+    // inside tmux 3.4+) through to the browser, where a click opens them.
+    //
     // `copy-pipe-no-clear "tmux load-buffer -w -"` is what actually reaches the
     // browser: it keeps the highlight on screen after the button comes up, and
     // -w makes tmux hand the text over as an OSC 52 sequence, which the
@@ -81,7 +86,8 @@ pub(super) fn tmux_conf_body(scrollback: u32) -> String {
          set -g mouse on\n\
          set -g set-clipboard on\n\
          set -g window-size latest\n\
-         set -as terminal-features ',xterm*:clipboard'\n\
+         set -su terminal-features\n\
+         set -as terminal-features 'xterm*:clipboard:hyperlinks'\n\
          bind -T copy-mode    MouseDragEnd1Pane {copy}\n\
          bind -T copy-mode-vi MouseDragEnd1Pane {copy}\n\
          bind -T copy-mode    DoubleClick1Pane send -X select-word \\; {copy}\n\

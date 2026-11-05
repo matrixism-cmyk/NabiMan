@@ -8,6 +8,7 @@ import { fontOf } from './terminalFonts';
 import { applyArmed } from './stickyKeys';
 import { blobsFromClipboardItems, pathsForClipboardFiles } from './pasteFile';
 import { HangulComposer, needsHangulComposer } from './hangul';
+import { hyperlinkHandler, linkTooltip, openTerminalLink } from './terminalLinks';
 
 const THEME = {
   background: '#0f1923', foreground: '#e0e6ed', cursor: '#3b82f6', cursorAccent: '#0f1923',
@@ -31,7 +32,9 @@ export function createTerminal(settings: TerminalSettings): { term: Terminal; fi
   });
   const fit = new FitAddon();
   term.loadAddon(fit);
-  term.loadAddon(new WebLinksAddon());
+  // Typed-out URLs and OSC 8 hyperlinks open the same way; see ./terminalLinks.
+  term.options.linkHandler = hyperlinkHandler(term);
+  term.loadAddon(new WebLinksAddon((_event, uri) => openTerminalLink(uri), linkTooltip(term)));
   return { term, fit };
 }
 
