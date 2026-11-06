@@ -5,6 +5,7 @@ import { downloadFile, formatSize, SftpEntry, SftpSource, streamLink } from '../
 import ImagePreview from './ImagePreview';
 import TextPreview, { TextInfo } from './TextPreview';
 import PdfPreview from './PdfPreview';
+import OfficePreview from './OfficePreview';
 import MediaPreview from './MediaPreview';
 import ZipPreview from './ZipPreview';
 import FilePreview from './FilePreview';
@@ -182,6 +183,10 @@ export default function PreviewDialog({ source, dir, files, start, onDownload, o
         {load.state === 'link' && spec.kind === 'zip' && <ZipPreview url={load.url} size={entry.size} onFacts={setFacts} />}
         {load.state === 'link' && spec.kind === 'file' && (
           <FilePreview url={load.url} entry={entry} onFacts={setFacts} onText={setText} wrap={wrap} encoding={encoding} />
+        )}
+        {load.state === 'ready' && spec.kind === 'office' && (
+          <OfficePreview blob={load.blob} name={entry.name} allowed={!source.shareKey}
+            onInfo={(info) => setPages(info ? info.pages : null)} />
         )}
         {load.state === 'ready' && spec.kind === 'pdf' && (
           <PdfPreview blob={load.blob} onInfo={(info) => setPages(info ? info.pages : null)} />

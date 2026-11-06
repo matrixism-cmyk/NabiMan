@@ -134,7 +134,8 @@
 .preview-actions .btn.is-on { border-color: var(--primary); color: var(--primary); }
 
 /* PDF (pdf.js) */
-.preview-stage.is-pdf { background: var(--bg); align-items: stretch; justify-content: stretch; }
+/* Office documents arrive as PDFs and are laid out the same way. */
+.preview-stage.is-pdf, .preview-stage.is-office { background: var(--bg); align-items: stretch; justify-content: stretch; }
 .pdf-preview { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .pdf-tools { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 12px; }
 .pdf-tools .btn { min-width: 30px; white-space: nowrap; }

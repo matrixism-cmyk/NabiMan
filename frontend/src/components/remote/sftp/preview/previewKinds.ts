@@ -3,7 +3,7 @@
  * its own renderer in PreviewDialog; adding a format is adding a row here
  * and, for a new kind, a renderer.
  */
-export type PreviewKind = 'image' | 'text' | 'pdf' | 'video' | 'audio' | 'zip' | 'file';
+export type PreviewKind = 'image' | 'text' | 'pdf' | 'office' | 'video' | 'audio' | 'zip' | 'file';
 
 /** Kinds read a range at a time through a stream link instead of whole. */
 export const STREAMED: ReadonlySet<PreviewKind> = new Set<PreviewKind>(['video', 'audio', 'zip', 'file']);
@@ -31,6 +31,13 @@ const IMAGES: Record<string, string> = {
 
 const VIDEO = new Set(['mp4', 'm4v', 'webm', 'ogv', 'mov', 'mkv']);
 const AUDIO = new Set(['mp3', 'wav', 'flac', 'm4a', 'm4b', 'aac', 'ogg', 'oga', 'opus', 'weba']);
+/** Word, Excel, PowerPoint, OpenDocument and RTF: turned into a PDF on the server. */
+const OFFICE = new Set([
+  'doc', 'docx', 'docm', 'dot', 'dotx', 'dotm', 'odt', 'ott', 'fodt', 'rtf', 'wpd',
+  'xls', 'xlsx', 'xlsm', 'xlsb', 'xlt', 'xltx', 'ods', 'ots', 'fods',
+  'ppt', 'pptx', 'pptm', 'pps', 'ppsx', 'pot', 'potx', 'odp', 'otp', 'fodp',
+]);
+
 /** ZIP inside: archives, Office and OpenDocument files, Java, Android, e-books, wheels. */
 const ZIP = new Set(['zip', 'docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp', 'jar', 'war', 'ear', 'apk', 'aab', 'epub', 'whl', 'xpi', 'nupkg', 'vsix', 'ipa']);
 
@@ -83,6 +90,7 @@ export function previewOf(name: string): PreviewSpec | null {
   const ext = extensionOf(name);
   if (IMAGES[ext]) return { kind: 'image', mime: IMAGES[ext], maxBytes: 50 * MB };
   if (ext === 'pdf') return { kind: 'pdf', mime: 'application/pdf', maxBytes: 100 * MB };
+  if (OFFICE.has(ext)) return { kind: 'office', mime: 'application/octet-stream', maxBytes: 50 * MB };
   if (VIDEO.has(ext)) return { kind: 'video', mime: '', maxBytes: Infinity };
   if (AUDIO.has(ext)) return { kind: 'audio', mime: '', maxBytes: Infinity };
   if (ZIP.has(ext)) return { kind: 'zip', mime: '', maxBytes: Infinity };

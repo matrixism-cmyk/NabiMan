@@ -8,6 +8,7 @@ mod claude_links;
 mod claude_remote;
 mod claude_socket;
 mod claude_start;
+mod office_preview;
 mod claude_peers;
 mod claude_voice;
 mod dictation;
@@ -387,6 +388,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     handlers::configure(cfg);
     session_order::configure(cfg);
     claude_start::configure(cfg);
+    office_preview::configure(cfg);
     paste_file::config(cfg);
     session_settings::config(cfg);
     sftp::config(cfg);

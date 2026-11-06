@@ -6,6 +6,8 @@ import type { PDFDocumentProxy } from './pdf';
 interface Props {
   blob: Blob;
   onInfo: (info: { pages: number } | null) => void;
+  /** Fitting to the width never zooms in past this (a small spreadsheet page would fill the screen). */
+  maxFit?: number;
 }
 
 type Pdf = typeof import('./pdf');
@@ -21,7 +23,7 @@ const MARGIN = 40;
  * a number away. Pages are drawn as they come near, so a long document opens
  * as fast as a short one. A password-protected file asks for its password.
  */
-export default function PdfPreview({ blob, onInfo }: Props) {
+export default function PdfPreview({ blob, onInfo, maxFit = Infinity }: Props) {
   const { t } = useT();
   const [lib, setLib] = useState<Pdf | null>(null);
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
@@ -80,7 +82,7 @@ export default function PdfPreview({ blob, onInfo }: Props) {
     return () => observer.disconnect();
   }, [doc]);
 
-  const scale = zoom === 'width' ? Math.max(0.25, (width - MARGIN) / guess.width) : zoom;
+  const scale = zoom === 'width' ? Math.max(0.25, Math.min(maxFit, (width - MARGIN) / guess.width)) : zoom;
 
   /** The page whose middle is nearest the top third of the view. */
   const pageInView = useCallback(() => {
