@@ -254,6 +254,8 @@ async fn main() -> std::io::Result<()> {
     let pty_store = terminal_registry.store.clone();
     terminal::restore_sessions(&pty_store);
     terminal::start_pty_cleanup(pty_store.clone());
+    // Local programs (Claude Code in a session) may open Claude sessions here.
+    terminal::start_claude_socket(pty_store.clone());
 
     let mec_services = mec::services::bootstrap::bootstrap(mec_mode).await;
     let mec_state = web::Data::new(

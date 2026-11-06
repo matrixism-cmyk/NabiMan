@@ -29,6 +29,11 @@ pub(crate) struct Start {
     /// `-c`: carry on with the last conversation in that directory.
     pub resume: bool,
     pub title: String,
+    /// A first message for Claude Code (`claude "<prompt>"`).
+    pub prompt: Option<String>,
+    /// Drop to root's shell when the user's shell ends, as `su` by hand does.
+    /// Sessions opened by a program end with the user's shell instead.
+    pub root_shell_after: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -58,12 +63,12 @@ fn accounts_in(passwd: &str, home_exists: impl Fn(&str) -> bool) -> Vec<Account>
         .collect()
 }
 
-fn accounts() -> Vec<Account> {
+pub(crate) fn accounts() -> Vec<Account> {
     let passwd = fs::read_to_string("/etc/passwd").unwrap_or_default();
     accounts_in(&passwd, |home| Path::new(home).is_dir())
 }
 
-fn valid_user(name: &str) -> bool {
+pub(crate) fn valid_user(name: &str) -> bool {
     let mut chars = name.chars();
     matches!(chars.next(), Some(c) if c.is_ascii_lowercase() || c == '_')
         && name.len() <= 32
@@ -113,7 +118,7 @@ pub(crate) fn from_query(query: &str) -> Result<Option<Start>, String> {
         .filter(|c| !c.is_control())
         .take(MAX_TITLE_LEN)
         .collect();
-    Ok(Some(Start { user, dir, skip_permissions: on("claude_skip"), resume: on("claude_continue"), title }))
+    Ok(Some(Start { user, dir, skip_permissions: on("claude_skip"), resume: on("claude_continue"), title, prompt: None, root_shell_after: true }))
 }
 
 /// One word for a POSIX shell, whatever it holds.
@@ -123,10 +128,12 @@ fn quote(s: &str) -> String {
 
 /// The command tmux runs for the session (as root, like every local shell).
 ///
-/// The user's part runs in an interactive bash so their own start-up files
-/// set things up (PATH to `claude`, HOME) as when they type it, and drops to
-/// their shell when Claude Code exits; leaving that shell comes back to
-/// root's, the way `su` does by hand.
+/// The user's part runs in a login shell, so `/etc/profile.d` and their own
+/// profile set things up as when they sign in (PATH to `claude`, HOME,
+/// `GIT_CONFIG_GLOBAL`, cargo…): a plain `bash -i` misses profile.d, and an
+/// operator's `su` from root's login shell would have inherited it. When
+/// Claude Code exits they are left in their shell; leaving that comes back
+/// to root's, the way `su` does by hand (unless a program opened it).
 ///
 /// `--pty`: `su -c` alone starts the command in a new session with no
 /// controlling terminal ("no job control"); a pty of its own keeps Ctrl+C,
@@ -139,12 +146,20 @@ pub(crate) fn command(start: &Start) -> String {
     if start.resume {
         claude.push_str(" -c");
     }
-    let inner = format!("cd {} && {}; exec bash -i", quote(&start.dir), claude);
-    let as_user = format!("bash -i -c {}", quote(&inner));
-    if start.user == "root" {
-        format!("{as_user}; exec bash -l")
+    if let Some(prompt) = start.prompt.as_deref().filter(|p| !p.is_empty()) {
+        claude.push_str(" -- ");
+        claude.push_str(&quote(prompt));
+    }
+    let inner = format!("cd {} && {}; exec bash -l", quote(&start.dir), claude);
+    let run = if start.user == "root" {
+        format!("bash -l -c {}", quote(&inner))
     } else {
-        format!("su --pty {} -c {}; exec bash -l", start.user, quote(&as_user))
+        format!("su --pty -l {} -c {}", start.user, quote(&inner))
+    };
+    if start.root_shell_after {
+        format!("{run}; exec bash -l")
+    } else {
+        run
     }
 }
 
@@ -253,16 +268,61 @@ mod tests {
     use super::*;
 
     fn start(user: &str, dir: &str, skip: bool, resume: bool) -> Start {
-        Start { user: user.into(), dir: dir.into(), skip_permissions: skip, resume, title: String::new() }
+        Start { user: user.into(), dir: dir.into(), skip_permissions: skip, resume, title: String::new(), prompt: None, root_shell_after: true }
     }
 
     #[test]
     fn the_command_is_what_an_operator_types_by_hand() {
         assert_eq!(
             command(&start("nabi", "/workspace/nabiman", true, true)),
-            r#"su --pty nabi -c 'bash -i -c '\''cd '\''\'\'''\''/workspace/nabiman'\''\'\'''\'' && claude --dangerously-skip-permissions -c; exec bash -i'\'''; exec bash -l"#
+            r#"su --pty -l nabi -c 'cd '\''/workspace/nabiman'\'' && claude --dangerously-skip-permissions -c; exec bash -l'; exec bash -l"#
         );
-        assert_eq!(command(&start("root", "/srv", false, false)), r#"bash -i -c 'cd '\''/srv'\'' && claude; exec bash -i'; exec bash -l"#);
+        assert_eq!(command(&start("root", "/srv", false, false)), r#"bash -l -c 'cd '\''/srv'\'' && claude; exec bash -l'; exec bash -l"#);
+    }
+
+    /// Runs `command` with stand-ins for su, bash and claude on PATH, and
+    /// gives back the arguments claude got and the directory it ran in.
+    fn run_with_stand_ins(start: &Start) -> String {
+        use std::os::unix::fs::PermissionsExt;
+        let bin = std::env::temp_dir().join(format!("nabiman-start-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&bin).unwrap();
+        let tool = |name: &str, body: &str| {
+            let path = bin.join(name);
+            fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+        };
+        // su --pty -l <user> -c <cmd>; bash -l [-c <cmd>]; claude prints what it got.
+        tool("su", r#"[ "$1" = --pty ] && [ "$2" = -l ] && [ "$4" = -c ] && exec sh -c "$5""#);
+        tool("bash", r#"[ "$1" = -l ] && [ "$2" = -c ] && exec sh -c "$3"; exit 0"#);
+        tool("claude", r#"printf 'dir=%s\n' "$PWD"; for a in "$@"; do printf '[%s]' "$a"; done"#);
+        let out = std::process::Command::new("sh")
+            .args(["-c", &command(start)])
+            .env("PATH", format!("{}:/usr/bin:/bin", bin.display()))
+            .output()
+            .unwrap();
+        let _ = fs::remove_dir_all(&bin);
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    }
+
+    #[test]
+    fn claude_gets_its_options_and_a_first_message_as_one_argument() {
+        let dir = std::env::temp_dir().join(format!("it's a dir {}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let mut s = start("nabi", dir.to_str().unwrap(), true, true);
+        s.prompt = Some("it's -rf; $(touch /tmp/never) `x`".into());
+        let got = run_with_stand_ins(&s);
+        let _ = fs::remove_dir_all(&dir);
+        assert!(got.contains(&format!("dir={}", dir.display())), "{got}");
+        assert!(got.contains("[--dangerously-skip-permissions][-c][--][it's -rf; $(touch /tmp/never) `x`]"), "{got}");
+    }
+
+    #[test]
+    fn a_program_s_session_ends_with_the_user_s_shell() {
+        let mut s = start("nabi", "/w", true, false);
+        s.root_shell_after = false;
+        assert_eq!(command(&s), r#"su --pty -l nabi -c 'cd '\''/w'\'' && claude --dangerously-skip-permissions; exec bash -l'"#);
+        s.root_shell_after = true;
+        assert!(command(&s).ends_with("'; exec bash -l"));
     }
 
     #[test]
@@ -316,6 +376,6 @@ mod tests {
         assert!(from_query("start_user=root&start_dir=%2Fno%2Fsuch%2Fdir").is_err());
         assert!(from_query("start_user=root&start_dir=%2Ftmp%ZZ").is_err(), "a broken escape is no directory");
         let got = from_query("start_user=root&start_dir=%2Ftmp&claude_skip=1&claude_continue=0&start_title=%EB%82%98%EB%B9%84").unwrap().unwrap();
-        assert_eq!(got, Start { user: "root".into(), dir: "/tmp".into(), skip_permissions: true, resume: false, title: "나비".into() });
+        assert_eq!(got, Start { user: "root".into(), dir: "/tmp".into(), skip_permissions: true, resume: false, title: "나비".into(), prompt: None, root_shell_after: true });
     }
 }

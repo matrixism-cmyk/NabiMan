@@ -5,6 +5,7 @@ mod ssh_command;
 use ssh_command::build_ssh_command;
 
 mod claude_links;
+mod claude_socket;
 mod claude_start;
 mod claude_peers;
 mod claude_voice;
@@ -41,6 +42,7 @@ use actix_web_actors::ws;
 use std::os::unix::io::FromRawFd;
 
 pub use registry::open as open_registry;
+pub(crate) use claude_socket::start as start_claude_socket;
 pub use session::{restore_sessions, start_pty_cleanup, PtyStore};
 pub use settings::{open as open_settings_registry, SettingsStore};
 

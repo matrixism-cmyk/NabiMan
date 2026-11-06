@@ -268,6 +268,15 @@ fn session_of(rec: &Record, panes: &Panes) -> Option<String> {
     })
 }
 
+/// The tmux session a process runs in, found through its parents.
+pub(crate) fn tmux_session_of_pid(pid: u32) -> Option<String> {
+    let panes = panes()?;
+    up_to_pane(pid, &panes, |p| {
+        let stat = fs::read_to_string(format!("/proc/{p}/stat")).ok()?;
+        stat_fields(&stat).map(|(_, ppid)| ppid)
+    })
+}
+
 /// Climbs from `pid` through `parent` to a pane's shell, stopping at the
 /// tmux server itself or after `MAX_HOPS`.
 fn up_to_pane(mut pid: u32, panes: &Panes, parent: impl Fn(u32) -> Option<u32>) -> Option<String> {

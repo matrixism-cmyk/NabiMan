@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+"""Open a new NabiMan session that starts Claude Code in a directory.
+
+Meant for Claude Code itself, running inside a NabiMan session, to hand work
+to a fresh session it can then message:
+
+  nabiman-claude --dir /workspace/project                 # claude --dangerously-skip-permissions -c
+  nabiman-claude --dir /workspace/project --fresh "Review the open PR"   # new conversation, first message
+  nabiman-claude --json --dir /workspace/project          # machine-readable answer
+
+The session appears among the tiles of the NabiMan account whose session ran
+this, and runs as the user who ran this (root may pass --user). It prints the
+new Claude Code's address, `name [ref]`, ready for SendMessage.
+No password or key: NabiMan asks the kernel who is calling.
+"""
+import argparse
+import json
+import os
+import socket
+import sys
+
+SOCKET = os.environ.get('NABIMAN_CLAUDE_SOCKET', '/run/nabiman/claude.sock')
+
+
+def main():
+    p = argparse.ArgumentParser(prog='nabiman-claude', description=__doc__.split('\n')[1],
+                                formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__.split('\n', 2)[2])
+    p.add_argument('prompt', nargs='*', help='first message for the new Claude Code')
+    p.add_argument('--dir', default=os.getcwd(), help='directory to start in (default: here)')
+    p.add_argument('--title', help='session name in NabiMan (default: the directory name)')
+    p.add_argument('--fresh', action='store_true', help='start a new conversation instead of -c (continue the last one)')
+    p.add_argument('--ask-permissions', action='store_true', help='leave out --dangerously-skip-permissions')
+    p.add_argument('--user', help='run as this user (root only)')
+    p.add_argument('--no-wait', action='store_true', help="answer at once, without waiting for Claude Code's address")
+    p.add_argument('--json', action='store_true', help='print the answer as JSON')
+    a = p.parse_args()
+
+    ask = {'dir': os.path.abspath(a.dir), 'resume': not a.fresh, 'skip_permissions': not a.ask_permissions,
+           'wait': not a.no_wait}
+    if a.title:
+        ask['title'] = a.title
+    if a.user:
+        ask['user'] = a.user
+    if a.prompt:
+        ask['prompt'] = ' '.join(a.prompt)
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            s.settimeout(60)
+            s.connect(SOCKET)
+            s.sendall((json.dumps(ask, ensure_ascii=False) + '\n').encode())
+            data = b''
+            while not data.endswith(b'\n'):
+                part = s.recv(65536)
+                if not part:
+                    break
+                data += part
+    except OSError as e:
+        sys.exit(f'nabiman-claude: cannot reach NabiMan at {SOCKET}: {e}')
+    try:
+        answer = json.loads(data.decode() or '{}')
+    except ValueError:
+        sys.exit('nabiman-claude: unexpected answer from NabiMan')
+    if a.json:
+        print(json.dumps(answer, ensure_ascii=False))
+    elif answer.get('ok'):
+        print(f"session: {answer.get('title')} ({answer.get('session_id')})")
+        print(f"claude:  {answer['claude']}" if answer.get('claude') else
+              'claude:  starting (its address shows in ListAgents shortly)')
+    else:
+        print(f"nabiman-claude: {answer.get('error', 'refused')}", file=sys.stderr)
+    sys.exit(0 if answer.get('ok') else 1)
+
+
+if __name__ == '__main__':
+    main()
