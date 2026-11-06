@@ -6,11 +6,15 @@ use super::*;
 ///
 /// `member` is a remote-only member opening it: they may open only their own
 /// and their assigned saved servers, never a shell on this machine.
+///
+/// `mux`: the new session's id, so its connection can be shared (ControlMaster)
+/// by the probe that looks for Claude Code there (see claude_remote).
 pub(super) fn build_ssh_command(
     query: &str,
     keepalive: bool,
     ka_interval: u64,
     member: Option<&crate::models::NabimanUser>,
+    mux: Option<&str>,
 ) -> Result<Option<(String, String, remote_access::RemoteBinding)>, String> {
     let (host, port, user, password, trust, binding, isolation, cert_opts): (_, _, _, _, _, _, _, Vec<String>) =
         if let Some(server_id) = parse_query_param(query, "server_id") {
@@ -104,6 +108,10 @@ pub(super) fn build_ssh_command(
         cmd.push(' ');
     } else {
         cmd.push_str("-o ServerAliveInterval=30 ");
+    }
+    if let Some(opts) = mux.and_then(super::claude_remote::mux_options) {
+        cmd.push_str(&opts);
+        cmd.push(' ');
     }
     cmd.push_str(&format!("-p {} {}@{}", port, user, host));
 

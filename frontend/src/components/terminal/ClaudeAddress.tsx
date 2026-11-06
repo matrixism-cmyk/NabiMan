@@ -12,6 +12,9 @@ export interface ClaudePeer {
   cwd: string;
   /** Working on a turn now. */
   busy: boolean;
+  /** The saved server it runs on, when not this machine; `address` is then
+   *  `bridge:<Remote Control session>`, or just the name without Remote Control. */
+  server?: string;
 }
 
 interface ClaudeInfo { claude: ClaudePeer[]; busy: boolean }
@@ -89,9 +92,13 @@ export default function ClaudeAddress({ peers, variant = 'head' }: Props) {
       {peers.map((p) => {
         const done = copied === p.address;
         const state = t(p.busy ? 'claudePeer.busy' : 'claudePeer.idle');
+        const reachable = !p.server || p.address.startsWith('bridge:');
+        const hint = p.server
+          ? t(reachable ? 'claudePeer.remoteHint' : 'claudePeer.unreachableHint', { address: p.address, cwd: p.cwd, state, server: p.server })
+          : t('claudePeer.hint', { address: p.address, cwd: p.cwd, state });
         return (
-          <button key={p.address} type="button" className={`claude-addr-chip ${p.busy ? 'is-busy' : ''}`}
-            title={t('claudePeer.hint', { address: p.address, cwd: p.cwd, state })}
+          <button key={p.address} type="button" className={`claude-addr-chip ${p.busy ? 'is-busy' : ''} ${p.server ? 'is-remote' : ''} ${reachable ? '' : 'is-unreachable'}`}
+            title={hint}
             aria-label={t('claudePeer.copyLabel', { address: p.address })}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={async (e) => {
@@ -100,7 +107,7 @@ export default function ClaudeAddress({ peers, variant = 'head' }: Props) {
             }}>
             <span className="claude-addr-dot" aria-hidden="true" />
             <span className="claude-addr-name">{p.name}</span>
-            <span className="claude-addr-ref">[{p.ref}]</span>
+            {p.server ? <span className="claude-addr-ref">@{p.server}</span> : <span className="claude-addr-ref">[{p.ref}]</span>}
             {variant !== 'bar' && <span className="claude-addr-cwd">{p.cwd}</span>}
             <span className="claude-addr-copy">{done ? t('claudePeer.copied') : '⧉'}</span>
           </button>

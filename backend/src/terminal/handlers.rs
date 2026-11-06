@@ -39,6 +39,93 @@ struct SessionInfo {
     directs: Vec<String>,
     /// Its Claude leads others here and is led by none.
     orchestrator: bool,
+    /// For each of `directs`: the first line of the work it last sent there, and when.
+    notes: Vec<LinkNote>,
+}
+
+/// What travels along one arrow: the latest message's first line.
+#[derive(serde::Serialize, Clone)]
+struct LinkNote {
+    to: String,
+    text: String,
+    at: u64,
+}
+
+/// The notes for a card's arrows, named like its `directs`.
+fn notes_of(here: &super::claude_peers::Seen, id_of: &HashMap<&str, &str>, remote_ok: bool) -> Vec<LinkNote> {
+    here.notes
+        .iter()
+        .filter_map(|(t, (at, text))| {
+            let to = id_of.get(t.as_str()).map(|i| i.to_string()).or_else(|| (remote_ok && t.starts_with("rc:")).then(|| t.clone()))?;
+            Some(LinkNote { to, text: text.clone(), at: *at })
+        })
+        .collect()
+}
+
+/// Not a remote-only member (who sees only their own servers' shells).
+fn sees_remote_claude(user_id: &str, users: &crate::users::UserStore) -> bool {
+    !user_id.is_empty()
+        && users
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|u| u.id == user_id)
+            .is_some_and(|u| !crate::member_servers::is_member(u))
+}
+
+/// The cards a session's Claude has lately handed work to: sessions this
+/// account sees, and remote Claude sessions with no tile when it sees those.
+fn directs_of(here: &super::claude_peers::Seen, id_of: &HashMap<&str, &str>, remote_ok: bool) -> Vec<String> {
+    here.leads
+        .iter()
+        .filter_map(|t| id_of.get(t.as_str()).map(|i| i.to_string()).or_else(|| (remote_ok && t.starts_with("rc:")).then(|| t.clone())))
+        .collect()
+}
+
+/// A Claude session on a server the tiles are connected to, running under
+/// none of them (started at that machine, say). It gets a card of its own.
+#[derive(serde::Serialize)]
+struct RemoteClaudeCard {
+    id: String,
+    server: String,
+    claude: Vec<super::claude_peers::ClaudePeer>,
+    busy: bool,
+    directs: Vec<String>,
+    orchestrator: bool,
+    notes: Vec<LinkNote>,
+}
+
+async fn remote_claude(store: web::Data<PtyStore>, req: HttpRequest, users: web::Data<crate::users::UserStore>) -> HttpResponse {
+    let user_id = crate::auth::verified_user_id(&req).unwrap_or_default();
+    if !sees_remote_claude(&user_id, &users) {
+        return HttpResponse::Ok().json(crate::models::ApiResponse::ok(Vec::<RemoteClaudeCard>::new()));
+    }
+    super::claude_remote::want(store.get_ref());
+    let seen = super::claude_peers::look();
+    let map = store.lock().unwrap();
+    let id_of: HashMap<&str, &str> = map
+        .iter()
+        .filter(|(_, s)| super::session::visible_to(s, &user_id, &users))
+        .map(|(id, s)| (s.tmux_name.as_str(), id.as_str()))
+        .collect();
+    let mut cards: Vec<RemoteClaudeCard> = seen
+        .iter()
+        .filter(|(k, h)| k.starts_with("rc:") && h.ghost_server.is_some() && !h.claude.is_empty())
+        .map(|(k, h)| {
+            let directs = directs_of(h, &id_of, true);
+            RemoteClaudeCard {
+                id: k.clone(),
+                server: h.ghost_server.clone().unwrap_or_default(),
+                claude: h.claude.clone(),
+                busy: h.busy(),
+                orchestrator: h.orchestrator && !directs.is_empty(),
+                notes: notes_of(h, &id_of, true),
+                directs,
+            }
+        })
+        .collect();
+    cards.sort_by(|a, b| (&a.server, &a.claude[0].name).cmp(&(&b.server, &b.claude[0].name)));
+    HttpResponse::Ok().json(crate::models::ApiResponse::ok(cards))
 }
 
 #[derive(serde::Serialize)]
@@ -58,6 +145,11 @@ async fn list_sessions(
     users: web::Data<crate::users::UserStore>,
 ) -> HttpResponse {
     let user_id = crate::auth::verified_user_id(&req).unwrap_or_default();
+    // Remote servers' Claude sessions are for operators, not remote-only members.
+    let remote_ok = sees_remote_claude(&user_id, &users);
+    if remote_ok {
+        super::claude_remote::want(store.get_ref());
+    }
     // Before the lock: it asks tmux and reads /proc.
     let seen = super::claude_peers::look();
     let map = store.lock().unwrap();
@@ -82,9 +174,7 @@ async fn list_sessions(
             };
             let alive = state == "alive";
             let here = seen.get(&s.tmux_name).filter(|_| alive);
-            let directs: Vec<String> = here
-                .map(|h| h.leads.iter().filter_map(|t| id_of.get(t.as_str())).map(|i| i.to_string()).collect())
-                .unwrap_or_default();
+            let directs: Vec<String> = here.map(|h| directs_of(h, &id_of, remote_ok)).unwrap_or_default();
             SessionInfo {
                 id: id.clone(),
                 label: s.label.clone(),
@@ -106,6 +196,7 @@ async fn list_sessions(
                 claude: here.map(|h| h.claude.clone()).unwrap_or_default(),
                 busy: here.is_some_and(|h| h.busy()),
                 orchestrator: here.is_some_and(|h| h.orchestrator) && !directs.is_empty(),
+                notes: here.map(|h| notes_of(h, &id_of, remote_ok)).unwrap_or_default(),
                 directs,
             }
         })
@@ -433,6 +524,7 @@ pub(crate) fn configure(cfg: &mut web::ServiceConfig) {
     cfg.route("/api/terminal/settings", web::get().to(get_settings))
         .route("/api/terminal/settings", web::put().to(put_settings))
         .route("/api/terminal/sessions", web::get().to(list_sessions))
+        .route("/api/terminal/claude-remote", web::get().to(remote_claude))
         .route(
             "/api/terminal/sessions/{id}",
             web::delete().to(kill_session),

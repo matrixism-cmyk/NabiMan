@@ -3,6 +3,7 @@ import { apiPost, apiRequest } from '../../shared/api/useApi';
 import ClaudeAddress, { ClaudePeer } from '../terminal/ClaudeAddress';
 import SessionLinks, { SessionLink } from './SessionLinks';
 import { arrange, moved, ORDER_MODES, OrderMode, useSessionOrder } from './sessionOrder';
+import { useRemoteClaude } from './remoteClaude';
 import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useGrants, useMember, useSharing } from './member';
@@ -23,6 +24,8 @@ export interface SessionInfo {
   directs?: string[];
   /** Its Claude hands out work here and takes it from none. */
   orchestrator?: boolean;
+  /** For each of `directs`: the first line of the work last sent there, and when. */
+  notes?: { to: string; text: string; at: number }[];
 }
 
 /** How long a changed screen counts as output just now: a little over one refresh. */
@@ -114,18 +117,34 @@ export default function SessionsView({
   };
   // A state, not a ref: the arrows redraw once the grid is there.
   const [grid, setGrid] = useState<HTMLDivElement | null>(null);
-  const shown = new Set(sessions.map((s) => s.id));
-  const busy = new Set(sessions.filter((s) => s.busy).map((s) => s.id));
+  // Claude sessions on the connected servers that no tile is under: cards of their own.
+  const remote = useRemoteClaude(!member);
+  type Node = Pick<SessionInfo, 'id' | 'directs' | 'orchestrator' | 'busy' | 'claude' | 'notes'> & { title?: string; label?: string };
+  const nodes: Node[] = [...sessions, ...remote.map((r) => ({ ...r, label: r.server }))];
+  const shown = new Set(nodes.map((s) => s.id));
+  const busy = new Set(nodes.filter((s) => s.busy).map((s) => s.id));
   // Once both ends are waiting, the work handed over is done for now: the arrow fades.
-  const links: SessionLink[] = sessions.flatMap((s) => (s.directs || [])
+  const nameOf = (s: Node) => s.claude?.[0]?.name || s.title || s.label || '';
+  const nodeOf = new Map(nodes.map((n) => [n.id, n]));
+  // Hovering an arrow says what was handed over: the last request's first line.
+  const nowSecs = Math.floor(Date.now() / 1000);
+  const noteFor = (s: Node, to: string) => {
+    const target = nodeOf.get(to);
+    const toName = target ? nameOf(target) : to;
+    const lines = [`${nameOf(s)} → ${toName}`];
+    const note = s.notes?.find((n) => n.to === to);
+    if (note?.text) lines.push(t('claudePeer.linkLast', { ago: formatAge(Math.max(0, nowSecs - note.at)), text: note.text }));
+    lines.push(t(busy.has(to) ? 'claudePeer.linkBusy' : 'claudePeer.linkIdle', { name: toName }));
+    return lines.join('\n');
+  };
+  const links: SessionLink[] = nodes.flatMap((s) => (s.directs || [])
     .filter((to) => shown.has(to))
-    .map((to) => ({ from: s.id, to, orchestrator: !!s.orchestrator, live: busy.has(s.id) || busy.has(to) })));
-  const leader = new Map<string, SessionInfo>();
+    .map((to) => ({ from: s.id, to, orchestrator: !!s.orchestrator, live: busy.has(s.id) || busy.has(to), note: noteFor(s, to) })));
+  const leader = new Map<string, Node>();
   for (const l of links) {
-    const from = sessions.find((s) => s.id === l.from);
+    const from = nodeOf.get(l.from);
     if (from && (!leader.has(l.to) || from.orchestrator)) leader.set(l.to, from);
   }
-  const nameOf = (s: SessionInfo) => s.claude?.[0]?.name || s.title || s.label;
 
   const startRename = (session: SessionInfo) => {
     setRenaming(session.id);
@@ -193,7 +212,7 @@ export default function SessionsView({
       {message && <div role="alert" className="message">{message}</div>}
       {orderError && <div role="alert" className="message">{t('sessionOrder.saveFailed')}</div>}
       <div className="session-grid" ref={setGrid}>
-        <SessionLinks grid={grid} links={links} layout={shownIds.join(',')} />
+        <SessionLinks grid={grid} links={links} layout={[...shownIds, ...remote.map((r) => r.id)].join(',')} />
         {shownInOrder.map(session => {
           const state = session.state === undefined ? (session.alive ? 'alive' : 'ended') :
             ['alive', 'ended', 'unknown', 'blocked'].includes(session.state) ? session.state : 'unknown';
@@ -290,6 +309,34 @@ export default function SessionsView({
             </div>
           </div>
         );})}
+        {remote.map((r) => {
+          const directs = links.filter((l) => l.from === r.id).length;
+          const orchestrating = r.orchestrator && directs > 0;
+          const resting = orchestrating && !links.some((l) => l.from === r.id && l.live);
+          const working = !orchestrating && r.busy;
+          const ledBy = leader.get(r.id);
+          return (
+            <div key={r.id} data-session-id={r.id} title={t('claudeRemote.hint')}
+              className={`session-card is-remote-claude ${orchestrating ? 'is-orchestrator' : ''} ${resting ? 'is-resting' : ''} ${working ? 'is-working' : ''}`}>
+              <div className="session-card-head">
+                <strong className="session-name">{r.claude[0]?.name}</strong>
+                {orchestrating && (
+                  <span className={`session-work-badge is-orchestrator ${r.busy ? '' : 'is-still'}`} title={t('claudePeer.orchestratorHint')}>
+                    {t('claudePeer.orchestrator', { count: directs })}
+                  </span>
+                )}
+                {ledBy && (
+                  <span className="session-work-badge is-led" title={t('claudePeer.ledHint', { name: nameOf(ledBy) })}>
+                    {t('claudePeer.led', { name: nameOf(ledBy) })}
+                  </span>
+                )}
+                {working && <span className="session-work-badge" title={t('claudePeer.workingHint')}>{t('claudePeer.working')}</span>}
+              </div>
+              <code className="session-label">{t('claudeRemote.noTile', { server: r.server })}</code>
+              <ClaudeAddress variant="card" peers={r.claude} />
+            </div>
+          );
+        })}
       </div>
     </div>
   );

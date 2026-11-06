@@ -124,3 +124,12 @@
 .claude-start-preview { margin: 0; padding: 8px 10px; border-radius: 6px; background: var(--bg-secondary, rgba(127,127,127,.12)); overflow-wrap: anywhere; font-size: 0.85em; }
 .claude-start-form > label.claude-start-check > input { width: auto; flex: none; margin: 0; }
 .claude-start-form > label.claude-start-check > span { flex: 1; text-align: left; }
+
+/* Claude sessions on other servers. */
+.claude-addr-chip.is-remote .claude-addr-ref { font-style: italic; }
+.claude-addr-chip.is-unreachable { opacity: .65; text-decoration: line-through dotted; }
+.session-card.is-remote-claude { border-style: dashed; }
+.session-card.is-remote-claude .session-label { opacity: .8; }
+/* Hover an arrow to read what was handed over. */
+.session-link-hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: help; }
+.session-card.is-remote-claude { align-self: start; }

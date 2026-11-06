@@ -37,6 +37,10 @@ const ADDRESS_WAIT: Duration = Duration::from_secs(25);
 #[derive(Deserialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
 struct Ask {
+    /// List the Claude sessions NabiMan knows instead of opening one.
+    #[serde(default)]
+    list: bool,
+    #[serde(default)]
     dir: String,
     #[serde(default)]
     user: Option<String>,
@@ -69,6 +73,26 @@ struct Answer {
     claude: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
+    /// For `list`: every Claude session NabiMan knows of.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sessions: Option<Vec<Listed>>,
+}
+
+/// One Claude session as `list` gives it.
+#[derive(Serialize, Debug, Clone, PartialEq)]
+struct Listed {
+    /// What SendMessage's `to` takes: `name [ref]` here, `bridge:<session>`
+    /// on another machine (or just the name, without Remote Control there).
+    address: String,
+    name: String,
+    /// The saved server it runs on; `null` for this machine.
+    server: Option<String>,
+    cwd: String,
+    busy: bool,
+    /// The NabiMan tile it runs in, by name; `null` for one at a remote desktop.
+    tile: Option<String>,
+    /// Whether a message can reach it from here (Remote Control on, or same machine).
+    reachable: bool,
 }
 
 fn refuse(why: impl Into<String>) -> Answer {
@@ -157,10 +181,49 @@ fn run_as(caller: &str, asked: Option<&str>) -> Result<String, String> {
     }
 }
 
+/// Every Claude session NabiMan knows of, here and on the servers its tiles
+/// are connected to. For callers inside a NabiMan session, like opening one.
+fn list(pid: u32, store: &PtyStore) -> Answer {
+    if super::claude_peers::tmux_session_of_pid(pid).is_none() {
+        return refuse("only from inside a NabiMan session");
+    }
+    super::claude_remote::want(store);
+    // Right after a quiet spell the remote servers have not been looked at yet.
+    let until = Instant::now() + Duration::from_secs(20);
+    while super::claude_remote::pending() && Instant::now() < until {
+        std::thread::sleep(Duration::from_millis(500));
+    }
+    let titles: std::collections::HashMap<String, String> = store
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .values()
+        .map(|s| (s.tmux_name.clone(), if s.title.is_empty() { s.label.clone() } else { s.title.clone() }))
+        .collect();
+    let mut out: Vec<Listed> = Vec::new();
+    for (card, seen) in super::claude_peers::look().iter() {
+        for p in &seen.claude {
+            out.push(Listed {
+                address: p.address.clone(),
+                name: p.name.clone(),
+                server: p.server.clone(),
+                cwd: p.cwd.clone(),
+                busy: p.busy,
+                tile: titles.get(card).cloned(),
+                reachable: p.server.is_none() || p.address.starts_with("bridge:"),
+            });
+        }
+    }
+    out.sort_by(|a, b| (&a.server, &a.name).cmp(&(&b.server, &b.name)));
+    Answer { ok: true, sessions: Some(out), ..Default::default() }
+}
+
 fn open(ask: Ask, uid: u32, pid: u32, store: &PtyStore) -> Answer {
     let Some(caller) = user_of(uid) else {
         return refuse("this user cannot start NabiMan sessions");
     };
+    if ask.list {
+        return list(pid, store);
+    }
     let user = match run_as(&caller, ask.user.as_deref()) {
         Ok(u) => u,
         Err(e) => return refuse(e),
@@ -243,7 +306,7 @@ fn open(ask: Ask, uid: u32, pid: u32, store: &PtyStore) -> Answer {
         (sid, tmux_name)
     };
     let claude = if ask.wait { wait_for_address(&tmux_name) } else { None };
-    Answer { ok: true, session_id: Some(sid), title: Some(start.title), claude, error: None }
+    Answer { ok: true, session_id: Some(sid), title: Some(start.title), claude, error: None, sessions: None }
 }
 
 /// The new session's Claude Code address, once it has one.
@@ -274,7 +337,8 @@ mod tests {
     #[test]
     fn a_request_is_one_strict_json_line_with_safe_defaults() {
         let ask: Ask = serde_json::from_str(r#"{"dir":"/w"}"#).unwrap();
-        assert!(ask.resume && ask.skip_permissions && ask.wait && ask.user.is_none() && ask.prompt.is_none());
+        assert!(ask.resume && ask.skip_permissions && ask.wait && ask.user.is_none() && ask.prompt.is_none() && !ask.list);
+        assert!(serde_json::from_str::<Ask>(r#"{"list":true}"#).unwrap().list);
         assert!(serde_json::from_str::<Ask>(r#"{"dir":"/w","command":"rm -rf /"}"#).is_err(), "no extra fields");
     }
 }

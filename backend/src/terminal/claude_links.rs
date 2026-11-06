@@ -37,8 +37,30 @@ const PIECE: usize = 8 * 1024 * 1024;
 /// Messages kept per transcript (the first ones and the latest).
 const MAX_KEPT: usize = 20_000;
 
-/// One message received: the sender's socket and when (unix seconds).
-pub(crate) type Received = (String, u64);
+/// One message received: the sender (`uds:<socket>` or `bridge:<session>`),
+/// when (unix seconds), and the first line of what it said (see `gist`).
+pub(crate) type Received = (String, u64, String);
+
+/// How much of a message is kept, for the tooltip on its arrow.
+pub(crate) const GIST_LEN: usize = 140;
+
+/// The first line a peer message said, without the envelope Claude Code puts
+/// around it.
+pub(crate) fn gist(text: &str) -> String {
+    let body = match text.find("<cross-session-message") {
+        Some(i) => match text[i..].find('>') {
+            Some(j) => &text[i + j + 1..],
+            None => return String::new(),
+        },
+        None => text,
+    };
+    let body = body.split("</cross-session-message>").next().unwrap_or("");
+    body.lines()
+        .map(str::trim)
+        .find(|l| !l.is_empty())
+        .map(|l| l.chars().filter(|c| !c.is_control()).take(GIST_LEN).collect())
+        .unwrap_or_default()
+}
 
 #[derive(Default, Clone)]
 struct Tail {
@@ -127,7 +149,7 @@ fn trim(tail: &mut Tail) {
     tail.got = got
         .into_iter()
         .enumerate()
-        .filter(|(i, (s, _))| *i >= cut || firsts.insert(s.clone()))
+        .filter(|(i, (s, _, _))| *i >= cut || firsts.insert(s.clone()))
         .map(|(_, g)| g)
         .collect();
 }
@@ -172,9 +194,9 @@ fn catch_up(path: &Path, tail: &mut Tail) -> std::io::Result<()> {
             let begin = memchr::memrchr(b'\n', &whole[..hit]).map_or(0, |i| i + 1).max(from);
             let end = memchr::memchr(b'\n', &whole[hit..]).map_or(whole.len(), |i| hit + i);
             done_to = end;
-            if let Some((sock, at, id)) = peer_message(&whole[begin..end]) {
+            if let Some((sock, at, id, said)) = peer_message(&whole[begin..end]) {
                 if id.is_empty() || tail.ids.insert(id) {
-                    tail.got.push((sock, at));
+                    tail.got.push((sock, at, said));
                 }
             }
         }
@@ -186,7 +208,7 @@ fn catch_up(path: &Path, tail: &mut Tail) -> std::io::Result<()> {
 
 /// A message another session sent, as its transcript line records it: the
 /// sender's socket, when, and the message's id.
-fn peer_message(line: &[u8]) -> Option<(String, u64, String)> {
+fn peer_message(line: &[u8]) -> Option<(String, u64, String, String)> {
     let v: serde_json::Value = serde_json::from_slice(line).ok()?;
     let origin = match v.get("type")?.as_str()? {
         "user" => v.get("origin")?,
@@ -200,13 +222,30 @@ fn peer_message(line: &[u8]) -> Option<(String, u64, String)> {
         }
         _ => return None,
     };
-    if origin.get("kind")?.as_str()? != "peer" || origin.get("verifiedPeerPid").is_none() {
+    if origin.get("kind")?.as_str()? != "peer" {
         return None;
     }
-    let sock = origin.get("from")?.as_str()?.strip_prefix("uds:")?.to_string();
+    // A sender on this machine was checked by the kernel; one on another
+    // machine came through Remote Control, under the same account.
+    let from = origin.get("from")?.as_str()?;
+    let checked = from.starts_with("uds:") && origin.get("verifiedPeerPid").is_some();
+    if !checked && !from.starts_with("bridge:") {
+        return None;
+    }
+    let sock = from.to_string();
     let at = chrono::DateTime::parse_from_rfc3339(v.get("timestamp")?.as_str()?).ok()?;
     let id = origin.get("msg_id").and_then(|x| x.as_str()).unwrap_or("").to_string();
-    Some((sock, u64::try_from(at.timestamp()).ok()?, id))
+    // What it said: the user turn's text, or a queued command's prompt.
+    let text = v
+        .pointer("/message/content")
+        .map(|c| match c {
+            serde_json::Value::String(s) => s.clone(),
+            serde_json::Value::Array(parts) => parts.iter().filter_map(|p| p.get("text")?.as_str()).collect::<Vec<_>>().join("\n"),
+            _ => String::new(),
+        })
+        .or_else(|| v.pointer("/attachment/prompt").and_then(|p| p.as_str()).map(str::to_string))
+        .unwrap_or_default();
+    Some((sock, u64::try_from(at.timestamp()).ok()?, id, gist(&text)))
 }
 
 /// Which sessions lead which, from messages `(from, to, when)` between them.
@@ -309,10 +348,18 @@ mod tests {
     #[test]
     fn only_a_verified_peer_message_counts() {
         let real = br#"{"type":"user","timestamp":"2026-11-05T12:35:08.552Z","origin":{"kind":"peer","from":"uds:/tmp/cc-socks/1673538.sock","verifiedPeerPid":1673538,"body":"..."}}"#;
-        assert_eq!(peer_message(real), Some(("/tmp/cc-socks/1673538.sock".into(), 1_793_882_108, String::new())));
+        assert_eq!(peer_message(real), Some(("uds:/tmp/cc-socks/1673538.sock".into(), 1_793_882_108, String::new(), String::new())));
         // Arrived mid-turn: an attachment, with the same checked origin.
         let queued = br#"{"type":"attachment","timestamp":"2026-11-05T12:53:54.219Z","attachment":{"type":"queued_command","origin":{"kind":"peer","from":"uds:/s","verifiedPeerPid":1,"msg_id":"m1"}}}"#;
-        assert_eq!(peer_message(queued), Some(("/s".into(), 1_793_883_234, "m1".into())));
+        assert_eq!(peer_message(queued), Some(("uds:/s".into(), 1_793_883_234, "m1".into(), String::new())));
+        // From another machine, over Remote Control.
+        let bridged = br#"{"type":"user","timestamp":"2026-11-05T14:56:18.111Z","origin":{"kind":"peer","from":"bridge:session_01WD","msg_id":"m2"}}"#;
+        assert_eq!(peer_message(bridged), Some(("bridge:session_01WD".into(), 1_793_890_578, "m2".into(), String::new())));
+        // What it said, from either form, without the envelope.
+        let said = br#"{"type":"attachment","timestamp":"2026-11-05T12:53:54.219Z","attachment":{"type":"queued_command","prompt":"<cross-session-message from=\"uds:/s\" from-name=\"a\">\n\n  Review the PR, then report.\nMore lines.\n</cross-session-message>","origin":{"kind":"peer","from":"uds:/s","verifiedPeerPid":1}}}"#;
+        assert_eq!(peer_message(said).unwrap().3, "Review the PR, then report.");
+        let parts = r#"{"type":"user","timestamp":"2026-11-05T12:53:54.219Z","message":{"content":[{"type":"text","text":"Another Claude session sent a message:\n<cross-session-message from=\"bridge:x\">\n작업 요청: 배포 \u0007확인\n</cross-session-message>"}]},"origin":{"kind":"peer","from":"bridge:x"}}"#;
+        assert_eq!(peer_message(parts.as_bytes()).unwrap().3, "작업 요청: 배포 확인");
         // Quoted in a tool result, or claimed without the check: no.
         let quoted = br#"{"type":"user","timestamp":"2026-11-05T12:35:08.552Z","message":{"content":"\"kind\":\"peer\""}}"#;
         assert_eq!(peer_message(quoted), None);
@@ -335,7 +382,7 @@ mod tests {
         std::io::Write::write_all(&mut f, line("/b", "2026-11-05T12:00:30Z").as_bytes()).unwrap();
         std::io::Write::write_all(&mut f, b"{\"half a line").unwrap();
         catch_up(&path, &mut tail).unwrap();
-        assert_eq!(tail.got.iter().map(|g| g.0.as_str()).collect::<Vec<_>>(), vec!["/a", "/b"]);
+        assert_eq!(tail.got.iter().map(|g| g.0.as_str()).collect::<Vec<_>>(), vec!["uds:/a", "uds:/b"]);
         // In the background: the first look may come back before the reading is done.
         let _ = received(std::slice::from_ref(&path));
         let mut got = Vec::new();

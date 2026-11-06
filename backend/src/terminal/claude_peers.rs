@@ -48,6 +48,12 @@ pub(crate) struct ClaudePeer {
     pub cwd: String,
     /// Working on a turn now, not waiting for the person.
     pub busy: bool,
+    /// The saved server it runs on, when that is not this machine. Its
+    /// `address` is then `bridge:<Remote Control session>` (what SendMessage
+    /// takes for a session on another machine), or just its name without
+    /// Remote Control.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server: Option<String>,
 }
 
 /// What is known about one tmux session.
@@ -58,6 +64,15 @@ pub(crate) struct Seen {
     pub leads: Vec<String>,
     /// It leads others and none leads it.
     pub orchestrator: bool,
+    /// For a remote Claude session no tile is connected to: its server's name.
+    pub ghost_server: Option<String>,
+    /// For each card it leads: when it last sent work there and the first line of it.
+    pub notes: HashMap<String, (u64, String)>,
+}
+
+/// The id a remote Claude session with no tile goes by among the tiles.
+pub(crate) fn ghost_id(server_id: &str, session_id: &str) -> String {
+    format!("rc:{server_id}:{session_id}")
 }
 
 impl Seen {
@@ -128,7 +143,9 @@ fn scan() -> HashMap<String, Seen> {
         })
         .collect();
     let refs = refs(&found.iter().map(|(r, _)| r.sock.as_str()).collect::<Vec<_>>());
-    link(&found, &mut seen);
+    let remote = super::claude_remote::snapshot();
+    link(&found, &remote, &mut seen);
+    add_remote(&remote, &mut seen);
     for ((rec, tmux_name), reference) in found.into_iter().zip(refs) {
         let name = if rec.name.is_empty() { base_name(&rec.cwd) } else { rec.name.clone() };
         let peer = ClaudePeer {
@@ -137,6 +154,7 @@ fn scan() -> HashMap<String, Seen> {
             reference,
             cwd: rec.cwd,
             busy: rec.busy,
+            server: None,
         };
         let entry = seen.entry(tmux_name).or_default();
         entry.claude.push(peer);
@@ -145,9 +163,78 @@ fn scan() -> HashMap<String, Seen> {
     seen
 }
 
-/// Who has been handing work to whom among the sessions found.
-fn link(found: &[(Record, String)], seen: &mut HashMap<String, Seen>) {
-    let place: HashMap<&str, &str> = found.iter().map(|(r, t)| (r.sock.as_str(), t.as_str())).collect();
+/// Remote Claude sessions: into their tile's entry, or one of their own.
+fn add_remote(remote: &super::claude_remote::Snapshot, seen: &mut HashMap<String, Seen>) {
+    for p in &remote.peers {
+        let server = remote.servers.get(&p.server_id).cloned().unwrap_or_else(|| p.server_id.clone());
+        let card = p.tile.clone().unwrap_or_else(|| ghost_id(&p.server_id, &p.session_id));
+        let name = if p.name.is_empty() { base_name(&p.cwd) } else { p.name.clone() };
+        let peer = ClaudePeer {
+            address: p.bridge.as_ref().map(|b| format!("bridge:{b}")).unwrap_or_else(|| name.clone()),
+            name,
+            reference: String::new(),
+            cwd: p.cwd.clone(),
+            busy: p.busy,
+            server: Some(server.clone()),
+        };
+        let entry = seen.entry(card).or_default();
+        if p.tile.is_none() {
+            entry.ghost_server = Some(server);
+        }
+        entry.claude.push(peer);
+        entry.claude.sort_by(|a, b| a.address.cmp(&b.address));
+    }
+}
+
+/// `%XX` escapes in a peer address (Claude Code escapes unusual characters).
+fn unescape(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let Some(b) = s.get(i + 1..i + 3).and_then(|h| u8::from_str_radix(h, 16).ok()) {
+                out.push(b);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8(out).unwrap_or_else(|_| s.to_string())
+}
+
+/// Who has been handing work to whom among the sessions found, here and on
+/// the servers the tiles are connected to. A sender is named by its socket on
+/// the receiver's machine (`uds:…`) or, across machines, by its Remote Control
+/// session (`bridge:…`).
+fn link(found: &[(Record, String)], remote: &super::claude_remote::Snapshot, seen: &mut HashMap<String, Seen>) {
+    // Each session's card (tmux name, or a remote one's own id), by address.
+    let mut card: HashMap<String, String> = HashMap::new();
+    for (r, t) in found {
+        card.insert(format!("local|uds:{}", r.sock), t.clone());
+        if let Some(b) = &r.bridge {
+            card.insert(format!("bridge:{b}"), t.clone());
+        }
+    }
+    let mut remote_card: HashMap<(&str, &str), String> = HashMap::new();
+    for p in &remote.peers {
+        let c = p.tile.clone().unwrap_or_else(|| ghost_id(&p.server_id, &p.session_id));
+        card.insert(format!("{}|uds:{}", p.server_id, p.sock), c.clone());
+        if let Some(b) = &p.bridge {
+            card.insert(format!("bridge:{b}"), c.clone());
+        }
+        remote_card.insert((p.server_id.as_str(), p.session_id.as_str()), c);
+    }
+    let sender = |machine: &str, from: &str| -> Option<String> {
+        let from = unescape(from);
+        if from.starts_with("bridge:") {
+            card.get(&from).cloned()
+        } else {
+            card.get(&format!("{machine}|{from}")).cloned()
+        }
+    };
     let transcripts: Vec<(PathBuf, &str)> = found
         .iter()
         .filter_map(|(r, t)| {
@@ -159,17 +246,32 @@ fn link(found: &[(Record, String)], seen: &mut HashMap<String, Seen>) {
     let now = super::session::now_unix();
     let got = super::claude_links::received(&paths);
     let mut messages = Vec::new();
+    // The latest message along each pair, for the tooltip on its arrow.
+    let mut latest: HashMap<(String, String), (u64, String)> = HashMap::new();
+    let mut note = |f: &str, t: &str, at: u64, said: &str| {
+        let slot = latest.entry((f.to_string(), t.to_string())).or_insert((0, String::new()));
+        if at >= slot.0 && !said.is_empty() {
+            *slot = (at, said.to_string());
+        }
+    };
     for (path, to) in &transcripts {
-        for (sock, at) in got.get(path).into_iter().flatten() {
-            if let Some(from) = place.get(sock.as_str()) {
-                messages.push((from.to_string(), to.to_string(), *at));
+        for (from, at, said) in got.get(path).into_iter().flatten() {
+            if let Some(f) = sender("local", from) {
+                note(&f, to, *at, said);
+                messages.push((f, to.to_string(), *at));
             }
         }
+    }
+    for (server, receiver, from, at, said) in &remote.messages {
+        let (Some(to), Some(f)) = (remote_card.get(&(server.as_str(), receiver.as_str())), sender(server, from)) else { continue };
+        note(&f, to, *at, said);
+        messages.push((f, to.clone(), *at));
     }
     let links = super::claude_links::links(&messages, now);
     for (from, to) in links.leads {
         let entry = seen.entry(from.clone()).or_default();
         entry.orchestrator = links.orchestrators.contains(&from);
+        entry.notes = to.iter().filter_map(|t| Some((t.clone(), latest.get(&(from.clone(), t.clone()))?.clone()))).collect();
         entry.leads = to;
     }
 }
@@ -212,6 +314,8 @@ struct Record {
     cwd: String,
     busy: bool,
     session_id: String,
+    /// Its Remote Control session, when that is on.
+    bridge: Option<String>,
     /// Who wrote the file.
     uid: u32,
     /// The record's own path, under the account's `.claude` folder.
@@ -240,6 +344,7 @@ fn parse_record(text: &str, uid: u32, file: &Path) -> Option<Record> {
         cwd: clip(&s("cwd"), 300),
         busy: s("status") == "busy",
         session_id: s("sessionId"),
+        bridge: Some(s("bridgeSessionId")).filter(|b| !b.is_empty()),
         uid,
         file: file.to_path_buf(),
     };

@@ -7,6 +7,12 @@ to a fresh session it can then message:
   nabiman-claude --dir /workspace/project                 # claude --dangerously-skip-permissions -c
   nabiman-claude --dir /workspace/project --fresh "Review the open PR"   # new conversation, first message
   nabiman-claude --json --dir /workspace/project          # machine-readable answer
+  nabiman-claude list                                     # every Claude session NabiMan knows, with addresses
+
+`list` covers this machine and the servers NabiMan's SSH tiles are connected
+to: `name [ref]` here, `bridge:<session>` on another machine (Remote Control),
+which SendMessage takes as `to`. Sessions marked unreachable have Remote
+Control off.
 
 The session appears among the tiles of the NabiMan account whose session ran
 this, and runs as the user who ran this (root may pass --user). It prints the
@@ -22,7 +28,46 @@ import sys
 SOCKET = os.environ.get('NABIMAN_CLAUDE_SOCKET', '/run/nabiman/claude.sock')
 
 
+def ask_nabiman(ask):
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            s.settimeout(60)
+            s.connect(SOCKET)
+            s.sendall((json.dumps(ask, ensure_ascii=False) + '\n').encode())
+            data = b''
+            while not data.endswith(b'\n'):
+                part = s.recv(65536)
+                if not part:
+                    break
+                data += part
+    except OSError as e:
+        sys.exit(f'nabiman-claude: cannot reach NabiMan at {SOCKET}: {e}')
+    try:
+        return json.loads(data.decode() or '{}')
+    except ValueError:
+        sys.exit('nabiman-claude: unexpected answer from NabiMan')
+
+
+def list_sessions(argv):
+    as_json = '--json' in argv
+    answer = ask_nabiman({'list': True})
+    if not answer.get('ok'):
+        sys.exit(f"nabiman-claude: {answer.get('error', 'refused')}")
+    rows = answer.get('sessions') or []
+    if as_json:
+        print(json.dumps(rows, ensure_ascii=False))
+        return
+    for r in rows:
+        where = r.get('server') or 'this machine'
+        state = 'busy' if r.get('busy') else 'idle'
+        note = '' if r.get('reachable') else '  (Remote Control off: not reachable by SendMessage)'
+        print(f"{r['address']}\t{where}\t{state}\t{r.get('cwd', '')}\t{r.get('tile') or '-'}{note}")
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == 'list':
+        list_sessions(sys.argv[2:])
+        return
     p = argparse.ArgumentParser(prog='nabiman-claude', description=__doc__.split('\n')[1],
                                 formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__.split('\n', 2)[2])
     p.add_argument('prompt', nargs='*', help='first message for the new Claude Code')
@@ -43,23 +88,7 @@ def main():
         ask['user'] = a.user
     if a.prompt:
         ask['prompt'] = ' '.join(a.prompt)
-    try:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
-            s.settimeout(60)
-            s.connect(SOCKET)
-            s.sendall((json.dumps(ask, ensure_ascii=False) + '\n').encode())
-            data = b''
-            while not data.endswith(b'\n'):
-                part = s.recv(65536)
-                if not part:
-                    break
-                data += part
-    except OSError as e:
-        sys.exit(f'nabiman-claude: cannot reach NabiMan at {SOCKET}: {e}')
-    try:
-        answer = json.loads(data.decode() or '{}')
-    except ValueError:
-        sys.exit('nabiman-claude: unexpected answer from NabiMan')
+    answer = ask_nabiman(ask)
     if a.json:
         print(json.dumps(answer, ensure_ascii=False))
     elif answer.get('ok'):

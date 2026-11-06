@@ -1,0 +1,504 @@
+//! Claude Code on the servers NabiMan's SSH tiles are connected to.
+//!
+//! Each SSH tile shares its connection (OpenSSH ControlMaster, a socket per
+//! session). While someone is looking at the session list, a short probe runs
+//! over that same connection every little while: no new login, and whatever
+//! the network in between, it lands under the very sshd the tile's shell is
+//! under. That is how a Claude Code session there is known to be the tile's —
+//! its process descends from the same connection. Sessions on that server
+//! that are not under any tile (started at its desktop, say) are listed too.
+//!
+//! The probe sends back session records and, from their transcripts, only who
+//! sent each peer message, when, and its id; message text stays where it is.
+
+use std::collections::{HashMap, HashSet};
+use std::io::{Read, Write};
+use std::path::PathBuf;
+use std::process::{Command, Stdio};
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
+
+use super::session::PtyStore;
+
+const LINUX_PROBE: &str = include_str!("claude_remote_probe.sh");
+const WINDOWS_PROBE: &str = include_str!("claude_remote_probe.ps1");
+/// How often the servers are looked at, while anyone is watching.
+const EVERY: Duration = Duration::from_secs(15);
+/// Nobody has asked for this long: stop probing.
+const IDLE_AFTER: Duration = Duration::from_secs(90);
+const PROBE_TIMEOUT: Duration = Duration::from_secs(25);
+const MAX_OUTPUT: usize = 4 << 20;
+const MAX_KEPT: usize = 20000;
+
+/// Where each SSH tile's shared-connection socket lives.
+pub(crate) fn mux_dir() -> PathBuf {
+    nabiman_server::data_dir().join("ssh").join("mux")
+}
+
+pub(crate) fn mux_path(session_id: &str) -> PathBuf {
+    mux_dir().join(session_id)
+}
+
+/// ssh options that make a tile's connection shareable. ssh appends a random
+/// suffix to the path while it sets up, so the whole stays under the 108-byte
+/// limit for Unix sockets with our short names.
+pub(crate) fn mux_options(session_id: &str) -> Option<String> {
+    let dir = mux_dir();
+    private_dir(&dir)?;
+    let path = mux_path(session_id).to_string_lossy().into_owned();
+    (path.len() + 20 < 104 && session_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'))
+        .then(|| format!("-o ControlMaster=yes -o ControlPath={path} -o ControlPersist=no"))
+}
+
+/// Makes `dir` this process's own, mode 0700, or gives up: whoever could
+/// write there could stand in for a tile's connection. (The container's start
+/// hands all of /workspace to another user, so it is checked every time.)
+fn private_dir(dir: &std::path::Path) -> Option<()> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    std::fs::create_dir_all(dir).ok()?;
+    // SAFETY: geteuid has no preconditions.
+    let me = unsafe { libc::geteuid() };
+    if std::fs::metadata(dir).ok()?.uid() != me {
+        std::os::unix::fs::chown(dir, Some(me), None).ok()?;
+    }
+    std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700)).ok()?;
+    let meta = std::fs::metadata(dir).ok()?;
+    (meta.uid() == me && meta.mode() & 0o077 == 0).then_some(())
+}
+
+/// One Claude Code session on a remote server.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct RemoteClaude {
+    pub server_id: String,
+    pub name: String,
+    pub cwd: String,
+    pub busy: bool,
+    /// Its messaging socket (or pipe) on that machine.
+    pub sock: String,
+    /// Its Remote Control session, when that is on.
+    pub bridge: Option<String>,
+    pub session_id: String,
+    /// The NabiMan session (tmux name) whose connection it runs under.
+    pub tile: Option<String>,
+}
+
+/// A peer message a remote session received: (server, receiver's session id,
+/// from, when, the first line it said).
+pub(crate) type RemoteMessage = (String, String, String, u64, String);
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Snapshot {
+    pub peers: Vec<RemoteClaude>,
+    pub messages: Vec<RemoteMessage>,
+    /// Server id → its name in NabiMan.
+    pub servers: HashMap<String, String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Os {
+    Unix,
+    Windows,
+}
+
+#[derive(Default)]
+struct Server {
+    /// Session id → the session, from the last look.
+    peers: HashMap<String, RemoteClaude>,
+    offsets: HashMap<String, u64>,
+    got: Vec<(String, String, u64, String)>,
+    ids: HashSet<String>,
+}
+
+#[derive(Default)]
+struct State {
+    servers: HashMap<String, Server>,
+    names: HashMap<String, String>,
+    os: HashMap<String, Os>,
+    /// Servers looked at (answered or not) since they gained a tile.
+    tried: HashSet<String>,
+    wanted: Option<Instant>,
+    store: Option<PtyStore>,
+    running: bool,
+}
+
+fn state() -> &'static Mutex<State> {
+    static STATE: OnceLock<Mutex<State>> = OnceLock::new();
+    STATE.get_or_init(Default::default)
+}
+
+/// Someone is looking at the sessions: keep the remote view fresh for a while.
+pub(crate) fn want(store: &PtyStore) {
+    let mut s = state().lock().unwrap_or_else(|e| e.into_inner());
+    s.wanted = Some(Instant::now());
+    if s.store.is_none() {
+        s.store = Some(store.clone());
+    }
+    if !s.running {
+        s.running = true;
+        let _ = std::thread::Builder::new().name("claude-remote".into()).spawn(poll);
+    }
+}
+
+/// Tiles are connected to remote servers that have not been looked at yet.
+pub(crate) fn pending() -> bool {
+    let s = state().lock().unwrap_or_else(|e| e.into_inner());
+    let Some(store) = s.store.clone() else { return false };
+    let looked = s.tried.clone();
+    drop(s);
+    tiles(&store).iter().any(|t| !looked.contains(&t.2))
+}
+
+/// What was last seen on the remote servers.
+pub(crate) fn snapshot() -> Snapshot {
+    let s = state().lock().unwrap_or_else(|e| e.into_inner());
+    let mut out = Snapshot { servers: s.names.clone(), ..Default::default() };
+    for (server, st) in &s.servers {
+        out.peers.extend(st.peers.values().cloned());
+        out.messages.extend(st.got.iter().map(|(sid, from, at, said)| (server.clone(), sid.clone(), from.clone(), *at, said.clone())));
+    }
+    out.peers.sort_by(|a, b| (&a.server_id, &a.name).cmp(&(&b.server_id, &b.name)));
+    out
+}
+
+/// A tile to look through: (session id, tmux name, server id, user@host).
+type Tile = (String, String, String, String);
+
+fn tiles(store: &PtyStore) -> Vec<Tile> {
+    let map = store.lock().unwrap_or_else(|e| e.into_inner());
+    map.iter()
+        .filter_map(|(sid, s)| {
+            let b = s.remote_binding.as_ref()?;
+            s.ssh_cmd.as_ref()?;
+            if !s.label.starts_with("ssh:") || !mux_path(sid).exists() {
+                return None;
+            }
+            Some((sid.clone(), s.tmux_name.clone(), b.server_id().to_string(), b.target()))
+        })
+        .collect()
+}
+
+fn poll() {
+    loop {
+        let (store, wanted) = {
+            let s = state().lock().unwrap_or_else(|e| e.into_inner());
+            (s.store.clone(), s.wanted)
+        };
+        let active = wanted.is_some_and(|w| w.elapsed() < IDLE_AFTER);
+        if let (true, Some(store)) = (active, store) {
+            look_once(&store);
+        }
+        std::thread::sleep(EVERY);
+    }
+}
+
+fn look_once(store: &PtyStore) {
+    let tiles = tiles(store);
+    let live: HashSet<&str> = tiles.iter().map(|t| t.2.as_str()).collect();
+    {
+        let mut s = state().lock().unwrap_or_else(|e| e.into_inner());
+        // Servers no tile is connected to any more are forgotten.
+        s.servers.retain(|id, _| live.contains(id.as_str()));
+        for id in &live {
+            if !s.names.contains_key(*id) {
+                let name = crate::remote_servers::find_server(id).ok().flatten().map(|srv| srv.name).unwrap_or_else(|| id.to_string());
+                s.names.insert(id.to_string(), name);
+            }
+        }
+    }
+    // Each server's sessions as its tiles see them; the tile a session is under claims it.
+    let mut fresh: HashMap<String, HashMap<String, RemoteClaude>> = HashMap::new();
+    let mut ok_servers: HashSet<String> = HashSet::new();
+    for (sid, tmux_name, server_id, target) in &tiles {
+        let offsets = {
+            let s = state().lock().unwrap_or_else(|e| e.into_inner());
+            s.servers.get(server_id).map(|st| st.offsets.clone()).unwrap_or_default()
+        };
+        let Some(out) = probe(sid, target) else { continue };
+        ok_servers.insert(server_id.clone());
+        let found = parse(&out, server_id, tmux_name);
+        let mut s = state().lock().unwrap_or_else(|e| e.into_inner());
+        let st = s.servers.entry(server_id.clone()).or_default();
+        for (session, size) in found.sizes {
+            st.offsets.insert(session, size);
+        }
+        for (session, from, at, id, said) in found.messages {
+            // The same message shows up twice (as delivered and as queued).
+            if id.is_empty() || st.ids.insert(id) {
+                st.got.push((session, from, at, said));
+            }
+        }
+        if st.got.len() > MAX_KEPT {
+            let cut = st.got.len() - MAX_KEPT;
+            st.got.drain(..cut);
+        }
+        let _ = offsets;
+        let seen = fresh.entry(server_id.clone()).or_default();
+        for peer in found.peers {
+            match seen.get_mut(&peer.session_id) {
+                Some(have) if have.tile.is_none() && peer.tile.is_some() => *have = peer,
+                Some(_) => {}
+                None => {
+                    seen.insert(peer.session_id.clone(), peer);
+                }
+            }
+        }
+    }
+    let mut s = state().lock().unwrap_or_else(|e| e.into_inner());
+    s.tried = tiles.iter().map(|t| t.2.clone()).collect();
+    for (server, peers) in fresh {
+        if ok_servers.contains(&server) {
+            s.servers.entry(server).or_default().peers = peers;
+        }
+    }
+}
+
+/// Runs the probe over the tile's shared connection; its output, or `None`.
+fn probe(session_id: &str, target: &str) -> Option<String> {
+    let os = state().lock().unwrap_or_else(|e| e.into_inner()).os.get(session_id).copied();
+    let offsets = {
+        let s = state().lock().unwrap_or_else(|e| e.into_inner());
+        s.servers.values().flat_map(|st| st.offsets.clone()).collect::<HashMap<_, _>>()
+    };
+    let order: Vec<Os> = match os {
+        Some(o) => vec![o],
+        None => vec![Os::Unix, Os::Windows],
+    };
+    for o in order {
+        if let Some(out) = run(session_id, target, o, &offsets) {
+            if out.lines().any(|l| l.starts_with("C\t")) {
+                state().lock().unwrap_or_else(|e| e.into_inner()).os.insert(session_id.to_string(), o);
+                return Some(out);
+            }
+        }
+    }
+    None
+}
+
+fn run(session_id: &str, target: &str, os: Os, offsets: &HashMap<String, u64>) -> Option<String> {
+    let (remote, input) = match os {
+        Os::Unix => {
+            let lines: String = offsets
+                .iter()
+                .filter(|(k, _)| k.chars().all(|c| c.is_ascii_hexdigit() || c == '-'))
+                .map(|(k, v)| format!("{k} {v}\n"))
+                .collect();
+            ("sh -s".to_string(), format!("NABIMAN_OFFSETS='{lines}'\n{LINUX_PROBE}"))
+        }
+        Os::Windows => {
+            let table: String = offsets
+                .iter()
+                .filter(|(k, _)| k.chars().all(|c| c.is_ascii_hexdigit() || c == '-'))
+                .map(|(k, v)| format!("'{k}'={v};"))
+                .collect();
+            // A tiny loader on the command line; the probe itself comes on stdin
+            // (a Windows command line is limited to 8191 characters).
+            let loader = "$s=[Console]::In.ReadToEnd(); Invoke-Expression $s";
+            let encoded = b64_encode(&loader.encode_utf16().flat_map(|u| u.to_le_bytes()).collect::<Vec<u8>>());
+            (
+                format!("powershell -NoProfile -NonInteractive -EncodedCommand {encoded}"),
+                format!("$offsets=@{{{table}}}\n{WINDOWS_PROBE}"),
+            )
+        }
+    };
+    let mut child = Command::new("ssh")
+        .arg("-S")
+        .arg(mux_path(session_id))
+        .args(["-o", "ControlMaster=no", "-o", "BatchMode=yes", "-T", target, &remote])
+        .env_remove("TMUX")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(input.as_bytes());
+    }
+    let mut stdout = child.stdout.take()?;
+    let reader = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = (&mut stdout).take(MAX_OUTPUT as u64).read_to_end(&mut buf);
+        buf
+    });
+    let until = Instant::now() + PROBE_TIMEOUT;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) if Instant::now() < until => std::thread::sleep(Duration::from_millis(100)),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+        }
+    }
+    let out = reader.join().ok()?;
+    Some(String::from_utf8_lossy(&out).into_owned())
+}
+
+const B64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+fn b64_encode(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let n = (u32::from(chunk[0]) << 16) | (u32::from(*chunk.get(1).unwrap_or(&0)) << 8) | u32::from(*chunk.get(2).unwrap_or(&0));
+        for (i, shift) in [18, 12, 6, 0].into_iter().enumerate() {
+            out.push(if i <= chunk.len() { B64[(n >> shift) as usize & 63] as char } else { '=' });
+        }
+    }
+    out
+}
+
+fn b64_decode(text: &str) -> Option<Vec<u8>> {
+    let mut out = Vec::with_capacity(text.len() / 4 * 3);
+    let (mut acc, mut bits) = (0u32, 0u32);
+    for c in text.bytes().filter(|c| !c.is_ascii_whitespace()) {
+        if c == b'=' {
+            break;
+        }
+        acc = (acc << 6) | B64.iter().position(|&x| x == c)? as u32;
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            out.push((acc >> bits) as u8);
+            acc &= (1 << bits) - 1;
+        }
+    }
+    Some(out)
+}
+
+#[derive(Debug, Default)]
+struct Found {
+    peers: Vec<RemoteClaude>,
+    sizes: Vec<(String, u64)>,
+    messages: Vec<(String, String, u64, String, String)>,
+}
+
+fn clip(s: &str, n: usize) -> String {
+    s.chars().filter(|c| !c.is_control()).take(n).collect()
+}
+
+/// Reads a probe's output (see claude_remote_probe.sh).
+fn parse(out: &str, server_id: &str, tmux_name: &str) -> Found {
+    let mut found = Found::default();
+    for line in out.lines() {
+        let f: Vec<&str> = line.trim_end_matches('\r').split('\t').collect();
+        match f.as_slice() {
+            ["R", under, b64] => {
+                let Some(raw) = b64_decode(b64.trim()) else { continue };
+                let Ok(v) = serde_json::from_slice::<serde_json::Value>(&raw) else { continue };
+                let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
+                let session_id = s("sessionId");
+                if session_id.is_empty() || !session_id.chars().all(|c| c.is_ascii_hexdigit() || c == '-') {
+                    continue;
+                }
+                let bridge = Some(s("bridgeSessionId")).filter(|b| !b.is_empty() && b.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'));
+                found.peers.push(RemoteClaude {
+                    server_id: server_id.to_string(),
+                    name: clip(&s("name"), 80),
+                    cwd: clip(&s("cwd"), 300),
+                    busy: s("status") == "busy",
+                    sock: clip(&s("messagingSocketPath"), 300),
+                    bridge,
+                    session_id,
+                    tile: (*under == "1").then(|| tmux_name.to_string()),
+                });
+            }
+            ["O", sid, size] => {
+                if let Ok(n) = size.trim().parse() {
+                    found.sizes.push((sid.to_string(), n));
+                }
+            }
+            ["M", sid, from, at, id, rest @ ..] => {
+                let Ok(at) = chrono::DateTime::parse_from_rfc3339(at) else { continue };
+                let Ok(at) = u64::try_from(at.timestamp()) else { continue };
+                // The first line it said, base64 (it may hold tabs or any script).
+                let said = rest
+                    .first()
+                    .and_then(|b| b64_decode(b.trim()))
+                    .map(|raw| String::from_utf8_lossy(&raw).replace("\\\"", "\"").replace("\\\\", "\\"))
+                    .map(|t| super::claude_links::gist(&t))
+                    .unwrap_or_default();
+                found.messages.push((sid.to_string(), clip(from, 400), at, clip(id, 80), said));
+            }
+            _ => {}
+        }
+    }
+    found
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_probe_s_answer_becomes_sessions_and_messages() {
+        let rec = r#"{"pid":7,"sessionId":"0bb8-ab5","cwd":"C:\\Users\\A\\책","name":"x-f9","status":"busy","messagingSocketPath":"\\\\.\\pipe\\LOCAL\\cc-msg-1","bridgeSessionId":"session_01AB"}"#;
+        let other = r#"{"pid":8,"sessionId":"77","cwd":"/w","name":"y","status":"idle","messagingSocketPath":"/tmp/cc-socks/8.sock"}"#;
+        let b = |s: &str| b64_encode(s.as_bytes());
+        let out = format!(
+            "C\t11680\r\nR\t1\t{}\r\nR\t0\t{}\nO\t0bb8-ab5\t1234\nM\t0bb8-ab5\tbridge:session_01CD\t2026-11-05T14:56:18.111Z\tm1\t{}\nM\t77\tuds:/tmp/cc-socks/9.sock\tnot a time\tm2\nnoise\n",
+            b(rec),
+            b(other),
+            b("배포 확인해 줘")
+        );
+        let got = parse(&out, "srv", "nb_admin_pty_1");
+        assert_eq!(got.peers.len(), 2);
+        let first = &got.peers[0];
+        assert_eq!((first.name.as_str(), first.cwd.as_str(), first.busy), ("x-f9", "C:\\Users\\A\\책", true));
+        assert_eq!(first.bridge.as_deref(), Some("session_01AB"));
+        assert_eq!(first.tile.as_deref(), Some("nb_admin_pty_1"));
+        assert_eq!(got.peers[1].tile, None, "not under this tile's connection");
+        assert_eq!(got.sizes, vec![("0bb8-ab5".to_string(), 1234)]);
+        assert_eq!(got.messages, vec![("0bb8-ab5".to_string(), "bridge:session_01CD".to_string(), 1793890578, "m1".to_string(), "배포 확인해 줘".to_string())]);
+    }
+
+    #[test]
+    fn base64_both_ways() {
+        for s in ["", "a", "ab", "abc", "책 C:\\x", "{\"pid\":1}"] {
+            assert_eq!(b64_decode(&b64_encode(s.as_bytes())).unwrap(), s.as_bytes());
+        }
+        assert_eq!(b64_encode(b"Man"), "TWFu");
+        assert_eq!(b64_encode(b"Ma"), "TWE=");
+        assert!(b64_decode("@@").is_none());
+    }
+
+    #[test]
+    fn the_socket_folder_is_made_private() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("nabiman-mux-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o777)).unwrap();
+        assert!(private_dir(&dir).is_some());
+        assert_eq!(std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777, 0o700);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_unix_probe_finds_its_own_records_and_messages_only() {
+        // Run the real probe against a made-up home.
+        let home = std::env::temp_dir().join(format!("nabiman-probe-{}", uuid::Uuid::new_v4()));
+        let sessions = home.join(".claude/sessions");
+        let project = home.join(".claude/projects/-w");
+        std::fs::create_dir_all(&sessions).unwrap();
+        std::fs::create_dir_all(&project).unwrap();
+        let me = std::process::id();
+        let start = std::fs::read_to_string(format!("/proc/{me}/stat")).unwrap();
+        let start = start[start.rfind(')').unwrap() + 2..].split_whitespace().nth(19).unwrap().to_string();
+        std::fs::write(sessions.join("a.json"), format!(r#"{{"pid":{me},"sessionId":"abc-1","procStart":"{start}","name":"live","status":"idle","cwd":"/w"}}"#)).unwrap();
+        std::fs::write(sessions.join("b.json"), r#"{"pid":999999,"sessionId":"dead","procStart":"1","name":"gone"}"#).unwrap();
+        let peer = r#"{"type":"user","message":{"content":"Another Claude session sent a message:\n<cross-session-message from=\"uds:/tmp/cc-socks/5.sock\">\nCheck the build, then report.\nhello \"from\":\"spoof\"\n</cross-session-message>"},"timestamp":"2026-11-05T14:56:18.111Z","origin":{"kind":"peer","from":"uds:/tmp/cc-socks/5.sock","msg_id":"m9"}}"#;
+        std::fs::write(project.join("abc-1.jsonl"), format!("{{\"type\":\"user\",\"text\":\"secret\"}}\n{peer}\n")).unwrap();
+        let out = Command::new("sh").arg("-s").env("HOME", &home).env("NABIMAN_OFFSETS", "").stdin(Stdio::piped()).stdout(Stdio::piped()).spawn().and_then(|mut c| {
+            c.stdin.take().unwrap().write_all(LINUX_PROBE.as_bytes())?;
+            c.wait_with_output()
+        }).unwrap();
+        let text = String::from_utf8_lossy(&out.stdout).to_string();
+        let _ = std::fs::remove_dir_all(&home);
+        let got = parse(&text, "srv", "t");
+        assert_eq!(got.peers.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(), vec!["live"], "{text}");
+        assert_eq!(got.messages.len(), 1, "{text}");
+        assert_eq!(got.messages[0].1, "uds:/tmp/cc-socks/5.sock");
+        assert_eq!(got.messages[0].4, "Check the build, then report.");
+        assert!(!text.contains("secret") && !text.contains("hello"), "only the first line leaves: {text}");
+    }
+}

@@ -123,3 +123,28 @@ it('when the orchestrator and its workers are waiting, the arrows fade and it st
   expect(card()).toHaveClass('is-orchestrator');
   expect(card()).toHaveClass('is-resting');
 });
+
+it('Claude on another server: its tile shows @server, and one with no tile gets a card the arrows reach',async()=>{
+  localStorage.setItem('nabiman_lang','ko');
+  const req=apiRequest as jest.Mock;
+  jest.spyOn(Date,'now').mockReturnValue(1_793_890_120_000);
+  const ghost={id:'rc:srv_w:5064',server:'winsrv',busy:true,orchestrator:true,directs:['pty_ssh'],notes:[{to:'pty_ssh',text:'배포 결과 확인해 줘',at:1_793_890_000}],
+    claude:[{name:'nabic-c2',ref:'',address:'bridge:session_01AB',cwd:'C:\\Users\\A\\nabic',busy:true,server:'winsrv'}]};
+  req.mockImplementation((path:string)=>Promise.resolve(path==='/api/terminal/claude-remote'?{success:true,data:[ghost]}:{success:true,data:{mode:'newest',ids:[]}}));
+  const tile:SessionInfo={...session,id:'pty_ssh',label:'ssh:Administrator@172.20.26.163:22',title:'winsrv',state:'alive',
+    claude:[{name:'worker-1',ref:'',address:'worker-1',cwd:'C:\\w',busy:false,server:'winsrv'}]};
+  const { container } = render(<I18nProvider><SessionsView sessions={[tile]} onRefresh={jest.fn()} onAttach={jest.fn()} onPopOut={jest.fn()}/></I18nProvider>);
+  const card=await waitFor(()=>{ const c=container.querySelector('[data-session-id="rc:srv_w:5064"]'); expect(c).not.toBeNull(); return c as HTMLElement; });
+  expect(card).toHaveClass('is-remote-claude');
+  expect(card).toHaveClass('is-orchestrator');
+  expect(screen.getByText('winsrv · 타일 없음')).toBeInTheDocument();
+  expect(screen.getAllByText('@winsrv')).toHaveLength(2);
+  // Remote Control off: shown, but marked as not reachable.
+  expect(screen.getByRole('button',{name:/worker-1/})).toHaveClass('is-unreachable');
+  expect(screen.getByRole('button',{name:/bridge:session_01AB/})).not.toHaveClass('is-unreachable');
+  expect(screen.getByText('← nabic-c2')).toBeInTheDocument();
+  // Hovering the arrow tells what was handed over.
+  expect(container.querySelector('[data-link-hit="rc:srv_w:5064>pty_ssh"] title')?.textContent).toBe('nabic-c2 → worker-1\n마지막 요청 (2m 전): 배포 결과 확인해 줘\nworker-1: 대기 중');
+  expect(Array.from(container.querySelectorAll('.session-link')).map((p)=>p.getAttribute('data-link'))).toEqual(['rc:srv_w:5064>pty_ssh']);
+  jest.restoreAllMocks();
+});

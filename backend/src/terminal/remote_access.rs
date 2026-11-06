@@ -88,6 +88,11 @@ impl RemoteBinding {
             terminal: "telnet".into(),
         }
     }
+    /// `user@host`, as ssh is given it.
+    pub(crate) fn target(&self) -> String {
+        format!("{}@{}", self.user, self.host)
+    }
+
     pub(crate) fn server_id(&self) -> &str {
         &self.server_id
     }

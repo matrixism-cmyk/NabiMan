@@ -5,6 +5,7 @@ mod ssh_command;
 use ssh_command::build_ssh_command;
 
 mod claude_links;
+mod claude_remote;
 mod claude_socket;
 mod claude_start;
 mod claude_peers;
@@ -212,8 +213,9 @@ async fn ws_terminal(
     let (keepalive, timeout_secs) = member
         .as_ref()
         .map_or((keepalive, timeout_secs), |m| crate::member_servers::session_terms(m, keepalive, timeout_secs));
+    let sid = generate_session_id();
     let (shell_cmd, label, remote_binding) =
-        match build_ssh_command(query, keepalive, user_settings.keepalive_interval_secs, member.as_ref()) {
+        match build_ssh_command(query, keepalive, user_settings.keepalive_interval_secs, member.as_ref(), Some(&sid)) {
             Ok(Some((cmd, label, binding))) => (Some(cmd), label, Some(binding)),
             Ok(None) => (None, "local".to_string(), None),
             // A target we cannot resolve (deleted server, bad parameters) is
@@ -234,7 +236,6 @@ async fn ws_terminal(
     if !grant.valid() || remote_binding.as_ref().is_some_and(|b| !b.valid()) {
         return Ok(HttpResponse::Forbidden().finish());
     }
-    let sid = generate_session_id();
     let safe_user: String = username
         .chars()
         .filter(|c| c.is_alphanumeric() || *c == '_')
