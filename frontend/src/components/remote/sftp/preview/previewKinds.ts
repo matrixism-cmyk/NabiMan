@@ -31,8 +31,9 @@ const IMAGES: Record<string, string> = {
 
 const VIDEO = new Set(['mp4', 'm4v', 'webm', 'ogv', 'mov', 'mkv']);
 const AUDIO = new Set(['mp3', 'wav', 'flac', 'm4a', 'm4b', 'aac', 'ogg', 'oga', 'opus', 'weba']);
-/** Word, Excel, PowerPoint, OpenDocument and RTF: turned into a PDF on the server. */
+/** Word, Excel, PowerPoint, OpenDocument, RTF and Hangul (HWP, HWPX): turned into a PDF on the server. */
 const OFFICE = new Set([
+  'hwp', 'hwpx',
   'doc', 'docx', 'docm', 'dot', 'dotx', 'dotm', 'odt', 'ott', 'fodt', 'rtf', 'wpd',
   'xls', 'xlsx', 'xlsm', 'xlsb', 'xlt', 'xltx', 'ods', 'ots', 'fods',
   'ppt', 'pptx', 'pptm', 'pps', 'ppsx', 'pot', 'potx', 'odp', 'otp', 'fodp',

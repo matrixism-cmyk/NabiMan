@@ -19,7 +19,7 @@ const response = (status: number, type: string, body: BodyInit) => ({
 beforeEach(() => { localStorage.setItem('nabiman_lang', 'ko'); fetchMock.mockReset(); });
 
 it('Word, Excel and PowerPoint files are previewed as documents, not archives', () => {
-  for (const name of ['a.docx', 'b.DOC', 'c.xlsx', 'd.xls', 'e.pptx', 'f.ppt', 'g.odt', 'h.rtf']) expect(previewOf(name)?.kind).toBe('office');
+  for (const name of ['a.docx', 'b.DOC', 'c.xlsx', 'd.xls', 'e.pptx', 'f.ppt', 'g.odt', 'h.rtf', '공문.hwp', '양식.HWPX']) expect(previewOf(name)?.kind).toBe('office');
   expect(previewOf('a.zip')?.kind).toBe('zip');
   expect(previewOf('a.pdf')?.kind).toBe('pdf');
   expect(previewOf('a.csv')?.kind).toBe('text');

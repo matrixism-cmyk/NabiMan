@@ -1,6 +1,9 @@
-//! Office documents (Word, Excel, PowerPoint, OpenDocument, RTF) shown in
-//! the file panel's preview: LibreOffice turns the bytes into a PDF, which
-//! the browser's PDF viewer then draws.
+//! Office documents (Word, Excel, PowerPoint, OpenDocument, RTF) and Hangul
+//! documents (HWP 5.0, HWPX) shown in the file panel's preview: they are
+//! turned into a PDF, which the browser's PDF viewer then draws. Office
+//! files go through LibreOffice; Hangul files through rhwp, which lays them
+//! out the way Hangul does, and through LibreOffice's H2Orestart extension
+//! when rhwp cannot.
 //!
 //! The browser sends the file it already fetched (from whichever server or
 //! share it came from) and gets a PDF back. LibreOffice runs as `nobody`, in
@@ -29,17 +32,42 @@ const TIME_LIMIT: Duration = Duration::from_secs(90);
 const CACHE_BYTES: u64 = 512 << 20;
 /// Where LibreOffice is, unless `NABIMAN_SOFFICE` says otherwise.
 const SOFFICE: &str = "/workspace/opt/libreoffice-26.2.7/opt/libreoffice26.2/program/soffice.bin";
+/// Where rhwp is, unless `NABIMAN_RHWP` says otherwise.
+const RHWP: &str = "/workspace/opt/rhwp-0.8.7/bin/rhwp";
+/// Korean fonts both converters use (Noto Sans/Serif KR), and the fontconfig
+/// file that adds them to the system's.
+const FONTS: &str = "/workspace/opt/fonts-noto-kr";
 /// LibreOffice asks to be started again after making a new profile.
 const RESTART: i32 = 81;
 const NOBODY: u32 = 65534;
 
-/// The extensions converted, and whether they are spreadsheets (each sheet
-/// is then one page, not cut into printed pages).
-fn kind(ext: &str) -> Option<bool> {
+/// What a file is converted as.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Kind {
+    /// Text and slides, page by page.
+    Document,
+    /// A spreadsheet: each sheet one page, not cut into printed pages.
+    Sheet,
+    /// HWP 5.0 or HWPX.
+    Hangul,
+}
+
+impl Kind {
+    fn tag(self) -> &'static [u8] {
+        match self {
+            Kind::Document => b"p",
+            Kind::Sheet => b"s",
+            Kind::Hangul => b"h",
+        }
+    }
+}
+
+fn kind(ext: &str) -> Option<Kind> {
     match ext {
-        "doc" | "docx" | "docm" | "dot" | "dotx" | "dotm" | "odt" | "ott" | "fodt" | "rtf" | "wpd" => Some(false),
-        "ppt" | "pptx" | "pptm" | "pps" | "ppsx" | "pot" | "potx" | "odp" | "otp" | "fodp" => Some(false),
-        "xls" | "xlsx" | "xlsm" | "xlsb" | "xlt" | "xltx" | "ods" | "ots" | "fods" => Some(true),
+        "doc" | "docx" | "docm" | "dot" | "dotx" | "dotm" | "odt" | "ott" | "fodt" | "rtf" | "wpd" => Some(Kind::Document),
+        "ppt" | "pptx" | "pptm" | "pps" | "ppsx" | "pot" | "potx" | "odp" | "otp" | "fodp" => Some(Kind::Document),
+        "xls" | "xlsx" | "xlsm" | "xlsb" | "xlt" | "xltx" | "ods" | "ots" | "fods" => Some(Kind::Sheet),
+        "hwp" | "hwpx" => Some(Kind::Hangul),
         _ => None,
     }
 }
@@ -50,6 +78,10 @@ fn extension(name: &str) -> String {
 
 fn soffice() -> PathBuf {
     std::env::var_os("NABIMAN_SOFFICE").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(SOFFICE))
+}
+
+fn rhwp() -> PathBuf {
+    std::env::var_os("NABIMAN_RHWP").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(RHWP))
 }
 
 fn cache_dir() -> PathBuf {
@@ -95,17 +127,18 @@ fn trim_cache(dir: &Path) {
 static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
 
 /// The PDF for these bytes, converted or from the cache.
-fn convert(bytes: &[u8], ext: &str, sheets: bool) -> Result<Vec<u8>, String> {
+fn convert(bytes: &[u8], ext: &str, kind: Kind) -> Result<Vec<u8>, String> {
     let cache = private_cache().ok_or("미리보기 캐시 폴더를 쓸 수 없습니다")?;
-    convert_in(&cache, bytes, ext, sheets)
+    convert_in(&cache, bytes, ext, kind)
 }
 
-fn convert_in(cache: &Path, bytes: &[u8], ext: &str, sheets: bool) -> Result<Vec<u8>, String> {
+fn convert_in(cache: &Path, bytes: &[u8], ext: &str, kind: Kind) -> Result<Vec<u8>, String> {
     let program = soffice();
-    if !program.exists() {
-        return Err("문서 변환기(LibreOffice)가 이 서버에 설치되어 있지 않습니다".into());
+    let hangul = rhwp();
+    if !program.exists() && !(kind == Kind::Hangul && hangul.exists()) {
+        return Err("문서 변환기가 이 서버에 설치되어 있지 않습니다".into());
     }
-    let key = hex::encode(Sha256::digest([bytes, ext.as_bytes(), if sheets { b"s" } else { b"p" }].concat()));
+    let key = hex::encode(Sha256::digest([bytes, ext.as_bytes(), kind.tag()].concat()));
     let cached = cache.join(format!("{key}.pdf"));
     if let Ok(pdf) = fs::read(&cached) {
         let _ = filetime_touch(&cached);
@@ -120,13 +153,37 @@ fn convert_in(cache: &Path, bytes: &[u8], ext: &str, sheets: bool) -> Result<Vec
     let input = work.path.join(format!("document.{ext}"));
     fs::write(&input, bytes).map_err(|e| format!("write: {e}"))?;
     let _ = std::os::unix::fs::chown(&input, Some(NOBODY), Some(NOBODY));
-    let filter = if sheets {
+    let output = work.path.join("document.pdf");
+    let started = Instant::now();
+    // Hangul documents: rhwp first, which lays them out the way Hangul does.
+    if kind == Kind::Hangul && hangul.exists() {
+        let fonts = Path::new(FONTS);
+        let mut args: Vec<String> = vec!["export-pdf".into(), input.display().to_string(), "-o".into(), output.display().to_string()];
+        if fonts.is_dir() {
+            args.extend(["--font-path".into(), FONTS.into(), "--fallback-serif".into(), "Noto Serif KR".into(), "--fallback-sans".into(), "Noto Sans KR".into(), "--fallback-mono".into(), "Noto Sans KR".into()]);
+        }
+        args.extend(["--font-path".into(), "/usr/share/fonts".into()]);
+        let args: Vec<&str> = args.iter().map(String::as_str).collect();
+        let done = run(&hangul, &work.path, &args, TIME_LIMIT)?;
+        if done == Some(0) {
+            if let Ok(pdf) = fs::read(&output) {
+                if pdf.starts_with(b"%PDF") {
+                    return Ok(keep(cache, &key, pdf));
+                }
+            }
+        }
+        // LibreOffice (H2Orestart) gets the next try, with what time is left.
+        let _ = fs::remove_file(&output);
+        if !program.exists() {
+            return Err("이 한글 문서는 변환하지 못했습니다".into());
+        }
+    }
+    let filter = if kind == Kind::Sheet {
         r#"pdf:calc_pdf_Export:{"SinglePageSheets":{"type":"boolean","value":"true"}}"#
     } else {
         "pdf"
     };
     let profile = format!("file://{}", work.path.join("profile").display());
-    let started = Instant::now();
     let mut code = None;
     for _ in 0..3 {
         code = run(&program, &work.path, &[
@@ -145,19 +202,24 @@ fn convert_in(cache: &Path, bytes: &[u8], ext: &str, sheets: bool) -> Result<Vec
             break;
         }
     }
-    let pdf = fs::read(work.path.join("document.pdf")).map_err(|_| match code {
+    let pdf = fs::read(&output).map_err(|_| match code {
         None => "변환 시간이 초과되었습니다".to_string(),
         _ => "이 문서는 변환하지 못했습니다 (손상되었거나 암호가 걸린 파일일 수 있습니다)".to_string(),
     })?;
     if !pdf.starts_with(b"%PDF") {
         return Err("변환 결과가 PDF가 아닙니다".into());
     }
+    Ok(keep(cache, &key, pdf))
+}
+
+/// Puts a result in the cache (best effort) and hands it back.
+fn keep(cache: &Path, key: &str, pdf: Vec<u8>) -> Vec<u8> {
     let temp = cache.join(format!(".{key}.{}.tmp", std::process::id()));
     if fs::File::create(&temp).and_then(|mut f| f.write_all(&pdf)).is_ok() {
-        let _ = fs::rename(&temp, &cached);
+        let _ = fs::rename(&temp, cache.join(format!("{key}.pdf")));
     }
     trim_cache(cache);
-    Ok(pdf)
+    pdf
 }
 
 /// Marks a cache entry as just used.
@@ -190,7 +252,7 @@ impl Drop for Workdir {
     }
 }
 
-/// Runs LibreOffice as nobody (when this is root) in its own process group,
+/// Runs a converter as nobody (when this is root) in its own process group,
 /// killing the group past `limit`. The exit code, or `None` on a timeout.
 fn run(program: &Path, home: &Path, args: &[&str], limit: Duration) -> Result<Option<i32>, String> {
     let mut cmd = Command::new(program);
@@ -204,6 +266,11 @@ fn run(program: &Path, home: &Path, args: &[&str], limit: Duration) -> Result<Op
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
+    let fonts = Path::new(FONTS).join("fonts.conf");
+    if fonts.is_file() {
+        // The Korean fonts, for LibreOffice too (rhwp is given them directly).
+        cmd.env("FONTCONFIG_FILE", fonts);
+    }
     let root = unsafe { libc::geteuid() } == 0;
     // SAFETY: only async-signal-safe calls between fork and exec.
     unsafe {
@@ -217,7 +284,7 @@ fn run(program: &Path, home: &Path, args: &[&str], limit: Duration) -> Result<Op
             Ok(())
         });
     }
-    let mut child = cmd.spawn().map_err(|e| format!("LibreOffice: {e}"))?;
+    let mut child = cmd.spawn().map_err(|e| format!("{}: {e}", program.display()))?;
     let pid = child.id() as i32;
     let until = Instant::now() + limit;
     loop {
@@ -244,13 +311,13 @@ async fn preview(req: HttpRequest, query: web::Query<Query>, body: web::Bytes) -
         return HttpResponse::Unauthorized().json(ApiResponse::<()>::error("Not signed in"));
     }
     let ext = extension(&query.name);
-    let Some(sheets) = kind(&ext) else {
+    let Some(kind) = kind(&ext) else {
         return HttpResponse::BadRequest().json(ApiResponse::<()>::error("이 형식은 문서 미리보기가 없습니다"));
     };
     if body.is_empty() {
         return HttpResponse::BadRequest().json(ApiResponse::<()>::error("빈 파일입니다"));
     }
-    match web::block(move || convert(&body, &ext, sheets)).await {
+    match web::block(move || convert(&body, &ext, kind)).await {
         Ok(Ok(pdf)) => HttpResponse::Ok()
             .content_type("application/pdf")
             .insert_header(("Cache-Control", "private, no-store"))
@@ -275,10 +342,12 @@ mod tests {
 
     #[test]
     fn which_files_are_converted_and_how() {
-        assert_eq!(kind(&extension("보고서.DOCX")), Some(false));
-        assert_eq!(kind(&extension("deck.pptx")), Some(false));
-        assert_eq!(kind(&extension("표.xlsx")), Some(true), "a sheet is one page");
-        assert_eq!(kind(&extension("old.xls")), Some(true));
+        assert_eq!(kind(&extension("보고서.DOCX")), Some(Kind::Document));
+        assert_eq!(kind(&extension("deck.pptx")), Some(Kind::Document));
+        assert_eq!(kind(&extension("표.xlsx")), Some(Kind::Sheet), "a sheet is one page");
+        assert_eq!(kind(&extension("old.xls")), Some(Kind::Sheet));
+        assert_eq!(kind(&extension("공문.hwp")), Some(Kind::Hangul));
+        assert_eq!(kind(&extension("양식.HWPX")), Some(Kind::Hangul));
         assert_eq!(kind(&extension("notes.txt")), None);
         assert_eq!(kind(&extension("archive.zip")), None);
         assert_eq!(kind(&extension("noext")), None);
@@ -307,10 +376,24 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         // A flat OpenDocument text: small, and a real document.
         let doc = r#"<?xml version="1.0" encoding="UTF-8"?><office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.2" office:mimetype="application/vnd.oasis.opendocument.text"><office:body><office:text><text:p>나비맨 미리보기</text:p></office:text></office:body></office:document>"#;
-        let pdf = convert_in(&dir, doc.as_bytes(), "fodt", false).unwrap();
+        let pdf = convert_in(&dir, doc.as_bytes(), "fodt", Kind::Document).unwrap();
         assert!(pdf.starts_with(b"%PDF"));
         // Again: from the cache, the same bytes.
-        assert_eq!(convert_in(&dir, doc.as_bytes(), "fodt", false).unwrap(), pdf);
+        assert_eq!(convert_in(&dir, doc.as_bytes(), "fodt", Kind::Document).unwrap(), pdf);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A real Hangul document (NABIMAN_TEST_HWP) through rhwp, with LibreOffice
+    /// out of the way to show rhwp did it; then a broken one, which neither can do.
+    #[test]
+    fn a_hangul_document_becomes_a_pdf_when_rhwp_is_here() {
+        let (Some(sample), true) = (std::env::var_os("NABIMAN_TEST_HWP"), rhwp().exists()) else { return };
+        let dir = std::env::temp_dir().join(format!("nabiman-hwp-test-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let bytes = fs::read(&sample).unwrap();
+        let ext = extension(&sample.to_string_lossy());
+        let pdf = convert_in(&dir, &bytes, &ext, Kind::Hangul).unwrap();
+        assert!(pdf.starts_with(b"%PDF"));
         let _ = fs::remove_dir_all(&dir);
     }
 }

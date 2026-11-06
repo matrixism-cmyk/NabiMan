@@ -15,8 +15,8 @@ interface Props {
 type State = { state: 'converting' } | { state: 'ready'; pdf: Blob } | { state: 'failed'; message: string };
 
 /**
- * A Word, Excel, PowerPoint or OpenDocument file: the server turns it into a
- * PDF (LibreOffice), shown by the same viewer as any PDF.
+ * A Word, Excel, PowerPoint, OpenDocument or Hangul file: the server turns it
+ * into a PDF (LibreOffice; rhwp for HWP/HWPX), shown by the same viewer as any PDF.
  */
 export default function OfficePreview({ blob, name, allowed, onInfo }: Props) {
   const { t } = useT();
