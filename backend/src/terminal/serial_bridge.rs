@@ -188,6 +188,36 @@ impl Handler<FromSocat> for SerialBridge {
     }
 }
 
+/// The OS group that may use serial devices besides root (`NABIMAN_SERIAL_GROUP`),
+/// with its gid: tools in a session often run as a person's account (`su nabi`,
+/// Claude Code), not root. Unset or unknown, devices stay root's alone.
+pub(crate) fn device_group() -> Option<(String, u32)> {
+    let name = std::env::var("NABIMAN_SERIAL_GROUP").ok()?;
+    group_in(&name, &std::fs::read_to_string("/etc/group").ok()?)
+}
+
+fn group_in(name: &str, groups: &str) -> Option<(String, u32)> {
+    let mut chars = name.chars();
+    let valid = matches!(chars.next(), Some(c) if c.is_ascii_lowercase() || c == '_')
+        && name.len() <= 32
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-');
+    if !valid {
+        return None;
+    }
+    groups.lines().find_map(|l| {
+        let f: Vec<&str> = l.split(':').collect();
+        (f.len() > 2 && f[0] == name).then(|| f[2].parse().ok().map(|gid| (name.to_string(), gid)))?
+    })
+}
+
+/// socat's PTY address: with a device group, the PTY is made that group's, read-write.
+fn pty_address(link: &str, group: Option<&str>) -> String {
+    match group {
+        Some(g) => format!("PTY,link={link},raw,echo=0,group-late={g},perm-late=0660"),
+        None => format!("PTY,link={link},raw,echo=0"),
+    }
+}
+
 /// Runs `socat` to make a PTY at `link`, then relays bytes both ways: the server
 /// tool opens the PTY, the browser holds the real port.
 async fn pump(link: String, mut rx: mpsc::UnboundedReceiver<Vec<u8>>, addr: actix::Addr<SerialBridge>) {
@@ -195,8 +225,9 @@ async fn pump(link: String, mut rx: mpsc::UnboundedReceiver<Vec<u8>>, addr: acti
         let _ = std::fs::create_dir_all(dir);
     }
     let _ = std::fs::remove_file(&link);
+    let group = device_group().map(|(name, _)| name);
     let mut child = match Command::new("socat")
-        .arg(format!("PTY,link={link},raw,echo=0"))
+        .arg(pty_address(&link, group.as_deref()))
         .arg("-")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -268,4 +299,19 @@ async fn ws_serial(
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(ws_serial);
     super::serial_sessions::config(cfg);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_device_group_makes_the_pty_shared_with_it() {
+        let groups = "root:x:0:\ntty:x:5:\nnabi:x:1000:\n";
+        assert_eq!(group_in("nabi", groups), Some(("nabi".to_string(), 1000)));
+        assert_eq!(group_in("nobody-here", groups), None);
+        assert_eq!(group_in("Bad;rm", groups), None, "a name that could break socat's address is refused");
+        assert_eq!(pty_address("/s/esp32", Some("nabi")), "PTY,link=/s/esp32,raw,echo=0,group-late=nabi,perm-late=0660");
+        assert_eq!(pty_address("/s/esp32", None), "PTY,link=/s/esp32,raw,echo=0");
+    }
 }

@@ -144,13 +144,21 @@ async fn ws_session_serial(
     started
 }
 
-/// `serial/`, `serial/<owner>`, `serial/<owner>/<sid>`: created as needed, owner and session levels 0700.
+/// `serial/`, `serial/<owner>`, `serial/<owner>/<sid>`: created as needed.
+/// The owner and session levels are root's (0700), or, with a device group
+/// (see `device_group`), root's and that group's to enter (0750).
 fn private_dir(dir: &std::path::Path) -> std::io::Result<()> {
     use std::os::unix::fs::PermissionsExt;
     std::fs::create_dir_all(dir)?;
-    std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))?;
-    if let Some(owner) = dir.parent() {
-        std::fs::set_permissions(owner, std::fs::Permissions::from_mode(0o700))?;
+    let group = super::serial_bridge::device_group();
+    let mode = if group.is_some() { 0o750 } else { 0o700 };
+    // SAFETY: geteuid has no preconditions.
+    let me = unsafe { libc::geteuid() };
+    for level in [Some(dir), dir.parent()].into_iter().flatten() {
+        if let Some((_, gid)) = &group {
+            std::os::unix::fs::chown(level, Some(me), Some(*gid))?;
+        }
+        std::fs::set_permissions(level, std::fs::Permissions::from_mode(mode))?;
     }
     Ok(())
 }
