@@ -17,6 +17,7 @@ import { useChromeHidden } from './shared/ui/useChromeHidden';
 import { useFocusMode } from './shared/ui/useFocusMode';
 import RemoteShell, { isStandaloneRemote } from './components/remote/RemoteShell';
 import ConsolePopout, { isConsolePopout } from './components/remote/ConsolePopout';
+import SerialMonitorPopout, { serialMonitorTarget } from './components/remote/SerialMonitorPopout';
 import { DEFAULT_GRANTS } from './components/remote/member';
 import CommandPalette from './components/CommandPalette';
 import LanguageSelector from './shared/ui/LanguageSelector';
@@ -175,6 +176,11 @@ function App() {
       <button className="btn btn-secondary" onClick={handleLogout}>{t('app.logout')}</button>
     </div>
   </main>;
+
+  // A serial monitor window: it opens no port and asks the server nothing; the
+  // tab bridging the board feeds it, so any signed-in account may open one.
+  const serialMonitor = serialMonitorTarget();
+  if (serialMonitor) return <SerialMonitorPopout sid={serialMonitor.sid} name={serialMonitor.name} />;
 
   if (isConsolePopout()) {
     return currentUser.role === 'admin'

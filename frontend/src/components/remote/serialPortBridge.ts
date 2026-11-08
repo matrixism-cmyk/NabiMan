@@ -58,6 +58,8 @@ export interface BridgeOptions {
   onChange: () => void;
   /** Web Locks name: one tab of this browser bridges the device, as the server takes one socket for it. */
   lock?: string;
+  /** Every chunk the board sends, as it arrives (for a serial monitor window). */
+  onBytes?: (bytes: Uint8Array) => void;
 }
 
 export class PortBridge {
@@ -180,6 +182,12 @@ export class PortBridge {
     this.note({ key: 'serial.portBack' });
   }
 
+  /** Bytes typed in a serial monitor, straight to the board. False when no port is up. */
+  async send(bytes: Uint8Array): Promise<boolean> {
+    if (!this.writer || !this.state.portUp) return false;
+    try { await this.writer.write(bytes); return true; } catch { return false; }
+  }
+
   reset() { return this.lines(RESET); }
   bootloader() { return this.lines(isUsbJtag(this.port) ? BOOT_USB_JTAG : BOOT_CLASSIC); }
 
@@ -207,6 +215,7 @@ export class PortBridge {
           if (done) break;
           if (!value?.length) continue;
           if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(value);
+          this.opts.onBytes?.(value);
           this.append(dec.decode(value, { stream: true }));
         }
       } catch (e) {

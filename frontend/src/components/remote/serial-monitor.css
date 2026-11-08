@@ -1,0 +1,16 @@
+/* The serial monitor in a window of its own (SerialMonitorPopout). */
+.serial-monitor-popout { position: fixed; inset: 0; display: flex; flex-direction: column; background: #0b0d10; color: var(--text, #e6e6e6); }
+.serial-monitor-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--border, #2a2f36); background: var(--bg-secondary, #111418); }
+.serial-monitor-gap { flex: 1; }
+.serial-monitor-path { font-size: 12px; opacity: .75; max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.serial-monitor-note { margin: 0; padding: 6px 10px; font-size: 13px; background: rgba(255, 196, 0, .08); }
+.serial-monitor-note.is-error { background: rgba(255, 80, 80, .12); }
+.serial-monitor-screen { flex: 1; min-height: 0; padding: 4px 6px; }
+.serial-monitor-screen .xterm { height: 100%; }
+.serial-monitor-send { display: flex; gap: 6px; padding: 6px 10px; border-top: 1px solid var(--border, #2a2f36); }
+.serial-monitor-send .filter-input { flex: 1; margin: 0; font-family: Menlo, Consolas, monospace; }
+.serial-monitor-send .select-input { width: auto; margin: 0; }
+@media (max-width: 640px) {
+  .serial-monitor-path { display: none; }
+}
+.is-serial-monitor [data-nabiman-feedback-launcher], .is-serial-monitor [data-nabiman-feedback-panel] { display: none !important; }

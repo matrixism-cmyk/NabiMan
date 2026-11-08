@@ -1,4 +1,5 @@
 import { sessionSerialTicket } from './vncApi';
+import { channelName, FromHolder, FromMonitor, MonitorState } from './serialMonitorChannel';
 import {
   BridgeState, Notice, PortBridge, errText, portKey, serialApi, serialSupported,
 } from './serialPortBridge';
@@ -34,7 +35,7 @@ function remember(edit: (all: Record<string, Remembered[]>) => void) {
   try { localStorage.setItem(SAVED, JSON.stringify(all)); } catch { /* private mode */ }
 }
 
-const bridges = new Map<string, { sid: string; name: string; baud: number; bridge: PortBridge }>();
+const bridges = new Map<string, { sid: string; name: string; baud: number; bridge: PortBridge; channel: BroadcastChannel | null }>();
 const keyOf = (sid: string, name: string) => `${sid}/${name}`;
 const listeners = new Set<() => void>();
 let snapshot: SessionDevice[] = [];
@@ -46,7 +47,39 @@ function changed() {
 export const subscribe = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; };
 export const getDevices = () => snapshot;
 
+/** What a monitor window should show for a bridge. */
+function monitorState(bridge: Pick<PortBridge, 'state'>): MonitorState {
+  return !bridge.state.socketUp ? 'connecting' : !bridge.state.portUp ? 'waiting' : 'connected';
+}
+
+/** The BroadcastChannel a device's monitor windows listen on (see serialMonitorChannel.ts). */
+export function monitorChannel(sid: string, name: string, baud: number, bridge: () => Pick<PortBridge, 'state' | 'send' | 'reset' | 'bootloader'> | undefined): BroadcastChannel | null {
+  if (typeof BroadcastChannel === 'undefined') return null;
+  const channel = new BroadcastChannel(channelName(sid, name));
+  const post = (m: FromHolder) => { try { channel.postMessage(m); } catch { /* closed */ } };
+  channel.onmessage = (e: MessageEvent<FromMonitor>) => {
+    const b = bridge();
+    if (!b || !e.data) return;
+    const m = e.data;
+    if (m.type === 'hello') {
+      post({ type: 'backlog', text: b.state.log });
+      post({ type: 'state', state: monitorState(b), baud, path: b.state.path });
+    } else if (m.type === 'send' && ArrayBuffer.isView(m.bytes)) {
+      const bytes = new Uint8Array(m.bytes.buffer, m.bytes.byteOffset, m.bytes.byteLength);
+      void b.send(bytes).then((ok) => post({ type: 'done', what: 'send', ok }));
+    } else if (m.type === 'reset' || m.type === 'bootloader') {
+      const what = m.type;
+      (what === 'reset' ? b.reset() : b.bootloader())
+        .then(() => post({ type: 'done', what, ok: true }))
+        .catch((err) => post({ type: 'done', what, ok: false, error: errText(err) }));
+    }
+  };
+  return channel;
+}
+
 function make(sid: string, name: string, baud: number, device: string) {
+  let channel: BroadcastChannel | null = null;
+  let last = '';
   const bridge = new PortBridge({
     baud,
     device,
@@ -54,10 +87,20 @@ function make(sid: string, name: string, baud: number, device: string) {
       const ticket = await sessionSerialTicket(sid, name);
       return `${window.location.origin.replace('http', 'ws')}/api/terminal/serial?session_id=${sid}&serial=${name}&ticket=${ticket}`;
     },
-    onChange: changed,
+    onChange: () => {
+      // A monitor hears when the state it shows changes, not on every byte.
+      const now = `${monitorState(bridge)}|${bridge.state.path}`;
+      if (channel && now !== last) {
+        last = now;
+        try { channel.postMessage({ type: 'state', state: monitorState(bridge), baud, path: bridge.state.path } satisfies FromHolder); } catch { /* closed */ }
+      }
+      changed();
+    },
+    onBytes: (bytes) => { try { channel?.postMessage({ type: 'data', bytes } satisfies FromHolder); } catch { /* closed */ } },
     lock: `nabiman-serial:${keyOf(sid, name)}`,
   });
-  bridges.set(keyOf(sid, name), { sid, name, baud, bridge });
+  channel = monitorChannel(sid, name, baud, () => bridges.get(keyOf(sid, name))?.bridge);
+  bridges.set(keyOf(sid, name), { sid, name, baud, bridge, channel });
   return bridge;
 }
 
@@ -107,6 +150,8 @@ export function resumeSession(sid: string) {
 export async function detach(sid: string, name: string) {
   const entry = bridges.get(keyOf(sid, name));
   bridges.delete(keyOf(sid, name));
+  try { entry?.channel?.postMessage({ type: 'state', state: 'connecting', baud: entry.baud, path: '' } satisfies FromHolder); } catch { /* closed */ }
+  entry?.channel?.close();
   remember((all) => { all[sid] = (all[sid] || []).filter((d) => d.name !== name); });
   changed();
   await entry?.bridge.stop();

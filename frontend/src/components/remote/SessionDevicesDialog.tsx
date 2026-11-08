@@ -4,6 +4,7 @@ import { apiRequest } from '../../shared/api/useApi';
 import Modal from '../../shared/ui/Modal';
 import * as devices from './serialDevices';
 import { noticeText, serialSupported, setTranslator, type Notice } from './serialPortBridge';
+import { openMonitor } from './serialMonitorChannel';
 
 const BAUDS = [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600];
 const LIST_EVERY_MS = 3000;
@@ -78,6 +79,7 @@ export default function SessionDevicesDialog({ sessionId, sessionName, onClose }
                 <span className={`rw-console-state is-${state === 'connected' ? 'connected' : 'disconnected'}`}>{t(`serial.status.${state}`)}</span>
                 <span className="text-secondary">{d.baud}</span>
                 <span style={{ flex: 1 }} />
+                <button className="btn btn-secondary btn-sm" onClick={() => openMonitor(sessionId, d.name)} title={t('serial.monitorOpenHint')}>{t('serial.monitorOpen')}</button>
                 {state === 'connected' && <>
                   <button className="btn btn-secondary btn-sm" onClick={run(() => devices.reset(sessionId, d.name))} title={t('serial.resetHint')}>{t('serial.reset')}</button>
                   <button className="btn btn-secondary btn-sm" onClick={run(() => devices.bootloader(sessionId, d.name))} title={t('serial.bootloaderHint')}>{t('serial.bootloader')}</button>
