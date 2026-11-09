@@ -344,6 +344,8 @@ export default function RemoteWorkspace() {
           )}
           {hasSessionsView && serverView === 'sessions' && (
             <TargetSessionsView name={headTitle} sessions={targetSessions} currentSessionId={currentSessionId}
+              allSessions={sessions}
+              cardPrefix={selection.kind === 'local' ? 'lc:' : selection.kind === 'server' ? `rc:${selection.id}:` : ''}
               onRefresh={refetchSessions} onAttach={attachSession} onPopOut={popOutSession}
               onShare={(session) => { setShareTarget(session.id); setShowShare(true); }}
               onNewSession={() => connectTo(selection, true)}

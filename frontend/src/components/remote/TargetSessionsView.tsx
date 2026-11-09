@@ -13,6 +13,10 @@ interface Props {
   onShare: (session: SessionInfo) => void;
   onNewSession: () => void;
   onOpenWindow: () => void;
+  /** Every session, so badges count work handed to sessions on other targets. */
+  allSessions?: SessionInfo[];
+  /** Which Claude cards belong to this target (see SessionsView). */
+  cardPrefix?: string;
 }
 
 /**
@@ -21,13 +25,15 @@ interface Props {
  * deliberate one.
  */
 export default function TargetSessionsView({
-  name, sessions, currentSessionId, onRefresh, onAttach, onPopOut, onShare, onNewSession, onOpenWindow,
+  name, sessions, currentSessionId, onRefresh, onAttach, onPopOut, onShare, onNewSession, onOpenWindow, allSessions, cardPrefix,
 }: Props) {
   const { t } = useT();
   return (
     <div className="rw-view rw-view-scroll">
       <SessionsView
         sessions={sessions}
+        context={allSessions}
+        cardPrefix={cardPrefix}
         currentSessionId={currentSessionId}
         title={t('remote.targetSessions', { name })}
         onRefresh={onRefresh}

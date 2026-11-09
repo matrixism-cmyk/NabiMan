@@ -66,6 +66,11 @@ pub(crate) struct Seen {
     pub orchestrator: bool,
     /// For a remote Claude session no tile is connected to: its server's name.
     pub ghost_server: Option<String>,
+    /// A Claude session on this machine outside every tile (a Claude Code
+    /// background session, or one started in another terminal).
+    pub ghost_local: bool,
+    /// That session is a Claude Code background session (`claude --bg`).
+    pub background: bool,
     /// For each card it leads: when it last sent work there and the first line of it.
     pub notes: HashMap<String, (u64, String)>,
 }
@@ -73,6 +78,11 @@ pub(crate) struct Seen {
 /// The id a remote Claude session with no tile goes by among the tiles.
 pub(crate) fn ghost_id(server_id: &str, session_id: &str) -> String {
     format!("rc:{server_id}:{session_id}")
+}
+
+/// The id a Claude session on this machine outside every tile goes by.
+pub(crate) fn local_ghost_id(rec_session: &str, sock: &str) -> String {
+    if rec_session.is_empty() { format!("lc:{}", base_name(sock)) } else { format!("lc:{rec_session}") }
 }
 
 impl Seen {
@@ -134,12 +144,24 @@ fn parse_panes(text: &str) -> Option<Panes> {
 fn scan() -> HashMap<String, Seen> {
     let Some(panes) = panes() else { return HashMap::new() };
     let mut seen: HashMap<String, Seen> = HashMap::new();
+    // Every live Claude session here: in a tile (its tmux name), or not (an
+    // `lc:` card of its own, so work handed to or from it still shows).
+    let mut loose: Vec<String> = Vec::new();
     let found: Vec<(Record, String)> = session_files()
         .into_iter()
         .filter_map(|path| {
             let rec = read_record(&path)?;
-            let session = session_of(&rec, &panes)?;
-            Some((rec, session))
+            if !alive(&rec) {
+                return None;
+            }
+            match session_of(&rec, &panes) {
+                Some(session) => Some((rec, session)),
+                None => {
+                    let card = local_ghost_id(&rec.session_id, &rec.sock);
+                    loose.push(card.clone());
+                    Some((rec, card))
+                }
+            }
         })
         .collect();
     let refs = refs(&found.iter().map(|(r, _)| r.sock.as_str()).collect::<Vec<_>>());
@@ -156,7 +178,12 @@ fn scan() -> HashMap<String, Seen> {
             busy: rec.busy,
             server: None,
         };
-        let entry = seen.entry(tmux_name).or_default();
+        let background = rec.background;
+        let entry = seen.entry(tmux_name.clone()).or_default();
+        if loose.contains(&tmux_name) {
+            entry.ghost_local = true;
+            entry.background = background;
+        }
         entry.claude.push(peer);
         entry.claude.sort_by(|a, b| a.address.cmp(&b.address));
     }
@@ -316,6 +343,8 @@ struct Record {
     session_id: String,
     /// Its Remote Control session, when that is on.
     bridge: Option<String>,
+    /// A Claude Code background session (`kind: bg`), run by its daemon rather than a terminal.
+    background: bool,
     /// Who wrote the file.
     uid: u32,
     /// The record's own path, under the account's `.claude` folder.
@@ -345,6 +374,7 @@ fn parse_record(text: &str, uid: u32, file: &Path) -> Option<Record> {
         busy: s("status") == "busy",
         session_id: s("sessionId"),
         bridge: Some(s("bridgeSessionId")).filter(|b| !b.is_empty()),
+        background: s("kind") == "bg",
         uid,
         file: file.to_path_buf(),
     };
@@ -358,13 +388,16 @@ fn clip(s: &str, n: usize) -> String {
 /// The tmux session the record's process runs in, if it is still that
 /// process, the file's owner runs it, and a pane of this tmux server's is
 /// among its parents.
-fn session_of(rec: &Record, panes: &Panes) -> Option<String> {
+/// The record's process is running: same owner, same start time (not a reused pid).
+fn alive(rec: &Record) -> bool {
     let proc_dir = PathBuf::from(format!("/proc/{}", rec.pid));
-    if fs::metadata(&proc_dir).ok()?.uid() != rec.uid {
-        return None;
-    }
-    let (start, _) = stat_fields(&fs::read_to_string(proc_dir.join("stat")).ok()?)?;
-    if start != rec.proc_start {
+    let owner = fs::metadata(&proc_dir).map(|m| m.uid()).ok();
+    let start = fs::read_to_string(proc_dir.join("stat")).ok().and_then(|s| stat_fields(&s)).map(|(start, _)| start);
+    owner == Some(rec.uid) && start.as_deref() == Some(rec.proc_start.as_str())
+}
+
+fn session_of(rec: &Record, panes: &Panes) -> Option<String> {
+    if !alive(rec) {
         return None;
     }
     up_to_pane(rec.pid, panes, |pid| {

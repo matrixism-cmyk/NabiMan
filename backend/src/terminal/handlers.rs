@@ -56,7 +56,7 @@ fn notes_of(here: &super::claude_peers::Seen, id_of: &HashMap<&str, &str>, remot
     here.notes
         .iter()
         .filter_map(|(t, (at, text))| {
-            let to = id_of.get(t.as_str()).map(|i| i.to_string()).or_else(|| (remote_ok && t.starts_with("rc:")).then(|| t.clone()))?;
+            let to = id_of.get(t.as_str()).map(|i| i.to_string()).or_else(|| (remote_ok && is_card(t)).then(|| t.clone()))?;
             Some(LinkNote { to, text: text.clone(), at: *at })
         })
         .collect()
@@ -78,16 +78,26 @@ fn sees_remote_claude(user_id: &str, users: &crate::users::UserStore) -> bool {
 fn directs_of(here: &super::claude_peers::Seen, id_of: &HashMap<&str, &str>, remote_ok: bool) -> Vec<String> {
     here.leads
         .iter()
-        .filter_map(|t| id_of.get(t.as_str()).map(|i| i.to_string()).or_else(|| (remote_ok && t.starts_with("rc:")).then(|| t.clone())))
+        .filter_map(|t| id_of.get(t.as_str()).map(|i| i.to_string()).or_else(|| (remote_ok && is_card(t)).then(|| t.clone())))
         .collect()
 }
 
-/// A Claude session on a server the tiles are connected to, running under
-/// none of them (started at that machine, say). It gets a card of its own.
+/// A Claude session with a card of its own rather than a tile: `rc:` on a
+/// connected server, `lc:` on this machine (background sessions, other terminals).
+fn is_card(id: &str) -> bool {
+    id.starts_with("rc:") || id.starts_with("lc:")
+}
+
+/// A Claude session running under no tile: on a server the tiles are
+/// connected to (started at that machine, say), or on this machine (a Claude
+/// Code background session, or one in another terminal). It gets a card.
 #[derive(serde::Serialize)]
 struct RemoteClaudeCard {
     id: String,
+    /// The saved server's name; empty for this machine.
     server: String,
+    /// A Claude Code background session.
+    background: bool,
     claude: Vec<super::claude_peers::ClaudePeer>,
     busy: bool,
     directs: Vec<String>,
@@ -110,12 +120,13 @@ async fn remote_claude(store: web::Data<PtyStore>, req: HttpRequest, users: web:
         .collect();
     let mut cards: Vec<RemoteClaudeCard> = seen
         .iter()
-        .filter(|(k, h)| k.starts_with("rc:") && h.ghost_server.is_some() && !h.claude.is_empty())
+        .filter(|(k, h)| (k.starts_with("rc:") && h.ghost_server.is_some() || k.starts_with("lc:") && h.ghost_local) && !h.claude.is_empty())
         .map(|(k, h)| {
             let directs = directs_of(h, &id_of, true);
             RemoteClaudeCard {
                 id: k.clone(),
                 server: h.ghost_server.clone().unwrap_or_default(),
+                background: h.background,
                 claude: h.claude.clone(),
                 busy: h.busy(),
                 orchestrator: h.orchestrator && !directs.is_empty(),

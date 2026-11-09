@@ -148,3 +148,25 @@ it('Claude on another server: its tile shows @server, and one with no tile gets 
   expect(Array.from(container.querySelectorAll('.session-link')).map((p)=>p.getAttribute('data-link'))).toEqual(['rc:srv_w:5064>pty_ssh']);
   jest.restoreAllMocks();
 });
+
+it('a background Claude session on this machine gets a card, and one target\'s list still badges work handed elsewhere',async()=>{
+  localStorage.setItem('nabiman_lang','ko');
+  const req=apiRequest as jest.Mock;
+  const bg={id:'lc:fb91fc72',server:'',background:true,busy:true,orchestrator:true,directs:['pty_5g'],notes:[],
+    claude:[{name:'n8n 설치',ref:'2ba68a',address:'n8n 설치 [2ba68a]',cwd:'/workspace',busy:true}]};
+  const rc={id:'rc:srv_w:1',server:'winsrv',busy:false,directs:[],notes:[],claude:[{name:'w',ref:'',address:'bridge:s',cwd:'C:\\',busy:false,server:'winsrv'}]};
+  req.mockImplementation((path:string)=>Promise.resolve(path==='/api/terminal/claude-remote'?{success:true,data:[bg,rc]}:{success:true,data:{mode:'newest',ids:[]}}));
+  const peer=(name:string)=>[{name,ref:'abcdef',address:`${name} [abcdef]`,cwd:'/w',busy:false}];
+  const five:SessionInfo={...session,id:'pty_5g',label:'local',title:'5gmec',state:'alive',claude:peer('5gmec-9a')};
+  const lead:SessionInfo={...session,id:'pty_lead',label:'ssh:a@b:22',title:'lead',state:'alive',busy:true,orchestrator:true,claude:peer('lead-1'),directs:['pty_5g']};
+  // The local list: only local tiles and `lc:` cards; the remote leader is elsewhere.
+  const { container } = render(<I18nProvider><SessionsView sessions={[five]} context={[five,lead]} cardPrefix="lc:" onRefresh={jest.fn()} onAttach={jest.fn()} onPopOut={jest.fn()}/></I18nProvider>);
+  const card=await waitFor(()=>{ const c=container.querySelector('[data-session-id="lc:fb91fc72"]'); expect(c).not.toBeNull(); return c as HTMLElement; });
+  expect(card).toHaveClass('is-orchestrator');
+  expect(screen.getByText('이 서버 · 백그라운드')).toBeInTheDocument();
+  expect(container.querySelector('[data-session-id="rc:srv_w:1"]')).toBeNull();
+  // The arrow joins the two cards shown here.
+  expect(Array.from(container.querySelectorAll('.session-link')).map((p)=>p.getAttribute('data-link'))).toEqual(['lc:fb91fc72>pty_5g']);
+  // The 5gmec tile is led by the background session (an orchestrator outranks the other leader).
+  expect(screen.getByText('← n8n 설치')).toBeInTheDocument();
+});

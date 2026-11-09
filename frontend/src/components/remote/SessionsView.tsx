@@ -3,7 +3,7 @@ import { apiPost, apiRequest } from '../../shared/api/useApi';
 import ClaudeAddress, { ClaudePeer } from '../terminal/ClaudeAddress';
 import SessionLinks, { SessionLink } from './SessionLinks';
 import { arrange, moved, ORDER_MODES, OrderMode, useSessionOrder } from './sessionOrder';
-import { useRemoteClaude } from './remoteClaude';
+import { RemoteClaudeCard, useRemoteClaude } from './remoteClaude';
 import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useGrants, useMember, useSharing } from './member';
@@ -67,11 +67,17 @@ interface Props {
   actions?: React.ReactNode;
   /** What to show when nothing is running, in place of the plain notice. */
   empty?: React.ReactNode;
+  /** Every session, when `sessions` is one target's: badges count work handed
+   *  to or from sessions not on this list (arrows join only those shown). */
+  context?: SessionInfo[];
+  /** Which Claude cards (sessions under no tile) belong here, by id prefix:
+   *  all when unset, `lc:` this machine's, `rc:<server>:` one server's. */
+  cardPrefix?: string;
 }
 
 /** Every shell running on the server, with a look at what is on each screen. */
 export default function SessionsView({
-  sessions, currentSessionId, onRefresh, onAttach, onPopOut, onShare, title, actions, empty,
+  sessions, currentSessionId, onRefresh, onAttach, onPopOut, onShare, title, actions, empty, context, cardPrefix,
 }: Props) {
   const { t } = useT();
   const member = useMember();
@@ -117,15 +123,20 @@ export default function SessionsView({
   };
   // A state, not a ref: the arrows redraw once the grid is there.
   const [grid, setGrid] = useState<HTMLDivElement | null>(null);
-  // Claude sessions on the connected servers that no tile is under: cards of their own.
-  const remote = useRemoteClaude(!member);
+  // Claude sessions no tile is under (on connected servers, or this machine's
+  // background ones): cards of their own.
+  const allCards = useRemoteClaude(!member);
+  const remote = cardPrefix === undefined ? allCards : allCards.filter((c) => cardPrefix !== '' && c.id.startsWith(cardPrefix));
   type Node = Pick<SessionInfo, 'id' | 'directs' | 'orchestrator' | 'busy' | 'claude' | 'notes'> & { title?: string; label?: string };
-  const nodes: Node[] = [...sessions, ...remote.map((r) => ({ ...r, label: r.server }))];
+  const asNode = (r: RemoteClaudeCard): Node => ({ ...r, label: r.server });
+  const nodes: Node[] = [...sessions, ...remote.map(asNode)];
   const shown = new Set(nodes.map((s) => s.id));
-  const busy = new Set(nodes.filter((s) => s.busy).map((s) => s.id));
+  // Everyone, for the badges: a target's list still says who leads whom elsewhere.
+  const everyone: Node[] = Array.from(new Map([...(context || []), ...sessions, ...allCards.map(asNode)].map((n) => [n.id, n] as const)).values());
+  const busy = new Set(everyone.filter((s) => s.busy).map((s) => s.id));
   // Once both ends are waiting, the work handed over is done for now: the arrow fades.
   const nameOf = (s: Node) => s.claude?.[0]?.name || s.title || s.label || '';
-  const nodeOf = new Map(nodes.map((n) => [n.id, n]));
+  const nodeOf = new Map(everyone.map((n) => [n.id, n]));
   // Hovering an arrow says what was handed over: the last request's first line.
   const nowSecs = Math.floor(Date.now() / 1000);
   const noteFor = (s: Node, to: string) => {
@@ -137,11 +148,13 @@ export default function SessionsView({
     lines.push(t(busy.has(to) ? 'claudePeer.linkBusy' : 'claudePeer.linkIdle', { name: toName }));
     return lines.join('\n');
   };
-  const links: SessionLink[] = nodes.flatMap((s) => (s.directs || [])
-    .filter((to) => shown.has(to))
+  const related: SessionLink[] = everyone.flatMap((s) => (s.directs || [])
+    .filter((to) => nodeOf.has(to))
     .map((to) => ({ from: s.id, to, orchestrator: !!s.orchestrator, live: busy.has(s.id) || busy.has(to), note: noteFor(s, to) })));
+  // Arrows only between cards on this list.
+  const links = related.filter((l) => shown.has(l.from) && shown.has(l.to));
   const leader = new Map<string, Node>();
-  for (const l of links) {
+  for (const l of related) {
     const from = nodeOf.get(l.from);
     if (from && (!leader.has(l.to) || from.orchestrator)) leader.set(l.to, from);
   }
@@ -219,10 +232,10 @@ export default function SessionsView({
           const attachable = session.alive && state === 'alive';
           // The orchestrator blinks red; Claude at work blinks green; any
           // other screen that just changed glows.
-          const directs = links.filter((l) => l.from === session.id).length;
+          const directs = related.filter((l) => l.from === session.id).length;
           const orchestrating = attachable && !!session.orchestrator && directs > 0;
           // It blinks while it or any session it handed work to is working.
-          const resting = orchestrating && !links.some((l) => l.from === session.id && l.live);
+          const resting = orchestrating && !related.some((l) => l.from === session.id && l.live);
           const working = attachable && !orchestrating && !!session.busy;
           const output = attachable && !orchestrating && !working && recentOutput(session.id);
           const ledBy = attachable ? leader.get(session.id) : undefined;
@@ -310,13 +323,13 @@ export default function SessionsView({
           </div>
         );})}
         {remote.map((r) => {
-          const directs = links.filter((l) => l.from === r.id).length;
+          const directs = related.filter((l) => l.from === r.id).length;
           const orchestrating = r.orchestrator && directs > 0;
-          const resting = orchestrating && !links.some((l) => l.from === r.id && l.live);
+          const resting = orchestrating && !related.some((l) => l.from === r.id && l.live);
           const working = !orchestrating && r.busy;
           const ledBy = leader.get(r.id);
           return (
-            <div key={r.id} data-session-id={r.id} title={t('claudeRemote.hint')}
+            <div key={r.id} data-session-id={r.id} title={t(r.server ? 'claudeRemote.hint' : r.background ? 'claudeRemote.backgroundHint' : 'claudeRemote.localHint')}
               className={`session-card is-remote-claude ${orchestrating ? 'is-orchestrator' : ''} ${resting ? 'is-resting' : ''} ${working ? 'is-working' : ''}`}>
               <div className="session-card-head">
                 <strong className="session-name">{r.claude[0]?.name}</strong>
@@ -332,7 +345,9 @@ export default function SessionsView({
                 )}
                 {working && <span className="session-work-badge" title={t('claudePeer.workingHint')}>{t('claudePeer.working')}</span>}
               </div>
-              <code className="session-label">{t('claudeRemote.noTile', { server: r.server })}</code>
+              <code className="session-label">
+                {r.server ? t('claudeRemote.noTile', { server: r.server }) : t(r.background ? 'claudeRemote.localBackground' : 'claudeRemote.localNoTile')}
+              </code>
               <ClaudeAddress variant="card" peers={r.claude} />
             </div>
           );

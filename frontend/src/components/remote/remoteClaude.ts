@@ -4,8 +4,12 @@ import type { ClaudePeer } from '../terminal/ClaudeAddress';
 
 /** A Claude session on a server the tiles are connected to, under none of them. */
 export interface RemoteClaudeCard {
+  /** `rc:<server>:<session>` on a connected server, `lc:<session>` on this machine. */
   id: string;
+  /** The saved server's name; empty for this machine. */
   server: string;
+  /** A Claude Code background session (run by its daemon, not in a terminal). */
+  background?: boolean;
   claude: ClaudePeer[];
   busy: boolean;
   directs: string[];
