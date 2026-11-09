@@ -16,8 +16,13 @@ export interface SessionDevice extends BridgeState {
   sid: string;
   name: string;
   baud: number;
+  /** The board's USB vendor:product (decimal), as the bridge looks for it. */
+  device: string;
+  /** The operator's own note for it, such as the COM port the browser's picker showed. */
+  label: string;
 }
-type Remembered = { name: string; baud: number; device: string };
+type Remembered = { name: string; baud: number; device: string; label?: string };
+const MAX_LABEL = 40;
 
 const SAVED = 'nabiman_serial_devices';
 export const NAME_RE = /^[a-z0-9_-]{1,24}$/;
@@ -35,12 +40,12 @@ function remember(edit: (all: Record<string, Remembered[]>) => void) {
   try { localStorage.setItem(SAVED, JSON.stringify(all)); } catch { /* private mode */ }
 }
 
-const bridges = new Map<string, { sid: string; name: string; baud: number; bridge: PortBridge; channel: BroadcastChannel | null }>();
+const bridges = new Map<string, { sid: string; name: string; baud: number; label: string; bridge: PortBridge; channel: BroadcastChannel | null }>();
 const keyOf = (sid: string, name: string) => `${sid}/${name}`;
 const listeners = new Set<() => void>();
 let snapshot: SessionDevice[] = [];
 function changed() {
-  snapshot = Array.from(bridges.values()).map(({ sid, name, baud, bridge }) => ({ ...bridge.state, sid, name, baud }));
+  snapshot = Array.from(bridges.values()).map(({ sid, name, baud, label, bridge }) => ({ ...bridge.state, sid, name, baud, device: bridge.device, label }));
   listeners.forEach((l) => l());
 }
 
@@ -63,7 +68,8 @@ export function monitorChannel(sid: string, name: string, baud: number, bridge: 
     const m = e.data;
     if (m.type === 'hello') {
       post({ type: 'backlog', text: b.state.log });
-      post({ type: 'state', state: monitorState(b), baud, path: b.state.path });
+      const e = bridges.get(keyOf(sid, name));
+      post({ type: 'state', state: monitorState(b), baud, path: b.state.path, device: (b as PortBridge).device ?? '', label: e?.label ?? '' });
     } else if (m.type === 'send' && ArrayBuffer.isView(m.bytes)) {
       const bytes = new Uint8Array(m.bytes.buffer, m.bytes.byteOffset, m.bytes.byteLength);
       void b.send(bytes).then((ok) => post({ type: 'done', what: 'send', ok }));
@@ -77,7 +83,7 @@ export function monitorChannel(sid: string, name: string, baud: number, bridge: 
   return channel;
 }
 
-function make(sid: string, name: string, baud: number, device: string) {
+function make(sid: string, name: string, baud: number, device: string, label = '') {
   let channel: BroadcastChannel | null = null;
   let last = '';
   const bridge = new PortBridge({
@@ -89,10 +95,10 @@ function make(sid: string, name: string, baud: number, device: string) {
     },
     onChange: () => {
       // A monitor hears when the state it shows changes, not on every byte.
-      const now = `${monitorState(bridge)}|${bridge.state.path}`;
+      const now = `${monitorState(bridge)}|${bridge.state.path}|${bridge.device}`;
       if (channel && now !== last) {
         last = now;
-        try { channel.postMessage({ type: 'state', state: monitorState(bridge), baud, path: bridge.state.path } satisfies FromHolder); } catch { /* closed */ }
+        announce(sid, name);
       }
       changed();
     },
@@ -100,8 +106,28 @@ function make(sid: string, name: string, baud: number, device: string) {
     lock: `nabiman-serial:${keyOf(sid, name)}`,
   });
   channel = monitorChannel(sid, name, baud, () => bridges.get(keyOf(sid, name))?.bridge);
-  bridges.set(keyOf(sid, name), { sid, name, baud, bridge, channel });
+  bridges.set(keyOf(sid, name), { sid, name, baud, label, bridge, channel });
   return bridge;
+}
+
+/** Tells a device's monitor windows its state, port and label. */
+function announce(sid: string, name: string) {
+  const e = bridges.get(keyOf(sid, name));
+  if (!e?.channel) return;
+  try {
+    e.channel.postMessage({ type: 'state', state: monitorState(e.bridge), baud: e.baud, path: e.bridge.state.path, device: e.bridge.device, label: e.label } satisfies FromHolder);
+  } catch { /* closed */ }
+}
+
+/** Note what a device is (the COM port, say), remembered with it in this browser. */
+export function setLabel(sid: string, name: string, label: string) {
+  const entry = bridges.get(keyOf(sid, name));
+  // eslint-disable-next-line no-control-regex
+  const clean = label.replace(/[\u0000-\u001f]/g, '').trim().slice(0, MAX_LABEL);
+  if (entry) entry.label = clean;
+  remember((all) => { all[sid] = (all[sid] || []).map((d) => (d.name === name ? { ...d, label: clean || undefined } : d)); });
+  changed();
+  announce(sid, name);
 }
 
 /** The first of `esp32`, `esp32-2`, … not in `taken`. */
@@ -141,7 +167,7 @@ export function resumeSession(sid: string) {
   if (!serialSupported()) return;
   for (const d of remembered()[sid] || []) {
     if (bridges.has(keyOf(sid, d.name))) continue;
-    void make(sid, d.name, d.baud, d.device).resume();
+    void make(sid, d.name, d.baud, d.device, d.label || '').resume();
   }
   changed();
 }

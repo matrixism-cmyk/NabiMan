@@ -12,7 +12,7 @@
 export type MonitorState = 'connected' | 'waiting' | 'connecting';
 
 export type FromHolder =
-  | { type: 'state'; state: MonitorState; baud: number; path: string }
+  | { type: 'state'; state: MonitorState; baud: number; path: string; device?: string; label?: string }
   | { type: 'data'; bytes: Uint8Array }
   | { type: 'backlog'; text: string }
   | { type: 'done'; what: 'send' | 'reset' | 'bootloader'; ok: boolean; error?: string };

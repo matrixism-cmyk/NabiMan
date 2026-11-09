@@ -5,6 +5,8 @@ import Modal from '../../shared/ui/Modal';
 import * as devices from './serialDevices';
 import { noticeText, serialSupported, setTranslator, type Notice } from './serialPortBridge';
 import { openMonitor } from './serialMonitorChannel';
+import { usbLabel } from './usbNames';
+import './serial-monitor.css';
 
 const BAUDS = [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600];
 const LIST_EVERY_MS = 3000;
@@ -76,6 +78,7 @@ export default function SessionDevicesDialog({ sessionId, sessionName, onClose }
             <section key={d.name} className="serial-dev-item">
               <div className="serial-dev-row">
                 <strong>{d.name}</strong>
+                {d.label && <span className="serial-dev-label-chip">{d.label}</span>}
                 <span className={`rw-console-state is-${state === 'connected' ? 'connected' : 'disconnected'}`}>{t(`serial.status.${state}`)}</span>
                 <span className="text-secondary">{d.baud}</span>
                 <span style={{ flex: 1 }} />
@@ -86,6 +89,13 @@ export default function SessionDevicesDialog({ sessionId, sessionName, onClose }
                 </>}
                 {state === 'waiting' && <button className="btn btn-secondary btn-sm" onClick={() => void devices.repick(sessionId, d.name).then((why) => why && setError(why))}>{t('serial.dev.repick')}</button>}
                 <button className="btn btn-danger btn-sm" onClick={() => void devices.detach(sessionId, d.name)}>{t('serial.dev.detach')}</button>
+              </div>
+              <div className="serial-dev-row serial-dev-info">
+                {usbLabel(d.device) && <span className="text-secondary" title={t('serial.dev.usbHint')}>{usbLabel(d.device)}</span>}
+                <input className="filter-input serial-dev-label" defaultValue={d.label} key={`${d.name}:${d.label}`} maxLength={40}
+                  placeholder={t('serial.dev.labelPlaceholder')} aria-label={t('serial.dev.labelFor', { name: d.name })} title={t('serial.dev.labelHint')}
+                  onBlur={(e) => { if (e.target.value.trim() !== d.label) devices.setLabel(sessionId, d.name, e.target.value); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
               </div>
               {d.path && (
                 <div className="serial-dev-row">

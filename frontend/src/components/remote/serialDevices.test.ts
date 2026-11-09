@@ -166,3 +166,19 @@ test('a second tab of the same session waits for the first instead of fighting i
     delete (navigator as any).locks;
   }
 });
+
+test('a device carries its USB ids and a note (the COM port) that is remembered and comes back', async () => {
+  expect(await devices.attach('pty_9', 'esp32', 115200)).toBeNull();
+  await flush();
+  const d = devices.getDevices().find((x) => x.name === 'esp32')!;
+  expect(d.device).toBe(`${0x303a}:${0x1001}`);
+  expect(d.label).toBe('');
+  devices.setLabel('pty_9', 'esp32', '  COM5\n');
+  expect(devices.getDevices().find((x) => x.name === 'esp32')!.label).toBe('COM5');
+  expect(JSON.parse(localStorage.getItem('nabiman_serial_devices') || '{}').pty_9[0].label).toBe('COM5');
+  // Gone and back (a reload): the note returns with the device.
+  await devices.detach('pty_9', 'esp32');
+  localStorage.setItem('nabiman_serial_devices', JSON.stringify({ pty_9: [{ name: 'esp32', baud: 115200, device: `${0x303a}:${0x1001}`, label: 'COM5' }] }));
+  devices.resumeSession('pty_9');
+  expect(devices.getDevices().find((x) => x.name === 'esp32')!.label).toBe('COM5');
+});

@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import 'xterm/css/xterm.css';
 import { useT } from '../../shared/i18n';
 import { channelName, FromHolder, FromMonitor, MonitorState, monitorTarget } from './serialMonitorChannel';
+import { usbLabel } from './usbNames';
 import './serial-monitor.css';
 
 export { monitorTarget as serialMonitorTarget };
@@ -41,6 +42,8 @@ export default function SerialMonitorPopout({ sid, name }: { sid: string; name: 
   const [holder, setHolder] = useState<Holder>('connecting');
   const [baud, setBaud] = useState<number | null>(null);
   const [path, setPath] = useState('');
+  const [device, setDevice] = useState('');
+  const [label, setLabel] = useState('');
   const [paused, setPaused] = useState(false);
   const pausedRef = useRef(false);
   const [stamps, setStamps] = useState(false);
@@ -51,7 +54,7 @@ export default function SerialMonitorPopout({ sid, name }: { sid: string; name: 
   const [at, setAt] = useState<number | null>(null);
   const [notice, setNotice] = useState('');
 
-  useEffect(() => { document.title = `${name} · ${t('serial.monitorTitle')}`; }, [name, t]);
+  useEffect(() => { document.title = `${name}${label ? ` (${label})` : ''} · ${t('serial.monitorTitle')}`; }, [name, label, t]);
   // A window of its own: the page-wide floating buttons would cover the send bar.
   useEffect(() => {
     document.body.classList.add('is-serial-monitor');
@@ -107,7 +110,7 @@ export default function SerialMonitorPopout({ sid, name }: { sid: string; name: 
       const m = e.data;
       if (!m) return;
       heard = true;
-      if (m.type === 'state') { setHolder(m.state); setBaud(m.baud); setPath(m.path); }
+      if (m.type === 'state') { setHolder(m.state); setBaud(m.baud); setPath(m.path); setDevice(m.device || ''); setLabel(m.label || ''); }
       else if (m.type === 'backlog') {
         // Once: a holder answering again (a second monitor said hello) is not news here.
         if (!backlogShown && m.text) { show(m.text); show(`\r\n\x1b[2m── ${t('serial.monitorLive')} ──\x1b[0m\r\n`); }
@@ -168,10 +171,12 @@ export default function SerialMonitorPopout({ sid, name }: { sid: string; name: 
     <div className="serial-monitor-popout">
       <header className="serial-monitor-bar">
         <strong>{name}</strong>
+        {label && <span className="serial-dev-label-chip">{label}</span>}
         <span className={`rw-console-state is-${up ? 'connected' : 'disconnected'}`}>
           {holder === 'none' ? t('serial.monitorNoHolder') : t(`serial.status.${holder}`)}
         </span>
         {baud && <span className="text-secondary">{baud}</span>}
+        {usbLabel(device) && <span className="text-secondary serial-monitor-usb">{usbLabel(device)}</span>}
         {path && <code className="serial-monitor-path" title={path}>{path}</code>}
         <span className="serial-monitor-gap" />
         <button className={`btn btn-sm ${paused ? 'btn-warning' : 'btn-secondary'}`} onClick={togglePause}>{t(paused ? 'serial.monitorResume' : 'serial.monitorPause')}</button>

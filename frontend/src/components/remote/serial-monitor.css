@@ -14,3 +14,7 @@
   .serial-monitor-path { display: none; }
 }
 .is-serial-monitor [data-nabiman-feedback-launcher], .is-serial-monitor [data-nabiman-feedback-panel] { display: none !important; }
+.serial-dev-label-chip { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; background: var(--primary-bg, rgba(80, 200, 255, .15)); color: var(--primary, #5cc8ff); }
+.serial-dev-info { gap: 8px; flex-wrap: wrap; }
+.serial-dev-label.filter-input { width: 14em; margin: 0; padding: 3px 8px; font-size: 13px; }
+.serial-monitor-usb { font-size: 12px; }
