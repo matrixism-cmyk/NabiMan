@@ -5,6 +5,7 @@
 #   R <1 if under that connection else 0> <base64 of the session record>
 #   O <session id> <transcript size>
 #   M <session id> <from> <timestamp> <msg_id> <base64 first line>   (peer messages after the given offset)
+#   U <pid> <user>   a Claude under this connection whose record is not ours to read (after `su -`, say)
 # Only addresses, times, ids and each message's first line leave the machine.
 # Offsets come in as lines "<session id> <offset>" in NABIMAN_OFFSETS.
 export LC_ALL=C
@@ -22,11 +23,13 @@ printf 'C\t%s\n' "$conn"
 under() { q=$1; n=0; while [ -n "$q" ] && [ "$q" -gt 1 ] && [ $n -lt 64 ]; do [ "$q" = "$conn" ] && return 0; q=$(parent "$q"); n=$((n+1)); done; return 1; }
 field() { printf '%s' "$1" | grep -o "\"$2\":\"[^\"]*\"" | head -n 1 | cut -d'"' -f4; }
 num() { printf '%s' "$1" | grep -o "\"$2\":[0-9]*" | head -n 1 | cut -d: -f2; }
+seen=" "
 for f in "$HOME"/.claude/sessions/*.json; do
   [ -f "$f" ] || continue
   rec=$(head -c 65536 "$f" | tr -d '\n')
   pid=$(num "$rec" pid)
   [ -n "$pid" ] && [ -d "/proc/$pid" ] || continue
+  seen="$seen$pid "
   [ "$(starttime "$pid")" = "$(field "$rec" procStart)" ] || continue
   in=0; under "$pid" && in=1
   printf 'R\t%s\t%s\n' "$in" "$(printf '%s' "$rec" | base64 | tr -d '\n')"
@@ -47,4 +50,23 @@ for f in "$HOME"/.claude/sessions/*.json; do
     done
   fi
   printf 'O\t%s\t%s\n' "$sid" "$size"
+done
+# Claude Code under this connection that is someone else's (a `su -` to root,
+# say): its record cannot be read, but that it runs there can be shown.
+is_claude() {
+  a0=$(tr '\0' '\n' < "/proc/$1/cmdline" 2>/dev/null | head -n 2 | tr '\n' ' ')
+  case "$a0" in *bg-pty-host*|*" daemon "*) return 1;; esac
+  case "${a0%% *}" in claude|claude.exe|*/claude|*/claude.exe) return 0;; esac
+  case "$a0" in node\ */claude-code/*|*/node\ */claude-code/*) return 0;; esac
+  return 1
+}
+for d in /proc/[0-9]*; do
+  pid=${d#/proc/}
+  case "$seen" in *" $pid "*) continue;; esac
+  is_claude "$pid" || continue
+  is_claude "$(parent "$pid")" && continue
+  under "$pid" || continue
+  user=$(stat -c %U "$d" 2>/dev/null)
+  case "$user" in ''|*[!A-Za-z0-9._-]*) continue;; esac
+  printf 'U\t%s\t%s\n' "$pid" "$user"
 done

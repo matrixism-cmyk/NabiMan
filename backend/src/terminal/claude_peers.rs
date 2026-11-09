@@ -75,9 +75,10 @@ pub(crate) struct Seen {
     pub notes: HashMap<String, (u64, String)>,
 }
 
-/// The id a remote Claude session with no tile goes by among the tiles.
-pub(crate) fn ghost_id(server_id: &str, session_id: &str) -> String {
-    format!("rc:{server_id}:{session_id}")
+/// The id a remote Claude session with no tile goes by among the tiles: its
+/// server, conversation and process (one conversation may run in several).
+pub(crate) fn ghost_id(server_id: &str, p: &super::claude_remote::RemoteClaude) -> String {
+    format!("rc:{server_id}:{}", p.key())
 }
 
 /// A running Claude Code background session, as a tile opens it.
@@ -224,7 +225,7 @@ fn scan() -> HashMap<String, Seen> {
 fn add_remote(remote: &super::claude_remote::Snapshot, seen: &mut HashMap<String, Seen>) {
     for p in &remote.peers {
         let server = remote.servers.get(&p.server_id).cloned().unwrap_or_else(|| p.server_id.clone());
-        let card = p.tile.clone().unwrap_or_else(|| ghost_id(&p.server_id, &p.session_id));
+        let card = p.tile.clone().unwrap_or_else(|| ghost_id(&p.server_id, p));
         let name = if p.name.is_empty() { base_name(&p.cwd) } else { p.name.clone() };
         let peer = ClaudePeer {
             address: p.bridge.as_ref().map(|b| format!("bridge:{b}")).unwrap_or_else(|| name.clone()),
@@ -277,12 +278,19 @@ fn link(found: &[(Record, String)], remote: &super::claude_remote::Snapshot, see
     }
     let mut remote_card: HashMap<(&str, &str), String> = HashMap::new();
     for p in &remote.peers {
-        let c = p.tile.clone().unwrap_or_else(|| ghost_id(&p.server_id, &p.session_id));
+        if p.sock.is_empty() {
+            continue; // no address (another user's Claude): nothing reaches or leaves it here
+        }
+        let c = p.tile.clone().unwrap_or_else(|| ghost_id(&p.server_id, p));
         card.insert(format!("{}|uds:{}", p.server_id, p.sock), c.clone());
         if let Some(b) = &p.bridge {
             card.insert(format!("bridge:{b}"), c.clone());
         }
-        remote_card.insert((p.server_id.as_str(), p.session_id.as_str()), c);
+        // A conversation open in several Claudes writes one transcript: its
+        // messages go to the one in a tile, if any.
+        if p.tile.is_some() || !remote_card.contains_key(&(p.server_id.as_str(), p.session_id.as_str())) {
+            remote_card.insert((p.server_id.as_str(), p.session_id.as_str()), c);
+        }
     }
     let sender = |machine: &str, from: &str| -> Option<String> {
         let from = unescape(from);

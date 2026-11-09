@@ -78,8 +78,18 @@ pub(crate) struct RemoteClaude {
     /// Its Remote Control session, when that is on.
     pub bridge: Option<String>,
     pub session_id: String,
+    /// Its process on that machine: one conversation may be open in several
+    /// (`claude -c` in two terminals), each its own Claude.
+    pub pid: u32,
     /// The NabiMan session (tmux name) whose connection it runs under.
     pub tile: Option<String>,
+}
+
+impl RemoteClaude {
+    /// One running Claude: its conversation and its process.
+    pub(crate) fn key(&self) -> String {
+        format!("{}:{}", self.session_id, self.pid)
+    }
 }
 
 /// A peer message a remote session received: (server, receiver's session id,
@@ -232,22 +242,27 @@ fn look_once(store: &PtyStore) {
             st.got.drain(..cut);
         }
         let _ = offsets;
-        let seen = fresh.entry(server_id.clone()).or_default();
-        for peer in found.peers {
-            match seen.get_mut(&peer.session_id) {
-                Some(have) if have.tile.is_none() && peer.tile.is_some() => *have = peer,
-                Some(_) => {}
-                None => {
-                    seen.insert(peer.session_id.clone(), peer);
-                }
-            }
-        }
+        merge(fresh.entry(server_id.clone()).or_default(), found.peers);
     }
     let mut s = state().lock().unwrap_or_else(|e| e.into_inner());
     s.tried = tiles.iter().map(|t| t.2.clone()).collect();
     for (server, peers) in fresh {
         if ok_servers.contains(&server) {
             s.servers.entry(server).or_default().peers = peers;
+        }
+    }
+}
+
+/// Adds what one tile's probe found to its server's sessions: each running
+/// Claude once, claimed by the tile it runs under.
+fn merge(seen: &mut HashMap<String, RemoteClaude>, peers: Vec<RemoteClaude>) {
+    for peer in peers {
+        match seen.get_mut(&peer.key()) {
+            Some(have) if have.tile.is_none() && peer.tile.is_some() => *have = peer,
+            Some(_) => {}
+            None => {
+                seen.insert(peer.key(), peer);
+            }
         }
     }
 }
@@ -400,7 +415,27 @@ fn parse(out: &str, server_id: &str, tmux_name: &str) -> Found {
                     sock: clip(&s("messagingSocketPath"), 300),
                     bridge,
                     session_id,
+                    pid: v.get("pid").and_then(serde_json::Value::as_u64).and_then(|p| u32::try_from(p).ok()).unwrap_or(0),
                     tile: (*under == "1").then(|| tmux_name.to_string()),
+                });
+            }
+            ["U", pid, user] => {
+                // Someone else's Claude under this tile (after `su -`): its
+                // record is not readable, so no address; it is shown as running.
+                let (Ok(pid), user) = (pid.trim().parse::<u32>(), user.trim()) else { continue };
+                if user.is_empty() || user.len() > 32 || !user.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c)) {
+                    continue;
+                }
+                found.peers.push(RemoteClaude {
+                    server_id: server_id.to_string(),
+                    name: format!("Claude ({user})"),
+                    cwd: String::new(),
+                    busy: false,
+                    sock: String::new(),
+                    bridge: None,
+                    session_id: String::new(),
+                    pid,
+                    tile: Some(tmux_name.to_string()),
                 });
             }
             ["O", sid, size] => {
@@ -450,6 +485,32 @@ mod tests {
         assert_eq!(got.peers[1].tile, None, "not under this tile's connection");
         assert_eq!(got.sizes, vec![("0bb8-ab5".to_string(), 1234)]);
         assert_eq!(got.messages, vec![("0bb8-ab5".to_string(), "bridge:session_01CD".to_string(), 1793890578, "m1".to_string(), "배포 확인해 줘".to_string())]);
+    }
+
+    #[test]
+    fn someone_else_s_claude_under_the_tile_shows_without_an_address() {
+        let got = parse("C\t9\nU\t1855021\tmaster\nU\tx\troot\nU\t5\tro ot\n", "spark", "nb_c");
+        assert_eq!(got.peers.len(), 1);
+        let p = &got.peers[0];
+        assert_eq!((p.name.as_str(), p.pid, p.tile.as_deref(), p.sock.as_str()), ("Claude (master)", 1855021, Some("nb_c"), ""));
+    }
+
+    #[test]
+    fn one_conversation_open_in_several_claudes_shows_each() {
+        // spark: `claude -c` in two tiles and a desktop terminal, one conversation.
+        let rec = |pid: u32, name: &str| b64_encode(format!(r#"{{"pid":{pid},"sessionId":"c9ab-04","cwd":"/home","name":"{name}","status":"idle","messagingSocketPath":"/run/{pid}.sock"}}"#).as_bytes());
+        let tile_a = format!("R\t1\t{}\nR\t0\t{}\nR\t0\t{}\n", rec(1807, "home-f7"), rec(412, "home-6a"), rec(54, "home-ba"));
+        let tile_b = format!("R\t0\t{}\nR\t1\t{}\nR\t0\t{}\n", rec(1807, "home-f7"), rec(412, "home-6a"), rec(54, "home-ba"));
+        let mut seen = HashMap::new();
+        merge(&mut seen, parse(&tile_a, "spark", "nb_a").peers);
+        merge(&mut seen, parse(&tile_b, "spark", "nb_b").peers);
+        let mut got: Vec<(String, Option<String>)> = seen.values().map(|p| (p.name.clone(), p.tile.clone())).collect();
+        got.sort();
+        assert_eq!(got, vec![
+            ("home-6a".into(), Some("nb_b".into())),
+            ("home-ba".into(), None),
+            ("home-f7".into(), Some("nb_a".into())),
+        ]);
     }
 
     #[test]
