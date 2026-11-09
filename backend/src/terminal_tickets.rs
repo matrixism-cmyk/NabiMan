@@ -86,6 +86,7 @@ fn valid_query(query: &str) -> bool {
                     | "start_title"
                     | "claude_skip"
                     | "claude_continue"
+                    | "claude_attach"
             ) && keys.insert(k)
         })
 }

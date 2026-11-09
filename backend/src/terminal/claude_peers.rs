@@ -80,6 +80,36 @@ pub(crate) fn ghost_id(server_id: &str, session_id: &str) -> String {
     format!("rc:{server_id}:{session_id}")
 }
 
+/// A running Claude Code background session, as a tile opens it.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Background {
+    /// Its owner: the tile runs `claude attach` as them.
+    pub uid: u32,
+    /// What `claude attach` takes: letters, digits, `-` and `_` only.
+    pub job: String,
+    pub cwd: String,
+    pub name: String,
+}
+
+fn safe_job(job: &str) -> bool {
+    !job.is_empty() && job.len() <= 64 && job.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+/// The live background session whose card is `lc:<session id>`; `None` for
+/// anything else (a tile's session, one that ended, a made-up id).
+pub(crate) fn background(card: &str) -> Option<Background> {
+    let session = card.strip_prefix("lc:")?;
+    session_files().into_iter().filter_map(|p| read_record(&p)).find_map(|rec| {
+        let job = if rec.job.is_empty() { rec.session_id.chars().take(8).collect() } else { rec.job.clone() };
+        (rec.background && !session.is_empty() && rec.session_id == session && safe_job(&job) && alive(&rec)).then(|| Background {
+            uid: rec.uid,
+            job,
+            name: if rec.name.is_empty() { base_name(&rec.cwd) } else { rec.name.clone() },
+            cwd: rec.cwd,
+        })
+    })
+}
+
 /// The id a Claude session on this machine outside every tile goes by.
 pub(crate) fn local_ghost_id(rec_session: &str, sock: &str) -> String {
     if rec_session.is_empty() { format!("lc:{}", base_name(sock)) } else { format!("lc:{rec_session}") }
@@ -345,6 +375,8 @@ struct Record {
     bridge: Option<String>,
     /// A Claude Code background session (`kind: bg`), run by its daemon rather than a terminal.
     background: bool,
+    /// The id `claude attach` takes for a background session (its `jobId`).
+    job: String,
     /// Who wrote the file.
     uid: u32,
     /// The record's own path, under the account's `.claude` folder.
@@ -375,6 +407,7 @@ fn parse_record(text: &str, uid: u32, file: &Path) -> Option<Record> {
         session_id: s("sessionId"),
         bridge: Some(s("bridgeSessionId")).filter(|b| !b.is_empty()),
         background: s("kind") == "bg",
+        job: s("jobId"),
         uid,
         file: file.to_path_buf(),
     };
@@ -385,9 +418,6 @@ fn clip(s: &str, n: usize) -> String {
     s.chars().filter(|c| !c.is_control()).take(n).collect()
 }
 
-/// The tmux session the record's process runs in, if it is still that
-/// process, the file's owner runs it, and a pane of this tmux server's is
-/// among its parents.
 /// The record's process is running: same owner, same start time (not a reused pid).
 fn alive(rec: &Record) -> bool {
     let proc_dir = PathBuf::from(format!("/proc/{}", rec.pid));
@@ -396,6 +426,9 @@ fn alive(rec: &Record) -> bool {
     owner == Some(rec.uid) && start.as_deref() == Some(rec.proc_start.as_str())
 }
 
+/// The tmux session the record's process runs in, if it is still that
+/// process, the file's owner runs it, and a pane of this tmux server's is
+/// among its parents.
 fn session_of(rec: &Record, panes: &Panes) -> Option<String> {
     if !alive(rec) {
         return None;
@@ -431,7 +464,7 @@ fn up_to_pane(mut pid: u32, panes: &Panes, parent: impl Fn(u32) -> Option<u32>) 
 }
 
 /// The start time (field 22) and parent (field 4) in `/proc/<pid>/stat`.
-fn stat_fields(stat: &str) -> Option<(String, u32)> {
+pub(crate) fn stat_fields(stat: &str) -> Option<(String, u32)> {
     // The command name (field 2) may hold spaces and parentheses.
     let rest: Vec<&str> = stat[stat.rfind(')')? + 1..].split_whitespace().collect();
     Some((rest.get(19)?.to_string(), rest.get(1)?.parse().ok()?))
@@ -463,6 +496,17 @@ fn base_name(path: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_background_record_keeps_the_id_attach_takes() {
+        let rec = parse_record(r#"{"pid":7,"procStart":"1","messagingSocketPath":"/s","sessionId":"cd2cae1c-62","kind":"bg","jobId":"cd2cae1c","cwd":"/w"}"#, 1000, Path::new("/x")).unwrap();
+        assert!(rec.background);
+        assert_eq!(rec.job, "cd2cae1c");
+        assert!(safe_job("cd2cae1c") && !safe_job("a b") && !safe_job("x';rm") && !safe_job(""));
+        assert_eq!(background("lc:cd2cae1c-62"), None, "a record whose process is not running opens nothing");
+        assert_eq!(background("rc:x:y"), None);
+    }
+
     use super::*;
 
     #[test]

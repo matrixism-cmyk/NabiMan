@@ -62,3 +62,11 @@ it('starts Claude Code only when opening a new local session, never on rejoin', 
   expect(rejoin).not.toContain('start_');
   expect(rejoin).not.toContain('claude_');
 });
+
+it('opening a background Claude session sends only its card id', () => {
+  const start = { user: '', dir: '', skipPermissions: false, resume: false, title: 'n8n', attach: 'lc:fb91fc72-97e3' };
+  const url = buildTerminalUrl({ settings: DEFAULT_TERMINAL_SETTINGS, target: { kind: 'local', start }, sessionId: '', join: false, cols: 80, rows: 24 });
+  expect(url).toContain('&claude_attach=lc%3Afb91fc72-97e3&start_title=n8n');
+  expect(url).not.toContain('start_user');
+  expect(url).not.toContain('claude_skip');
+});

@@ -34,6 +34,9 @@ pub(crate) struct Start {
     /// Drop to root's shell when the user's shell ends, as `su` by hand does.
     /// Sessions opened by a program end with the user's shell instead.
     pub root_shell_after: bool,
+    /// Open this Claude Code background session (`claude attach <job>`)
+    /// instead of starting a new conversation.
+    pub attach: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -61,6 +64,16 @@ fn accounts_in(passwd: &str, home_exists: impl Fn(&str) -> bool) -> Vec<Account>
             home_exists(f[5]).then(|| Account { name: f[0].to_string(), home: f[5].to_string() })
         })
         .collect()
+}
+
+/// The account with this uid, if it may run a shell here.
+fn user_of(uid: u32) -> Option<Account> {
+    let passwd = fs::read_to_string("/etc/passwd").unwrap_or_default();
+    let name = passwd.lines().find_map(|l| {
+        let f: Vec<&str> = l.split(':').collect();
+        (f.len() >= 7 && f[2].parse::<u32>().ok() == Some(uid)).then(|| f[0].to_string())
+    })?;
+    accounts().into_iter().find(|a| a.name == name)
 }
 
 pub(crate) fn accounts() -> Vec<Account> {
@@ -96,6 +109,15 @@ fn param(query: &str, key: &str) -> Option<String> {
 
 /// The start the query asks for, checked; `None` when it asks for none.
 pub(crate) fn from_query(query: &str) -> Result<Option<Start>, String> {
+    if let Some(card) = param(query, "claude_attach") {
+        // Only a background session running here, as its owner, in its folder:
+        // nothing from the query reaches the command but the id it matched.
+        let bg = super::claude_peers::background(&card).ok_or("그 백그라운드 세션이 이제 없습니다 / that background session is gone")?;
+        let owner = user_of(bg.uid).ok_or("세션 주인 계정을 찾지 못했습니다 / its owner has no usable account here")?;
+        let dir = if Path::new(&bg.cwd).is_dir() { bg.cwd } else { owner.home };
+        let title = bg.name.chars().filter(|c| !c.is_control()).take(MAX_TITLE_LEN).collect();
+        return Ok(Some(Start { user: owner.name, dir, skip_permissions: false, resume: false, title, prompt: None, root_shell_after: true, attach: Some(bg.job) }));
+    }
     let Some(user) = param(query, "start_user") else {
         return Ok(None);
     };
@@ -118,7 +140,7 @@ pub(crate) fn from_query(query: &str) -> Result<Option<Start>, String> {
         .filter(|c| !c.is_control())
         .take(MAX_TITLE_LEN)
         .collect();
-    Ok(Some(Start { user, dir, skip_permissions: on("claude_skip"), resume: on("claude_continue"), title, prompt: None, root_shell_after: true }))
+    Ok(Some(Start { user, dir, skip_permissions: on("claude_skip"), resume: on("claude_continue"), title, prompt: None, root_shell_after: true, attach: None }))
 }
 
 /// One word for a POSIX shell, whatever it holds.
@@ -140,10 +162,14 @@ fn quote(s: &str) -> String {
 /// job control, `/dev/tty` and window resizes working for Claude Code.
 pub(crate) fn command(start: &Start) -> String {
     let mut claude = String::from("claude");
-    if start.skip_permissions {
+    if let Some(job) = &start.attach {
+        claude.push_str(" attach ");
+        claude.push_str(&quote(job));
+    }
+    if start.skip_permissions && start.attach.is_none() {
         claude.push_str(" --dangerously-skip-permissions");
     }
-    if start.resume {
+    if start.resume && start.attach.is_none() {
         claude.push_str(" -c");
     }
     if let Some(prompt) = start.prompt.as_deref().filter(|p| !p.is_empty()) {
@@ -268,7 +294,19 @@ mod tests {
     use super::*;
 
     fn start(user: &str, dir: &str, skip: bool, resume: bool) -> Start {
-        Start { user: user.into(), dir: dir.into(), skip_permissions: skip, resume, title: String::new(), prompt: None, root_shell_after: true }
+        Start { user: user.into(), dir: dir.into(), skip_permissions: skip, resume, title: String::new(), prompt: None, root_shell_after: true, attach: None }
+    }
+
+    #[test]
+    fn a_background_session_opens_with_claude_attach_as_its_owner() {
+        let st = Start { attach: Some("cd2cae1c".into()), skip_permissions: true, resume: true, ..start("nabi", "/workspace/a b", false, false) };
+        assert_eq!(
+            command(&st),
+            r"su --pty -l nabi -c 'cd '\''/workspace/a b'\'' && claude attach '\''cd2cae1c'\''; exec bash -l'; exec bash -l"
+        );
+        // Only a live background session's card opens one; anything else is refused.
+        assert!(from_query("claude_attach=lc%3Ano-such-session").is_err());
+        assert!(from_query("claude_attach=pty_123").is_err());
     }
 
     #[test]
@@ -376,6 +414,6 @@ mod tests {
         assert!(from_query("start_user=root&start_dir=%2Fno%2Fsuch%2Fdir").is_err());
         assert!(from_query("start_user=root&start_dir=%2Ftmp%ZZ").is_err(), "a broken escape is no directory");
         let got = from_query("start_user=root&start_dir=%2Ftmp&claude_skip=1&claude_continue=0&start_title=%EB%82%98%EB%B9%84").unwrap().unwrap();
-        assert_eq!(got, Start { user: "root".into(), dir: "/tmp".into(), skip_permissions: true, resume: false, title: "나비".into(), prompt: None, root_shell_after: true });
+        assert_eq!(got, Start { user: "root".into(), dir: "/tmp".into(), skip_permissions: true, resume: false, title: "나비".into(), prompt: None, root_shell_after: true, attach: None });
     }
 }

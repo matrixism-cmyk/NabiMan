@@ -40,9 +40,14 @@ export function buildTerminalUrl({ settings, target, sessionId, join, cols, rows
   // Only a brand new local session starts Claude Code; rejoining never reruns it.
   if (target.kind === 'local' && target.start && !sessionId) {
     const st = target.start;
+    if (st.attach) {
+      url += `&claude_attach=${encodeURIComponent(st.attach)}`;
+      if (st.title) url += `&start_title=${encodeURIComponent(st.title)}`;
+    } else {
     url += `&start_user=${encodeURIComponent(st.user)}&start_dir=${encodeURIComponent(st.dir)}`;
     if (st.title) url += `&start_title=${encodeURIComponent(st.title)}`;
     url += `&claude_skip=${st.skipPermissions ? 1 : 0}&claude_continue=${st.resume ? 1 : 0}`;
+    }
   }
   if (target.kind === 'ssh') {
     if (target.serverId) {

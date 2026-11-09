@@ -70,6 +70,8 @@ interface Props {
   /** Every session, when `sessions` is one target's: badges count work handed
    *  to or from sessions not on this list (arrows join only those shown). */
   context?: SessionInfo[];
+  /** Opens a Claude Code background session (an `lc:` card) in a new tile. */
+  onOpenBackground?: (card: RemoteClaudeCard) => void;
   /** Which Claude cards (sessions under no tile) belong here, by id prefix:
    *  all when unset, `lc:` this machine's, `rc:<server>:` one server's. */
   cardPrefix?: string;
@@ -77,7 +79,7 @@ interface Props {
 
 /** Every shell running on the server, with a look at what is on each screen. */
 export default function SessionsView({
-  sessions, currentSessionId, onRefresh, onAttach, onPopOut, onShare, title, actions, empty, context, cardPrefix,
+  sessions, currentSessionId, onRefresh, onAttach, onPopOut, onShare, title, actions, empty, context, cardPrefix, onOpenBackground,
 }: Props) {
   const { t } = useT();
   const member = useMember();
@@ -349,6 +351,18 @@ export default function SessionsView({
                 {r.server ? t('claudeRemote.noTile', { server: r.server }) : t(r.background ? 'claudeRemote.localBackground' : 'claudeRemote.localNoTile')}
               </code>
               <ClaudeAddress variant="card" peers={r.claude} />
+              {!r.server && r.background && (
+                <>
+                  <p className="text-secondary session-card-note">{t('claudeRemote.backgroundNote')}</p>
+                  {onOpenBackground && (
+                    <div className="session-actions">
+                      <button className="btn btn-primary btn-sm" onClick={() => onOpenBackground(r)} title={t('claudeRemote.openHint')}>
+                        {t('claudeRemote.open')}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           );
         })}

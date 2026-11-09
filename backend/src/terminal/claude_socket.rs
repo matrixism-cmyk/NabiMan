@@ -258,6 +258,7 @@ fn open(ask: Ask, uid: u32, pid: u32, store: &PtyStore) -> Answer {
         title: title.clone(),
         prompt: ask.prompt.filter(|p| !p.trim().is_empty()),
         root_shell_after: false,
+        attach: None,
     };
 
     let (sid, tmux_name) = {

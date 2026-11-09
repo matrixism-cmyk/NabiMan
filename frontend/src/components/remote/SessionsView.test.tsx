@@ -160,7 +160,8 @@ it('a background Claude session on this machine gets a card, and one target\'s l
   const five:SessionInfo={...session,id:'pty_5g',label:'local',title:'5gmec',state:'alive',claude:peer('5gmec-9a')};
   const lead:SessionInfo={...session,id:'pty_lead',label:'ssh:a@b:22',title:'lead',state:'alive',busy:true,orchestrator:true,claude:peer('lead-1'),directs:['pty_5g']};
   // The local list: only local tiles and `lc:` cards; the remote leader is elsewhere.
-  const { container } = render(<I18nProvider><SessionsView sessions={[five]} context={[five,lead]} cardPrefix="lc:" onRefresh={jest.fn()} onAttach={jest.fn()} onPopOut={jest.fn()}/></I18nProvider>);
+  const open=jest.fn();
+  const { container } = render(<I18nProvider><SessionsView sessions={[five]} context={[five,lead]} cardPrefix="lc:" onOpenBackground={open} onRefresh={jest.fn()} onAttach={jest.fn()} onPopOut={jest.fn()}/></I18nProvider>);
   const card=await waitFor(()=>{ const c=container.querySelector('[data-session-id="lc:fb91fc72"]'); expect(c).not.toBeNull(); return c as HTMLElement; });
   expect(card).toHaveClass('is-orchestrator');
   expect(screen.getByText('이 서버 · 백그라운드')).toBeInTheDocument();
@@ -169,4 +170,8 @@ it('a background Claude session on this machine gets a card, and one target\'s l
   expect(Array.from(container.querySelectorAll('.session-link')).map((p)=>p.getAttribute('data-link'))).toEqual(['lc:fb91fc72>pty_5g']);
   // The 5gmec tile is led by the background session (an orchestrator outranks the other leader).
   expect(screen.getByText('← n8n 설치')).toBeInTheDocument();
+  // It says what it is, and opens in a tile.
+  expect(screen.getByText(/터미널 없이 따로 돌리는 세션/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'타일에서 열기'}));
+  expect(open).toHaveBeenCalledWith(expect.objectContaining({id:'lc:fb91fc72'}));
 });

@@ -5,7 +5,7 @@
 mod tmux_operations;
 use tmux_operations::write_tmux_conf;
 pub(crate) use tmux_operations::{
-    capture_scrollback, client_size, close_tmux_session, create_tmux_session, exact_session,
+    capture_scrollback, client_size, create_tmux_session, exact_session,
     pane_preview, paste_into_pane, pipe_pane_record, rename_tmux_window, tmux, tmux_session_exists,
     tmux_session_state,
 };
@@ -16,6 +16,77 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use super::settings::default_scrollback;
 use crate::ssh_auth;
+
+/// Closes the tmux session, then hangs up what ran under its panes.
+///
+/// Closing a pane hangs up only its own terminal; `su` (and `su --pty`)
+/// starts the user's command in a session of its own, so the shell, Claude
+/// Code and anything else started there would live on as orphans, as they
+/// did for "＋ Claude 세션" tiles. Every process found under the panes before
+/// the close gets the SIGHUP a terminal hangup would have sent it: what
+/// ignores that (`nohup`) keeps running, as it would anywhere.
+pub(crate) fn close_tmux_session(name: &str) -> std::io::Result<()> {
+    let under = processes_under(&pane_pids(name));
+    tmux_operations::close_tmux_session(name)?;
+    if !under.is_empty() {
+        std::thread::spawn(move || {
+            // Let tmux finish its own hangup first.
+            std::thread::sleep(Duration::from_millis(300));
+            hang_up(&under);
+        });
+    }
+    Ok(())
+}
+
+fn pane_pids(name: &str) -> Vec<u32> {
+    let Ok(out) = tmux().args(["list-panes", "-s", "-t", &exact_session(name), "-F", "#{pane_pid}"]).output() else {
+        return Vec::new();
+    };
+    String::from_utf8_lossy(&out.stdout).lines().filter_map(|l| l.trim().parse().ok()).collect()
+}
+
+/// Every process below the given ones, with its start time (so a pid reused
+/// later is never signalled).
+fn processes_under(roots: &[u32]) -> Vec<(u32, String)> {
+    if roots.is_empty() {
+        return Vec::new();
+    }
+    let mut children: HashMap<u32, Vec<(u32, String)>> = HashMap::new();
+    for entry in std::fs::read_dir("/proc").into_iter().flatten().flatten() {
+        let Some(pid) = entry.file_name().to_str().and_then(|n| n.parse::<u32>().ok()) else { continue };
+        let Some((start, parent)) = std::fs::read_to_string(entry.path().join("stat")).ok().and_then(|s| super::claude_peers::stat_fields(&s)) else {
+            continue;
+        };
+        children.entry(parent).or_default().push((pid, start));
+    }
+    descendants(roots, &children)
+}
+
+fn descendants(roots: &[u32], children: &HashMap<u32, Vec<(u32, String)>>) -> Vec<(u32, String)> {
+    let mut out = Vec::new();
+    let mut queue: Vec<u32> = roots.to_vec();
+    while let Some(p) = queue.pop() {
+        for (c, start) in children.get(&p).into_iter().flatten() {
+            if *c > 1 && !out.iter().any(|(o, _)| o == c) {
+                out.push((*c, start.clone()));
+                queue.push(*c);
+            }
+        }
+    }
+    out
+}
+
+fn hang_up(procs: &[(u32, String)]) {
+    for (pid, start) in procs {
+        let now = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok().and_then(|s| super::claude_peers::stat_fields(&s));
+        if now.is_some_and(|(s, _)| &s == start) {
+            if let Ok(p) = i32::try_from(*pid) {
+                // SAFETY: kill(2) with a pid read from /proc whose start time still matches.
+                unsafe { libc::kill(p, libc::SIGHUP) };
+            }
+        }
+    }
+}
 
 pub(crate) const CLEANUP_INTERVAL: Duration = Duration::from_secs(60);
 pub(crate) const MAX_SCROLLBACK: u32 = 200_000;
@@ -197,5 +268,24 @@ impl crate::stream_access::ConnectionGrant {
     /// Whether this account may see `session` (its own, or one shared with it).
     pub(crate) fn can_access_session(&self, session: &TmuxSession) -> bool {
         visible_to(session, &self.user_id, &self.users)
+    }
+}
+
+#[cfg(test)]
+mod hangup_tests {
+    use super::*;
+
+    #[test]
+    fn a_closed_session_hangs_up_everything_under_its_panes() {
+        let mut children: HashMap<u32, Vec<(u32, String)>> = HashMap::new();
+        // pane 10 → su 11 → bash 12 → claude 13; another pane's 20 → 21 is left alone.
+        children.insert(10, vec![(11, "a".into())]);
+        children.insert(11, vec![(12, "b".into())]);
+        children.insert(12, vec![(13, "c".into())]);
+        children.insert(20, vec![(21, "d".into())]);
+        let mut got: Vec<u32> = descendants(&[10], &children).into_iter().map(|(p, _)| p).collect();
+        got.sort_unstable();
+        assert_eq!(got, vec![11, 12, 13]);
+        assert!(processes_under(&[]).is_empty());
     }
 }

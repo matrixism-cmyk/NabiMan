@@ -29,6 +29,9 @@ export interface ClaudeStart {
   resume: boolean;
   /** The session's name in the list. */
   title?: string;
+  /** Open this Claude Code background session (its `lc:` card id) with
+   *  `claude attach`, as its owner, instead of starting a conversation. */
+  attach?: string;
 }
 
 export type TerminalStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'ended';
