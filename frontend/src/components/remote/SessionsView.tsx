@@ -224,7 +224,7 @@ export default function SessionsView({
 
       {message && <div role="alert" className="message">{message}</div>}
       {orderError && <div role="alert" className="message">{t('sessionOrder.saveFailed')}</div>}
-      <div className="session-grid" ref={setGrid}>
+      <div className={`session-grid ${links.length ? 'has-links' : ''}`} ref={setGrid}>
         <SessionLinks grid={grid} links={links} layout={[...shownIds, ...remote.map((r) => r.id)].join(',')} />
         {shownInOrder.map(session => {
           const state = session.state === undefined ? (session.alive ? 'alive' : 'ended') :

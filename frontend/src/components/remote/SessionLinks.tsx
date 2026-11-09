@@ -20,34 +20,111 @@ interface Props {
 
 interface Drawn { key: string; d: string; orchestrator: boolean; live: boolean; note?: string }
 
-/** Where the line from a box's centre towards a point leaves the box, a little outside it. */
-function exit(r: DOMRect, x: number, y: number, gap = 4) {
-  const cx = r.left + r.width / 2;
-  const cy = r.top + r.height / 2;
-  const dx = x - cx;
-  const dy = y - cy;
-  if (!dx && !dy) return { x: cx, y: cy };
-  const t = Math.min(dx ? (r.width / 2 + gap) / Math.abs(dx) : Infinity, dy ? (r.height / 2 + gap) / Math.abs(dy) : Infinity);
-  return { x: cx + dx * t, y: cy + dy * t };
+/** A card's box, relative to the grid. */
+export interface Box { l: number; t: number; r: number; b: number }
+type Pt = [number, number];
+
+const cx = (k: Box) => (k.l + k.r) / 2;
+/** How far an arrow stops short of the card it points at, so its head is seen. */
+const STOP = 3;
+
+/** A line through the points with its corners rounded. */
+export function rounded(points: Pt[], radius = 8): string {
+  const pts = points.filter((p, i) => i === 0 || p[0] !== points[i - 1][0] || p[1] !== points[i - 1][1]);
+  const f = (n: number) => n.toFixed(1);
+  let d = `M${f(pts[0][0])},${f(pts[0][1])}`;
+  for (let i = 1; i < pts.length - 1; i += 1) {
+    const [p, q, n] = [pts[i - 1], pts[i], pts[i + 1]];
+    const into = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    const out = Math.hypot(n[0] - q[0], n[1] - q[1]);
+    const r = Math.min(radius, into / 2, out / 2);
+    const a: Pt = [q[0] - ((q[0] - p[0]) / into) * r, q[1] - ((q[1] - p[1]) / into) * r];
+    const c: Pt = [q[0] + ((n[0] - q[0]) / out) * r, q[1] + ((n[1] - q[1]) / out) * r];
+    d += ` L${f(a[0])},${f(a[1])} Q${f(q[0])},${f(q[1])} ${f(c[0])},${f(c[1])}`;
+  }
+  const last = pts[pts.length - 1];
+  return `${d} L${f(last[0])},${f(last[1])}`;
 }
+
+/**
+ * The way from one card to another through the gaps between cards, never
+ * across one: straight to a neighbour, otherwise along the row gap below
+ * (or above) the source, down (or up) the column gap beside the target, and
+ * in along the row gap next to it. `lane` shifts the line within the gaps so
+ * arrows sharing one stay apart; `gx`/`gy` are the grid's column/row gaps.
+ */
+export function route(a: Box, b: Box, cards: Box[], gx: number, gy: number, lane = 0): Pt[] {
+  const rowsOverlap = a.t < b.b && b.t < a.b;
+  const colsOverlap = a.l < b.r && b.l < a.r;
+  const between = (k: Box) => k !== a && k !== b;
+  if (rowsOverlap) {
+    const [left, right] = a.l < b.l ? [a, b] : [b, a];
+    const blocked = cards.some((k) => between(k) && k.t < Math.min(a.b, b.b) && Math.max(a.t, b.t) < k.b && k.l >= left.r - 1 && k.r <= right.l + 1);
+    if (!blocked) {
+      const y = (Math.max(a.t, b.t) + Math.min(a.b, b.b)) / 2 + lane;
+      const dir = b.l > a.l ? 1 : -1;
+      return [[dir > 0 ? a.r : a.l, y], [dir > 0 ? b.l - STOP : b.r + STOP, y]];
+    }
+    // Others between them in the row: under the row and up into the target.
+    const y = Math.max(a.b, b.b) + gy / 2 + lane;
+    return [[cx(a) + lane, a.b], [cx(a) + lane, y], [cx(b) + lane, y], [cx(b) + lane, b.b + STOP]];
+  }
+  const down = b.t >= a.b;
+  const leave = down ? a.b : a.t;
+  const enter = down ? b.t - STOP : b.b + STOP;
+  const gapNearA = down ? a.b + gy / 2 : a.t - gy / 2;
+  const gapNearB = down ? b.t - gy / 2 : b.b + gy / 2;
+  const blockedColumn = colsOverlap && cards.some((k) => between(k) && k.l < Math.min(a.r, b.r) && Math.max(a.l, b.l) < k.r
+    && (down ? k.t >= a.b - 1 && k.b <= b.t + 1 : k.t >= b.b - 1 && k.b <= a.t + 1));
+  if (colsOverlap && !blockedColumn) {
+    const x = (Math.max(a.l, b.l) + Math.min(a.r, b.r)) / 2 + lane;
+    return [[x, leave], [x, enter]];
+  }
+  const sx = cx(a) + lane;
+  const tx = cx(b) + lane;
+  // Next rows: across the one gap between them.
+  if (Math.abs(gapNearA - gapNearB) < gy) {
+    const y = (gapNearA + gapNearB) / 2 + lane;
+    return [[sx, leave], [sx, y], [tx, y], [tx, enter]];
+  }
+  // Rows apart: down the column gap on the source's side of the target
+  // (beside the column, for one in the same column).
+  let x: number;
+  if (colsOverlap) {
+    const right = Math.max(...cards.map((k) => k.r));
+    x = a.r + gx < right ? a.r + gx / 2 : a.l - gx / 2;
+  } else {
+    x = cx(b) > cx(a) ? b.l - gx / 2 : b.r + gx / 2;
+  }
+  x += lane;
+  return [[sx, leave], [sx, gapNearA + lane], [x, gapNearA + lane], [x, gapNearB + lane], [tx, gapNearB + lane], [tx, enter]];
+}
+
+/** Offsets for the arrows, so two in one gap are not drawn on top of each other: 0, +s, -s, +2s… within the gap. */
+const laneOf = (i: number, gap: number) => {
+  const step = Math.max(4, Math.round(gap / 5));
+  const room = Math.max(0, gap / 2 - 2);
+  const n = Math.ceil(i / 2) * step * (i % 2 ? 1 : -1);
+  return Math.max(-room, Math.min(room, n));
+};
 
 function draw(grid: HTMLDivElement, links: SessionLink[]): Drawn[] {
   const box = grid.getBoundingClientRect();
-  const card = (id: string) => grid.querySelector<HTMLElement>(`[data-session-id="${id.replace(/["\\]/g, '\\$&')}"]`);
+  const style = getComputedStyle(grid);
+  const gx = parseFloat(style.columnGap) || 12;
+  const gy = parseFloat(style.rowGap) || 12;
+  const rel = (r: DOMRect): Box => ({ l: r.left - box.left, t: r.top - box.top, r: r.right - box.left, b: r.bottom - box.top });
+  const byId = new Map<string, Box>();
+  grid.querySelectorAll<HTMLElement>('[data-session-id]').forEach((el) => byId.set(el.dataset.sessionId || '', rel(el.getBoundingClientRect())));
+  const cards = Array.from(byId.values());
   const out: Drawn[] = [];
-  for (const l of links) {
-    const a = card(l.from)?.getBoundingClientRect();
-    const b = card(l.to)?.getBoundingClientRect();
-    if (!a || !b) continue;
-    const p = exit(a, b.left + b.width / 2, b.top + b.height / 2);
-    const q = exit(b, a.left + a.width / 2, a.top + a.height / 2);
-    const [x1, y1, x2, y2] = [p.x - box.left, p.y - box.top, q.x - box.left, q.y - box.top];
-    // A slight bend, so two arrows between neighbours do not lie on one line.
-    const bend = 0.12;
-    const mx = (x1 + x2) / 2 - (y2 - y1) * bend;
-    const my = (y1 + y2) / 2 + (x2 - x1) * bend;
-    out.push({ key: `${l.from}>${l.to}`, d: `M${x1.toFixed(1)},${y1.toFixed(1)} Q${mx.toFixed(1)},${my.toFixed(1)} ${x2.toFixed(1)},${y2.toFixed(1)}`, orchestrator: l.orchestrator, live: l.live, note: l.note });
-  }
+  links.forEach((l, i) => {
+    const a = byId.get(l.from);
+    const b = byId.get(l.to);
+    if (!a || !b) return;
+    const d = rounded(route(a, b, cards, gx, gy, laneOf(i, Math.min(gx, gy))));
+    out.push({ key: `${l.from}>${l.to}`, d, orchestrator: l.orchestrator, live: l.live, note: l.note });
+  });
   return out;
 }
 
@@ -66,6 +143,8 @@ export default function SessionLinks({ grid, links, layout }: Props) {
     redraw();
     const watch = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(redraw) : null;
     watch?.observe(el);
+    // A card growing (a longer screen, a new badge) moves the ones after it.
+    el.querySelectorAll('[data-session-id]').forEach((c) => watch?.observe(c));
     window.addEventListener('resize', redraw);
     return () => { watch?.disconnect(); window.removeEventListener('resize', redraw); };
     // `signature` stands for `links`, which is rebuilt on every refresh.

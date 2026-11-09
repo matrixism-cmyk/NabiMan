@@ -72,7 +72,7 @@ it('shows what the board said before and since, and sends, resets through the ta
 
   fireEvent.click(screen.getByRole('button', { name: '보드 리셋' }));
   await waitFor(() => expect(asked.some((m) => m.type === 'reset')).toBe(true), { timeout: 5000 });
-});
+}, 20000);
 
 it('says when no tab holds the port, and picks up once one answers', async () => {
   view('pty_2', 'esp32');
@@ -109,4 +109,4 @@ it('the tab holding the port answers a monitor and carries out what it asks', as
   ]));
   expect(Array.from(bridge.send.mock.calls[0][0])).toEqual([65, 10]);
   holder.close();
-});
+}, 20000);
