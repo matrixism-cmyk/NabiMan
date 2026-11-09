@@ -124,54 +124,25 @@ it('when the orchestrator and its workers are waiting, the arrows fade and it st
   expect(card()).toHaveClass('is-resting');
 });
 
-it('Claude on another server: its tile shows @server, and one with no tile gets a card the arrows reach',async()=>{
+it('Claude on another server: its tile shows @server, marked unreachable without Remote Control',()=>{
   localStorage.setItem('nabiman_lang','ko');
-  const req=apiRequest as jest.Mock;
-  jest.spyOn(Date,'now').mockReturnValue(1_793_890_120_000);
-  const ghost={id:'rc:srv_w:5064',server:'winsrv',busy:true,orchestrator:true,directs:['pty_ssh'],notes:[{to:'pty_ssh',text:'배포 결과 확인해 줘',at:1_793_890_000}],
-    claude:[{name:'nabic-c2',ref:'',address:'bridge:session_01AB',cwd:'C:\\Users\\A\\nabic',busy:true,server:'winsrv'}]};
-  req.mockImplementation((path:string)=>Promise.resolve(path==='/api/terminal/claude-remote'?{success:true,data:[ghost]}:{success:true,data:{mode:'newest',ids:[]}}));
   const tile:SessionInfo={...session,id:'pty_ssh',label:'ssh:Administrator@172.20.26.163:22',title:'winsrv',state:'alive',
     claude:[{name:'worker-1',ref:'',address:'worker-1',cwd:'C:\\w',busy:false,server:'winsrv'}]};
-  const { container } = render(<I18nProvider><SessionsView sessions={[tile]} onRefresh={jest.fn()} onAttach={jest.fn()} onPopOut={jest.fn()}/></I18nProvider>);
-  const card=await waitFor(()=>{ const c=container.querySelector('[data-session-id="rc:srv_w:5064"]'); expect(c).not.toBeNull(); return c as HTMLElement; });
-  expect(card).toHaveClass('is-remote-claude');
-  expect(card).toHaveClass('is-orchestrator');
-  expect(screen.getByText('winsrv · 타일 없음')).toBeInTheDocument();
-  expect(screen.getAllByText('@winsrv')).toHaveLength(2);
-  // Remote Control off: shown, but marked as not reachable.
+  render(<I18nProvider><SessionsView sessions={[tile]} onRefresh={jest.fn()} onAttach={jest.fn()} onPopOut={jest.fn()}/></I18nProvider>);
+  expect(screen.getByText('@winsrv')).toBeInTheDocument();
   expect(screen.getByRole('button',{name:/worker-1/})).toHaveClass('is-unreachable');
-  expect(screen.getByRole('button',{name:/bridge:session_01AB/})).not.toHaveClass('is-unreachable');
-  expect(screen.getByText('← nabic-c2')).toBeInTheDocument();
-  // Hovering the arrow tells what was handed over.
-  expect(container.querySelector('[data-link-hit="rc:srv_w:5064>pty_ssh"] title')?.textContent).toBe('nabic-c2 → worker-1\n마지막 요청 (2m 전): 배포 결과 확인해 줘\nworker-1: 대기 중');
-  expect(Array.from(container.querySelectorAll('.session-link')).map((p)=>p.getAttribute('data-link'))).toEqual(['rc:srv_w:5064>pty_ssh']);
-  jest.restoreAllMocks();
 });
 
-it('a background Claude session on this machine gets a card, and one target\'s list still badges work handed elsewhere',async()=>{
+it('only sessions are tiles, and one target\'s list still badges work handed to a session elsewhere',()=>{
   localStorage.setItem('nabiman_lang','ko');
-  const req=apiRequest as jest.Mock;
-  const bg={id:'lc:fb91fc72',server:'',background:true,busy:true,orchestrator:true,directs:['pty_5g'],notes:[],
-    claude:[{name:'n8n 설치',ref:'2ba68a',address:'n8n 설치 [2ba68a]',cwd:'/workspace',busy:true}]};
-  const rc={id:'rc:srv_w:1',server:'winsrv',busy:false,directs:[],notes:[],claude:[{name:'w',ref:'',address:'bridge:s',cwd:'C:\\',busy:false,server:'winsrv'}]};
-  req.mockImplementation((path:string)=>Promise.resolve(path==='/api/terminal/claude-remote'?{success:true,data:[bg,rc]}:{success:true,data:{mode:'newest',ids:[]}}));
   const peer=(name:string)=>[{name,ref:'abcdef',address:`${name} [abcdef]`,cwd:'/w',busy:false}];
   const five:SessionInfo={...session,id:'pty_5g',label:'local',title:'5gmec',state:'alive',claude:peer('5gmec-9a')};
-  const lead:SessionInfo={...session,id:'pty_lead',label:'ssh:a@b:22',title:'lead',state:'alive',busy:true,orchestrator:true,claude:peer('lead-1'),directs:['pty_5g']};
-  // The local list: only local tiles and `lc:` cards; the remote leader is elsewhere.
-  const open=jest.fn();
-  const { container } = render(<I18nProvider><SessionsView sessions={[five]} context={[five,lead]} cardPrefix="lc:" onOpenBackground={open} onRefresh={jest.fn()} onAttach={jest.fn()} onPopOut={jest.fn()}/></I18nProvider>);
-  const card=await waitFor(()=>{ const c=container.querySelector('[data-session-id="lc:fb91fc72"]'); expect(c).not.toBeNull(); return c as HTMLElement; });
-  expect(card).toHaveClass('is-orchestrator');
-  expect(screen.getByText('이 서버 · 백그라운드')).toBeInTheDocument();
-  expect(container.querySelector('[data-session-id="rc:srv_w:1"]')).toBeNull();
-  // The arrow joins the two cards shown here.
-  expect(Array.from(container.querySelectorAll('.session-link')).map((p)=>p.getAttribute('data-link'))).toEqual(['lc:fb91fc72>pty_5g']);
-  // The 5gmec tile is led by the background session (an orchestrator outranks the other leader).
-  expect(screen.getByText('← n8n 설치')).toBeInTheDocument();
-  // It says what it is, and opens in a tile.
-  expect(screen.getByText(/터미널 없이 따로 돌리는 세션/)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button',{name:'타일에서 열기'}));
-  expect(open).toHaveBeenCalledWith(expect.objectContaining({id:'lc:fb91fc72'}));
+  const lead:SessionInfo={...session,id:'pty_lead',label:'ssh:a@b:22',title:'lead',state:'alive',busy:true,orchestrator:true,claude:peer('lead-1'),directs:['pty_5g','lc:gone']};
+  const { container } = render(<I18nProvider><SessionsView sessions={[five]} context={[five,lead]} onRefresh={jest.fn()} onAttach={jest.fn()} onPopOut={jest.fn()}/></I18nProvider>);
+  expect(Array.from(container.querySelectorAll('[data-session-id]')).map((c)=>c.getAttribute('data-session-id'))).toEqual(['pty_5g']);
+  // The leader is on another target: no arrow here, but the badge says who leads.
+  expect(container.querySelectorAll('.session-link')).toHaveLength(0);
+  expect(screen.getByText('← lead-1')).toBeInTheDocument();
+  // Work handed to something that is no session draws nothing.
+  expect(container.querySelector('[data-session-id="lc:gone"]')).toBeNull();
 });

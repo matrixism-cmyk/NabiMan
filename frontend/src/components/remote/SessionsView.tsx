@@ -3,7 +3,6 @@ import { apiPost, apiRequest } from '../../shared/api/useApi';
 import ClaudeAddress, { ClaudePeer } from '../terminal/ClaudeAddress';
 import SessionLinks, { SessionLink } from './SessionLinks';
 import { arrange, moved, ORDER_MODES, OrderMode, useSessionOrder } from './sessionOrder';
-import { RemoteClaudeCard, useRemoteClaude } from './remoteClaude';
 import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useGrants, useMember, useSharing } from './member';
@@ -70,16 +69,11 @@ interface Props {
   /** Every session, when `sessions` is one target's: badges count work handed
    *  to or from sessions not on this list (arrows join only those shown). */
   context?: SessionInfo[];
-  /** Opens a Claude Code background session (an `lc:` card) in a new tile. */
-  onOpenBackground?: (card: RemoteClaudeCard) => void;
-  /** Which Claude cards (sessions under no tile) belong here, by id prefix:
-   *  all when unset, `lc:` this machine's, `rc:<server>:` one server's. */
-  cardPrefix?: string;
 }
 
 /** Every shell running on the server, with a look at what is on each screen. */
 export default function SessionsView({
-  sessions, currentSessionId, onRefresh, onAttach, onPopOut, onShare, title, actions, empty, context, cardPrefix, onOpenBackground,
+  sessions, currentSessionId, onRefresh, onAttach, onPopOut, onShare, title, actions, empty, context,
 }: Props) {
   const { t } = useT();
   const member = useMember();
@@ -125,16 +119,12 @@ export default function SessionsView({
   };
   // A state, not a ref: the arrows redraw once the grid is there.
   const [grid, setGrid] = useState<HTMLDivElement | null>(null);
-  // Claude sessions no tile is under (on connected servers, or this machine's
-  // background ones): cards of their own.
-  const allCards = useRemoteClaude(!member);
-  const remote = cardPrefix === undefined ? allCards : allCards.filter((c) => cardPrefix !== '' && c.id.startsWith(cardPrefix));
+  // Only NabiMan's sessions are tiles: a Claude no tile holds (a background
+  // agent, one started on a server itself) is not shown, nor arrows to it.
   type Node = Pick<SessionInfo, 'id' | 'directs' | 'orchestrator' | 'busy' | 'claude' | 'notes'> & { title?: string; label?: string };
-  const asNode = (r: RemoteClaudeCard): Node => ({ ...r, label: r.server });
-  const nodes: Node[] = [...sessions, ...remote.map(asNode)];
-  const shown = new Set(nodes.map((s) => s.id));
-  // Everyone, for the badges: a target's list still says who leads whom elsewhere.
-  const everyone: Node[] = Array.from(new Map([...(context || []), ...sessions, ...allCards.map(asNode)].map((n) => [n.id, n] as const)).values());
+  const shown = new Set(sessions.map((s) => s.id));
+  // Every session, for the badges: a target's list still says who leads whom elsewhere.
+  const everyone: Node[] = Array.from(new Map([...(context || []), ...sessions].map((n) => [n.id, n] as const)).values());
   const busy = new Set(everyone.filter((s) => s.busy).map((s) => s.id));
   // Once both ends are waiting, the work handed over is done for now: the arrow fades.
   const nameOf = (s: Node) => s.claude?.[0]?.name || s.title || s.label || '';
@@ -227,7 +217,7 @@ export default function SessionsView({
       {message && <div role="alert" className="message">{message}</div>}
       {orderError && <div role="alert" className="message">{t('sessionOrder.saveFailed')}</div>}
       <div className={`session-grid ${links.length ? 'has-links' : ''}`} ref={setGrid}>
-        <SessionLinks grid={grid} links={links} layout={[...shownIds, ...remote.map((r) => r.id)].join(',')} />
+        <SessionLinks grid={grid} links={links} layout={shownIds.join(',')} />
         {shownInOrder.map(session => {
           const state = session.state === undefined ? (session.alive ? 'alive' : 'ended') :
             ['alive', 'ended', 'unknown', 'blocked'].includes(session.state) ? session.state : 'unknown';
@@ -324,48 +314,6 @@ export default function SessionsView({
             </div>
           </div>
         );})}
-        {remote.map((r) => {
-          const directs = related.filter((l) => l.from === r.id).length;
-          const orchestrating = r.orchestrator && directs > 0;
-          const resting = orchestrating && !related.some((l) => l.from === r.id && l.live);
-          const working = !orchestrating && r.busy;
-          const ledBy = leader.get(r.id);
-          return (
-            <div key={r.id} data-session-id={r.id} title={t(r.server ? 'claudeRemote.hint' : r.background ? 'claudeRemote.backgroundHint' : 'claudeRemote.localHint')}
-              className={`session-card is-remote-claude ${orchestrating ? 'is-orchestrator' : ''} ${resting ? 'is-resting' : ''} ${working ? 'is-working' : ''}`}>
-              <div className="session-card-head">
-                <strong className="session-name">{r.claude[0]?.name}</strong>
-                {orchestrating && (
-                  <span className={`session-work-badge is-orchestrator ${r.busy ? '' : 'is-still'}`} title={t('claudePeer.orchestratorHint')}>
-                    {t('claudePeer.orchestrator', { count: directs })}
-                  </span>
-                )}
-                {ledBy && (
-                  <span className="session-work-badge is-led" title={t('claudePeer.ledHint', { name: nameOf(ledBy) })}>
-                    {t('claudePeer.led', { name: nameOf(ledBy) })}
-                  </span>
-                )}
-                {working && <span className="session-work-badge" title={t('claudePeer.workingHint')}>{t('claudePeer.working')}</span>}
-              </div>
-              <code className="session-label">
-                {r.server ? t('claudeRemote.noTile', { server: r.server }) : t(r.background ? 'claudeRemote.localBackground' : 'claudeRemote.localNoTile')}
-              </code>
-              <ClaudeAddress variant="card" peers={r.claude} />
-              {!r.server && r.background && (
-                <>
-                  <p className="text-secondary session-card-note">{t('claudeRemote.backgroundNote')}</p>
-                  {onOpenBackground && (
-                    <div className="session-actions">
-                      <button className="btn btn-primary btn-sm" onClick={() => onOpenBackground(r)} title={t('claudeRemote.openHint')}>
-                        {t('claudeRemote.open')}
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          );
-        })}
       </div>
     </div>
   );

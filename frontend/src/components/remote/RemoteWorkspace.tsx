@@ -17,7 +17,6 @@ import { ServerStatusView, ServerExecView, ServerSettingsView } from './ServerDe
 import SessionsView, { SessionInfo } from './SessionsView';
 import ClaudeStartDialog from './ClaudeStartDialog';
 import TargetSessionsView from './TargetSessionsView';
-import { RemoteClaudeCard } from './remoteClaude';
 import TargetRail from './TargetRail';
 import AdhocConnect from './AdhocConnect';
 import ConsoleArea from './ConsoleArea';
@@ -74,12 +73,6 @@ export default function RemoteWorkspace() {
   const [showSettings, setShowSettings] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showClaudeStart, setShowClaudeStart] = useState(false);
-  // A Claude Code background session's card: a new local tile runs `claude attach` for it.
-  const openBackground = (card: RemoteClaudeCard) => {
-    const name = card.claude[0]?.name || card.id;
-    openTerminal({ kind: 'local', start: { user: '', dir: '', skipPermissions: false, resume: false, title: name, attach: card.id } }, { title: name });
-    window.setTimeout(refetchSessions, 1500);
-  };
   const [shareTarget, setShareTarget] = useState('');
   const [shareFiles, setShareFiles] = useState(false);
   const [filter, setFilter] = useState('');
@@ -326,7 +319,7 @@ export default function RemoteWorkspace() {
             <div className="rw-view rw-view-scroll">
               {overviewView === 'summary' && <MultiServerDashboard />}
               {overviewView === 'sessions' && (
-                <SessionsView sessions={sessions} currentSessionId={currentSessionId} onOpenBackground={openBackground}
+                <SessionsView sessions={sessions} currentSessionId={currentSessionId}
                   onRefresh={refetchSessions} onAttach={attachSession} onPopOut={popOutSession}
                   onShare={(session) => { setShareTarget(session.id); setShowShare(true); }}
                   actions={member ? undefined : (
@@ -352,8 +345,6 @@ export default function RemoteWorkspace() {
           {hasSessionsView && serverView === 'sessions' && (
             <TargetSessionsView name={headTitle} sessions={targetSessions} currentSessionId={currentSessionId}
               allSessions={sessions}
-              cardPrefix={selection.kind === 'local' ? 'lc:' : selection.kind === 'server' ? `rc:${selection.id}:` : ''}
-              onOpenBackground={openBackground}
               onRefresh={refetchSessions} onAttach={attachSession} onPopOut={popOutSession}
               onShare={(session) => { setShareTarget(session.id); setShowShare(true); }}
               onNewSession={() => connectTo(selection, true)}

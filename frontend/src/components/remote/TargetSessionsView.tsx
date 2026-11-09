@@ -1,7 +1,6 @@
 import React from 'react';
 import { useT } from '../../shared/i18n';
 import SessionsView, { SessionInfo } from './SessionsView';
-import { RemoteClaudeCard } from './remoteClaude';
 
 interface Props {
   /** The server's name, or "로컬 셸". */
@@ -16,9 +15,6 @@ interface Props {
   onOpenWindow: () => void;
   /** Every session, so badges count work handed to sessions on other targets. */
   allSessions?: SessionInfo[];
-  /** Which Claude cards belong to this target (see SessionsView). */
-  cardPrefix?: string;
-  onOpenBackground?: (card: RemoteClaudeCard) => void;
 }
 
 /**
@@ -27,7 +23,7 @@ interface Props {
  * deliberate one.
  */
 export default function TargetSessionsView({
-  name, sessions, currentSessionId, onRefresh, onAttach, onPopOut, onShare, onNewSession, onOpenWindow, allSessions, cardPrefix, onOpenBackground,
+  name, sessions, currentSessionId, onRefresh, onAttach, onPopOut, onShare, onNewSession, onOpenWindow, allSessions,
 }: Props) {
   const { t } = useT();
   return (
@@ -35,8 +31,6 @@ export default function TargetSessionsView({
       <SessionsView
         sessions={sessions}
         context={allSessions}
-        cardPrefix={cardPrefix}
-        onOpenBackground={onOpenBackground}
         currentSessionId={currentSessionId}
         title={t('remote.targetSessions', { name })}
         onRefresh={onRefresh}
