@@ -31,6 +31,15 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** USB vendor:product, so the same board is found again after it re-enumerates. */
 export const portKey = (p: any) => { const i = p?.getInfo?.() ?? {}; return `${i.usbVendorId ?? ''}:${i.usbProductId ?? ''}`; };
 /** Espressif's built-in USB-Serial/JTAG (ESP32-C3/S3/C6…): DTR is the boot pin, RTS the reset. */
+/**
+ * Which bridge each port of this page belongs to. Two boards of one kind
+ * report the same USB ids, so the ids alone cannot tell them apart: a port a
+ * bridge has opened stays its own while the board resets or is flashed (and
+ * drops off USB for a moment), and no other bridge takes it in its place.
+ */
+const claims = new Map<any, PortBridge>();
+/** The bridges running in this page, to see which others wait for a board of the same kind. */
+const live = new Set<PortBridge>();
 const isUsbJtag = (p: any) => { const i = p?.getInfo?.() ?? {}; return i.usbVendorId === 0x303a && i.usbProductId === 0x1001; };
 export const serialApi = (): any => (typeof navigator !== 'undefined' ? (navigator as any).serial : undefined);
 export const serialSupported = () => !!serialApi();
@@ -78,6 +87,9 @@ export class PortBridge {
   private redials = 0;
   private unlock: (() => void) | null = null;
   private lockWait: AbortController | null = null;
+  /** The port this bridge last had open, and the ports there were just after it was lost. */
+  private last: any = null;
+  private before: Set<any> | null = null;
 
   constructor(readonly opts: BridgeOptions) { this.device = opts.device; }
 
@@ -147,6 +159,7 @@ export class PortBridge {
   }
 
   private begin() {
+    live.add(this);
     this.running = true;
     this.redials = 0;
     this.set({ status: 'connecting', error: null });
@@ -155,6 +168,7 @@ export class PortBridge {
   }
 
   async stop() {
+    live.delete(this);
     this.running = false;
     if (this.reattachTimer) clearInterval(this.reattachTimer);
     if (this.redialTimer) clearTimeout(this.redialTimer);
@@ -167,15 +181,23 @@ export class PortBridge {
     try { this.writer?.releaseLock(); } catch { /* ignore */ }
     this.reader = this.writer = this.pumping = null;
     try { await p?.close(); } catch { /* ignore */ }
+    this.release();
     // The port is closed, so a tab waiting its turn can open it.
     this.lockWait?.abort(); this.unlock?.();
     this.lockWait = null; this.unlock = null;
     this.set({ status: 'idle', socketUp: false, portUp: false, path: '', stuck: null });
   }
 
+  /** Let go of the ports this bridge held, for another bridge (or a tab) to take. */
+  private release() {
+    for (const [p, b] of Array.from(claims)) if (b === this) claims.delete(p);
+  }
+
   /** A board the operator chose again in the picker (its grant was lost, say): open it now. */
   async adopt(chosen: any) {
     if (this.port) return;
+    const owner = claims.get(chosen);
+    if (owner && owner !== this) throw new Error(translate('serial.dev.takenByOther'));
     this.device = portKey(chosen);
     await this.openPort(chosen);
     this.stuck(null);
@@ -230,6 +252,9 @@ export class PortBridge {
     try { await p.close(); } catch { /* already gone */ }
     this.set({ portUp: false });
     this.note({ key: 'serial.portLost', vars: { reason: reason || '-' } });
+    // What else is plugged in now: a twin of this board is among these; this
+    // board, coming back, will not be.
+    try { this.before = new Set(await serialApi().getPorts()); } catch { this.before = null; }
   }
 
   private async openPort(p: any) {
@@ -239,6 +264,10 @@ export class PortBridge {
       throw new Error(translate('serial.portGone'));
     }
     this.port = p;
+    this.release();
+    claims.set(p, this);
+    this.last = p;
+    this.before = null;
     this.writer = p.writable.getWriter();
     this.set({ portUp: true, stuck: null });
     this.pumping = this.pump(p);
@@ -250,9 +279,22 @@ export class PortBridge {
     this.reattaching = true;
     try {
       const ports: any[] = (await serialApi().getPorts()).filter((p: any) => portKey(p) === this.device);
+      // Not one another bridge here has (open, or waiting for it to come back).
+      const free = ports.filter((p: any) => !p.readable && (claims.get(p) ?? this) === this);
+      const fresh = this.before ? free.filter((p: any) => !this.before!.has(p)) : [];
+      // The very port it had; else the one that just came back; else the only one there is.
+      // A board coming back from a reset is a new port to the browser: if another bridge here waits
+      // for a board of the same kind too, the one that came back could be either's.
+      const rivals = Array.from(live).filter((b) => b !== this && b.running && !b.port && b.device === this.device);
+      const same = this.last && free.includes(this.last);
+      const pick = same ? [this.last] : rivals.length ? [] : fresh.length === 1 ? fresh : free.length === 1 ? free : [];
+      if (!pick.length && free.length && (rivals.length || free.length > 1)) {
+        // Twins, and nothing tells which is this one: the operator chooses (the COM number helps).
+        this.stuck({ key: 'serial.dev.ambiguous', vars: { count: String(free.length) } });
+        return;
+      }
       let why = '';
-      for (const p of ports) {
-        if (p.readable) continue;
+      for (const p of pick) {
         try {
           await this.openPort(p);
           if (announce) this.note({ key: 'serial.portBack' });

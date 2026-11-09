@@ -57,9 +57,10 @@
 .session-grid.has-links { gap: 28px; }
 .session-links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 2; }
 .session-link {
-  fill: none; stroke: var(--danger); stroke-width: 2; stroke-dasharray: 7 6; opacity: 0.9;
-  animation: session-link-flow 0.9s linear infinite;
+  fill: none; stroke: var(--danger); stroke-width: 2; stroke-dasharray: 7 6;
 }
+/* Only work being done now flows; how faint a finished one is, is its group's opacity. */
+.is-live > .session-link { animation: session-link-flow 0.9s linear infinite; }
 .session-link.is-sub { stroke: var(--warning); }
 .session-link-head { fill: var(--danger); }
 .session-link-head.is-sub { fill: var(--warning); }
@@ -110,7 +111,7 @@
 }
 
 /* Work handed over is done for now: the arrows fade and the orchestrator stops blinking. */
-.session-link.is-faint { opacity: 0.22; animation: none; }
+.session-link.is-faint { animation: none; }
 .session-card.is-orchestrator.is-resting {
   animation: none; box-shadow: none;
   border-color: color-mix(in srgb, var(--danger) 45%, var(--border));

@@ -27,6 +27,8 @@ function fakePort(vendor = 0x303a, product = 0x1001) {
     getInfo: () => ({ usbVendorId: vendor, usbProductId: product }),
     open: jest.fn(async () => {
       let cancel: () => void = () => {};
+      // Pulled out (or reset off USB): the read ends and the port has no streams left.
+      port.unplug = () => { port.readable = port.writable = null; cancel(); };
       port.readable = { getReader: () => ({
         read: () => new Promise((resolve) => { cancel = () => resolve({ done: true }); }),
         cancel: async () => cancel(), releaseLock: () => {},
@@ -181,4 +183,41 @@ test('a device carries its USB ids and a note (the COM port) that is remembered 
   localStorage.setItem('nabiman_serial_devices', JSON.stringify({ pty_9: [{ name: 'esp32', baud: 115200, device: `${0x303a}:${0x1001}`, label: 'COM5' }] }));
   devices.resumeSession('pty_9');
   expect(devices.getDevices().find((x) => x.name === 'esp32')!.label).toBe('COM5');
+});
+
+test('two boards of one kind: a board that resets comes back to its own device, never to its twin', async () => {
+  const a = fakePort(); const b = fakePort();
+  ports = [a, b];
+  (navigator as any).serial.requestPort = jest.fn().mockResolvedValueOnce(a).mockResolvedValueOnce(b);
+  expect(await devices.attach('pty_t', 'esp32', 115200)).toBeNull();
+  expect(await devices.attach('pty_t', 'esp32-2', 115200)).toBeNull();
+  await flush();
+  // esp32-2's board is flashed: it drops off USB and comes back as a new port.
+  b.unplug(); await flush(); await flush();
+  const b2 = fakePort();
+  ports = [a, b2];
+  await new Promise((r) => setTimeout(r, 1100));
+  expect(b2.open).toHaveBeenCalled();
+  expect(a.open).toHaveBeenCalledTimes(1);
+  const up = Object.fromEntries(devices.getDevices().map((d) => [d.name, d.portUp]));
+  expect(up).toEqual({ esp32: true, 'esp32-2': true });
+});
+
+test('two boards of one kind both gone at once: the one that comes back is not guessed, the operator chooses', async () => {
+  const a = fakePort(); const b = fakePort();
+  ports = [a, b];
+  (navigator as any).serial.requestPort = jest.fn().mockResolvedValueOnce(a).mockResolvedValueOnce(b);
+  expect(await devices.attach('pty_u', 'esp32', 115200)).toBeNull();
+  expect(await devices.attach('pty_u', 'esp32-2', 115200)).toBeNull();
+  await flush();
+  b.unplug(); a.unplug(); await flush(); await flush();
+  const back = fakePort();
+  ports = [back];
+  await new Promise((r) => setTimeout(r, 1100));
+  expect(back.open).not.toHaveBeenCalled();
+  for (const d of devices.getDevices()) expect(d.stuck).toEqual({ key: 'serial.dev.ambiguous', vars: { count: '1' } });
+  // Chosen by hand, it goes where the operator says.
+  (navigator as any).serial.requestPort = jest.fn(async () => back);
+  expect(await devices.repick('pty_u', 'esp32')).toBeNull();
+  expect(back.open).toHaveBeenCalledTimes(1);
 });

@@ -53,6 +53,11 @@ function formatAge(secs: number): string {
   return `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`;
 }
 
+/** A finished hand-off's arrow fades from FADED_START to FAINTEST over FADE_SECS. */
+const FADE_SECS = 2 * 60 * 60;
+const FADED_START = 0.75;
+const FAINTEST = 0.12;
+
 interface Props {
   sessions: SessionInfo[];
   currentSessionId?: string;
@@ -140,9 +145,22 @@ export default function SessionsView({
     lines.push(t(busy.has(to) ? 'claudePeer.linkBusy' : 'claudePeer.linkIdle', { name: toName }));
     return lines.join('\n');
   };
+  // Strong only while the session it went to works on it; after that it
+  // fades over FADE_SECS from when that session stopped (or the last request).
+  const idleSince = (n: Node | undefined, to: string, from: Node) => {
+    const own = Math.max(0, ...(n?.claude || []).map((p) => p.since || 0));
+    return own || from.notes?.find((x) => x.to === to)?.at || 0;
+  };
+  const strengthOf = (from: Node, to: string) => {
+    if (busy.has(to)) return 1;
+    const since = idleSince(nodeOf.get(to), to, from);
+    if (!since) return FAINTEST;
+    const left = Math.max(0, 1 - (nowSecs - since) / FADE_SECS);
+    return FAINTEST + (FADED_START - FAINTEST) * left;
+  };
   const related: SessionLink[] = everyone.flatMap((s) => (s.directs || [])
     .filter((to) => nodeOf.has(to))
-    .map((to) => ({ from: s.id, to, orchestrator: !!s.orchestrator, live: busy.has(s.id) || busy.has(to), note: noteFor(s, to) })));
+    .map((to) => ({ from: s.id, to, orchestrator: !!s.orchestrator, live: busy.has(to), strength: strengthOf(s, to), note: noteFor(s, to) })));
   // Arrows only between cards on this list.
   const links = related.filter((l) => shown.has(l.from) && shown.has(l.to));
   const leader = new Map<string, Node>();
@@ -262,7 +280,7 @@ export default function SessionsView({
                   {state !== 'alive' && <span className="status-badge down">{t(state === 'unknown' ? 'terminal.sessionUnknown' : state === 'blocked' ? 'terminal.sessionBlocked' : 'share.ended')}</span>}
                   {session.id === currentSessionId && <span className="status-badge up">{t('terminal.thisPane')}</span>}
                   {orchestrating && (
-                    <span className={`session-work-badge is-orchestrator ${session.busy ? '' : 'is-still'}`} title={t('claudePeer.orchestratorHint')}>
+                    <span className={`session-work-badge is-orchestrator ${session.busy ? '' : 'is-still'}`} title={t('claudePeer.orchestratorHint', { count: directs })}>
                       {t('claudePeer.orchestrator', { count: directs })}
                     </span>
                   )}

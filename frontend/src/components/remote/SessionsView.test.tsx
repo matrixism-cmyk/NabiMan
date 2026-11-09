@@ -74,10 +74,10 @@ it('the orchestrator blinks red and an arrow runs to each session it handed work
   const card=(id:string)=>container.querySelector(`[data-session-id="${id}"]`);
   expect(card('pty_art')).toHaveClass('is-orchestrator');
   expect(card('pty_art')).not.toHaveClass('is-working');
-  expect(screen.getByText('오케스트레이터 → 2')).toBeInTheDocument();
+  expect(screen.getByText('지휘 중 · 세션 2개')).toBeInTheDocument();
   // A worker keeps its own green and says who it works for.
   expect(card('pty_nabi')).toHaveClass('is-working');
-  expect(screen.getAllByText('← artisland-bd')).toHaveLength(2);
+  expect(screen.getAllByText('artisland-bd의 지시')).toHaveLength(2);
   // Only sessions on this list are joined.
   expect(Array.from(container.querySelectorAll('.session-link')).map((p)=>p.getAttribute('data-link')).sort())
     .toEqual(['pty_art>pty_mpcf','pty_art>pty_nabi']);
@@ -142,7 +142,26 @@ it('only sessions are tiles, and one target\'s list still badges work handed to 
   expect(Array.from(container.querySelectorAll('[data-session-id]')).map((c)=>c.getAttribute('data-session-id'))).toEqual(['pty_5g']);
   // The leader is on another target: no arrow here, but the badge says who leads.
   expect(container.querySelectorAll('.session-link')).toHaveLength(0);
-  expect(screen.getByText('← lead-1')).toBeInTheDocument();
+  expect(screen.getByText('lead-1의 지시')).toBeInTheDocument();
   // Work handed to something that is no session draws nothing.
   expect(container.querySelector('[data-session-id="lc:gone"]')).toBeNull();
+});
+
+it('an arrow is strong only while the work is being done, and fades as time passes after it',()=>{
+  localStorage.setItem('nabiman_lang','ko');
+  jest.spyOn(Date,'now').mockReturnValue(1_800_000_000_000);
+  const now=1_800_000_000;
+  const peer=(name:string,since?:number)=>[{name,ref:'abcdef',address:`${name} [abcdef]`,cwd:'/w',busy:false,since}];
+  const lead:SessionInfo={...session,id:'pty_l',title:'lead',state:'alive',claude:peer('lead'),orchestrator:true,directs:['pty_w','pty_d1','pty_d2']};
+  const working:SessionInfo={...session,id:'pty_w',title:'w',state:'alive',busy:true,claude:[{...peer('w')[0],busy:true}]};
+  const justDone:SessionInfo={...session,id:'pty_d1',title:'d1',state:'alive',claude:peer('d1',now-60)};
+  const longDone:SessionInfo={...session,id:'pty_d2',title:'d2',state:'alive',claude:peer('d2',now-3*3600)};
+  const { container } = render(<I18nProvider><SessionsView sessions={[lead,working,justDone,longDone]} onRefresh={jest.fn()} onAttach={jest.fn()} onPopOut={jest.fn()}/></I18nProvider>);
+  const strength=(k:string)=>Number(container.querySelector(`[data-link="${k}"]`)?.parentElement?.getAttribute('data-link-strength'));
+  expect(strength('pty_l>pty_w')).toBe(1);
+  expect(container.querySelector('[data-link="pty_l>pty_w"]')?.parentElement).toHaveClass('is-live');
+  expect(strength('pty_l>pty_d1')).toBeGreaterThan(0.7);
+  expect(strength('pty_l>pty_d2')).toBeCloseTo(0.12);
+  expect(container.querySelector('[data-link="pty_l>pty_d1"]')?.parentElement).not.toHaveClass('is-live');
+  jest.restoreAllMocks();
 });

@@ -12,6 +12,8 @@ export interface ClaudePeer {
   cwd: string;
   /** Working on a turn now. */
   busy: boolean;
+  /** When it last became busy or idle (seconds since 1970), if known. */
+  since?: number;
   /** The saved server it runs on, when not this machine; `address` is then
    *  `bridge:<Remote Control session>`, or just the name without Remote Control. */
   server?: string;

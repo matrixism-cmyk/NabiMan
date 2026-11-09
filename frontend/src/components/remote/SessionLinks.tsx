@@ -1,11 +1,13 @@
 import React, { useLayoutEffect, useState } from 'react';
 
-/** One session handing work to another, by session id; `live` while either end is working. */
+/** One session handing work to another, by session id; `live` while the one it went to works on it. */
 export interface SessionLink {
   from: string;
   to: string;
   orchestrator: boolean;
   live: boolean;
+  /** How strongly to draw it, 0–1: full while live, fading once the work is done. */
+  strength?: number;
   /** Shown on hover: who handed what to whom, and how it is going. */
   note?: string;
 }
@@ -18,7 +20,7 @@ interface Props {
   layout?: string;
 }
 
-interface Drawn { key: string; d: string; orchestrator: boolean; live: boolean; note?: string }
+interface Drawn { key: string; d: string; orchestrator: boolean; live: boolean; strength: number; note?: string }
 
 /** A card's box, relative to the grid. */
 export interface Box { l: number; t: number; r: number; b: number }
@@ -123,7 +125,7 @@ function draw(grid: HTMLDivElement, links: SessionLink[]): Drawn[] {
     const b = byId.get(l.to);
     if (!a || !b) return;
     const d = rounded(route(a, b, cards, gx, gy, laneOf(i, Math.min(gx, gy))));
-    out.push({ key: `${l.from}>${l.to}`, d, orchestrator: l.orchestrator, live: l.live, note: l.note });
+    out.push({ key: `${l.from}>${l.to}`, d, orchestrator: l.orchestrator, live: l.live, strength: l.strength ?? (l.live ? 1 : 0.2), note: l.note });
   });
   return out;
 }
@@ -134,7 +136,7 @@ function draw(grid: HTMLDivElement, links: SessionLink[]): Drawn[] {
  */
 export default function SessionLinks({ grid, links, layout }: Props) {
   const [drawn, setDrawn] = useState<Drawn[]>([]);
-  const signature = links.map((l) => `${l.from}>${l.to}:${l.orchestrator}:${l.live}:${l.note ?? ''}`).join(',');
+  const signature = links.map((l) => `${l.from}>${l.to}:${l.orchestrator}:${l.live}:${(l.strength ?? 0).toFixed(2)}:${l.note ?? ''}`).join(',');
 
   useLayoutEffect(() => {
     const el = grid;
@@ -163,7 +165,8 @@ export default function SessionLinks({ grid, links, layout }: Props) {
         </marker>
       </defs>
       {drawn.map((l) => (
-        <g key={l.key}>
+        // The line and its head fade together: the opacity is the group's.
+        <g key={l.key} className={l.live ? 'is-live' : ''} style={{ opacity: l.strength }} data-link-strength={l.strength.toFixed(2)}>
           <path d={l.d} data-link={l.key} className={`session-link ${l.orchestrator ? '' : 'is-sub'} ${l.live ? '' : 'is-faint'}`}
             markerEnd={`url(#session-link-head${l.orchestrator ? '' : '-sub'})`} />
           {/* A wide, invisible stroke to hover: the dashed line alone is too thin to find. */}

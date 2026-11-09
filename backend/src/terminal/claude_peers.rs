@@ -48,6 +48,9 @@ pub(crate) struct ClaudePeer {
     pub cwd: String,
     /// Working on a turn now, not waiting for the person.
     pub busy: bool,
+    /// When it last became busy or idle (seconds since 1970), if known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub since: Option<u64>,
     /// The saved server it runs on, when that is not this machine. Its
     /// `address` is then `bridge:<Remote Control session>` (what SendMessage
     /// takes for a session on another machine), or just its name without
@@ -207,6 +210,7 @@ fn scan() -> HashMap<String, Seen> {
             reference,
             cwd: rec.cwd,
             busy: rec.busy,
+            since: rec.since,
             server: None,
         };
         let background = rec.background;
@@ -233,6 +237,7 @@ fn add_remote(remote: &super::claude_remote::Snapshot, seen: &mut HashMap<String
             reference: String::new(),
             cwd: p.cwd.clone(),
             busy: p.busy,
+            since: p.since,
             server: Some(server.clone()),
         };
         let entry = seen.entry(card).or_default();
@@ -378,6 +383,8 @@ struct Record {
     name: String,
     cwd: String,
     busy: bool,
+    /// When `busy` last changed (seconds since 1970).
+    since: Option<u64>,
     session_id: String,
     /// Its Remote Control session, when that is on.
     bridge: Option<String>,
@@ -412,6 +419,7 @@ fn parse_record(text: &str, uid: u32, file: &Path) -> Option<Record> {
         name: clip(&s("name"), 80),
         cwd: clip(&s("cwd"), 300),
         busy: s("status") == "busy",
+        since: v.get("statusUpdatedAt").and_then(serde_json::Value::as_u64).map(|ms| ms / 1000),
         session_id: s("sessionId"),
         bridge: Some(s("bridgeSessionId")).filter(|b| !b.is_empty()),
         background: s("kind") == "bg",

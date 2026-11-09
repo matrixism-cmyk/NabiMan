@@ -73,6 +73,8 @@ pub(crate) struct RemoteClaude {
     pub name: String,
     pub cwd: String,
     pub busy: bool,
+    /// When `busy` last changed (seconds since 1970), if the record says.
+    pub since: Option<u64>,
     /// Its messaging socket (or pipe) on that machine.
     pub sock: String,
     /// Its Remote Control session, when that is on.
@@ -412,6 +414,7 @@ fn parse(out: &str, server_id: &str, tmux_name: &str) -> Found {
                     name: clip(&s("name"), 80),
                     cwd: clip(&s("cwd"), 300),
                     busy: s("status") == "busy",
+                    since: v.get("statusUpdatedAt").and_then(serde_json::Value::as_u64).map(|ms| ms / 1000),
                     sock: clip(&s("messagingSocketPath"), 300),
                     bridge,
                     session_id,
@@ -431,6 +434,7 @@ fn parse(out: &str, server_id: &str, tmux_name: &str) -> Found {
                     name: format!("Claude ({user})"),
                     cwd: String::new(),
                     busy: false,
+                    since: None,
                     sock: String::new(),
                     bridge: None,
                     session_id: String::new(),
