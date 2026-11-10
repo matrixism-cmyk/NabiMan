@@ -30,6 +30,8 @@ use std::sync::Mutex;
 
 /// Messages older than this no longer tie two sessions together.
 pub(crate) const WINDOW_SECS: u64 = 60 * 60;
+/// A pair silent this long starts afresh: whoever writes first then leads.
+pub(crate) const EPISODE_GAP_SECS: u64 = 6 * 60 * 60;
 /// The most of a transcript ever read: its last gigabyte.
 const MAX_READ: u64 = 1024 * 1024 * 1024;
 /// Read in pieces this big.
@@ -255,7 +257,8 @@ pub(crate) struct Links {
     pub orchestrators: HashSet<String>,
 }
 
-pub(crate) fn links(messages: &[(String, String, u64)], now: u64) -> Links {
+/// `lead`: the session the operator made the lead; a pair it is in runs from it.
+pub(crate) fn links(messages: &[(String, String, u64)], now: u64, lead: Option<&str>) -> Links {
     let mut sorted: Vec<(&str, &str, u64)> = messages
         .iter()
         .filter(|(f, t, _)| f != t)
@@ -269,28 +272,30 @@ pub(crate) fn links(messages: &[(String, String, u64)], now: u64) -> Links {
             pairs.insert(if f < t { (*f, *t) } else { (*t, *f) });
         }
     }
-    // When work from each session first reached each other one: by a message
-    // from it, or from one its work had already reached.
-    let mut reached: HashMap<&str, HashMap<&str, u64>> = HashMap::new();
-    for &(a, b) in &pairs {
-        for src in [a, b] {
-            reached.entry(src).or_insert_with(|| {
-                let mut got: HashMap<&str, u64> = HashMap::from([(src, 0)]);
-                for &(f, t, at) in &sorted {
-                    if got.get(f).is_some_and(|since| *since <= at) {
-                        got.entry(t).and_modify(|x| *x = (*x).min(at)).or_insert(at);
-                    }
-                }
-                got
-            });
+    // Who started each pair's current exchange: the sender of its first
+    // message after a quiet spell of EPISODE_GAP_SECS. Answers and reports
+    // that follow do not turn it round, and an old exchange (yesterday's) does
+    // not decide today's.
+    let a_started = |a: &str, b: &str| -> bool {
+        let between: Vec<&(&str, &str, u64)> = sorted.iter().filter(|(f, t, _)| (*f == a && *t == b) || (*f == b && *t == a)).collect();
+        let mut start = between.len().saturating_sub(1);
+        while start > 0 && between[start].2.saturating_sub(between[start - 1].2) <= EPISODE_GAP_SECS {
+            start -= 1;
         }
-    }
+        between.get(start).is_none_or(|m| m.0 == a)
+    };
     let mut out = Links::default();
     let mut led: HashSet<&str> = HashSet::new();
     for &(a, b) in &pairs {
-        let ab = reached[a].get(b).copied().unwrap_or(u64::MAX);
-        let ba = reached[b].get(a).copied().unwrap_or(u64::MAX);
-        let (from, to) = if ab <= ba { (a, b) } else { (b, a) };
+        let (from, to) = if lead == Some(a) {
+            (a, b)
+        } else if lead == Some(b) {
+            (b, a)
+        } else if a_started(a, b) {
+            (a, b)
+        } else {
+            (b, a)
+        };
         out.leads.entry(from.to_string()).or_default().push(to.to_string());
         led.insert(to);
     }
@@ -316,31 +321,50 @@ mod tests {
     #[test]
     fn the_first_to_write_leads_and_answers_do_not_turn_it_round() {
         // art handed out work hours ago; the answers since are the latest.
-        let l = links(&[m("art", "mpcf", NOW - 9000), m("mpcf", "art", NOW - 50), m("art", "nabi", NOW - 8000), m("nabi", "art", NOW - 20)], NOW);
+        let l = links(&[m("art", "mpcf", NOW - 9000), m("mpcf", "art", NOW - 50), m("art", "nabi", NOW - 8000), m("nabi", "art", NOW - 20)], NOW, None);
         assert_eq!(l.leads["art"], vec!["mpcf", "nabi"]);
         assert_eq!(l.leads.len(), 1);
         assert_eq!(l.orchestrators, HashSet::from(["art".to_string()]));
     }
 
     #[test]
-    fn work_passed_on_still_counts_as_the_first_ones() {
-        // Seen live: art asks or, or passes it to mpcf, mpcf answers art, art writes back.
-        let l = links(&[m("art", "or", NOW - 960), m("or", "mpcf", NOW - 480), m("mpcf", "art", NOW - 30), m("art", "mpcf", NOW - 10)], NOW);
-        assert_eq!(l.leads["art"], vec!["mpcf", "or"]);
-        assert_eq!(l.leads["or"], vec!["mpcf"]);
-        assert!(!l.leads.contains_key("mpcf"));
-        assert_eq!(l.orchestrators, HashSet::from(["art".to_string()]));
+    fn reports_back_to_the_lead_do_not_make_the_reporters_lead() {
+        // nabiman tells everyone; each reports back, and one asks another for data.
+        let l = links(&[
+            m("nabi", "a", NOW - 900), m("nabi", "b", NOW - 900), m("a", "nabi", NOW - 600), m("b", "nabi", NOW - 500),
+            m("a", "b", NOW - 300), m("b", "a", NOW - 200), m("a", "nabi", NOW - 100),
+        ], NOW, None);
+        assert_eq!(l.leads["nabi"], vec!["a", "b"]);
+        assert_eq!(l.leads["a"], vec!["b"]);
+        assert_eq!(l.orchestrators, HashSet::from(["nabi".to_string()]));
+    }
+
+    #[test]
+    fn the_lead_named_by_the_operator_leads_every_pair_it_is_in() {
+        // Reports reach the lead first (an old exchange): still drawn from the lead.
+        let l = links(&[m("a", "lead", NOW - 600), m("lead", "a", NOW - 500), m("b", "lead", NOW - 100), m("a", "b", NOW - 50)], NOW, Some("lead"));
+        assert_eq!(l.leads["lead"], vec!["a", "b"]);
+        assert_eq!(l.leads["a"], vec!["b"]);
+        assert_eq!(l.orchestrators, HashSet::from(["lead".to_string()]));
+    }
+
+    #[test]
+    fn yesterdays_exchange_does_not_decide_todays() {
+        // b led a yesterday; today a starts afresh after a long quiet spell.
+        let l = links(&[m("b", "a", NOW - 86_400), m("a", "b", NOW - 86_300), m("a", "b", NOW - 600), m("b", "a", NOW - 300)], NOW, None);
+        assert_eq!(l.leads["a"], vec!["b"]);
+        assert!(!l.leads.contains_key("b"));
     }
 
     #[test]
     fn a_pair_quiet_for_an_hour_is_no_longer_linked() {
-        let l = links(&[m("a", "b", NOW - WINDOW_SECS - 1), m("b", "a", NOW - WINDOW_SECS - 1)], NOW);
+        let l = links(&[m("a", "b", NOW - WINDOW_SECS - 1), m("b", "a", NOW - WINDOW_SECS - 1)], NOW, None);
         assert_eq!(l, Links::default());
     }
 
     #[test]
     fn one_led_by_another_is_not_the_orchestrator_though_it_leads_too() {
-        let l = links(&[m("a", "b", NOW - 3), m("a", "c", NOW - 3), m("a", "d", NOW - 3), m("b", "e", NOW - 2)], NOW);
+        let l = links(&[m("a", "b", NOW - 3), m("a", "c", NOW - 3), m("a", "d", NOW - 3), m("b", "e", NOW - 2)], NOW, None);
         assert_eq!(l.orchestrators, HashSet::from(["a".to_string()]));
         assert_eq!(l.leads["b"], vec!["e"]);
     }

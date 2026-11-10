@@ -23,6 +23,8 @@ export interface SessionInfo {
   directs?: string[];
   /** Its Claude hands out work here and takes it from none. */
   orchestrator?: boolean;
+  /** The session the operator made the lead of all Claude work (총괄). */
+  lead?: boolean;
   /** For each of `directs`: the first line of the work last sent there, and when. */
   notes?: { to: string; text: string; at: number }[];
 }
@@ -55,8 +57,8 @@ function formatAge(secs: number): string {
 
 /** A finished hand-off's arrow fades from FADED_START to FAINTEST over FADE_SECS. */
 const FADE_SECS = 2 * 60 * 60;
-const FADED_START = 0.75;
-const FAINTEST = 0.12;
+const FADED_START = 0.85;
+const FAINTEST = 0.35;
 
 interface Props {
   sessions: SessionInfo[];
@@ -281,7 +283,7 @@ export default function SessionsView({
                   {session.id === currentSessionId && <span className="status-badge up">{t('terminal.thisPane')}</span>}
                   {orchestrating && (
                     <span className={`session-work-badge is-orchestrator ${session.busy ? '' : 'is-still'}`} title={t('claudePeer.orchestratorHint', { count: directs })}>
-                      {t('claudePeer.orchestrator', { count: directs })}
+                      {t(session.lead ? 'claudePeer.lead' : 'claudePeer.orchestrator', { count: directs })}
                     </span>
                   )}
                   {ledBy && (

@@ -128,6 +128,11 @@ impl Seen {
 type Cache = Mutex<Option<(Instant, Arc<HashMap<String, Seen>>)>>;
 static CACHE: Cache = Mutex::new(None);
 
+/// Drop what was seen, so the next look scans again (the lead changed, say).
+pub(crate) fn forget() {
+    *CACHE.lock().unwrap_or_else(|e| e.into_inner()) = None;
+}
+
 /// The Claude sessions in each tmux session, by tmux name.
 pub(crate) fn look() -> Arc<HashMap<String, Seen>> {
     let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
@@ -337,7 +342,7 @@ fn link(found: &[(Record, String)], remote: &super::claude_remote::Snapshot, see
         note(&f, to, *at, said);
         messages.push((f, to.clone(), *at));
     }
-    let links = super::claude_links::links(&messages, now);
+    let links = super::claude_links::links(&messages, now, super::claude_lead::lead_tmux().as_deref());
     for (from, to) in links.leads {
         let entry = seen.entry(from.clone()).or_default();
         entry.orchestrator = links.orchestrators.contains(&from);

@@ -130,12 +130,35 @@ function draw(grid: HTMLDivElement, links: SessionLink[]): Drawn[] {
   return out;
 }
 
+/** Colours for the arrows, one per session handing out work, so each one's arrows read as a set. */
+export const LINK_COLORS = ['#ff6b6b', '#4dabf7', '#ffd43b', '#69db7c', '#da77f2', '#ff922b', '#38d9a9', '#f783ac'];
+export const colorIndex = (id: string) => {
+  let h = 0;
+  for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return h % LINK_COLORS.length;
+};
+
+interface Hover { key: string; x: number; y: number }
+
+/** What the hover box says: who to whom on top, then the last request and how it is going. */
+function LinkTip({ note, x, y, width }: { note: string; x: number; y: number; width: number }) {
+  const [head, ...rest] = note.split('\n');
+  const left = Math.max(8, Math.min(x + 14, width - 340));
+  return (
+    <div className="session-link-tip" role="tooltip" style={{ left, top: y + 16 }}>
+      <div className="session-link-tip-head">{head}</div>
+      {rest.map((line, i) => <div key={i} className="session-link-tip-line">{line}</div>)}
+    </div>
+  );
+}
+
 /**
  * Dashed arrows over the session cards, from a session handing out work to
  * each session it handed work to; the dashes run the way the work goes.
  */
 export default function SessionLinks({ grid, links, layout }: Props) {
   const [drawn, setDrawn] = useState<Drawn[]>([]);
+  const [hover, setHover] = useState<Hover | null>(null);
   const signature = links.map((l) => `${l.from}>${l.to}:${l.orchestrator}:${l.live}:${(l.strength ?? 0).toFixed(2)}:${l.note ?? ''}`).join(',');
 
   useLayoutEffect(() => {
@@ -154,29 +177,43 @@ export default function SessionLinks({ grid, links, layout }: Props) {
   }, [grid, signature, layout]);
 
   if (drawn.length === 0) return null;
+  const at = (e: React.MouseEvent, key: string) => {
+    const box = grid?.getBoundingClientRect();
+    if (box) setHover({ key, x: e.clientX - box.left, y: e.clientY - box.top });
+  };
+  const hovered = hover ? drawn.find((l) => l.key === hover.key) : undefined;
+  const colorOf = (key: string) => colorIndex(key.split('>')[0]);
   return (
-    <svg className="session-links" aria-hidden="true">
-      <defs>
-        <marker id="session-link-head" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-          <path d="M0,0 L10,5 L0,10 z" className="session-link-head" />
-        </marker>
-        <marker id="session-link-head-sub" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-          <path d="M0,0 L10,5 L0,10 z" className="session-link-head is-sub" />
-        </marker>
-      </defs>
-      {drawn.map((l) => (
-        // The line and its head fade together: the opacity is the group's.
-        <g key={l.key} className={l.live ? 'is-live' : ''} style={{ opacity: l.strength }} data-link-strength={l.strength.toFixed(2)}>
-          <path d={l.d} data-link={l.key} className={`session-link ${l.orchestrator ? '' : 'is-sub'} ${l.live ? '' : 'is-faint'}`}
-            markerEnd={`url(#session-link-head${l.orchestrator ? '' : '-sub'})`} />
-          {/* A wide, invisible stroke to hover: the dashed line alone is too thin to find. */}
-          {l.note && (
-            <path d={l.d} className="session-link-hit" data-link-hit={l.key}>
-              <title>{l.note}</title>
-            </path>
-          )}
-        </g>
-      ))}
-    </svg>
+    <>
+      <svg className={`session-links ${hovered ? 'is-hovering' : ''}`} aria-hidden="true">
+        <defs>
+          {LINK_COLORS.map((c, i) => (
+            <marker key={c} id={`session-link-head-${i}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill={c} />
+            </marker>
+          ))}
+        </defs>
+        {drawn.map((l) => {
+          const c = colorOf(l.key);
+          const on = hovered?.key === l.key;
+          return (
+            // The line and its head fade together: the opacity is the group's.
+            <g key={l.key} className={`${l.live ? 'is-live' : ''} ${on ? 'is-hovered' : ''}`} style={{ opacity: on ? 1 : l.strength }}
+              data-link-strength={l.strength.toFixed(2)}>
+              {/* A dark band under the line keeps it apart from card borders and other lines. */}
+              <path d={l.d} className="session-link-halo" />
+              <path d={l.d} data-link={l.key} className={`session-link ${l.orchestrator ? '' : 'is-sub'} ${l.live ? '' : 'is-faint'}`}
+                style={{ stroke: LINK_COLORS[c] }} markerEnd={`url(#session-link-head-${c})`} />
+              {/* A wide, invisible stroke to hover: the dashed line alone is too thin to find. */}
+              {l.note && (
+                <path d={l.d} className="session-link-hit" data-link-hit={l.key} aria-label={l.note}
+                  onMouseEnter={(e) => at(e, l.key)} onMouseMove={(e) => at(e, l.key)} onMouseLeave={() => setHover(null)} />
+              )}
+            </g>
+          );
+        })}
+      </svg>
+      {hovered?.note && hover && <LinkTip note={hovered.note} x={hover.x} y={hover.y} width={grid?.clientWidth ?? 800} />}
+    </>
   );
 }

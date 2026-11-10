@@ -57,8 +57,21 @@
 .session-grid.has-links { gap: 28px; }
 .session-links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 2; }
 .session-link {
-  fill: none; stroke: var(--danger); stroke-width: 2; stroke-dasharray: 7 6;
+  fill: none; stroke: var(--danger); stroke-width: 2.5; stroke-dasharray: 8 5; stroke-linecap: round;
 }
+.session-link-halo { fill: none; stroke: var(--bg, #0d1117); stroke-width: 7; opacity: 0.85; }
+.is-live > .session-link { stroke-width: 3; }
+.is-hovered > .session-link { stroke-width: 3.5; }
+/* While one arrow is pointed at, the others step back. */
+.session-links.is-hovering g:not(.is-hovered) { opacity: 0.15 !important; }
+.session-link-tip {
+  position: absolute; z-index: 5; max-width: 330px; padding: 10px 12px; border-radius: 8px;
+  background: var(--surface, #1a2634); color: var(--text, #e6edf3);
+  border: 1px solid var(--border, #30363d); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  font-size: 12.5px; line-height: 1.5; pointer-events: none; white-space: normal; word-break: keep-all;
+}
+.session-link-tip-head { font-weight: 700; margin-bottom: 4px; }
+.session-link-tip-line { color: var(--text-secondary, #9da7b3); }
 /* Only work being done now flows; how faint a finished one is, is its group's opacity. */
 .is-live > .session-link { animation: session-link-flow 0.9s linear infinite; }
 .session-link.is-sub { stroke: var(--warning); }

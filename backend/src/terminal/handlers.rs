@@ -39,6 +39,8 @@ struct SessionInfo {
     directs: Vec<String>,
     /// Its Claude leads others here and is led by none.
     orchestrator: bool,
+    /// The session the operator made the lead of all Claude work (총괄).
+    lead: bool,
     /// For each of `directs`: the first line of the work it last sent there, and when.
     notes: Vec<LinkNote>,
 }
@@ -155,6 +157,7 @@ async fn list_sessions(
     req: HttpRequest,
     users: web::Data<crate::users::UserStore>,
 ) -> HttpResponse {
+    let lead = super::claude_lead::lead_tmux();
     let user_id = crate::auth::verified_user_id(&req).unwrap_or_default();
     // Remote servers' Claude sessions are for operators, not remote-only members.
     let remote_ok = sees_remote_claude(&user_id, &users);
@@ -207,6 +210,7 @@ async fn list_sessions(
                 claude: here.map(|h| h.claude.clone()).unwrap_or_default(),
                 busy: here.is_some_and(|h| h.busy()),
                 orchestrator: here.is_some_and(|h| h.orchestrator) && !directs.is_empty(),
+                lead: lead.as_deref() == Some(s.tmux_name.as_str()),
                 notes: here.map(|h| notes_of(h, &id_of, remote_ok)).unwrap_or_default(),
                 directs,
             }

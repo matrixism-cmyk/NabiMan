@@ -161,7 +161,29 @@ it('an arrow is strong only while the work is being done, and fades as time pass
   expect(strength('pty_l>pty_w')).toBe(1);
   expect(container.querySelector('[data-link="pty_l>pty_w"]')?.parentElement).toHaveClass('is-live');
   expect(strength('pty_l>pty_d1')).toBeGreaterThan(0.7);
-  expect(strength('pty_l>pty_d2')).toBeCloseTo(0.12);
+  expect(strength('pty_l>pty_d2')).toBeCloseTo(0.35);
   expect(container.querySelector('[data-link="pty_l>pty_d1"]')?.parentElement).not.toHaveClass('is-live');
+  jest.restoreAllMocks();
+});
+
+it('pointing at an arrow shows a box with who handed what to whom, and the others step back',()=>{
+  localStorage.setItem('nabiman_lang','ko');
+  jest.spyOn(Date,'now').mockReturnValue(1_800_000_000_000);
+  const peer=(name:string)=>[{name,ref:'abcdef',address:`${name} [abcdef]`,cwd:'/w',busy:false}];
+  const lead:SessionInfo={...session,id:'pty_l',title:'lead',state:'alive',claude:peer('lead'),orchestrator:true,directs:['pty_a','pty_b'],
+    notes:[{to:'pty_a',text:'보고서 그림 갱신해 줘',at:1_800_000_000-120}]};
+  const a:SessionInfo={...session,id:'pty_a',title:'a',state:'alive',claude:peer('worker-a')};
+  const b:SessionInfo={...session,id:'pty_b',title:'b',state:'alive',claude:peer('worker-b')};
+  const { container } = render(<I18nProvider><SessionsView sessions={[lead,a,b]} onRefresh={jest.fn()} onAttach={jest.fn()} onPopOut={jest.fn()}/></I18nProvider>);
+  // No browser tooltip any more.
+  expect(container.querySelector('.session-link-hit title')).toBeNull();
+  fireEvent.mouseEnter(container.querySelector('[data-link-hit="pty_l>pty_a"]')!,{clientX:40,clientY:40});
+  const tip=screen.getByRole('tooltip');
+  expect(tip).toHaveTextContent('lead → worker-a');
+  expect(tip).toHaveTextContent('마지막 요청 (2m 전): 보고서 그림 갱신해 줘');
+  expect(container.querySelector('.session-links')).toHaveClass('is-hovering');
+  expect(container.querySelector('[data-link="pty_l>pty_a"]')?.parentElement).toHaveClass('is-hovered');
+  fireEvent.mouseLeave(container.querySelector('[data-link-hit="pty_l>pty_a"]')!);
+  expect(screen.queryByRole('tooltip')).toBeNull();
   jest.restoreAllMocks();
 });

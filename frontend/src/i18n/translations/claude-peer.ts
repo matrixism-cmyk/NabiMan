@@ -15,6 +15,7 @@ const t: T = {
   'claudePeer.working': { ko: 'Claude 작업 중', en: 'Claude working', ja: 'Claude 作業中' },
   'claudePeer.output': { ko: '출력 중', en: 'output', ja: '出力中' },
   'claudePeer.workingHint': { ko: '이 세션의 Claude Code가 지금 작업하고 있습니다.', en: 'Claude Code in this session is working now.', ja: 'このセッションの Claude Code が作業中です。' },
+  'claudePeer.lead': { ko: '총괄 · 세션 {count}개', en: 'Lead · {count} session(s)', ja: '総括 · セッション {count} 件' },
   'claudePeer.orchestrator': { ko: '지휘 중 · 세션 {count}개', en: 'Directing {count} session(s)', ja: '指揮中 · セッション {count} 件' },
   'claudePeer.orchestratorHint': {
     ko: '이 세션의 Claude가 다른 세션 {count}개에 일을 맡겼습니다(최근 1시간 안에 보낸 메시지 기준). 화살표는 맡긴 쪽에서 받은 쪽으로 이어지고, 받은 쪽이 그 일을 하는 동안 진하게, 끝난 뒤에는 시간이 지날수록 옅게 보입니다.',
