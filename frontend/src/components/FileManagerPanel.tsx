@@ -3,6 +3,7 @@ import { apiPost, apiRequest, fetchWithRefresh } from '../shared/api/useApi';
 import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';
 import { confirmDialog } from '../shared/ui/ConfirmDialog';
+import DismissibleMessage from '../shared/ui/DismissibleMessage';
 
 interface FileEntry { name: string; path: string; is_dir: boolean; size: number; modified: string; permissions: string; }
 interface FileContent { path: string; content: string; size: number; }
@@ -120,9 +121,9 @@ export default function FileManagerPanel() {
     if (res.success) browse(pathInput);
   };
 
-  const { sorted, toggle, indicator } = useSortable(files, 'name', 'asc');
+  const { sorted, indicator, headerProps } = useSortable(files, 'name', 'asc');
   const S = (key: string, label: string) => (
-    <th className="sortable" onClick={() => toggle(key)}>{label}{indicator(key)}</th>
+    <th {...headerProps(key)}>{label}{indicator(key)}</th>
   );
 
   return (
@@ -140,7 +141,7 @@ export default function FileManagerPanel() {
         <button className="btn btn-secondary btn-sm" onClick={handleMkdir}>{t('files.newFolder')}</button>
         <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleUpload} />
       </div>
-      {msg && <div className="message" onClick={() => setMsg('')}>{msg}</div>}
+      {msg && <DismissibleMessage onDismiss={() => setMsg('')}>{msg}</DismissibleMessage>}
       {editing ? (
         <div>
           <div className="filter-row">
@@ -165,8 +166,10 @@ export default function FileManagerPanel() {
             {loading ? <tr><td colSpan={5} className="loading">{t('common.loading')}</td></tr> :
               sorted.map((f, i) => (
                 <tr key={i}>
-                  <td onClick={() => handleClick(f)} style={{ cursor: 'pointer' }}>
-                    {f.is_dir ? '📁 ' : '📄 '}{f.name}
+                  <td>
+                    <button type="button" className="cell-button" onClick={() => handleClick(f)}>
+                      {f.is_dir ? '📁 ' : '📄 '}{f.name}
+                    </button>
                   </td>
                   <td>{f.is_dir ? '-' : fmtSize(f.size)}</td>
                   <td><code>{f.permissions}</code></td>

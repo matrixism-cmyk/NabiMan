@@ -4,6 +4,7 @@ import TerminalSettingsForm from './TerminalSettingsForm';
 import SessionSettingsForm from './SessionSettingsForm';
 import DictationSettings from './dictation/DictationSettings';
 import { useMember } from '../remote/member';
+import Modal from '../../shared/ui/Modal';
 
 interface Props {
   onClose: () => void;
@@ -22,24 +23,21 @@ export default function TerminalSettingsModal({ onClose, sessionId, sessionName 
   const member = useMember();
   const [side, setSide] = useState<'session' | 'all'>(sessionId ? 'session' : 'all');
   return (
-    <div className="modal-overlay term-settings-overlay" onClick={onClose}>
-      <div className="modal-content term-settings" onClick={(e) => e.stopPropagation()}>
-        <h3>{t('terminal.settings')}</h3>
-        {sessionId && (
-          <div className="term-settings-sides" role="tablist">
-            <button type="button" role="tab" aria-selected={side === 'session'} className={side === 'session' ? 'is-active' : ''}
-              onClick={() => setSide('session')}>{t('terminal.sessionTab')}{sessionName ? ` · ${sessionName}` : ''}</button>
-            <button type="button" role="tab" aria-selected={side === 'all'} className={side === 'all' ? 'is-active' : ''}
-              onClick={() => setSide('all')}>{t('terminal.defaultsTab')}</button>
-          </div>
-        )}
-        {side === 'session' && sessionId
-          ? <SessionSettingsForm sessionId={sessionId} onDone={onClose} />
-          : (<>
-            <TerminalSettingsForm onDone={onClose} />
-            {!member && <DictationSettings />}
-          </>)}
-      </div>
-    </div>
+    <Modal onClose={onClose} title={t('terminal.settings')} className="term-settings">
+      {sessionId && (
+        <div className="term-settings-sides" role="tablist">
+          <button type="button" role="tab" aria-selected={side === 'session'} className={side === 'session' ? 'is-active' : ''}
+            onClick={() => setSide('session')}>{t('terminal.sessionTab')}{sessionName ? ` · ${sessionName}` : ''}</button>
+          <button type="button" role="tab" aria-selected={side === 'all'} className={side === 'all' ? 'is-active' : ''}
+            onClick={() => setSide('all')}>{t('terminal.defaultsTab')}</button>
+        </div>
+      )}
+      {side === 'session' && sessionId
+        ? <SessionSettingsForm sessionId={sessionId} onDone={onClose} />
+        : (<>
+          <TerminalSettingsForm onDone={onClose} />
+          {!member && <DictationSettings />}
+        </>)}
+    </Modal>
   );
 }

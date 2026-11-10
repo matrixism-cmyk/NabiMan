@@ -130,6 +130,7 @@ export default function SftpList(props: Props) {
       {parent && (
         <div
           className={`sftp-row is-up ${dropOn === parent ? 'is-drop' : ''}`}
+          role="option" aria-selected={false} aria-label={t('sftp.up')}
           onDoubleClick={props.onUp}
           {...press.bind(null)}
           onClick={() => { if (press.wasTouch()) props.onUp(); }}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApi, apiPost } from '../shared/api/useApi';
 import { useT } from '../i18n';
+import DismissibleMessage from '../shared/ui/DismissibleMessage';
 
 interface LicenseStatus {
   active: boolean;
@@ -71,7 +72,7 @@ export default function LicensePanel() {
           {t('license.refresh')}
         </button>
       </div>
-      {msg && <div className="message" onClick={() => setMsg('')}>{msg}</div>}
+      {msg && <DismissibleMessage onDismiss={() => setMsg('')}>{msg}</DismissibleMessage>}
 
       {data.validation_state && <p role={data.active ? 'status' : 'alert'}>{t(`license.state.${data.validation_state}`)}</p>}
 

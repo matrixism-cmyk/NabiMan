@@ -4,6 +4,7 @@ import { Container, ContainerImage } from '../types';
 import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';
 import { confirmDialog } from '../shared/ui/ConfirmDialog';
+import DismissibleMessage from '../shared/ui/DismissibleMessage';
 
 export default function ContainersPanel() {
   const { t } = useT();
@@ -45,9 +46,9 @@ export default function ContainersPanel() {
   };
 
   const containerList = containers || [];
-  const { sorted, toggle, indicator } = useSortable(containerList, 'name', 'asc');
+  const { sorted, indicator, headerProps } = useSortable(containerList, 'name', 'asc');
   const S = (key: string, label: string) => (
-    <th className="sortable" onClick={() => toggle(key)}>{label}{indicator(key)}</th>
+    <th {...headerProps(key)}>{label}{indicator(key)}</th>
   );
 
   if (loading) return <div className="panel loading">{t('containers.loading')}</div>;
@@ -64,7 +65,7 @@ export default function ContainersPanel() {
         </div>
       </div>
 
-      {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
+      {message && <DismissibleMessage onDismiss={() => setMessage('')}>{message}</DismissibleMessage>}
 
       {logContainer && (
         <div className="log-viewer">

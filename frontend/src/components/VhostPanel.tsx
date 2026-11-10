@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApi, apiPost, apiRequest, ApiResponse } from '../shared/api/useApi';
 import { useT } from '../i18n';
 import { confirmDialog } from '../shared/ui/ConfirmDialog';
+import DismissibleMessage from '../shared/ui/DismissibleMessage';
 
 interface VhostInfo { domain: string; vhost_type: string; target: string; ssl: boolean; enabled: boolean; config_file: string; }
 interface VhostConfig { domain: string; http_config: string; ssl_config: string | null; }
@@ -85,7 +86,7 @@ export default function VhostPanel() {
           <button className="btn btn-secondary btn-sm" onClick={() => setEditing(null)}>{t('common.cancel')}</button>
         </div>
       </div>
-      {msg && <div className="message" onClick={() => setMsg('')}>{msg}</div>}
+      {msg && <DismissibleMessage onDismiss={() => setMsg('')}>{msg}</DismissibleMessage>}
       <h3>HTTP {t('vhost.config')}</h3>
       <textarea className="file-editor" value={editHttp} onChange={e => setEditHttp(e.target.value)} />
       {editSsl && (<>
@@ -103,7 +104,7 @@ export default function VhostPanel() {
           {showAdd ? t('common.cancel') : t('vhost.add')}
         </button>
       </div>
-      {msg && <div className="message" onClick={() => setMsg('')}>{msg}</div>}
+      {msg && <DismissibleMessage onDismiss={() => setMsg('')}>{msg}</DismissibleMessage>}
       {showAdd && (
         <div className="inline-form">
           <div className="form-row">

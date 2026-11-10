@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useApi, apiPost } from '../shared/api/useApi';
 import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';
+import DismissibleMessage from '../shared/ui/DismissibleMessage';
 
 interface IpBlockStatus {
   backend: string;
@@ -88,9 +89,9 @@ export default function IpBlockPanel() {
     refetchLog();
   };
 
-  const { sorted: sortedBanned, toggle, indicator } = useSortable(banned || []);
+  const { sorted: sortedBanned, indicator, headerProps } = useSortable(banned || []);
   const S = (key: string, label: string) => (
-    <th className="sortable" onClick={() => toggle(key)}>{label}{indicator(key)}</th>
+    <th {...headerProps(key)}>{label}{indicator(key)}</th>
   );
 
   const actionBadge = (action: string) => {
@@ -110,7 +111,7 @@ export default function IpBlockPanel() {
           {t('ipblock.refresh')}
         </button>
       </div>
-      {msg && <div className="message" onClick={() => setMsg('')}>{msg}</div>}
+      {msg && <DismissibleMessage onDismiss={() => setMsg('')}>{msg}</DismissibleMessage>}
 
       {/* Status Overview */}
       <div className="info-grid">

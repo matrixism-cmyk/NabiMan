@@ -5,6 +5,7 @@ import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';
 import { confirmDialog } from '../shared/ui/ConfirmDialog';
 import { startVisibleInterval } from '../shared/ui/useVisibleInterval';
+import DismissibleMessage from '../shared/ui/DismissibleMessage';
 
 interface RenewStatus { domain: string; status: string; message: string; started_at: string; }
 
@@ -59,9 +60,9 @@ export default function SslPanel() {
     await start(domain, '/api/ssl/renew', 'ssl.renewStarted', 'ssl.renewed');
   };
 
-  const { sorted, toggle, indicator } = useSortable(data || [], 'days_left', 'asc');
+  const { sorted, indicator, headerProps } = useSortable(data || [], 'days_left', 'asc');
   const S = (key: string, label: string) => (
-    <th className="sortable" onClick={() => toggle(key)}>{label}{indicator(key)}</th>
+    <th {...headerProps(key)}>{label}{indicator(key)}</th>
   );
 
   if (loading) return <div className="panel loading">{t('common.loading')}</div>;
@@ -87,7 +88,7 @@ export default function SslPanel() {
         <h2>{t('ssl.title')}</h2>
         <button className="btn btn-secondary btn-sm" onClick={refetch}>{t('ssl.refresh')}</button>
       </div>
-      {renewMsg && <div className="message" onClick={() => setRenewMsg('')}>{renewMsg}</div>}
+      {renewMsg && <DismissibleMessage onDismiss={() => setRenewMsg('')}>{renewMsg}</DismissibleMessage>}
       {renewError && <div role="alert" className="message" onClick={() => setRenewError('')}>{renewError}</div>}
       {data.length === 0 ? (
         <p className="text-secondary">{t('ssl.noCerts')}</p>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApi, apiPost, apiRequest } from '../shared/api/useApi';
 import { useT } from '../i18n';
 import { confirmDialog } from '../shared/ui/ConfirmDialog';
+import DismissibleMessage from '../shared/ui/DismissibleMessage';
 
 interface Channel { id: string; name: string; channel_type: string; target: string; enabled: boolean; }
 
@@ -46,7 +47,7 @@ export default function NotificationsPanel() {
           <button className="btn btn-secondary btn-sm" onClick={testAll}>{t('notify.test')}</button>
         </div>
       </div>
-      {msg && <div className="message" onClick={() => setMsg('')}>{msg}</div>}
+      {msg && <DismissibleMessage onDismiss={() => setMsg('')}>{msg}</DismissibleMessage>}
       {showAdd && (
         <div className="inline-form">
           <div className="form-row">

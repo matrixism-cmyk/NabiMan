@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useT } from '../../../i18n';
+import { onActivateKey } from '../../../shared/ui/activate';
 
 export interface Column<T> {
   key: string;
@@ -109,6 +110,9 @@ export default function SortableTable<T>({
         key={col.key}
         title={col.headerTitle}
         onClick={col.sortable === false ? undefined : () => handleSort(col)}
+        tabIndex={col.sortable === false ? undefined : 0}
+        onKeyDown={col.sortable === false ? undefined : onActivateKey(() => handleSort(col))}
+        aria-sort={col.sortable === false ? undefined : isSorted ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
         style={{
           textAlign: col.align || 'left',
           width: col.width,
@@ -185,6 +189,8 @@ export default function SortableTable<T>({
               key={rk}
               className={highlightRowKeys?.has(rk) ? 'mec-row-in' : undefined}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
+              tabIndex={onRowClick ? 0 : undefined}
+              onKeyDown={onRowClick ? onActivateKey(() => onRowClick(row)) : undefined}
               style={{
                 cursor: onRowClick ? 'pointer' : undefined,
                 borderBottom: '1px solid var(--border)',

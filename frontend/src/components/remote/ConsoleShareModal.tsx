@@ -4,6 +4,7 @@ import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import { ConsoleShare, createShare, listShares, revokeShare, shareLink } from './vncApi';
 import { formatDateTime } from '../../shared/i18n/format';
+import DismissibleMessage from '../../shared/ui/DismissibleMessage';
 
 // Mirrors the terminal share's expiry choices (in seconds; 0 = until revoked).
 const EXPIRY: { key: string; secs: number }[] = [
@@ -56,7 +57,7 @@ export default function ConsoleShareModal({ console: key, label, onClose }: {
     <Modal className="share-dialog console-share" onClose={onClose} title={`${t('remote.console.share.title')} · ${label}`}>
       <p className="share-warning">{t('remote.console.share.warning')}</p>
       <p className="text-secondary">{t('share.lifetimePolicy')}</p>
-      {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
+      {message && <DismissibleMessage onDismiss={() => setMessage('')}>{message}</DismissibleMessage>}
 
       <div className="form-group">
         <label>{t('share.expiry')}</label>

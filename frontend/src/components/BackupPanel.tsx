@@ -105,9 +105,9 @@ export default function BackupPanel() {
     refetch();
   };
 
-  const { sorted, toggle, indicator } = useSortable(data || [], 'created', 'desc');
+  const { sorted, indicator, headerProps } = useSortable(data || [], 'created', 'desc');
   const S = (key: string, label: string) => (
-    <th className="sortable" onClick={() => toggle(key)}>{label}{indicator(key)}</th>
+    <th {...headerProps(key)}>{label}{indicator(key)}</th>
   );
 
   if (loading && !data) return <div className="panel loading">{t('common.loading')}</div>;

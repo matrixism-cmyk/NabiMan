@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApi, apiPost } from '../shared/api/useApi';
 import { useT } from '../i18n';
 import { confirmDialog } from '../shared/ui/ConfirmDialog';
+import DismissibleMessage from '../shared/ui/DismissibleMessage';
 
 interface Package {
   name: string;
@@ -65,7 +66,7 @@ export default function PackagesPanel() {
     <div className="panel">
       <h2>{t('packages.title')}</h2>
 
-      {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
+      {message && <DismissibleMessage onDismiss={() => setMessage('')}>{message}</DismissibleMessage>}
 
       <div className="inline-form" style={{ flexDirection: 'row', alignItems: 'center' }}>
         <input

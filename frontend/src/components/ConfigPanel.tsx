@@ -3,6 +3,8 @@ import { useApi, apiPost } from '../shared/api/useApi';
 import { ServiceConfig, ServiceDefinition } from '../types';
 import { useT } from '../i18n';
 import { confirmDialog } from '../shared/ui/ConfirmDialog';
+import DismissibleMessage from '../shared/ui/DismissibleMessage';
+import { clickable } from '../shared/ui/activate';
 
 function ConfigEditor({ serviceId, displayName }: { serviceId: string; displayName: string }) {
   const { t } = useT();
@@ -67,7 +69,7 @@ function ConfigEditor({ serviceId, displayName }: { serviceId: string; displayNa
         </div>
       </div>
 
-      {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
+      {message && <DismissibleMessage onDismiss={() => setMessage('')}>{message}</DismissibleMessage>}
 
       {editing ? (
         <div className="editor-area">
@@ -97,7 +99,7 @@ function ServiceCard({ svc }: { svc: ServiceDefinition }) {
 
   return (
     <div key={svc.id}>
-      <div className="service-detect-header" onClick={() => setExpanded(!expanded)}
+      <div className="service-detect-header" {...clickable(() => setExpanded(!expanded))} aria-expanded={expanded}
         style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
         <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{expanded ? '▼' : '▶'}</span>
         <strong>{svc.display_name}</strong>

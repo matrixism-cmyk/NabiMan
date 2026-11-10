@@ -65,15 +65,23 @@ export default function CommandPalette({ onClose, onSelect, hiddenTabs }: Props)
         <input
           ref={inputRef}
           className="cmdk-input"
+          role="combobox"
+          aria-expanded="true"
+          aria-controls="cmdk-list"
+          aria-label={t('palette.placeholder')}
+          aria-activedescendant={results[active] ? `cmdk-${active}` : undefined}
           placeholder={t('palette.placeholder')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <div className="cmdk-list" ref={listRef}>
+        <div className="cmdk-list" ref={listRef} id="cmdk-list" role="listbox">
           {results.length === 0 && <div className="cmdk-empty">{t('palette.empty')}</div>}
           {results.map((e, i) => (
             <div
               key={`${e.cat}/${e.tab}`}
+              id={`cmdk-${i}`}
+              role="option"
+              aria-selected={i === active}
               data-active={i === active}
               className={`cmdk-item ${i === active ? 'cmdk-item-active' : ''}`}
               onMouseEnter={() => setActive(i)}

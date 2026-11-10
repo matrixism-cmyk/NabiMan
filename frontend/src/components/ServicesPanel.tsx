@@ -23,9 +23,9 @@ export default function ServicesPanel() {
     return matchName && matchState;
   });
 
-  const { sorted, toggle, indicator } = useSortable(filtered, 'name', 'asc');
+  const { sorted, indicator, headerProps } = useSortable(filtered, 'name', 'asc');
   const S = (key: string, label: string) => (
-    <th className="sortable" onClick={() => toggle(key)}>{label}{indicator(key)}</th>
+    <th {...headerProps(key)}>{label}{indicator(key)}</th>
   );
 
 

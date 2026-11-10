@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApi, apiPost } from '../shared/api/useApi';
 import { useT } from '../i18n';
 import ApiTokensPanel from './ApiTokensPanel';
+import DismissibleMessage from '../shared/ui/DismissibleMessage';
 
 interface LdapConfig {
   enabled: boolean;
@@ -67,7 +68,7 @@ function LdapTab() {
 
   return (
     <div>
-      {msg && <div className="message" onClick={() => setMsg('')}>{msg}</div>}
+      {msg && <DismissibleMessage onDismiss={() => setMsg('')}>{msg}</DismissibleMessage>}
       <div className="inline-form">
         <div className="form-row">
           <label>{t('ldap.enabled')}</label>
@@ -173,7 +174,7 @@ function OAuthTab() {
 
   return (
     <div>
-      {msg && <div className="message" onClick={() => setMsg('')}>{msg}</div>}
+      {msg && <DismissibleMessage onDismiss={() => setMsg('')}>{msg}</DismissibleMessage>}
       <div className="inline-form">
         <div className="form-row">
           <label>{t('oauth.enabled')}</label>

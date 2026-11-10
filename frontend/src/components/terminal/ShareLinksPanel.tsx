@@ -5,6 +5,7 @@ import { isPermanent, ShareLink } from './ShareDialog';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useVisibleInterval } from '../../shared/ui/useVisibleInterval';
 import { formatDateTime } from '../../shared/i18n/format';
+import DismissibleMessage from '../../shared/ui/DismissibleMessage';
 
 const shareUrl = (token: string) => `${window.location.origin}/share/${token}`;
 
@@ -88,7 +89,7 @@ export default function ShareLinksPanel() {
         <h3>{t('share.panelTitle')}</h3>
         <button className="btn btn-secondary btn-sm" onClick={load}>{t('common.refresh')}</button>
       </div>
-      {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
+      {message && <DismissibleMessage onDismiss={() => setMessage('')}>{message}</DismissibleMessage>}
 
       {links.length === 0 ? (
         <p className="text-secondary">{t('share.none')}</p>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApi, apiPost } from '../shared/api/useApi';
 import { useT } from '../i18n';
 import { confirmDialog } from '../shared/ui/ConfirmDialog';
+import DismissibleMessage from '../shared/ui/DismissibleMessage';
 
 interface LoginSession { user: string; tty: string; from: string; login_time: string; idle: string; what: string; }
 
@@ -32,7 +33,7 @@ export default function SessionsPanel() {
           <button className="btn btn-secondary btn-sm" onClick={refetch}>{t('ssl.refresh')}</button>
         </div>
       </div>
-      {msg && <div className="message" onClick={() => setMsg('')}>{msg}</div>}
+      {msg && <DismissibleMessage onDismiss={() => setMsg('')}>{msg}</DismissibleMessage>}
       {tab === 'active' ? (
         data && data.length > 0 ? (
           <table className="data-table">

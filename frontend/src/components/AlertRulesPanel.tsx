@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApi, apiPost, apiRequest } from '../shared/api/useApi';
 import { useT } from '../i18n';
 import { confirmDialog } from '../shared/ui/ConfirmDialog';
+import DismissibleMessage from '../shared/ui/DismissibleMessage';
 
 interface AlertRule { id: string; name: string; metric: string; threshold: number; duration_secs: number; enabled: boolean; last_triggered: string | null; service_name?: string; }
 
@@ -47,7 +48,7 @@ export default function AlertRulesPanel() {
           {showAdd ? t('common.cancel') : t('alerts.addRule')}
         </button>
       </div>
-      {msg && <div className="message" onClick={() => setMsg('')}>{msg}</div>}
+      {msg && <DismissibleMessage onDismiss={() => setMsg('')}>{msg}</DismissibleMessage>}
       {showAdd && (
         <div className="inline-form">
           <div className="form-row">

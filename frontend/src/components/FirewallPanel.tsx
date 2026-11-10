@@ -4,6 +4,7 @@ import { FirewallStatus } from '../types';
 import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';
 import { confirmDialog } from '../shared/ui/ConfirmDialog';
+import DismissibleMessage from '../shared/ui/DismissibleMessage';
 
 export default function FirewallPanel() {
   const { t } = useT();
@@ -37,9 +38,9 @@ export default function FirewallPanel() {
     refetch();
   };
 
-  const { sorted, toggle, indicator } = useSortable(data?.rules || [], 'number', 'asc');
+  const { sorted, indicator, headerProps } = useSortable(data?.rules || [], 'number', 'asc');
   const S = (key: string, label: string) => (
-    <th className="sortable" onClick={() => toggle(key)}>{label}{indicator(key)}</th>
+    <th {...headerProps(key)}>{label}{indicator(key)}</th>
   );
 
   if (loading) return <div className="panel loading">{t('firewall.loading')}</div>;
@@ -63,7 +64,7 @@ export default function FirewallPanel() {
         </div>
       </div>
 
-      {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
+      {message && <DismissibleMessage onDismiss={() => setMessage('')}>{message}</DismissibleMessage>}
 
       <form onSubmit={handleAdd} className="inline-form" style={{ flexDirection: 'row', alignItems: 'center', gap: '8px' }}>
         <input

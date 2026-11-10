@@ -37,8 +37,8 @@ export default function AccountsPanel() {
     } catch { setMessage(t('accounts.resultUnknown')); }
     finally { setPassword(''); setBusy(false); refetch(); }
   };
-  const { sorted, toggle, indicator } = useSortable(data || [], 'uid', 'asc');
-  const heading = (key: string, label: string) => <th className="sortable" onClick={() => toggle(key)}>{label}{indicator(key)}</th>;
+  const { sorted, indicator, headerProps } = useSortable(data || [], 'uid', 'asc');
+  const heading = (key: string, label: string) => <th {...headerProps(key)}>{label}{indicator(key)}</th>;
   if (loading) return <div className="panel loading">{t('accounts.loading')}</div>;
   if (error) return <div className="panel error">{t('common.error')}: {error}</div>;
   return <div className="panel">

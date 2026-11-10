@@ -5,6 +5,7 @@ import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useGrants, useSharing } from '../remote/member';
 import { formatDateTime } from '../../shared/i18n/format';
+import DismissibleMessage from '../../shared/ui/DismissibleMessage';
 
 export interface ShareLink {
   token: string;
@@ -145,7 +146,7 @@ export default function ShareDialog({ sessionId = '', serverId = '', sessionLabe
         <p className="text-secondary">{sessionLabel}</p>
         <p className="share-warning">{t(filesOnly ? 'share.filesWarning' : 'share.warning')}</p>
         <p className="text-secondary">{t('share.lifetimePolicy')}</p>
-        {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
+        {message && <DismissibleMessage onDismiss={() => setMessage('')}>{message}</DismissibleMessage>}
 
         <div className="form-group">
           <label>{t('share.expiry')}</label>

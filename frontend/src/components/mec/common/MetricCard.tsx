@@ -3,6 +3,7 @@ import { StatusTone, tone as toneFor } from './StatusBadge';
 import { useCountUp } from '../../../hooks/mec/useCountUp';
 import Sparkline from './Sparkline';
 import { formatNumber } from '../../../shared/i18n/format';
+import { clickable } from '../../../shared/ui/activate';
 
 interface Props {
   label: string;
@@ -60,7 +61,7 @@ export default function MetricCard({
 
   return (
     <div
-      onClick={onClick}
+      {...(onClick ? clickable(onClick) : {})}
       style={{
         background: 'var(--surface)',
         borderRadius: '8px',

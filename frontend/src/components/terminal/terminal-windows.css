@@ -183,7 +183,6 @@
 
 .term-taskbar-spacer { flex: 1 1 auto; }
 
-.term-settings-overlay { z-index: 1000; }
 /* Wide enough for the settings in two columns, and never taller than the
    window: what does not fit scrolls inside instead of being cut off. */
 .term-settings { width: min(920px, 94vw); max-width: 94vw; max-height: 92vh; overflow-y: auto; }

@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
+import { onActivateKey } from '../shared/ui/activate';
 
 export type SortDir = 'asc' | 'desc';
 
@@ -36,5 +37,14 @@ export function useSortable<T>(data: T[], defaultKey?: string, defaultDir: SortD
 
   const indicator = (key: string) => sort.key === key ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '';
 
-  return { sorted, sort, toggle, indicator };
+  /** A sortable column heading's props: reachable by Tab, sorted by Enter or Space, its order announced. */
+  const headerProps = (key: string) => ({
+    className: 'sortable',
+    tabIndex: 0,
+    'aria-sort': (sort.key === key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none') as React.AriaAttributes['aria-sort'],
+    onClick: () => toggle(key),
+    onKeyDown: onActivateKey(() => toggle(key)),
+  });
+
+  return { sorted, sort, toggle, indicator, headerProps };
 }

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { apiPost } from '../shared/api/useApi';
 import { useT } from '../i18n';
 import { passwordOk } from '../shared/passwordRule';
+import Modal from '../shared/ui/Modal';
 
 export default function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const { t } = useT();
@@ -22,20 +23,20 @@ export default function ChangePasswordModal({ onClose }: { onClose: () => void }
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <h3>{t('app.changePassword')}</h3>
-        <form onSubmit={handleSubmit}>
-          <input type="password" placeholder={t('app.currentPassword')} value={currentPw} onChange={e => setCurrentPw(e.target.value)} required autoFocus />
-          <input type="password" placeholder={t('app.newPassword')} value={newPw} onChange={e => setNewPw(e.target.value)} required />
-          <input type="password" placeholder={t('app.confirmPassword')} value={confirmPw} onChange={e => setConfirmPw(e.target.value)} required />
-          {msg && <div className={success ? 'login-success' : 'login-error'}>{msg}</div>}
-          <div className="modal-actions">
-            {!success && <button type="submit" className="btn btn-primary">{t('common.change')}</button>}
-            <button type="button" className="btn btn-secondary" onClick={onClose}>{success ? t('common.close') : t('common.cancel')}</button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <Modal onClose={onClose} title={t('app.changePassword')}>
+      <form onSubmit={handleSubmit}>
+        <input type="password" placeholder={t('app.currentPassword')} aria-label={t('app.currentPassword')} autoComplete="current-password"
+          value={currentPw} onChange={e => setCurrentPw(e.target.value)} required />
+        <input type="password" placeholder={t('app.newPassword')} aria-label={t('app.newPassword')} autoComplete="new-password"
+          value={newPw} onChange={e => setNewPw(e.target.value)} required />
+        <input type="password" placeholder={t('app.confirmPassword')} aria-label={t('app.confirmPassword')} autoComplete="new-password"
+          value={confirmPw} onChange={e => setConfirmPw(e.target.value)} required />
+        {msg && <div className={success ? 'login-success' : 'login-error'} role={success ? 'status' : 'alert'}>{msg}</div>}
+        <div className="modal-actions">
+          {!success && <button type="submit" className="btn btn-primary">{t('common.change')}</button>}
+          <button type="button" className="btn btn-secondary" onClick={onClose}>{success ? t('common.close') : t('common.cancel')}</button>
+        </div>
+      </form>
+    </Modal>
   );
 }

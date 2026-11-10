@@ -55,9 +55,9 @@ export default function DisksPanel() {
   const { data, loading, error } = useApi<DiskStatus>('/api/disks/status', 5000);
   const { data: history } = useApi<HistoryPoint[]>('/api/server/history?hours=1', 10000);
 
-  const { sorted, toggle, indicator } = useSortable(data?.partitions || [], 'use_percent', 'desc');
+  const { sorted, indicator, headerProps } = useSortable(data?.partitions || [], 'use_percent', 'desc');
   const S = (key: string, label: string) => (
-    <th className="sortable" onClick={() => toggle(key)}>{label}{indicator(key)}</th>
+    <th {...headerProps(key)}>{label}{indicator(key)}</th>
   );
 
   if (loading) return <div className="panel loading">{t('disks.loading')}</div>;

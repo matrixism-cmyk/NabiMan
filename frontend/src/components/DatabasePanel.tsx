@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApi, apiPost, apiRequest } from '../shared/api/useApi';
 import { useT } from '../i18n';
 import { confirmDialog } from '../shared/ui/ConfirmDialog';
+import DismissibleMessage from '../shared/ui/DismissibleMessage';
 
 interface DbStatus { engine: string; running: boolean; version: string; uptime: string; connections: string; databases: string[]; slow_queries: string; }
 interface DbBackupEntry { filename: string; size: number; created: string; }
@@ -115,7 +116,7 @@ export default function DatabasePanel() {
         </select>
         <button className="btn btn-primary btn-sm" onClick={createBackup}>{t('db.backup')}</button>
       </div>
-      {backupMsg && <div className="message" onClick={() => setBackupMsg('')}>{backupMsg}</div>}
+      {backupMsg && <DismissibleMessage onDismiss={() => setBackupMsg('')}>{backupMsg}</DismissibleMessage>}
       {backupsError && <div role="alert" className="message">{t('db.backupsFailed', { message: backupsError })}</div>}
       <h4>{t('db.backups')}</h4>
       {backups.length > 0 ? (
@@ -169,7 +170,7 @@ export default function DatabasePanel() {
       <div className="filter-row">
         <button className="btn btn-primary btn-sm" onClick={executeQuery}>{t('db.execute')}</button>
       </div>
-      {queryMsg && <div className="message" onClick={() => setQueryMsg('')}>{queryMsg}</div>}
+      {queryMsg && <DismissibleMessage onDismiss={() => setQueryMsg('')}>{queryMsg}</DismissibleMessage>}
       <h4>{t('db.results')}</h4>
       {queryResult ? (
         <div>

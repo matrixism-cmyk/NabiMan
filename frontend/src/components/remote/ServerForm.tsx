@@ -6,6 +6,7 @@ import { FileProtocol, PLAINTEXT, protocolName, TerminalProtocol } from './proto
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useMember } from './member';
 import './remote-base.css';
+import DismissibleMessage from '../../shared/ui/DismissibleMessage';
 
 interface Props {
   /** Absent for a new server, present when editing an existing one. */
@@ -127,7 +128,7 @@ export default function ServerForm({ server, onSaved, onCancel }: Props) {
 
   return (
     <form className="rw-form" onSubmit={handleSubmit}>
-      {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
+      {message && <DismissibleMessage onDismiss={() => setMessage('')}>{message}</DismissibleMessage>}
       <div className="form-grid">
         <div className="form-group"><label>{t('common.name')}</label>
           <input value={name} onChange={e => setName(e.target.value)} placeholder="web-prod-01" className="filter-input" /></div>

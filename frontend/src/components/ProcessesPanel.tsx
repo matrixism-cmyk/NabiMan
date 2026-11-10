@@ -31,7 +31,7 @@ export default function ProcessesPanel() {
       || p.pid.toString().includes(filter)
   );
 
-  const { sorted, toggle, indicator } = useSortable(filtered, 'cpu', 'desc');
+  const { sorted, indicator, headerProps } = useSortable(filtered, 'cpu', 'desc');
 
   const handleKill = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +50,7 @@ export default function ProcessesPanel() {
   if (error) return <div className="panel error">{t('common.error')}: {error}</div>;
 
   const S = (key: string, label: string) => (
-    <th className="sortable" onClick={() => toggle(key)}>{label}{indicator(key)}</th>
+    <th {...headerProps(key)}>{label}{indicator(key)}</th>
   );
 
   return (

@@ -3,6 +3,7 @@ import { useApi, apiPost } from '../../shared/api/useApi';
 import { RemoteServer, SshKeyInfo } from './remoteTypes';
 import { useT } from '../../shared/i18n';
 import './remote-base.css';
+import DismissibleMessage from '../../shared/ui/DismissibleMessage';
 
 export function SshKeyPanel() {
   const { t } = useT();
@@ -47,7 +48,7 @@ export function SshKeyPanel() {
         </div>
       </div>
 
-      {message && <div className="message" onClick={() => setMessage('')}>{message}</div>}
+      {message && <DismissibleMessage onDismiss={() => setMessage('')}>{message}</DismissibleMessage>}
 
       {keyInfo?.exists && keyInfo.public_key && (
         <div style={{ padding: '8px 0' }}>
