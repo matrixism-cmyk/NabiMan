@@ -3,6 +3,8 @@ use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+use crate::bounded_command::{deadline, OutputOffThread, OutputWithin};
+
 #[derive(Serialize, Clone)]
 pub struct DbStatus {
     pub engine: String,
@@ -21,7 +23,7 @@ pub struct DbQueryResult {
     pub row_count: usize,
 }
 
-fn detect_db() -> Option<&'static str> {
+async fn detect_db() -> Option<&'static str> {
     let checks = [
         ("mysql", &["mysqld", "mariadbd"][..]),
         ("postgresql", &["postgres"][..]),
@@ -31,7 +33,7 @@ fn detect_db() -> Option<&'static str> {
             let ok = std::process::Command::new("pgrep")
                 .arg("-x")
                 .arg(p)
-                .output()
+                .output_off_thread(deadline::QUICK).await
                 .map(|o| o.status.success())
                 .unwrap_or(false);
             if ok {
@@ -50,7 +52,7 @@ fn mysql_status() -> DbStatus {
     let run = |args: &[&str]| -> String {
         std::process::Command::new("mysql")
             .args(args)
-            .output()
+            .output_within(deadline::DATABASE)
             .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
             .unwrap_or_default()
     };
@@ -97,7 +99,7 @@ fn pg_status() -> DbStatus {
             .arg("postgres")
             .arg("psql")
             .args(args)
-            .output()
+            .output_within(deadline::DATABASE)
             .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
             .unwrap_or_default()
     };
@@ -132,17 +134,24 @@ fn pg_status() -> DbStatus {
 }
 
 async fn status() -> HttpResponse {
-    match detect_db() {
-        Some("mysql") => HttpResponse::Ok().json(ApiResponse::ok(mysql_status())),
-        Some("postgresql") => HttpResponse::Ok().json(ApiResponse::ok(pg_status())),
-        _ => HttpResponse::Ok().json(ApiResponse::<DbStatus>::error(
-            "No supported database server running",
-        )),
+    // Several client runs in a row: on the blocking pool, each bounded.
+    let status = match detect_db().await {
+        Some("mysql") => web::block(mysql_status).await,
+        Some("postgresql") => web::block(pg_status).await,
+        _ => {
+            return HttpResponse::Ok().json(ApiResponse::<DbStatus>::error(
+                "No supported database server running",
+            ))
+        }
+    };
+    match status {
+        Ok(status) => HttpResponse::Ok().json(ApiResponse::ok(status)),
+        Err(_) => HttpResponse::Ok().json(ApiResponse::<DbStatus>::error("Status check stopped unexpectedly")),
     }
 }
 
 async fn available() -> HttpResponse {
-    HttpResponse::Ok().json(ApiResponse::ok(detect_db().is_some()))
+    HttpResponse::Ok().json(ApiResponse::ok(detect_db().await.is_some()))
 }
 
 // --- New backup/restore/query endpoints ---
@@ -157,7 +166,7 @@ async fn db_backup(body: web::Json<DbBackupRequest>) -> HttpResponse {
     if db.contains("..") || db.contains('/') || db.contains(';') {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid database name"));
     }
-    let engine = match detect_db() {
+    let engine = match detect_db().await {
         Some(e) => e,
         None => {
             return HttpResponse::Ok().json(ApiResponse::<String>::error("No database running"))
@@ -180,7 +189,7 @@ async fn db_backup(body: web::Json<DbBackupRequest>) -> HttpResponse {
         ),
         _ => return HttpResponse::Ok().json(ApiResponse::<String>::error("Unknown engine")),
     };
-    let result = std::process::Command::new("sh").args(["-c", &cmd]).output();
+    let result = std::process::Command::new("sh").args(["-c", &cmd]).output_off_thread(deadline::DATABASE_DUMP).await;
     match result {
         Ok(o) if o.status.success() => HttpResponse::Ok().json(ApiResponse::ok(filename)),
         Ok(o) => {
@@ -228,7 +237,7 @@ async fn db_restore(body: web::Json<DbRestoreRequest>) -> HttpResponse {
     if !src.exists() {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Backup file not found"));
     }
-    let engine = match detect_db() {
+    let engine = match detect_db().await {
         Some(e) => e,
         None => {
             return HttpResponse::Ok().json(ApiResponse::<String>::error("No database running"))
@@ -243,7 +252,7 @@ async fn db_restore(body: web::Json<DbRestoreRequest>) -> HttpResponse {
         ),
         _ => return HttpResponse::Ok().json(ApiResponse::<String>::error("Unknown engine")),
     };
-    let result = std::process::Command::new("sh").args(["-c", &cmd]).output();
+    let result = std::process::Command::new("sh").args(["-c", &cmd]).output_off_thread(deadline::DATABASE_DUMP).await;
     match result {
         Ok(o) if o.status.success() => {
             HttpResponse::Ok().json(ApiResponse::ok("Restore completed".to_string()))
@@ -281,7 +290,7 @@ async fn db_query(body: web::Json<DbQueryRequest>) -> HttpResponse {
         return HttpResponse::Ok()
             .json(ApiResponse::<DbQueryResult>::error("Invalid database name"));
     }
-    let engine = match detect_db() {
+    let engine = match detect_db().await {
         Some(e) => e,
         None => {
             return HttpResponse::Ok()
@@ -291,12 +300,12 @@ async fn db_query(body: web::Json<DbQueryRequest>) -> HttpResponse {
     let output = match engine {
         "mysql" => std::process::Command::new("mysql")
             .args(["-BN", db, "-e", query])
-            .output(),
+            .output_off_thread(deadline::DATABASE).await,
         "postgresql" => std::process::Command::new("sudo")
             .args([
                 "-u", "postgres", "psql", "-d", db, "-tA", "-F", "\t", "-c", query,
             ])
-            .output(),
+            .output_off_thread(deadline::DATABASE).await,
         _ => return HttpResponse::Ok().json(ApiResponse::<DbQueryResult>::error("Unknown engine")),
     };
     match output {

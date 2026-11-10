@@ -1,5 +1,6 @@
 use crate::lock_safe::LockExt;
 use super::*;
+use crate::bounded_command::OutputWithin;
 
 pub(super) fn save_probe_results(
     snapshot: &[RemoteServer],
@@ -110,11 +111,18 @@ pub(super) async fn exec_on_server(
         }
     }
 
-    let (mut ssh, _pw_guard) = match ssh_command(srv, 10, cmd) {
-        Ok(c) => c,
+    // Off the HTTP worker, and stopped (with sshpass and ssh) at the deadline.
+    let (srv, cmd) = (srv.clone(), cmd.to_string());
+    let output = web::block(move || {
+        let (mut ssh, _pw_guard) = ssh_command(&srv, 10, &cmd)?;
+        Ok::<_, String>(ssh.output_within(crate::bounded_command::deadline::REMOTE_EXEC))
+    })
+    .await
+    .unwrap_or_else(|_| Err("The command runner stopped unexpectedly".into()));
+    let output = match output {
+        Ok(output) => output,
         Err(e) => return HttpResponse::Ok().json(ApiResponse::<String>::error(&e)),
     };
-    let output = ssh.output();
 
     match output {
         Ok(result) => {

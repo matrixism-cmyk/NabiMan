@@ -1,4 +1,9 @@
-use crate::{lock_safe::LockExt, models::ApiResponse};
+#[path = "ssl_jobs.rs"]
+mod jobs;
+use jobs::{issue_certificate, renew_certificate, renew_status};
+
+use crate::bounded_command::{deadline, OutputWithin};
+use crate::models::ApiResponse;
 use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
 
@@ -95,7 +100,7 @@ fn list_from_filesystem() -> Vec<SslCertificate> {
             let expiry_info = std::process::Command::new("openssl")
                 .args(["x509", "-enddate", "-noout", "-in"])
                 .arg(&cert_path)
-                .output()
+                .output_within(deadline::QUICK)
                 .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
                 .unwrap_or_default();
             // Format: notAfter=Jun 21 01:53:31 2026 GMT
@@ -135,7 +140,7 @@ fn calc_days_left(expiry: &str) -> i64 {
 fn list_vhost_domains() -> Vec<String> {
     let output = std::process::Command::new("sh")
         .args(["-c", "grep -rh 'ServerName' /etc/apache2/sites-enabled/ 2>/dev/null || grep -rh 'server_name' /etc/nginx/sites-enabled/ 2>/dev/null || true"])
-        .output()
+        .output_within(deadline::QUICK)
         .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
         .unwrap_or_default();
     output
@@ -165,10 +170,18 @@ fn list_vhost_domains() -> Vec<String> {
 }
 
 async fn list_certificates() -> HttpResponse {
+    // certbot, openssl per certificate, grep: on the blocking pool.
+    match web::block(collect_certificates).await {
+        Ok(certs) => HttpResponse::Ok().json(ApiResponse::ok(certs)),
+        Err(_) => HttpResponse::Ok().json(ApiResponse::<()>::error("Listing certificates stopped unexpectedly")),
+    }
+}
+
+fn collect_certificates() -> Vec<SslCertificate> {
     // Try certbot first, fall back to filesystem if locked/fails
     let output = std::process::Command::new("certbot")
         .args(["certificates", "--non-interactive"])
-        .output();
+        .output_within(deadline::SERVICE);
 
     let mut certs = match output {
         Ok(o) if o.status.success() => {
@@ -200,193 +213,7 @@ async fn list_certificates() -> HttpResponse {
         }
     }
     certs.sort_by(|a, b| a.domain.cmp(&b.domain));
-    HttpResponse::Ok().json(ApiResponse::ok(certs))
-}
-
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-
-#[derive(Serialize, Clone)]
-pub struct RenewStatus {
-    pub domain: String,
-    pub status: String, // "running", "success", "error"
-    pub message: String,
-    pub started_at: String,
-}
-
-type RenewJobs = Arc<Mutex<HashMap<String, RenewStatus>>>;
-
-fn renew_jobs() -> &'static RenewJobs {
-    use std::sync::OnceLock;
-    static JOBS: OnceLock<RenewJobs> = OnceLock::new();
-    JOBS.get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
-}
-
-#[derive(Deserialize)]
-pub struct RenewRequest {
-    pub domain: String,
-}
-
-async fn renew_certificate(body: web::Json<RenewRequest>) -> HttpResponse {
-    let domain = body.domain.clone();
-    if domain.is_empty()
-        || domain.len() > 253
-        || !domain
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '.' || c == '-')
-    {
-        return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid domain"));
-    }
-    let jobs = renew_jobs();
-    // Check if already running
-    if let Some(job) = jobs.lock_safe().get(&domain) {
-        if job.status == "running" {
-            return HttpResponse::Ok().json(ApiResponse::ok(job.clone()));
-        }
-    }
-    // Start background renewal
-    jobs.lock_safe().insert(
-        domain.clone(),
-        RenewStatus {
-            domain: domain.clone(),
-            status: "running".into(),
-            message: "Renewing...".into(),
-            started_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-        },
-    );
-    let jobs2 = jobs.clone();
-    let d = domain.clone();
-    std::thread::spawn(move || {
-        let output = std::process::Command::new("timeout")
-            .args([
-                "120",
-                "certbot",
-                "renew",
-                "--cert-name",
-                &d,
-                "--force-renewal",
-                "--non-interactive",
-                "--no-random-sleep-on-renew",
-            ])
-            .output();
-        let (status, message) = match output {
-            Ok(o) => {
-                let msg = format!(
-                    "{}\n{}",
-                    String::from_utf8_lossy(&o.stdout),
-                    String::from_utf8_lossy(&o.stderr)
-                )
-                .trim()
-                .to_string();
-                if o.status.success() {
-                    ("success".into(), msg)
-                } else {
-                    ("error".into(), msg)
-                }
-            }
-            Err(e) => ("error".into(), e.to_string()),
-        };
-        if let Ok(mut map) = jobs2.lock() {
-            if let Some(job) = map.get_mut(&d) {
-                job.status = status;
-                job.message = message;
-            }
-        }
-    });
-    HttpResponse::Ok().json(ApiResponse::ok(RenewStatus {
-        domain,
-        status: "running".into(),
-        message: "Renewal started in background".into(),
-        started_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-    }))
-}
-
-async fn renew_status(path: web::Path<String>) -> HttpResponse {
-    let domain = path.into_inner();
-    let jobs = renew_jobs();
-    match jobs.lock_safe().get(&domain) {
-        Some(job) => HttpResponse::Ok().json(ApiResponse::ok(job.clone())),
-        None => HttpResponse::Ok().json(ApiResponse::<RenewStatus>::error("No renewal job found")),
-    }
-}
-
-#[derive(Deserialize)]
-pub struct IssueRequest {
-    pub domain: String,
-}
-
-async fn issue_certificate(body: web::Json<IssueRequest>) -> HttpResponse {
-    let domain = body.domain.clone();
-    if domain.is_empty()
-        || domain.len() > 253
-        || !domain
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '.' || c == '-')
-    {
-        return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid domain"));
-    }
-    let jobs = renew_jobs();
-    if let Some(job) = jobs.lock_safe().get(&domain) {
-        if job.status == "running" {
-            return HttpResponse::Ok().json(ApiResponse::ok(job.clone()));
-        }
-    }
-    jobs.lock_safe().insert(
-        domain.clone(),
-        RenewStatus {
-            domain: domain.clone(),
-            status: "running".into(),
-            message: "Issuing...".into(),
-            started_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-        },
-    );
-    let jobs2 = jobs.clone();
-    let d = domain.clone();
-    std::thread::spawn(move || {
-        let output = std::process::Command::new("timeout")
-            .args([
-                "120",
-                "certbot",
-                "--apache",
-                "-d",
-                &d,
-                "--non-interactive",
-                "--agree-tos",
-                "--no-eff-email",
-                "--email",
-                "webmaster@xos.kr",
-            ])
-            .output();
-        let (status, message) = match output {
-            Ok(o) => {
-                let msg = format!(
-                    "{}\n{}",
-                    String::from_utf8_lossy(&o.stdout),
-                    String::from_utf8_lossy(&o.stderr)
-                )
-                .trim()
-                .to_string();
-                if o.status.success() {
-                    ("success".into(), msg)
-                } else {
-                    ("error".into(), msg)
-                }
-            }
-            Err(e) => ("error".into(), e.to_string()),
-        };
-        if let Ok(mut map) = jobs2.lock() {
-            if let Some(job) = map.get_mut(&d) {
-                job.status = status;
-                job.message = message;
-            }
-        }
-    });
-    HttpResponse::Ok().json(ApiResponse::ok(RenewStatus {
-        domain,
-        status: "running".into(),
-        message: "Certificate issuance started".into(),
-        started_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-    }))
+    certs
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {

@@ -2,6 +2,7 @@
 mod configuration;
 use configuration::{read_config, save_config};
 
+use crate::bounded_command::{deadline, OutputOffThread};
 use crate::models::ApiResponse;
 use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
@@ -198,12 +199,12 @@ async fn create_vhost(body: web::Json<CreateVhostRequest>) -> HttpResponse {
         .unwrap_or_else(|| detect_web_server());
 
     match srv {
-        "nginx" => create_nginx_vhost(&body),
-        _ => create_apache_vhost(&body),
+        "nginx" => create_nginx_vhost(&body).await,
+        _ => create_apache_vhost(&body).await,
     }
 }
 
-fn create_apache_vhost(body: &CreateVhostRequest) -> HttpResponse {
+async fn create_apache_vhost(body: &CreateVhostRequest) -> HttpResponse {
     let conf = format!("/etc/apache2/sites-available/{}.conf", body.domain);
     if std::path::Path::new(&conf).exists() {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Vhost already exists"));
@@ -219,21 +220,21 @@ fn create_apache_vhost(body: &CreateVhostRequest) -> HttpResponse {
     }
     let _ = std::process::Command::new("a2ensite")
         .arg(format!("{}.conf", body.domain))
-        .output();
+        .output_off_thread(deadline::SERVICE).await;
     if body.vhost_type == "static" {
         let _ = std::fs::create_dir_all(&body.target);
     }
     let _ = std::process::Command::new("systemctl")
         .args(["reload", "apache2"])
-        .output();
+        .output_off_thread(deadline::SERVICE).await;
     let mut msg = format!("{} created (Apache)", body.domain);
     if body.auto_ssl.unwrap_or(false) {
-        msg += &run_certbot(&body.domain, "apache");
+        msg += &run_certbot(&body.domain, "apache").await;
     }
     HttpResponse::Ok().json(ApiResponse::ok(msg))
 }
 
-fn create_nginx_vhost(body: &CreateVhostRequest) -> HttpResponse {
+async fn create_nginx_vhost(body: &CreateVhostRequest) -> HttpResponse {
     let conf = format!("/etc/nginx/sites-available/{}", body.domain);
     if std::path::Path::new(&conf).exists() {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Vhost already exists"));
@@ -254,20 +255,18 @@ fn create_nginx_vhost(body: &CreateVhostRequest) -> HttpResponse {
     }
     let _ = std::process::Command::new("nginx")
         .args(["-s", "reload"])
-        .output();
+        .output_off_thread(deadline::SERVICE).await;
     let mut msg = format!("{} created (Nginx)", body.domain);
     if body.auto_ssl.unwrap_or(false) {
-        msg += &run_certbot(&body.domain, "nginx");
+        msg += &run_certbot(&body.domain, "nginx").await;
     }
     HttpResponse::Ok().json(ApiResponse::ok(msg))
 }
 
-fn run_certbot(domain: &str, plugin: &str) -> String {
+async fn run_certbot(domain: &str, plugin: &str) -> String {
     let flag = format!("--{}", plugin);
-    match std::process::Command::new("timeout")
+    match std::process::Command::new("certbot")
         .args([
-            "120",
-            "certbot",
             &flag,
             "-d",
             domain,
@@ -277,7 +276,7 @@ fn run_certbot(domain: &str, plugin: &str) -> String {
             "--email",
             "webmaster@xos.kr",
         ])
-        .output()
+        .output_off_thread(deadline::CERTIFICATE).await
     {
         Ok(o) if o.status.success() => " + SSL issued".into(),
         Ok(o) => format!(
@@ -287,6 +286,7 @@ fn run_certbot(domain: &str, plugin: &str) -> String {
                 .last()
                 .unwrap_or("")
         ),
+        Err(e) if e.kind() == std::io::ErrorKind::TimedOut => format!(" (certbot: {e})"),
         _ => " (certbot error)".into(),
     }
 }
@@ -345,14 +345,14 @@ async fn delete_vhost(body: web::Json<DeleteVhostRequest>) -> HttpResponse {
         let _ = std::fs::remove_file(format!("/etc/nginx/sites-available/{}", body.domain));
         let _ = std::process::Command::new("nginx")
             .args(["-s", "reload"])
-            .output();
+            .output_off_thread(deadline::SERVICE).await;
     } else {
         let _ = std::process::Command::new("a2dissite")
             .arg(format!("{}.conf", body.domain))
-            .output();
+            .output_off_thread(deadline::SERVICE).await;
         let _ = std::process::Command::new("a2dissite")
             .arg(format!("{}-le-ssl.conf", body.domain))
-            .output();
+            .output_off_thread(deadline::SERVICE).await;
         let _ = std::fs::remove_file(format!("/etc/apache2/sites-available/{}.conf", body.domain));
         let _ = std::fs::remove_file(format!(
             "/etc/apache2/sites-available/{}-le-ssl.conf",
@@ -360,7 +360,7 @@ async fn delete_vhost(body: web::Json<DeleteVhostRequest>) -> HttpResponse {
         ));
         let _ = std::process::Command::new("systemctl")
             .args(["reload", "apache2"])
-            .output();
+            .output_off_thread(deadline::SERVICE).await;
     }
     HttpResponse::Ok().json(ApiResponse::ok(format!("{} removed", body.domain)))
 }

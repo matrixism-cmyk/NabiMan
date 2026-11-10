@@ -222,8 +222,16 @@ async fn ws_terminal(
         .as_ref()
         .map_or((keepalive, timeout_secs), |m| crate::member_servers::session_terms(m, keepalive, timeout_secs));
     let sid = generate_session_id();
+    // Building it may look a member's server name up, or sign a certificate.
+    let built = {
+        let (query, interval, sid) = (query.to_string(), user_settings.keepalive_interval_secs, sid.clone());
+        let member = member.clone();
+        web::block(move || build_ssh_command(&query, keepalive, interval, member.as_ref(), Some(&sid)))
+            .await
+            .unwrap_or_else(|_| Err("Preparing the session stopped unexpectedly".into()))
+    };
     let (shell_cmd, label, remote_binding) =
-        match build_ssh_command(query, keepalive, user_settings.keepalive_interval_secs, member.as_ref(), Some(&sid)) {
+        match built {
             Ok(Some((cmd, label, binding))) => (Some(cmd), label, Some(binding)),
             Ok(None) => (None, "local".to_string(), None),
             // A target we cannot resolve (deleted server, bad parameters) is

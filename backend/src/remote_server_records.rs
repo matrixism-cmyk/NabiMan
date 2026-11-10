@@ -11,6 +11,9 @@ fn actor(
     crate::membership::actor(req, store)
 }
 
+/// How long the member check's name lookup may take when adding a server.
+const LOOKUP: std::time::Duration = std::time::Duration::from_secs(10);
+
 /// A member's server: theirs, logged into with a password, and at an address
 /// they may reach (see `member_servers`).
 fn member_check(server: &mut RemoteServer) -> Result<(), String> {
@@ -105,9 +108,13 @@ pub(super) async fn add_server(
     if !server.uses_ssh() {
         server.auth_method = "password".into();
     }
-    if let Err(e) = member_check(&mut server) {
-        return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error(&e));
-    }
+    // The member check looks the name up: on the blocking pool, bounded.
+    let checked = tokio::time::timeout(LOOKUP, web::block(move || member_check(&mut server).map(|()| server)));
+    let server = match checked.await {
+        Ok(Ok(Ok(server))) => server,
+        Ok(Ok(Err(e))) => return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error(&e)),
+        _ => return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error("Address lookup timed out")),
+    };
     let max = actor.remote_permissions.max_servers as usize;
     if server.member_owned() && max > 0 {
         let own = load_servers().map(|all| all.iter().filter(|s| s.owner_id == actor.id).count()).unwrap_or(0);

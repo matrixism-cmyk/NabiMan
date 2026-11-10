@@ -3,6 +3,8 @@ use actix_web::{web, HttpResponse};
 use serde::Serialize;
 use std::time::Instant;
 
+use crate::bounded_command::{deadline, OutputOffThread, OutputWithin};
+
 #[derive(Serialize)]
 pub struct DnsStatus {
     pub service: DnsServiceInfo,
@@ -64,7 +66,7 @@ pub struct DnsRecentChange {
 fn service_info() -> DnsServiceInfo {
     let running = std::process::Command::new("systemctl")
         .args(["is-active", "nabidns-auth"])
-        .output()
+        .output_within(deadline::QUICK)
         .map(|o| String::from_utf8_lossy(&o.stdout).trim() == "active")
         .unwrap_or(false);
 
@@ -75,7 +77,7 @@ fn service_info() -> DnsServiceInfo {
             "-p",
             "MainPID,MemoryCurrent,ActiveEnterTimestamp",
         ])
-        .output()
+        .output_within(deadline::QUICK)
         .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
         .unwrap_or_default();
 
@@ -117,7 +119,7 @@ fn health_check() -> DnsHealthCheck {
     let start = Instant::now();
     let output = std::process::Command::new("dig")
         .args(["@127.0.0.1", "xos.kr", "A", "+short", "+time=3"])
-        .output();
+        .output_within(deadline::PROBE);
     let elapsed = start.elapsed().as_millis() as u64;
 
     match output {
@@ -150,7 +152,7 @@ fn mysql_query(sql: &str) -> String {
             "-BNe",
             sql,
         ])
-        .output()
+        .output_within(deadline::QUICK)
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
         .unwrap_or_default()
 }
@@ -200,7 +202,7 @@ fn read_metrics() -> Option<DnsMetrics> {
     }
     let output = std::process::Command::new("socat")
         .args(["-", &format!("UNIX-CONNECT:{}", sock)])
-        .output()
+        .output_within(deadline::QUICK)
         .ok()?;
     let text = String::from_utf8_lossy(&output.stdout);
     let mut m = DnsMetrics {
@@ -265,21 +267,25 @@ fn recent_changes() -> Vec<DnsRecentChange> {
 }
 
 async fn dns_status() -> HttpResponse {
-    let status = DnsStatus {
+    // A dozen tool runs in a row: on the blocking pool, each bounded.
+    let status = web::block(|| DnsStatus {
         service: service_info(),
         health: health_check(),
         records: record_stats(),
         users: user_stats(),
         metrics: read_metrics(),
         recent_changes: recent_changes(),
-    };
-    HttpResponse::Ok().json(ApiResponse::ok(status))
+    });
+    match status.await {
+        Ok(status) => HttpResponse::Ok().json(ApiResponse::ok(status)),
+        Err(_) => HttpResponse::Ok().json(ApiResponse::<()>::error("DNS status stopped unexpectedly")),
+    }
 }
 
 async fn dns_available() -> HttpResponse {
     let running = std::process::Command::new("systemctl")
         .args(["is-active", "nabidns-auth"])
-        .output()
+        .output_off_thread(deadline::QUICK).await
         .map(|o| o.status.success())
         .unwrap_or(false);
     HttpResponse::Ok().json(ApiResponse::ok(running))

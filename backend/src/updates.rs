@@ -2,6 +2,8 @@ use crate::models::ApiResponse;
 use actix_web::{web, HttpResponse};
 use serde::Serialize;
 
+use crate::bounded_command::{deadline, OutputOffThread};
+
 #[derive(Serialize, Clone)]
 pub struct UpdatablePackage {
     pub name: String,
@@ -15,11 +17,11 @@ pub struct UpdateCheckResult {
     pub packages: Vec<UpdatablePackage>,
 }
 
-fn detect_pkg_manager() -> Option<&'static str> {
+async fn detect_pkg_manager() -> Option<&'static str> {
     for cmd in &["apt", "dnf", "yum"] {
         if std::process::Command::new("which")
             .arg(cmd)
-            .output()
+            .output_off_thread(deadline::QUICK).await
             .map(|o| o.status.success())
             .unwrap_or(false)
         {
@@ -30,7 +32,7 @@ fn detect_pkg_manager() -> Option<&'static str> {
 }
 
 async fn check_updates() -> HttpResponse {
-    let mgr = match detect_pkg_manager() {
+    let mgr = match detect_pkg_manager().await {
         Some(m) => m,
         None => {
             return HttpResponse::Ok().json(ApiResponse::<UpdateCheckResult>::error(
@@ -41,14 +43,14 @@ async fn check_updates() -> HttpResponse {
 
     let output = match mgr {
         "apt" => {
-            let _ = std::process::Command::new("apt").args(["update"]).output();
+            let _ = std::process::Command::new("apt").args(["update"]).output_off_thread(deadline::PACKAGE_QUERY).await;
             std::process::Command::new("apt")
                 .args(["list", "--upgradable"])
-                .output()
+                .output_off_thread(deadline::PACKAGE_QUERY).await
         }
         "dnf" | "yum" => std::process::Command::new(mgr)
             .args(["check-update", "-q"])
-            .output(),
+            .output_off_thread(deadline::PACKAGE_QUERY).await,
         _ => {
             return HttpResponse::Ok().json(ApiResponse::<UpdateCheckResult>::error("Unsupported"))
         }
@@ -113,7 +115,7 @@ fn parse_dnf_updates(output: &str) -> Vec<UpdatablePackage> {
 }
 
 async fn run_upgrade() -> HttpResponse {
-    let mgr = match detect_pkg_manager() {
+    let mgr = match detect_pkg_manager().await {
         Some(m) => m,
         None => return HttpResponse::Ok().json(ApiResponse::<String>::error("No package manager")),
     };
@@ -122,13 +124,13 @@ async fn run_upgrade() -> HttpResponse {
         "apt" => std::process::Command::new("apt")
             .args(["upgrade", "-y"])
             .env("DEBIAN_FRONTEND", "noninteractive")
-            .output(),
+            .output_off_thread(deadline::SYSTEM_UPGRADE).await,
         "dnf" => std::process::Command::new("dnf")
             .args(["upgrade", "-y"])
-            .output(),
+            .output_off_thread(deadline::SYSTEM_UPGRADE).await,
         "yum" => std::process::Command::new("yum")
             .args(["update", "-y"])
-            .output(),
+            .output_off_thread(deadline::SYSTEM_UPGRADE).await,
         _ => return HttpResponse::Ok().json(ApiResponse::<String>::error("Unsupported")),
     };
 
@@ -162,7 +164,7 @@ async fn upgrade_package(body: web::Json<UpgradePackageRequest>) -> HttpResponse
     {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid package name"));
     }
-    let mgr = match detect_pkg_manager() {
+    let mgr = match detect_pkg_manager().await {
         Some(m) => m,
         None => return HttpResponse::Ok().json(ApiResponse::<String>::error("No package manager")),
     };
@@ -170,13 +172,13 @@ async fn upgrade_package(body: web::Json<UpgradePackageRequest>) -> HttpResponse
         "apt" => std::process::Command::new("apt")
             .args(["install", "--only-upgrade", "-y", name])
             .env("DEBIAN_FRONTEND", "noninteractive")
-            .output(),
+            .output_off_thread(deadline::PACKAGE).await,
         "dnf" => std::process::Command::new("dnf")
             .args(["upgrade", "-y", name])
-            .output(),
+            .output_off_thread(deadline::PACKAGE).await,
         "yum" => std::process::Command::new("yum")
             .args(["update", "-y", name])
-            .output(),
+            .output_off_thread(deadline::PACKAGE).await,
         _ => return HttpResponse::Ok().json(ApiResponse::<String>::error("Unsupported")),
     };
     match result {

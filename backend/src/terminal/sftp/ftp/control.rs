@@ -118,7 +118,7 @@ impl Control {
     /// Connects and logs in. `tls` is set for FTPS: implicit TLS starts the
     /// handshake at once, explicit TLS asks for it with AUTH TLS.
     pub async fn open(server: &RemoteServer, password: &str, tls: Option<Arc<Tls>>) -> Result<Control> {
-        let host = crate::member_servers::dial_host(server, server.ftp_port).map_err(broken)?;
+        let host = crate::remote_probe::dial_host_async(server, server.ftp_port).await.map_err(broken)?;
         let addr = (host.as_str(), server.ftp_port);
         let tcp = match timeout(CONNECT, TcpStream::connect(addr)).await {
             Ok(Ok(tcp)) => tcp,
@@ -209,7 +209,7 @@ impl Control {
     /// Whether the server would take TLS. Asked with AUTH TLS itself: some
     /// servers (vsftpd) take it without listing it in FEAT.
     pub async fn offers_tls(server: &RemoteServer) -> Result<bool> {
-        let host = crate::member_servers::dial_host(server, server.ftp_port).map_err(broken)?;
+        let host = crate::remote_probe::dial_host_async(server, server.ftp_port).await.map_err(broken)?;
         let tcp = timeout(CONNECT, TcpStream::connect((host.as_str(), server.ftp_port)))
             .await
             .map_err(|_| broken("Connecting timed out"))?

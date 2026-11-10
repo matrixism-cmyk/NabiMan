@@ -2,6 +2,9 @@
 //! password) and what a health probe reads back.
 
 use std::process::Command;
+use std::time::Duration;
+
+use crate::bounded_command::{deadline, OutputWithin};
 
 use crate::models::{RemoteServer, RemoteServerStatus};
 use crate::ssh_auth;
@@ -36,7 +39,7 @@ pub(crate) fn ssh_invocation(
         cmd.args(&trust);
         cmd.args(isolation);
         cmd.args(crate::ssh_cert::ssh_opts(&auth));
-        cmd.args(["-o", &timeout, "-o", "BatchMode=yes", "-o", "ServerAliveInterval=15"]);
+        cmd.args(["-o", &timeout, "-o", "BatchMode=yes", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3"]);
         cmd.args(extra);
         cmd.args(["-p", &port, &target, remote_cmd]);
         return Ok((cmd, None));
@@ -47,7 +50,8 @@ pub(crate) fn ssh_invocation(
         let mut cmd = Command::new("sshpass");
         cmd.args(["-f", pw_file.path(), "ssh"]);
         cmd.args(isolation);
-        cmd.args(["-o", &timeout]);
+        // Like the other paths: a server that stops answering is noticed.
+        cmd.args(["-o", &timeout, "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3"]);
         cmd.args(&trust);
         cmd.args(ssh_auth::password_auth_opts());
         cmd.args(extra);
@@ -69,10 +73,43 @@ pub(crate) fn ssh_invocation(
         "BatchMode=yes",
         "-o",
         "ServerAliveInterval=15",
+        "-o",
+        "ServerAliveCountMax=3",
     ]);
     cmd.args(extra);
     cmd.args(["-p", &port, &target, remote_cmd]);
     Ok((cmd, None))
+}
+
+/// How long resolving a member's server name may take.
+const LOOKUP: Duration = Duration::from_secs(10);
+
+/// `member_servers::dial_host` for async code: its name lookup blocks and has
+/// no timeout of its own, so it runs on the blocking pool, bounded.
+pub(crate) async fn dial_host_async(server: &RemoteServer, port: u16) -> Result<String, String> {
+    let s = server.clone();
+    let lookup = tokio::task::spawn_blocking(move || crate::member_servers::dial_host(&s, port));
+    match tokio::time::timeout(LOOKUP, lookup).await {
+        Ok(Ok(found)) => found,
+        Ok(Err(_)) => Err(format!("{}: address lookup stopped unexpectedly", server.host)),
+        Err(_) => Err(format!("{}: address lookup timed out after {}s", server.host, LOOKUP.as_secs())),
+    }
+}
+
+/// [`ssh_invocation`] for async code: it may look the name up (see above).
+pub(crate) async fn ssh_invocation_async(
+    srv: &RemoteServer,
+    connect_timeout: u32,
+    extra: &'static [&'static str],
+    remote_cmd: &'static str,
+) -> Result<(Command, Option<ssh_auth::PwFile>), String> {
+    let s = srv.clone();
+    let built = tokio::task::spawn_blocking(move || ssh_invocation(&s, connect_timeout, extra, remote_cmd));
+    match tokio::time::timeout(LOOKUP, built).await {
+        Ok(Ok(built)) => built,
+        Ok(Err(_)) => Err("Preparing the SSH connection stopped unexpectedly".into()),
+        Err(_) => Err(format!("{}: address lookup timed out after {}s", srv.host, LOOKUP.as_secs())),
+    }
 }
 
 /// A status with nothing measured: what an offline server, or one reached
@@ -137,7 +174,7 @@ pub(crate) fn ssh_probe(server: &RemoteServer) -> RemoteServerStatus {
         Ok(c) => c,
         Err(e) => return bare_status(server, "offline", format!("SSH setup error: {}", e)),
     };
-    match cmd.output() {
+    match cmd.output_within(deadline::PROBE) {
         Ok(result) if result.status.success() => {
             let stdout = String::from_utf8_lossy(&result.stdout).to_string();
             let lines: Vec<&str> = stdout.lines().collect();

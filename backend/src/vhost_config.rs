@@ -1,4 +1,5 @@
 use super::*;
+use crate::bounded_command::{deadline, OutputOffThread};
 
 // --- Read/Save config ---
 #[derive(Serialize)]
@@ -61,7 +62,12 @@ pub(super) async fn save_config(body: web::Json<SaveConfigRequest>) -> HttpRespo
             format!("/etc/nginx/sites-available/{}", body.domain),
             &body.http_config,
         );
-        let test = std::process::Command::new("nginx").arg("-t").output();
+        let test = std::process::Command::new("nginx").arg("-t").output_off_thread(deadline::SERVICE).await;
+        if let Err(e) = &test {
+            if e.kind() == std::io::ErrorKind::TimedOut {
+                return HttpResponse::Ok().json(ApiResponse::<String>::error(&format!("Config test: {e}")));
+            }
+        }
         if let Ok(o) = &test {
             if !o.status.success() {
                 return HttpResponse::Ok().json(ApiResponse::<String>::error(&format!(
@@ -72,7 +78,7 @@ pub(super) async fn save_config(body: web::Json<SaveConfigRequest>) -> HttpRespo
         }
         let _ = std::process::Command::new("nginx")
             .args(["-s", "reload"])
-            .output();
+            .output_off_thread(deadline::SERVICE).await;
         HttpResponse::Ok().json(ApiResponse::ok("Nginx config saved".to_string()))
     } else {
         let _ = std::fs::write(
@@ -87,7 +93,12 @@ pub(super) async fn save_config(body: web::Json<SaveConfigRequest>) -> HttpRespo
         }
         let test = std::process::Command::new("apache2ctl")
             .arg("configtest")
-            .output();
+            .output_off_thread(deadline::SERVICE).await;
+        if let Err(e) = &test {
+            if e.kind() == std::io::ErrorKind::TimedOut {
+                return HttpResponse::Ok().json(ApiResponse::<String>::error(&format!("Config test: {e}")));
+            }
+        }
         if let Ok(o) = &test {
             if !o.status.success() {
                 return HttpResponse::Ok().json(ApiResponse::<String>::error(&format!(
@@ -98,7 +109,7 @@ pub(super) async fn save_config(body: web::Json<SaveConfigRequest>) -> HttpRespo
         }
         let _ = std::process::Command::new("systemctl")
             .args(["reload", "apache2"])
-            .output();
+            .output_off_thread(deadline::SERVICE).await;
         HttpResponse::Ok().json(ApiResponse::ok("Apache config saved".to_string()))
     }
 }

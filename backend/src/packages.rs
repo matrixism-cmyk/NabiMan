@@ -3,6 +3,8 @@ use actix_web::{get, post, web, HttpResponse};
 use serde::Deserialize;
 use std::process::Command;
 
+use crate::bounded_command::{deadline, OutputOffThread};
+
 #[derive(Deserialize)]
 pub struct PackageRequest {
     pub name: String,
@@ -14,11 +16,11 @@ pub struct SearchRequest {
 }
 
 /// Detect package manager: apt, yum, or dnf
-fn detect_pkg_manager() -> Option<&'static str> {
+async fn detect_pkg_manager() -> Option<&'static str> {
     for cmd in &["apt-get", "dnf", "yum"] {
         if Command::new("which")
             .arg(cmd)
-            .output()
+            .output_off_thread(deadline::QUICK).await
             .map(|o| o.status.success())
             .unwrap_or(false)
         {
@@ -30,7 +32,7 @@ fn detect_pkg_manager() -> Option<&'static str> {
 
 #[get("/api/packages/installed")]
 async fn list_installed() -> HttpResponse {
-    let pm = detect_pkg_manager();
+    let pm = detect_pkg_manager().await;
 
     let (cmd, args): (&str, &[&str]) = match pm {
         Some("apt-get") => ("dpkg", &["--get-selections"]),
@@ -42,7 +44,7 @@ async fn list_installed() -> HttpResponse {
         }
     };
 
-    match Command::new(cmd).args(args).output() {
+    match Command::new(cmd).args(args).output_off_thread(deadline::PACKAGE_QUERY).await {
         Ok(output) => {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let packages: Vec<serde_json::Value> = stdout
@@ -75,15 +77,15 @@ async fn search_package(body: web::Json<SearchRequest>) -> HttpResponse {
         return HttpResponse::BadRequest().json(ApiResponse::<()>::error("Invalid search query"));
     }
 
-    let pm = detect_pkg_manager();
+    let pm = detect_pkg_manager().await;
 
     let output = match pm {
         Some("apt-get") => Command::new("apt-cache")
             .args(["search", &body.query])
-            .output(),
+            .output_off_thread(deadline::PACKAGE_QUERY).await,
         Some(yum_or_dnf) => Command::new(yum_or_dnf)
             .args(["search", &body.query])
-            .output(),
+            .output_off_thread(deadline::PACKAGE_QUERY).await,
         _ => {
             return HttpResponse::Ok().json(ApiResponse::<()>::error(
                 "No supported package manager found",
@@ -119,7 +121,7 @@ async fn install_package(body: web::Json<PackageRequest>) -> HttpResponse {
         return HttpResponse::BadRequest().json(ApiResponse::<()>::error("Invalid package name"));
     }
 
-    let pm = match detect_pkg_manager() {
+    let pm = match detect_pkg_manager().await {
         Some(pm) => pm,
         None => {
             return HttpResponse::Ok().json(ApiResponse::<()>::error(
@@ -132,10 +134,10 @@ async fn install_package(body: web::Json<PackageRequest>) -> HttpResponse {
         "apt-get" => Command::new("apt-get")
             .args(["install", "-y", &body.name])
             .env("DEBIAN_FRONTEND", "noninteractive")
-            .output(),
+            .output_off_thread(deadline::PACKAGE).await,
         yum_or_dnf => Command::new(yum_or_dnf)
             .args(["install", "-y", &body.name])
-            .output(),
+            .output_off_thread(deadline::PACKAGE).await,
     };
 
     match output {
@@ -160,7 +162,7 @@ async fn remove_package(body: web::Json<PackageRequest>) -> HttpResponse {
         return HttpResponse::BadRequest().json(ApiResponse::<()>::error("Invalid package name"));
     }
 
-    let pm = match detect_pkg_manager() {
+    let pm = match detect_pkg_manager().await {
         Some(pm) => pm,
         None => {
             return HttpResponse::Ok().json(ApiResponse::<()>::error(
@@ -173,10 +175,10 @@ async fn remove_package(body: web::Json<PackageRequest>) -> HttpResponse {
         "apt-get" => Command::new("apt-get")
             .args(["remove", "-y", &body.name])
             .env("DEBIAN_FRONTEND", "noninteractive")
-            .output(),
+            .output_off_thread(deadline::PACKAGE).await,
         yum_or_dnf => Command::new(yum_or_dnf)
             .args(["remove", "-y", &body.name])
-            .output(),
+            .output_off_thread(deadline::PACKAGE).await,
     };
 
     match output {

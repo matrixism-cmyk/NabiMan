@@ -7,6 +7,8 @@
 use std::path::PathBuf;
 use std::process::Command;
 
+use crate::bounded_command::{deadline, OutputWithin};
+
 use crate::models::RemoteServer;
 
 /// How long a signed certificate is valid — long enough to connect, short
@@ -39,7 +41,7 @@ pub fn ensure_ca() -> Result<(), String> {
     // A fresh CA; -N '' = no passphrase so the server can sign unattended.
     let out = Command::new("ssh-keygen")
         .args(["-t", "ed25519", "-f", &ca_key().to_string_lossy(), "-N", "", "-C", "nabiman-ssh-ca", "-q"])
-        .output()
+        .output_within(deadline::QUICK)
         .map_err(|e| format!("ssh-keygen: {e}"))?;
     if !out.status.success() {
         return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
@@ -84,7 +86,7 @@ pub fn sign_for(server: &RemoteServer) -> Result<CertAuth, String> {
             "-V", CERT_VALIDITY,
             &pub_copy,
         ])
-        .output()
+        .output_within(deadline::QUICK)
         .map_err(|e| format!("ssh-keygen sign: {e}"))?;
     if !out.status.success() {
         let _ = std::fs::remove_file(&pub_copy);

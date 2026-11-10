@@ -7,6 +7,7 @@ use actix_web::{web, HttpResponse};
 use serde::Serialize;
 
 use super::*;
+use crate::bounded_command::{deadline, OutputWithin};
 use crate::models::ProtocolCheck;
 use crate::remote_probe::bare_status;
 use crate::terminal::sftp::{ftp, sftp_check};
@@ -19,7 +20,7 @@ fn line(protocol: &str, result: Result<String, String>) -> ProtocolCheck {
 }
 
 async fn tcp(server: &RemoteServer, port: u16) -> Result<String, String> {
-    let host = crate::member_servers::dial_host(server, port)?;
+    let host = crate::remote_probe::dial_host_async(server, port).await?;
     match tokio::time::timeout(Duration::from_secs(5), tokio::net::TcpStream::connect((host.as_str(), port))).await {
         Ok(Ok(_)) => Ok(format!("Port {port} answers")),
         Ok(Err(e)) => Err(format!("Cannot reach port {port}: {e}")),
@@ -32,7 +33,7 @@ async fn shell(server: &RemoteServer) -> Result<String, String> {
     let server = server.clone();
     tokio::task::spawn_blocking(move || {
         let (mut cmd, _pw) = ssh_command(&server, 8, "echo nabiman-shell-ok")?;
-        let out = cmd.output().map_err(|e| format!("SSH error: {e}"))?;
+        let out = cmd.output_within(deadline::PROBE).map_err(|e| format!("SSH error: {e}"))?;
         if String::from_utf8_lossy(&out.stdout).contains("nabiman-shell-ok") {
             return Ok("Shell available".into());
         }
@@ -47,9 +48,21 @@ async fn shell(server: &RemoteServer) -> Result<String, String> {
     .unwrap_or_else(|_| Err("The check stopped unexpectedly".into()))
 }
 
+/// The longest one server's check may take, all its protocols together; so
+/// also the longest "check all" takes, since servers are checked at once.
+pub(crate) const CHECK_DEADLINE: Duration = Duration::from_secs(90);
+
+/// [`probe_unbounded`], given up on at [`CHECK_DEADLINE`].
+pub(crate) async fn probe(server: &RemoteServer) -> RemoteServerStatus {
+    match tokio::time::timeout(CHECK_DEADLINE, probe_unbounded(server)).await {
+        Ok(status) => status,
+        Err(_) => bare_status(server, "offline", format!("Check timed out after {}s", CHECK_DEADLINE.as_secs())),
+    }
+}
+
 /// Checks every way the server is set up to be reached. SSH also reads the
 /// machine's vital signs; the others only say whether they work.
-pub(crate) async fn probe(server: &RemoteServer) -> RemoteServerStatus {
+async fn probe_unbounded(server: &RemoteServer) -> RemoteServerStatus {
     let mut checks = Vec::new();
     let mut measured = None;
     match server.terminal.as_str() {

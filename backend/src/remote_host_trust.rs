@@ -1,4 +1,5 @@
 //! Verified host keys shared by every saved-server SSH path.
+use crate::bounded_command::{deadline, OutputWithin};
 use crate::lock_safe::LockExt;
 use crate::models::{ApiResponse, HostKeyTrust, RemoteServer};
 use actix_web::{web, HttpRequest, HttpResponse};
@@ -167,7 +168,7 @@ pub async fn scan(
 fn keyscan(host: &str, port: &str) -> Option<(String, String)> {
     let out = std::process::Command::new("ssh-keyscan")
         .args(["-T", "8", "-t", "ed25519,ecdsa,rsa", "-p", port, "--", host])
-        .output()
+        .output_within(deadline::PROBE)
         .ok()?;
     let text = String::from_utf8_lossy(&out.stdout);
     let keys: Vec<_> = text
@@ -196,7 +197,7 @@ fn legacy_keyscan(host: &str, port: &str) -> Option<(String, String)> {
     cmd.args(["-o", "PubkeyAuthentication=no", "-o", "PasswordAuthentication=no",
         "-o", "KbdInteractiveAuthentication=no",
         &format!("nabiman-probe@{host}"), "true"]);
-    let _ = cmd.output();
+    let _ = cmd.output_within(deadline::PROBE);
     let line = std::fs::read_to_string(&known).ok();
     let _ = std::fs::remove_dir_all(&dir);
     line?
@@ -270,7 +271,7 @@ fn build_legacy_opts() -> Vec<String> {
     let known = |query: &str| -> std::collections::HashSet<String> {
         std::process::Command::new("ssh")
             .args(["-Q", query])
-            .output()
+            .output_within(deadline::QUICK)
             .ok()
             .map(|o| String::from_utf8_lossy(&o.stdout).lines().map(|l| l.trim().to_string()).collect())
             .unwrap_or_default()

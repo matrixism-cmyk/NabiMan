@@ -108,7 +108,7 @@ pub(crate) async fn check(srv: &RemoteServer) -> Result<(), String> {
 
 async fn open(srv: &RemoteServer) -> Result<Conn, String> {
     let (command, password_file) =
-        crate::remote_probe::ssh_invocation(srv, 10, &["-s"], "sftp")?;
+        crate::remote_probe::ssh_invocation_async(srv, 10, &["-s"], "sftp").await?;
     let mut command = Command::from(command);
     command
         .stdin(Stdio::piped())

@@ -1,3 +1,4 @@
+use crate::bounded_command::{deadline, OutputOffThread};
 use crate::models::ApiResponse;
 use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
@@ -23,7 +24,9 @@ pub struct PortCheckResult {
 }
 
 fn validate_host(host: &str) -> bool {
+    // A leading '-' would reach ping/traceroute/dig as an option.
     !host.is_empty()
+        && !host.starts_with('-')
         && host.len() <= 253
         && host
             .chars()
@@ -36,7 +39,8 @@ async fn ping(body: web::Json<HostRequest>) -> HttpResponse {
     }
     match std::process::Command::new("ping")
         .args(["-c", "4", "-W", "3", &body.host])
-        .output()
+        .output_off_thread(deadline::PROBE)
+        .await
     {
         Ok(o) => {
             let out = String::from_utf8_lossy(&o.stdout).to_string();
@@ -61,12 +65,16 @@ async fn traceroute(body: web::Json<HostRequest>) -> HttpResponse {
 
     match std::process::Command::new(cmd)
         .args(["-m", "20", &body.host])
-        .output()
+        .output_off_thread(deadline::TRACEROUTE)
+        .await
     {
         Ok(o) => {
             let out = String::from_utf8_lossy(&o.stdout).to_string();
             let err = String::from_utf8_lossy(&o.stderr).to_string();
             HttpResponse::Ok().json(ApiResponse::ok(if out.is_empty() { err } else { out }))
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::TimedOut => {
+            HttpResponse::Ok().json(ApiResponse::<String>::error(&format!("{cmd}: {e}")))
         }
         Err(e) => HttpResponse::Ok().json(ApiResponse::<String>::error(&format!(
             "{} not found: {}",
@@ -90,7 +98,7 @@ async fn nslookup(body: web::Json<HostRequest>) -> HttpResponse {
         vec![&body.host]
     };
 
-    match std::process::Command::new(cmd).args(&args).output() {
+    match std::process::Command::new(cmd).args(&args).output_off_thread(deadline::PROBE).await {
         Ok(o) => {
             let out = String::from_utf8_lossy(&o.stdout).to_string();
             HttpResponse::Ok().json(ApiResponse::ok(out))
@@ -104,17 +112,22 @@ async fn port_check(body: web::Json<PortCheckRequest>) -> HttpResponse {
         return HttpResponse::Ok().json(ApiResponse::<PortCheckResult>::error("Invalid host"));
     }
     let addr = format!("{}:{}", body.host, body.port);
-    let open = TcpStream::connect_timeout(
-        &addr.parse().unwrap_or_else(|_| {
-            use std::net::ToSocketAddrs;
-            addr.to_socket_addrs()
-                .ok()
-                .and_then(|mut a| a.next())
-                .unwrap_or_else(|| "0.0.0.0:0".parse().unwrap())
-        }),
-        Duration::from_secs(3),
-    )
-    .is_ok();
+    // The name lookup blocks and has no timeout of its own: off the worker,
+    // and bounded as a whole.
+    let lookup = web::block(move || {
+        TcpStream::connect_timeout(
+            &addr.parse().unwrap_or_else(|_| {
+                use std::net::ToSocketAddrs;
+                addr.to_socket_addrs()
+                    .ok()
+                    .and_then(|mut a| a.next())
+                    .unwrap_or_else(|| "0.0.0.0:0".parse().unwrap())
+            }),
+            Duration::from_secs(3),
+        )
+        .is_ok()
+    });
+    let open = matches!(tokio::time::timeout(deadline::QUICK, lookup).await, Ok(Ok(true)));
 
     HttpResponse::Ok().json(ApiResponse::ok(PortCheckResult {
         host: body.host.clone(),

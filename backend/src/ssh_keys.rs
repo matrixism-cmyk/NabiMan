@@ -1,3 +1,4 @@
+use crate::bounded_command::{deadline, OutputWithin};
 use crate::models::{ApiResponse, DeployKeyRequest, RemoteServer, SshKeyInfo};
 use crate::ssh_auth;
 use actix_web::{web, HttpResponse};
@@ -44,7 +45,7 @@ pub fn ensure_ssh_key() -> Result<String, String> {
             "-C",
             "nabiman@server-manager",
         ])
-        .output()
+        .output_within(deadline::QUICK)
         .map_err(|e| format!("ssh-keygen failed: {}", e))?;
 
     if !output.status.success() {
@@ -52,8 +53,8 @@ pub fn ensure_ssh_key() -> Result<String, String> {
         return Err(format!("ssh-keygen error: {}", stderr));
     }
 
-    let _ = Command::new("chmod").args(["600", &key_path]).output();
-    let _ = Command::new("chmod").args(["644", &pubkey_path]).output();
+    let _ = Command::new("chmod").args(["600", &key_path]).output_within(deadline::QUICK);
+    let _ = Command::new("chmod").args(["644", &pubkey_path]).output_within(deadline::QUICK);
 
     fs::read_to_string(&pubkey_path)
         .map(|s| s.trim().to_string())
@@ -70,7 +71,7 @@ fn get_key_info() -> SshKeyInfo {
     let fingerprint = if exists {
         Command::new("ssh-keygen")
             .args(["-lf", &pubkey_path])
-            .output()
+            .output_within(deadline::QUICK)
             .ok()
             .filter(|o| o.status.success())
             .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
@@ -89,7 +90,7 @@ fn get_key_info() -> SshKeyInfo {
 fn fingerprint_from_pubkey() -> Option<String> {
     Command::new("ssh-keygen")
         .args(["-lf", &nabiman_pubkey_path()])
-        .output()
+        .output_within(deadline::QUICK)
         .ok()
         .filter(|o| o.status.success())
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
@@ -103,7 +104,7 @@ pub fn deploy_key_to_server(server: &RemoteServer, password: &str) -> Result<Str
 
     let has_sshpass = Command::new("which")
         .arg("sshpass")
-        .output()
+        .output_within(deadline::QUICK)
         .map(|o| o.status.success())
         .unwrap_or(false);
 
@@ -125,7 +126,7 @@ pub fn deploy_key_to_server(server: &RemoteServer, password: &str) -> Result<Str
             ])
             .args(&trust)
             .arg(&target)
-            .output()
+            .output_within(deadline::KEY_DEPLOY)
             .map_err(|e| format!("sshpass failed: {}", e))?;
 
         if output.status.success() {
@@ -150,7 +151,7 @@ pub fn deploy_key_to_server(server: &RemoteServer, password: &str) -> Result<Str
         .args(&trust)
         .arg(&target)
         .arg(&remote_cmd)
-        .output();
+        .output_within(deadline::KEY_DEPLOY);
 
     match output {
         Ok(result) if result.status.success() => Ok("Public key deployed via manual append".into()),
@@ -170,6 +171,7 @@ pub fn deploy_key_to_server(server: &RemoteServer, password: &str) -> Result<Str
                 Err(format!("Deploy failed: {}", stderr.trim()))
             }
         }
+        Err(e) if e.kind() == std::io::ErrorKind::TimedOut => Err(format!("Deploy failed: {e}")),
         Err(e) => {
             if !has_sshpass {
                 Err(format!(
@@ -213,24 +215,33 @@ pub fn test_key_auth(server: &RemoteServer) -> bool {
         ])
         .args(&trust)
         .args([&format!("{}@{}", server.user, server.host), "echo ok"])
-        .output()
+        .output_within(deadline::PROBE)
         .map(|o| o.status.success())
         .unwrap_or(false)
 }
 
 // --- Handlers ---
 
+/// The handlers below run ssh-keygen and ssh: on the blocking pool.
+fn stopped<T>(_: actix_web::error::BlockingError) -> Result<T, String> {
+    Err("The key operation stopped unexpectedly".into())
+}
+
 pub async fn get_ssh_key_info() -> HttpResponse {
-    HttpResponse::Ok().json(ApiResponse::ok(get_key_info()))
+    match web::block(get_key_info).await {
+        Ok(info) => HttpResponse::Ok().json(ApiResponse::ok(info)),
+        Err(_) => HttpResponse::Ok().json(ApiResponse::<SshKeyInfo>::error("The key operation stopped unexpectedly")),
+    }
 }
 
 pub async fn generate_ssh_key() -> HttpResponse {
-    match ensure_ssh_key() {
-        Ok(pubkey) => HttpResponse::Ok().json(ApiResponse::ok(SshKeyInfo {
+    let made = web::block(|| ensure_ssh_key().map(|pubkey| (pubkey, fingerprint_from_pubkey())));
+    match made.await.unwrap_or_else(stopped) {
+        Ok((pubkey, fingerprint)) => HttpResponse::Ok().json(ApiResponse::ok(SshKeyInfo {
             exists: true,
             key_path: nabiman_key_path(),
             public_key: Some(pubkey),
-            fingerprint: fingerprint_from_pubkey(),
+            fingerprint,
         })),
         Err(e) => HttpResponse::Ok().json(ApiResponse::<SshKeyInfo>::error(&e)),
     }
@@ -267,7 +278,8 @@ pub async fn deploy_key(
     } else {
         body.password.clone()
     };
-    match deploy_key_to_server(srv, &password) {
+    let srv = srv.clone();
+    match web::block(move || deploy_key_to_server(&srv, &password)).await.unwrap_or_else(stopped) {
         Ok(msg) => HttpResponse::Ok().json(ApiResponse::ok(msg)),
         Err(e) => HttpResponse::Ok().json(ApiResponse::<String>::error(&e)),
     }
@@ -285,5 +297,6 @@ pub async fn test_key_handler(path: web::Path<String>) -> HttpResponse {
         Some(s) => s,
         None => return HttpResponse::Ok().json(ApiResponse::<bool>::error("Server not found")),
     };
-    HttpResponse::Ok().json(ApiResponse::ok(test_key_auth(srv)))
+    let srv = srv.clone();
+    HttpResponse::Ok().json(ApiResponse::ok(web::block(move || test_key_auth(&srv)).await.unwrap_or(false)))
 }
