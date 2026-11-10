@@ -123,5 +123,9 @@ package install/remove, `/api/vhost` writes, `/api/config/*` writes,
   reached `apt`/`dnf` in root mode. Both now use the helper's validator
   (`system_ops::valid_package`) and put `--` before the name (and before a
   search query).
-- `firewall.rs::add_rule` with firewalld ignores `deny` and opens the port.
-  The helper refuses `deny` on firewalld.
+- Fixed: `firewall.rs::add_rule` with firewalld ignored `deny` and opened
+  the port. A deny is now a permanent rich rule that drops the port
+  (`rule port port="22" protocol="tcp" drop`; tcp and udp for `any`; ranges
+  in firewalld's `a-b` form), built by `system_ops::firewalld_drop_args`
+  for both root mode and the helper. Such rules are not listed in the
+  firewalld status, which reads only `ports:`.

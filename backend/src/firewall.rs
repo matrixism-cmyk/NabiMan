@@ -211,6 +211,18 @@ fn validate_port(port: &str) -> bool {
     }
 }
 
+/// `firewall-cmd` arguments for a deny of `port` (`22`, `8000:8100`) over
+/// `protocol` (validated: tcp, udp, any): firewalld writes ranges with `-`.
+fn firewalld_deny_args(port: &str, protocol: &str) -> Vec<String> {
+    use nabiman_server::privileged::system_ops::{firewalld_drop_args, Protocol};
+    let protocol = match protocol {
+        "tcp" => Protocol::Tcp,
+        "udp" => Protocol::Udp,
+        _ => Protocol::Any,
+    };
+    firewalld_drop_args(&port.replace(':', "-"), protocol)
+}
+
 fn validate_protocol(proto: &str) -> bool {
     matches!(proto, "tcp" | "udp" | "any")
 }
@@ -242,6 +254,12 @@ async fn add_rule(req: HttpRequest, client: web::Data<Client>, body: web::Json<F
                 "allow"
             };
             run_cmd("ufw", &[action, &port_proto])
+        }
+        // `--add-port` only opens a port: a deny is a drop rich rule (as the helper does).
+        FwBackend::Firewalld if body.action == "deny" => {
+            let args = firewalld_deny_args(&body.port, &body.protocol);
+            let args: Vec<&str> = args.iter().map(String::as_str).collect();
+            run_cmd("firewall-cmd", &args).and_then(|_| run_cmd("firewall-cmd", &["--reload"]))
         }
         FwBackend::Firewalld => {
             run_cmd("firewall-cmd", &["--add-port", &port_proto, "--permanent"])
@@ -308,4 +326,27 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("/add", web::post().to(add_rule))
             .route("/delete", web::post().to(delete_rule)),
     );
+}
+
+#[cfg(test)]
+mod firewalld_tests {
+    use super::*;
+
+    #[test]
+    fn a_firewalld_deny_is_a_drop_rule_not_an_open_port() {
+        assert_eq!(
+            firewalld_deny_args("22", "tcp"),
+            ["--permanent", r#"--add-rich-rule=rule port port="22" protocol="tcp" drop"#]
+        );
+        assert_eq!(
+            firewalld_deny_args("8000:8100", "udp"),
+            ["--permanent", r#"--add-rich-rule=rule port port="8000-8100" protocol="udp" drop"#]
+        );
+        let any = firewalld_deny_args("53", "any");
+        assert_eq!(any.len(), 3);
+        assert!(any[1].ends_with(r#"protocol="tcp" drop"#) && any[2].ends_with(r#"protocol="udp" drop"#));
+        assert!(!any.iter().any(|a| a.contains("--add-port")));
+        // Only validated ports reach the rule text.
+        assert!(!validate_port("22\" accept") && !validate_port("1:2:3"));
+    }
 }

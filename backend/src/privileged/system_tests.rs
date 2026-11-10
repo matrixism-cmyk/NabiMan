@@ -187,7 +187,22 @@ fn each_operation_is_a_fixed_argv_for_the_backend_found() {
         [["/usr/sbin/iptables", "-A", "INPUT", "-p", "udp", "--dport", "8000:8100", "-j", "DROP"]]
     );
     let firewalld = Tools { firewall: Some(("firewalld", PathBuf::from("/usr/bin/firewall-cmd"))), packages: None };
-    assert!(system_ops::plan(&deny, &firewalld).is_err(), "firewalld cannot deny a port here");
+    assert_eq!(
+        argv(&system_ops::plan(&deny, &firewalld).unwrap()),
+        [
+            vec!["/usr/bin/firewall-cmd", "--permanent", r#"--add-rich-rule=rule port port="8000-8100" protocol="udp" drop"#],
+            vec!["/usr/bin/firewall-cmd", "--reload"],
+        ]
+    );
+    let deny_any = Operation::FirewallAdd { verdict: Verdict::Deny, protocol: Protocol::Any, port: 22, port_end: None };
+    assert_eq!(
+        system_ops::firewalld_drop_args("22", Protocol::Any),
+        ["--permanent", r#"--add-rich-rule=rule port port="22" protocol="tcp" drop"#, r#"--add-rich-rule=rule port port="22" protocol="udp" drop"#]
+    );
+    assert_eq!(argv(&system_ops::plan(&deny_any, &firewalld).unwrap())[0].len(), 4);
+    // Allowing still opens the port.
+    let allow = Operation::FirewallAdd { verdict: Verdict::Allow, protocol: Protocol::Tcp, port: 443, port_end: None };
+    assert_eq!(argv(&system_ops::plan(&allow, &firewalld).unwrap())[0], ["/usr/bin/firewall-cmd", "--add-port", "443/tcp", "--permanent"]);
     assert!(system_ops::plan(&Operation::FirewallDelete { number: 3 }, &firewalld).is_err());
     let one = Operation::PackageUpgrade { package: Some("nginx".into()) };
     let plan = system_ops::plan(&one, &tools()).unwrap();

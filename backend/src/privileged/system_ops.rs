@@ -172,6 +172,21 @@ impl Tools {
     }
 }
 
+/// `firewall-cmd` arguments that drop new connections to `ports` (`22`, or
+/// firewalld's range form `8000-8100`): one permanent rich rule per protocol
+/// (`any` is tcp and udp). firewalld's `--add-port` can only open a port.
+/// `ports` must already be digits with at most one `-` (it goes into the rule).
+pub fn firewalld_drop_args(ports: &str, protocol: Protocol) -> Vec<String> {
+    let protocols: &[&str] = match protocol {
+        Protocol::Tcp => &["tcp"],
+        Protocol::Udp => &["udp"],
+        Protocol::Any => &["tcp", "udp"],
+    };
+    std::iter::once("--permanent".to_string())
+        .chain(protocols.iter().map(|p| format!("--add-rich-rule=rule port port=\"{ports}\" protocol=\"{p}\" drop")))
+        .collect()
+}
+
 fn step(program: &Path, args: &[&str]) -> Step {
     Step { program: program.to_path_buf(), args: args.iter().map(|a| a.to_string()).collect() }
 }
@@ -196,8 +211,12 @@ pub fn plan(operation: &Operation, tools: &Tools) -> Result<Plan, String> {
                     let spec = if *protocol == Protocol::Any { ports.clone() } else { format!("{ports}/{proto}") };
                     match *backend {
                         "ufw" => quick(backend, vec![step(fw, &[if *verdict == Verdict::Deny { "deny" } else { "allow" }, &spec])]),
-                        // firewalld opens ports; it has no "deny this port" of the same kind.
-                        "firewalld" if *verdict == Verdict::Deny => Err("firewalld rules here can only open a port".into()),
+                        "firewalld" if *verdict == Verdict::Deny => {
+                            let ranged = port_end.map_or(port.to_string(), |end| format!("{port}-{end}"));
+                            let args = firewalld_drop_args(&ranged, *protocol);
+                            let args: Vec<&str> = args.iter().map(String::as_str).collect();
+                            quick(backend, vec![step(fw, &args), step(fw, &["--reload"])])
+                        }
                         "firewalld" => quick(backend, vec![step(fw, &["--add-port", &spec, "--permanent"]), step(fw, &["--reload"])]),
                         _ => {
                             let proto = if *protocol == Protocol::Any { "tcp" } else { proto };
