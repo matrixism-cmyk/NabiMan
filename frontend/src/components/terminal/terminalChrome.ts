@@ -76,12 +76,12 @@ export function attachClipboard(
   sendPaste: (text: string) => void,
 ): () => void {
   const copy = (text: string) => {
-    if (text) navigator.clipboard.writeText(text).catch(() => {});
+    if (text) navigator.clipboard.writeText(text).catch(() => { /* copy-on-select is a convenience; the selection stays for Ctrl+C */ });
   };
   // Files on the clipboard (a screenshot, say) are uploaded and pasted as the
   // path the server saved them at; see ./pasteFile.
   const pasteFiles = (files: Array<File | Blob>) => {
-    pathsForClipboardFiles(files).then((paths) => { if (paths) sendPaste(paths); }).catch(() => {});
+    pathsForClipboardFiles(files).then((paths) => { if (paths) sendPaste(paths); }).catch(() => { /* pathsForClipboardFiles reports nothing pasted as an empty string already */ });
   };
   const pasteFromClipboard = async () => {
     try {

@@ -8,6 +8,7 @@ import TerminalWindowFrame from './TerminalWindowFrame';
 import { clamp, DEFAULT_H, DEFAULT_W, MIN_H, MIN_W, TASKBAR_H, TermWindow } from './windowGeometry';
 import { apiRequest } from '../../shared/api/useApi';
 import { useT } from '../../shared/i18n';
+import { noticeDialog } from '../../shared/ui/ConfirmDialog';
 import './terminal-windows.css';
 
 interface OpenOptions {
@@ -46,7 +47,7 @@ function loadLayout(key = LAYOUT_KEY): TermWindow[] {
 
 function saveLayout(windows: TermWindow[], key = LAYOUT_KEY) {
   try { localStorage.setItem(key, JSON.stringify(windows));
-    if (key === `${LAYOUT_KEY}:admin`) localStorage.removeItem(LAYOUT_KEY); } catch { /* ignore */ }
+    if (key === `${LAYOUT_KEY}:admin`) localStorage.removeItem(LAYOUT_KEY); } catch { /* storage blocked or full: only what this browser remembers is lost */ }
 }
 
 function describe(target: TerminalTarget): string {
@@ -105,7 +106,7 @@ export function TerminalWindowsProvider({ children, owner, active = true }: { ch
     topZ.current += 1;
     // The pane picks its session up from storage when it mounts.
     if (options?.joinSessionId) {
-      try { localStorage.setItem(`nabiman_term_sid_${id}`, options.joinSessionId); } catch { /* ignore */ }
+      try { localStorage.setItem(`nabiman_term_sid_${id}`, options.joinSessionId); } catch { /* storage blocked or full: only what this browser remembers is lost */ }
     }
     setWindows((prev) => {
       const offset = (prev.length % 6) * 28;
@@ -143,8 +144,10 @@ export function TerminalWindowsProvider({ children, owner, active = true }: { ch
   const endSession = useCallback(async (id: string) => {
     const sid = storedSessionId(id);
     if (sid) {
-      const res = await apiRequest(`/api/terminal/sessions/${encodeURIComponent(sid)}`, { method: 'DELETE' });
-      if (!res.success) { window.alert(res.message || t('common.error')); return; }
+      // The window stays open when the session could not be ended, and says why.
+      const res = await apiRequest(`/api/terminal/sessions/${encodeURIComponent(sid)}`, { method: 'DELETE' })
+        .catch((e: unknown) => ({ success: false, message: e instanceof Error ? e.message : String(e) }));
+      if (!res.success) { await noticeDialog(`${t('terminal.endFailed')}\n${res.message || t('common.error')}`); return; }
     }
     forgetTerminalStorage(id);
     setWindows((prev) => prev.filter((w) => w.id !== id));

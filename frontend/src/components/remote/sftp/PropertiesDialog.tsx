@@ -172,7 +172,7 @@ function Checksum({ source, path }: { source: SftpSource; path: string }) {
       {state?.sha && (
         <>
           <code className="sftp-props-hash">{state.sha}</code>
-          <button type="button" className="sftp-link" onClick={() => navigator.clipboard?.writeText(state.sha!).catch(() => undefined)}>{t('common.copy')}</button>
+          <button type="button" className="sftp-link" onClick={() => navigator.clipboard?.writeText(state.sha!).catch(() => undefined /* clipboard refused: the checksum stays on screen to select */)}>{t('common.copy')}</button>
         </>
       )}
       {state?.error && <span role="alert" className="message">{state.error}</span>}

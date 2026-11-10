@@ -116,7 +116,9 @@ function loadLocal(scope: string): ColumnState {
  * A signed-in account keeps them per server on the server, so every device
  * matches; a share-link visitor keeps them in this browser.
  */
-export function useColumns(source: SftpSource) {
+export function useColumns(source: SftpSource, onSaveFailed?: (message: string) => void) {
+  const failed = useRef(onSaveFailed);
+  failed.current = onSaveFailed;
   const scope = source.scope ?? source.key;
   const onAccount = !source.shareKey;
   const [state, setState] = useState<ColumnState>(() =>
@@ -138,7 +140,10 @@ export function useColumns(source: SftpSource) {
       if (accountCache) accountCache[scope] = next;
       clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
-        apiRequest('/api/terminal/sftp/columns', { method: 'PUT', body: JSON.stringify({ scope, layout: next }) }).catch(() => undefined);
+        // The layout still applies here; the panel says it was not kept for other devices.
+        apiRequest('/api/terminal/sftp/columns', { method: 'PUT', body: JSON.stringify({ scope, layout: next }) })
+          .then((r) => { if (!r.success) failed.current?.(r.message || ''); })
+          .catch((e: unknown) => failed.current?.(e instanceof Error ? e.message : String(e)));
       }, 500);
     } else {
       try { localStorage.setItem(localKey(scope), JSON.stringify(next)); } catch { /* private mode */ }

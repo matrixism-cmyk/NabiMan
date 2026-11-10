@@ -37,13 +37,13 @@ export default function LoginScreen({ onLogin }: Props) {
   useEffect(() => {
     fetch('/api/auth/ldap/provider').then(r => r.json()).then(j => {
       if (j.success && j.data?.enabled) setLdapEnabled(true);
-    }).catch(() => {});
+    }).catch(() => { /* no LDAP sign-in button when the probe fails; password login still works */ });
     fetch('/api/auth/oauth/provider').then(r => r.json()).then(j => {
       if (j.success && j.data?.enabled) {
         setOauthEnabled(true);
         setOauthProvider(j.data.provider_name || 'SSO');
       }
-    }).catch(() => {});
+    }).catch(() => { /* no single sign-on button when the probe fails; password login still works */ });
   }, []);
 
   const handleOAuthLogin = async () => {

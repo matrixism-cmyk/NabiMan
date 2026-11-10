@@ -64,7 +64,7 @@ export function sftpMenu(c: MenuContext, entry?: SftpEntry): RailMenuItem[] {
     ] : []),
     ...(c.onInsert ? [{ key: 'insert', label: t('sftp.insertPath'), icon: '⌨', onSelect: () => c.onInsert?.(`${c.quoted(targets)} `) }] : []),
     { key: 'copy', label: t('sftp.copyPath'), icon: '⧉',
-      onSelect: () => { navigator.clipboard?.writeText(c.quoted(targets)).catch(() => undefined); } },
+      onSelect: () => { navigator.clipboard?.writeText(c.quoted(targets)).catch(() => undefined /* clipboard refused: the path is still shown in the list */); } },
     { key: 'props', label: t('sftp.properties'), icon: 'ℹ', onSelect: () => c.properties(targets.map((e) => c.pathOf(e.name))) },
     ...(c.writable ? [
       { key: 'rename', label: t('sftp.rename'), icon: '✎', disabled: !single, separated: true,

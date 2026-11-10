@@ -18,7 +18,7 @@ export function useFullscreen(
   const toggle = useCallback(() => {
     const el = ref.current;
     if (!el) return;
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => { /* ignore */ });
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => { /* already out of fullscreen */ });
     else el.requestFullscreen?.().catch(() => { /* denied or unsupported */ });
   }, [ref]);
 

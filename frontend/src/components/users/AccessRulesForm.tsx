@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../../shared/api/useApi';
+import { useT } from '../../i18n';
 import type { AccessRules, MemberUser } from '../MembershipEditor';
 
 const DAYS = ['월', '화', '수', '목', '금', '토', '일'];
@@ -25,9 +26,14 @@ export default function AccessRulesForm({ user, busy, update }: Props) {
   const saved: AccessRules = { expires_at: null, require_mfa: false, allowed_networks: [], allowed_hours: null, ...user.access };
   const [draft, setDraft] = useState<AccessRules>(saved);
   const [networks, setNetworks] = useState(saved.allowed_networks.join('\n'));
+  const { t } = useT();
   const [mine, setMine] = useState('');
+  // Without it an admin could lock themselves out unawares, so a failed lookup is said.
+  const [mineFailed, setMineFailed] = useState(false);
   useEffect(() => {
-    apiRequest<string>('/api/users/my-address').then(r => { if (r.success && r.data) setMine(r.data); }).catch(() => undefined);
+    apiRequest<string>('/api/users/my-address')
+      .then(r => { if (r.success && r.data) setMine(r.data); else setMineFailed(true); })
+      .catch(() => setMineFailed(true));
   }, []);
 
   const next: AccessRules = { ...draft, allowed_networks: networks.split(/[\s,]+/).map(s => s.trim()).filter(Boolean) };
@@ -71,6 +77,7 @@ export default function AccessRulesForm({ user, busy, update }: Props) {
           <textarea className="filter-input users-networks" rows={4} value={networks} spellCheck={false}
             onChange={e => setNetworks(e.target.value)} placeholder={'203.0.113.7\n198.51.100.0/24'} />
         </label>
+        {mineFailed && <div role="alert" className="message">{t('access.myAddressFailed')}</div>}
         {mine && (
           <p className="text-secondary">
             이 서버가 보는 지금 내 접속 주소: <code>{mine}</code>{' '}

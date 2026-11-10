@@ -28,11 +28,14 @@ export default function DatabasePanel() {
   const [queryResult, setQueryResult] = useState<DbQueryResult | null>(null);
   const [queryMsg, setQueryMsg] = useState('');
 
+  const [backupsError, setBackupsError] = useState('');
+  // An empty list must not pass for "no backups" when the list could not be read.
   const fetchBackups = async () => {
     try {
       const json = await apiRequest<DbBackupEntry[]>('/api/database/backups');
-      if (json.success && json.data) setBackups(json.data);
-    } catch { /* ignore */ }
+      if (json.success && json.data) { setBackups(json.data); setBackupsError(''); }
+      else setBackupsError(json.message || t('common.error'));
+    } catch (e) { setBackupsError(e instanceof Error ? e.message : String(e)); }
   };
 
   useEffect(() => { fetchBackups(); }, []);
@@ -113,6 +116,7 @@ export default function DatabasePanel() {
         <button className="btn btn-primary btn-sm" onClick={createBackup}>{t('db.backup')}</button>
       </div>
       {backupMsg && <div className="message" onClick={() => setBackupMsg('')}>{backupMsg}</div>}
+      {backupsError && <div role="alert" className="message">{t('db.backupsFailed', { message: backupsError })}</div>}
       <h4>{t('db.backups')}</h4>
       {backups.length > 0 ? (
         <table className="data-table">

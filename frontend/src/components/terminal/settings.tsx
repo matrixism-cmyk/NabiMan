@@ -71,7 +71,7 @@ export function TerminalSettingsProvider({ children, enabled = true }: { childre
         const merged = { ...DEFAULT_TERMINAL_SETTINGS, ...res.data };
         setSettings(merged);
         setLoadError('');
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)); } catch { /* ignore */ }
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)); } catch { /* storage blocked or full: only what this browser remembers is lost */ }
       } else { setLoadError(t('terminal.preferencesUnavailable')); }
     } catch { setLoadError(t('terminal.preferencesUnavailable')); }
   }, [enabled, t]);
@@ -87,7 +87,7 @@ export function TerminalSettingsProvider({ children, enabled = true }: { childre
         const merged = { ...DEFAULT_TERMINAL_SETTINGS, ...(res.data || next) };
         setSettings(merged);
         setLoadError('');
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)); } catch { /* ignore */ }
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)); } catch { /* storage blocked or full: only what this browser remembers is lost */ }
         return '';
       }
       return t('terminal.preferencesSaveUncertain');

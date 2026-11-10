@@ -36,7 +36,7 @@ export function useIdleLogout(active: boolean, signOut: () => void) {
     if (!active) { setMinutes(0); return undefined; }
     const load = () => apiRequest<{ idle_logout_minutes: number }>('/api/app-settings')
       .then((r) => { if (r.success && r.data) setMinutes(r.data.idle_logout_minutes); })
-      .catch(() => undefined);
+      .catch(() => undefined /* the server enforces the idle limit too; the warning just stays off */);
     load();
     window.addEventListener('nabiman_app_settings_changed', load);
     return () => window.removeEventListener('nabiman_app_settings_changed', load);
@@ -46,7 +46,7 @@ export function useIdleLogout(active: boolean, signOut: () => void) {
     const now = Date.now();
     if (now - reported.current < REPORT_EVERY_MS) return;
     reported.current = now;
-    apiRequest('/api/auth/activity', { method: 'POST', body: '{}' }).catch(() => undefined);
+    apiRequest('/api/auth/activity', { method: 'POST', body: '{}' }).catch(() => undefined /* best-effort heartbeat; the next activity reports again */);
   }, []);
 
   const used = useCallback((force = false) => {

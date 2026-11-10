@@ -41,11 +41,14 @@ export default function SessionDevicesDialog({ sessionId, sessionName, onClose }
   const [name, setName] = useState('');
   const nameValue = name || devices.suggestName(taken);
 
+  // A list that could not be read is said, rather than passing for "nothing attached".
+  const [listFailed, setListFailed] = useState(false);
   useEffect(() => {
     let live = true;
     const load = async () => {
-      const r = await apiRequest<Listed[]>(`/api/terminal/sessions/${encodeURIComponent(sessionId)}/serial`).catch(() => null);
-      if (live && r?.success && Array.isArray(r.data)) setListed(r.data);
+      const r = await apiRequest<Listed[]>(`/api/terminal/sessions/${encodeURIComponent(sessionId)}/serial`).catch(() => null /* shown as listFailed below */);
+      if (!live) return;
+      if (r?.success && Array.isArray(r.data)) { setListed(r.data); setListFailed(false); } else setListFailed(true);
     };
     void load();
     const stopPolling = startVisibleInterval(() => { void load(); }, LIST_EVERY_MS);
@@ -62,7 +65,7 @@ export default function SessionDevicesDialog({ sessionId, sessionName, onClose }
   };
   const run = (f: () => Promise<void>) => () => { f().catch((e) => setError({ key: 'serial.raw', vars: { text: String(e?.message || e) } })); };
   const others = listed.filter((d) => !d.mine || !mine.some((m) => m.name === d.name));
-  const copy = (path: string) => navigator.clipboard.writeText(path).catch(() => { /* ignore */ });
+  const copy = (path: string) => navigator.clipboard.writeText(path).catch(() => { /* clipboard refused: the text stays on screen to select */ });
 
   return (
     <Modal onClose={onClose} title={t('serial.dev.title', { session: sessionName || sessionId })} className="serial-dev-dialog">
@@ -139,6 +142,7 @@ export default function SessionDevicesDialog({ sessionId, sessionName, onClose }
           </div>
           <small className="text-secondary">{t('serial.dev.hint')}</small>
           {error && <p role="alert" className="message">{noticeText(error)}</p>}
+          {listFailed && <p role="alert" className="message">{t('serial.dev.listFailed')}</p>}
         </section>
       </div>
     </Modal>

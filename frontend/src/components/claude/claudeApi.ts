@@ -56,7 +56,7 @@ export async function ask(id: string, text: string, onEvent: (e: AskEvent) => vo
     method: 'POST', body: JSON.stringify({ text }), headers: { 'Content-Type': 'application/json' }, signal,
   });
   if (!res.ok || !res.body) {
-    const body = await res.json().catch(() => null);
+    const body = await res.json().catch(() => null /* not JSON: the HTTP status below says enough */);
     throw new Error(body?.message || `HTTP ${res.status}`);
   }
   const reader = res.body.getReader();
@@ -82,7 +82,7 @@ export async function speak(text: string, signal?: AbortSignal, voice?: { speake
     method: 'POST', body: JSON.stringify({ text, ...voice }), headers: { 'Content-Type': 'application/json' }, signal,
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => null);
+    const body = await res.json().catch(() => null /* not JSON: the HTTP status below says enough */);
     throw new Error(body?.message || `HTTP ${res.status}`);
   }
   return res.blob();

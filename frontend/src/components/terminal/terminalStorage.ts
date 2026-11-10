@@ -50,7 +50,7 @@ export function forgetTerminalStorage(storageKey: string) {
     localStorage.removeItem(bufKey(storageKey));
     localStorage.removeItem(sidKey(storageKey));
     localStorage.removeItem(fontKey(storageKey));
-  } catch { /* ignore */ }
+  } catch { /* storage blocked or full: only what this browser remembers is lost */ }
 }
 
 /**
@@ -71,7 +71,7 @@ export function writeFontSize(storageKey: string, size: number) {
 
 /** Forget the zoom, so the size from settings applies again. */
 export function forgetFontSize(storageKey: string) {
-  try { localStorage.removeItem(fontKey(storageKey)); } catch { /* ignore */ }
+  try { localStorage.removeItem(fontKey(storageKey)); } catch { /* storage blocked or full: only what this browser remembers is lost */ }
 }
 
 /** The prefix every floating window's id carries (see TerminalWindows). */
@@ -107,7 +107,7 @@ export function pruneTerminalStorage(liveKeys: string[]) {
       stale.push(key);
     }
     stale.forEach((key) => localStorage.removeItem(key));
-  } catch { /* ignore */ }
+  } catch { /* storage blocked or full: only what this browser remembers is lost */ }
 }
 
 /**
@@ -130,7 +130,7 @@ export function pruneSessionZooms(liveSessionIds: string[]) {
       stale.push(key);
     }
     stale.forEach((key) => localStorage.removeItem(key));
-  } catch { /* ignore */ }
+  } catch { /* storage blocked or full: only what this browser remembers is lost */ }
 }
 
 /**
@@ -163,7 +163,7 @@ export function paneEnded(storageKey: string): boolean {
 
 /** The pane's next connection starts a new shell, with a clean screen. */
 export function startFresh(storageKey: string) {
-  try { localStorage.removeItem(bufKey(storageKey)); } catch { /* ignore */ }
+  try { localStorage.removeItem(bufKey(storageKey)); } catch { /* storage blocked or full: only what this browser remembers is lost */ }
   writeStored(sidKey(storageKey), '');
 }
 

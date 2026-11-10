@@ -85,6 +85,7 @@ const t: T = {
   'terminal.scrollbackShort': { ko: '스크롤백', en: 'Scrollback', ja: 'スクロールバック' },
   'terminal.join': { ko: '참여', en: 'Join', ja: '参加' },
   'terminal.endSession': { ko: '세션 종료', en: 'End session', ja: 'セッション終了' },
+  'terminal.endFailed': { ko: '세션을 끝내지 못했습니다. 창은 그대로 두었습니다.', en: 'Could not end the session; the window stays open.', ja: 'セッションを終了できませんでした。ウィンドウはそのままです。' },
   'terminal.historyUp': { ko: '이전 출력 보기', en: 'Scroll to earlier output', ja: '前の出力を表示' },
   'terminal.historyDown': { ko: '다음 출력 보기', en: 'Scroll to later output', ja: '次の出力を表示' },
   'terminal.historyHint': { ko: '클릭, 드래그 또는 마우스 휠로 기록을 이동합니다. 맨 아래는 실시간 화면입니다.', en: 'Click, drag, or use the mouse wheel to browse history. The bottom returns to live output.', ja: 'クリック、ドラッグ、ホイールで履歴を移動します。最下部でライブ表示に戻ります。' },

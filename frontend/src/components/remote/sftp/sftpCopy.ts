@@ -67,7 +67,7 @@ export function useCopies(scope: string | undefined, onFinished: (dir: string) =
 
   const poll = useCallback(async () => {
     if (!scope) return;
-    const res = await apiRequest<Copy[]>('/api/terminal/copies').catch(() => null);
+    const res = await apiRequest<Copy[]>('/api/terminal/copies').catch(() => null /* a missed poll is retried by the next one, a few seconds later */);
     if (!alive.current || !res?.success || !res.data) return;
     const mine = res.data.filter((c) => c.to.scope === scope);
     const now = performance.now();
@@ -112,7 +112,7 @@ export function useCopies(scope: string | undefined, onFinished: (dir: string) =
   }, [poll]);
 
   const cancel = useCallback(async (id: string) => {
-    await cancelCopy(id).catch(() => undefined);
+    await cancelCopy(id).catch(() => undefined /* the poll right after shows whether the copy stopped */);
     poll();
   }, [poll]);
 

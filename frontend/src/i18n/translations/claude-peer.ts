@@ -75,6 +75,8 @@ const t: T = {
   'graph.legend.busy': { ko: '작업 중', en: 'Working', ja: '作業中' },
   'graph.legend.local': { ko: '이 서버', en: 'This machine', ja: 'このサーバー' },
   'graph.count': { ko: '세션 {sessions} · 지시 {links}', en: '{sessions} sessions · {links} hand-offs', ja: 'セッション {sessions} · 指示 {links}' },
+  'graph.loadFailed': { ko: '작업 지도에 쓸 정보를 일부 받지 못했습니다. 보이는 내용이 최신이 아닐 수 있습니다. ({message})', en: 'Some of what the work map needs could not be fetched, so it may be out of date. ({message})', ja: '作業マップに必要な情報の一部を取得できませんでした。表示が最新でない可能性があります。({message})' },
+  'graph.checkFailed': { ko: '서버 상태를 확인하지 못했습니다: {message}', en: 'Could not check the servers: {message}', ja: 'サーバーの状態を確認できませんでした: {message}' },
   'graph.loading': { ko: '그래프를 불러오는 중…', en: 'Loading the graph…', ja: 'グラフを読み込み中…' },
   'graph.noWebgl': { ko: '이 브라우저에서는 3D 그래픽(WebGL)을 쓸 수 없습니다. 2D 그래프를 이용해 주세요.', en: '3D graphics (WebGL) are not available in this browser. Use the 2D graph.', ja: 'このブラウザでは 3D (WebGL) を使えません。2D グラフをご利用ください。' },
   'graph.hint2d': { ko: '세션을 누르면 상세가 열립니다 · 끌어서 옮기기 · 휠로 확대', en: 'Click a session for details · drag to move · wheel to zoom', ja: 'セッションをクリックで詳細 · ドラッグで移動 · ホイールで拡大' },

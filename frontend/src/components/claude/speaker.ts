@@ -31,7 +31,7 @@ export class Speaker {
   unlock(): void {
     try {
       this.audio.src = SILENT;
-      this.audio.play?.()?.catch(() => undefined);
+      this.audio.play?.()?.catch(() => undefined /* autoplay refused: the next tap unlocks audio */);
     } catch { /* nothing to unlock */ }
   }
 
@@ -60,7 +60,7 @@ export class Speaker {
     for (const item of this.items.slice(0, 2)) {
       if (!item.blob) {
         item.blob = this.fetch(item.text, this.abort.signal);
-        item.blob.catch(() => undefined);
+        item.blob.catch(() => undefined /* kept for later: the error is reported when this sentence is played */);
       }
     }
   }

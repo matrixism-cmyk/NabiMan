@@ -17,7 +17,7 @@ const sleep = (ms: number) => new Promise<void>((done) => { window.setTimeout(do
  */
 export function rdpTypist(client: () => any) {
   let chain: Promise<void> = Promise.resolve();
-  const later = (step: () => Promise<void> | void) => { chain = chain.then(step).catch(() => undefined); };
+  const later = (step: () => Promise<void> | void) => { chain = chain.then(step).catch(() => undefined /* one failed keystroke must not stop the ones queued after it */); };
   const tap = (c: any, keysym: number) => { c.sendKeyEvent(1, keysym); c.sendKeyEvent(0, keysym); };
 
   return {

@@ -175,12 +175,12 @@ export class PortBridge {
     this.reattachTimer = this.redialTimer = null;
     const socket = this.ws; const p = this.port;
     this.ws = this.port = null;
-    try { socket?.close(); } catch { /* ignore */ }
-    try { await this.reader?.cancel(); } catch { /* ignore */ }
-    try { await this.pumping; } catch { /* ignore */ }
-    try { this.writer?.releaseLock(); } catch { /* ignore */ }
+    try { socket?.close(); } catch { /* teardown: already closed or released */ }
+    try { await this.reader?.cancel(); } catch { /* teardown: already closed or released */ }
+    try { await this.pumping; } catch { /* teardown: already closed or released */ }
+    try { this.writer?.releaseLock(); } catch { /* teardown: already closed or released */ }
     this.reader = this.writer = this.pumping = null;
-    try { await p?.close(); } catch { /* ignore */ }
+    try { await p?.close(); } catch { /* teardown: already closed or released */ }
     this.release();
     // The port is closed, so a tab waiting its turn can open it.
     this.lockWait?.abort(); this.unlock?.();
@@ -243,11 +243,11 @@ export class PortBridge {
       } catch (e) {
         reason = errText(e);
       } finally {
-        try { rd.releaseLock(); } catch { /* ignore */ }
+        try { rd.releaseLock(); } catch { /* teardown: already closed or released */ }
       }
     }
     if (!this.running || this.port !== p) return;
-    try { this.writer?.releaseLock(); } catch { /* ignore */ }
+    try { this.writer?.releaseLock(); } catch { /* teardown: already closed or released */ }
     this.reader = this.writer = this.port = null;
     try { await p.close(); } catch { /* already gone */ }
     this.set({ portUp: false });
@@ -260,7 +260,7 @@ export class PortBridge {
   private async openPort(p: any) {
     await p.open({ baudRate: this.opts.baud });
     if (!p.readable || !p.writable) {
-      try { await p.close(); } catch { /* ignore */ }
+      try { await p.close(); } catch { /* teardown: already closed or released */ }
       throw new Error(translate('serial.portGone'));
     }
     this.port = p;
@@ -303,7 +303,7 @@ export class PortBridge {
       }
       // Not among the ports this page may use: unplugged, or the grant went with it.
       this.stuck(!ports.length ? { key: 'serial.dev.notGranted' } : why ? { key: 'serial.dev.openFailed', vars: { text: why } } : null);
-    } catch { /* ignore */ } finally {
+    } catch { /* a failed retry waits for the next tick */ } finally {
       this.reattaching = false;
     }
   }

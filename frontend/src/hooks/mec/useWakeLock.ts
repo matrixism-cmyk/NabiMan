@@ -32,7 +32,7 @@ export function useWakeLock(enabled: boolean) {
     return () => {
       cancelled = true;
       document.removeEventListener('visibilitychange', onVisible);
-      sentinel?.release().catch(() => {});
+      sentinel?.release().catch(() => { /* cleanup: the lock may already be released */ });
     };
   }, [enabled]);
 }

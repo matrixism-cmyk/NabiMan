@@ -52,7 +52,10 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
   const [editing, setEditing] = useState(false);
   const [facts, setFacts] = useState<ServerFacts[]>([]);
   const [checking, setChecking] = useState(false);
-  const loadFacts = () => apiRequest('/api/remote-servers/facts').then((r: any) => { if (r?.success && Array.isArray(r.data)) setFacts(r.data); }).catch(() => undefined);
+  // A request that fails outright (offline, server down) is said above the map, which would otherwise just go stale.
+  const [problem, setProblem] = useState('');
+  const fail = (e: unknown) => setProblem(t('graph.loadFailed', { message: e instanceof Error ? e.message : String(e) }));
+  const loadFacts = () => apiRequest('/api/remote-servers/facts').then((r: any) => { if (r?.success && Array.isArray(r.data)) setFacts(r.data); }).catch(fail);
   // Asks every saved server how it is (the same check as 「전체 확인」), then shows what they said.
   const checkAll = async () => {
     setChecking(true);
@@ -61,23 +64,25 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
       const r: any = await apiRequest('/api/remote-servers');
       if (r?.success && Array.isArray(r.data)) setServers(r.data);
       await loadFacts();
-    } catch { /* shown as stale facts */ } finally { setChecking(false); }
+    } catch (e) { setProblem(t('graph.checkFailed', { message: e instanceof Error ? e.message : String(e) })); } finally { setChecking(false); }
   };
   const [network, setNetwork] = useState(() => stored(NETWORK_KEY, '1') === '1');
   useEffect(() => {
     if (mode !== 'graph3d') return undefined;
     let live = true;
     void loadFacts();
-    apiRequest('/api/terminal/topology').then((r: any) => { if (live && r?.success && r.data?.devices) setTopology(r.data); }).catch(() => undefined);
-    apiRequest('/api/remote-servers').then((r: any) => { if (live && r?.success && Array.isArray(r.data)) setServers(r.data); }).catch(() => undefined);
+    apiRequest('/api/terminal/topology').then((r: any) => { if (live && r?.success && r.data?.devices) setTopology(r.data); }).catch((e) => { if (live) fail(e); });
+    apiRequest('/api/remote-servers').then((r: any) => { if (live && r?.success && Array.isArray(r.data)) setServers(r.data); }).catch((e) => { if (live) fail(e); });
     const pull = () => apiRequest(`/api/terminal/claude-events?window=3600&after=${newest.current}`).then((r: any) => {
+      if (live && r?.success) setProblem('');
       if (!live || !r?.success || !Array.isArray(r.data) || !r.data.length) return;
       newest.current = r.data[r.data.length - 1].id;
       setEvents((old) => [...old, ...r.data].slice(-300));
-    }).catch(() => undefined);
+    }).catch((e) => { if (live) fail(e); });
     void pull();
     const stopPulling = startVisibleInterval(() => { void pull(); }, 3000);
     return () => { live = false; stopPulling(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
   const graph = useMemo(
     () => (mode === 'graph3d' ? buildWorkMap(sessions, links, servers, events, t('graph.legend.local'), network ? topology : null, facts) : buildGraph(sessions, links)),
@@ -134,6 +139,7 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
           <span className="session-graph-count">{t('graph.count', { sessions: sessions.length, links: links.length })}</span>
         </div>
       </div>
+      {problem && <div role="alert" className="message" onClick={() => setProblem('')}>{problem}</div>}
       <div className="session-graph-stage">
         {webgl ? (
           <Suspense fallback={<p className="session-graph-wait">{t('graph.loading')}</p>}>

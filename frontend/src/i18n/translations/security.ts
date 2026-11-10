@@ -72,6 +72,7 @@ const t: T = {
   'loginSessions.title': { ko: "로그인 세션", en: "Login sessions", ja: "ログインセッション" },
   'loginSessions.hint': { ko: "본인의 로그인 세션을 조회하고 종료할 수 있습니다. 최고관리자는 전체 회원의 세션을 관리합니다. 종료된 로그인의 연결은 차단되며, 서버의 터미널 작업 자체는 종료하지 않습니다.", en: "Manage your login sessions. Super administrators manage all accounts. Revocation blocks the login and its connections without killing server terminal processes.", ja: "自分のログインセッションを管理できます。最高管理者は全会員を管理できます。失効は接続を遮断しますがサーバーの端末プロセスは終了しません。" },
   'loginSessions.current': { ko: "현재 로그인", en: "Current login", ja: "現在のログイン" },
+  'access.myAddressFailed': { ko: '이 서버가 보는 지금 내 접속 주소를 확인하지 못했습니다. 접속 허용 주소를 저장하기 전에 지금 쓰는 주소가 목록에 들어 있는지 꼭 확인하세요.', en: 'Could not find out which address this server sees you connecting from. Before saving allowed networks, make sure the address you are using now is in the list.', ja: 'このサーバーから見た現在の接続元アドレスを確認できませんでした。許可アドレスを保存する前に、いま使っているアドレスが一覧に含まれているか必ず確認してください。' },
   'loginSessions.others': { ko: "내 다른 로그인 모두 종료", en: "Sign out my other logins", ja: "自分の他のログインを終了" },
   'loginSessions.confirmOne': { ko: "이 로그인 세션을 종료하시겠습니까?", en: "Revoke this login session?", ja: "このログインセッションを終了しますか？" },
   'loginSessions.confirmOthers': { ko: "현재 로그인을 제외한 내 모든 로그인 세션을 종료하시겠습니까?", en: "Sign out all of your logins except this one?", ja: "現在以外の自分のログインをすべて終了しますか？" },

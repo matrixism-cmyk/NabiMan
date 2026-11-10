@@ -126,7 +126,7 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
     live.current = null;
     if (!now) return;
     now.media.getTracks().forEach((t) => t.stop());
-    now.audio.close().catch(() => undefined);
+    now.audio.close().catch(() => undefined /* cleanup: the audio context may already be closed */);
     now.uplink.close();
     if (now.ws.readyState <= WebSocket.OPEN) now.ws.close();
   }, []);
@@ -239,9 +239,9 @@ export function useDictation({ open, onText, onKeys, muted = false, endpointMs =
     if (!now) return;
     setState('stopping');
     now.media.getTracks().forEach((t) => t.stop());
-    now.audio.close().catch(() => undefined);
+    now.audio.close().catch(() => undefined /* cleanup: the audio context may already be closed */);
     // What is still in the encoder goes first, or the last words are cut off.
-    now.uplink.finish().catch(() => undefined).then(() => {
+    now.uplink.finish().catch(() => undefined /* the socket is closing either way; what was sent is kept */).then(() => {
       if (now.ws.readyState === WebSocket.OPEN) now.ws.send(JSON.stringify({ type: 'stop' }));
     });
     window.setTimeout(() => { if (live.current === now) release(); setState('idle'); }, LAST_WORDS_MS);

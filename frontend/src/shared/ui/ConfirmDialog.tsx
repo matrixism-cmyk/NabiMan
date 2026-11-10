@@ -11,6 +11,8 @@ export interface ConfirmOptions {
   confirmLabel?: string;
   /** Deleting, ending, revoking: the confirm button is red, and focus starts on cancel. */
   danger?: boolean;
+  /** Only telling, not asking: one OK button. */
+  notice?: boolean;
 }
 
 interface Pending extends ConfirmOptions {
@@ -33,6 +35,12 @@ export function confirmDialog(options: ConfirmOptions | string): Promise<boolean
   if (!listener) return Promise.resolve(window.confirm(opts.message));
   const show = listener;
   return new Promise((resolve) => show({ ...opts, resolve }));
+}
+
+/** Tells something in the app's own modal instead of the browser's `alert()`. */
+export async function noticeDialog(message: string, title?: string): Promise<void> {
+  if (!listener) { window.alert(message); return; }
+  await confirmDialog({ message, title, notice: true });
 }
 
 const SHOWN_ITEMS = 8;
@@ -62,7 +70,7 @@ export function ConfirmHost() {
   return (
     <Modal key={current.id} role="alertdialog" level="top" className="confirm-dialog" onClose={() => answer(false)}
       initialFocus={current.danger ? cancelRef : okRef}
-      title={<span className={current.danger ? 'is-danger' : ''}>{current.title || t(current.danger ? 'confirm.dangerTitle' : 'confirm.title')}</span>}>
+      title={<span className={current.danger ? 'is-danger' : ''}>{current.title || t(current.notice ? 'confirm.noticeTitle' : current.danger ? 'confirm.dangerTitle' : 'confirm.title')}</span>}>
       <p className="confirm-message">{current.message}</p>
       {items.length > 0 && (
         <ul className="confirm-items">
@@ -73,9 +81,9 @@ export function ConfirmHost() {
         </ul>
       )}
       <div className="modal-actions confirm-actions">
-        <button ref={cancelRef} type="button" className="btn btn-secondary" onClick={() => answer(false)}>
+        {!current.notice && <button ref={cancelRef} type="button" className="btn btn-secondary" onClick={() => answer(false)}>
           {t('common.cancel')}
-        </button>
+        </button>}
         <button ref={okRef} type="button" className={`btn ${current.danger ? 'btn-danger' : 'btn-primary'}`} onClick={() => answer(true)}>
           {current.confirmLabel || t('common.confirm')}
         </button>

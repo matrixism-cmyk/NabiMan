@@ -62,7 +62,7 @@ export default function SerialView() {
             <p className="text-secondary" style={{ marginBottom: 6 }}>{t('serial.pathLabel')}</p>
             <div style={{ display: 'flex', gap: 8 }}>
               <input readOnly className="filter-input" value={s.path} style={{ flex: 1, fontFamily: 'monospace' }} onFocus={(e) => e.target.select()} />
-              <button className="btn btn-secondary btn-sm" onClick={() => navigator.clipboard.writeText(s.path).catch(() => { /* ignore */ })}>{t('common.copy')}</button>
+              <button className="btn btn-secondary btn-sm" onClick={() => navigator.clipboard.writeText(s.path).catch(() => { /* clipboard refused: the text stays on screen to select */ })}>{t('common.copy')}</button>
             </div>
             <small className="text-secondary">{t('serial.pathHint')}</small>
           </div>

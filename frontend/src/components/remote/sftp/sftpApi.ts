@@ -288,7 +288,7 @@ export function uploadInParts(
     `dir=${encodeURIComponent(dir)}&name=${encodeURIComponent(name)}&id=${id}&overwrite=${overwrite}&${extra}`;
   let current: Transfer | null = null;
   let stopped = false;
-  const discard = () => request(src, `/upload-abort?${query('offset=0')}`, { method: 'POST' }).catch(() => undefined);
+  const discard = () => request(src, `/upload-abort?${query('offset=0')}`, { method: 'POST' }).catch(() => undefined /* best-effort cleanup of the part file; the upload already reports its failure */);
 
   const promise = (async (): Promise<TransferResult> => {
     let offset = 0;

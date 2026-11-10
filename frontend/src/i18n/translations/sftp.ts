@@ -58,6 +58,7 @@ const t: T = {
   'sftp.tooBig': { ko: '한 파일에 {mb}MB까지 올릴 수 있습니다', en: 'Uploads are limited to {mb} MB per file', ja: '1ファイル {mb}MB までアップロードできます' },
   'sftp.connecting': { ko: '연결하는 중…', en: 'Connecting…', ja: '接続中…' },
   'sftp.retry': { ko: '다시 시도', en: 'Retry', ja: '再試行' },
+  'sftp.columnsSaveFailed': { ko: '열 배치를 계정에 저장하지 못했습니다. 이 화면에는 적용됐지만 다른 기기에서는 이전 배치로 보입니다.', en: 'Could not save the column layout to your account. It applies here, but other devices keep the old layout.', ja: '列の配置をアカウントに保存できませんでした。この画面には反映されていますが、ほかの端末では以前の配置のままです。' },
   'sftp.empty': { ko: '빈 폴더입니다. 파일을 끌어다 놓으면 이곳에 올라갑니다.', en: 'This folder is empty. Drop files here to upload them.', ja: '空のフォルダーです。ファイルをドロップするとアップロードされます。' },
   'sftp.emptyReadOnly': { ko: '빈 폴더입니다.', en: 'This folder is empty.', ja: '空のフォルダーです。' },
   'sftp.dragHintReadOnly': { ko: '보기·내려받기만 허용된 링크입니다. 파일을 바탕화면이나 터미널로 끌 수 있습니다.', en: 'This link allows browsing and downloading. Drag files onto the desktop or the terminal.', ja: '閲覧とダウンロードのみ許可されたリンクです。ファイルはデスクトップやターミナルへドラッグできます。' },

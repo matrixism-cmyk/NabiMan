@@ -23,7 +23,7 @@ async function speak(text: string, signal: AbortSignal): Promise<Blob> {
     method: 'POST', body: JSON.stringify({ text }), headers: { 'Content-Type': 'application/json' }, signal,
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => null);
+    const body = await res.json().catch(() => null /* not JSON: the HTTP status below says enough */);
     throw new Error(body?.message || `HTTP ${res.status}`);
   }
   return res.blob();
@@ -64,7 +64,7 @@ export function useVoiceReply(handle: RefObject<TerminalViewHandle | null>, sess
     let text = '';
     if (session.current) {
       const res = await apiRequest<string>(`/api/terminal/sessions/${encodeURIComponent(session.current)}/scrollback?lines=${HISTORY_LINES}`)
-        .catch(() => null);
+        .catch(() => null /* falls back to the text on screen below */);
       if (res?.success && res.data) text = lastAnswer(res.data);
     }
     if (!text) text = lastAnswer(handle.current?.screenText() ?? '');

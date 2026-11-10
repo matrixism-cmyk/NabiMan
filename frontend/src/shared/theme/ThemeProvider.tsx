@@ -23,7 +23,7 @@ function readStored(): ThemeId {
     const v = localStorage.getItem(STORAGE_KEY);
     if (v && v in THEMES) return v as ThemeId;
   } catch {
-    /* ignore */
+    /* storage blocked or full: only what this browser remembers is lost */
   }
   return DEFAULT_THEME;
 }
@@ -61,7 +61,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem(STORAGE_KEY, id);
     } catch {
-      /* ignore */
+      /* storage blocked or full: only what this browser remembers is lost */
     }
   }, []);
 

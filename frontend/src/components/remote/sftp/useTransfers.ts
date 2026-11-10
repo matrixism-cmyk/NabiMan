@@ -77,7 +77,7 @@ export function useTransfers(source: SftpSource, onUploaded: (dir: string) => vo
       for (const folder of dropped.dirs) {
         // A folder that is already there is fine; anything else shows up as
         // failed uploads for the files that were meant to go in it.
-        await makeDir(source, joinPath(dir, folder)).catch(() => undefined);
+        await makeDir(source, joinPath(dir, folder)).catch(() => undefined /* an existing folder is fine; a real failure shows on the upload into it */);
       }
       let changed = false;
       for (const job of jobs) {

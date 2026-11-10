@@ -156,14 +156,14 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
           <label>{t('remote.console.clip.toVm')}</label>
           <textarea value={sendText} onChange={e => setSendText(e.target.value)} rows={2} placeholder={t('remote.console.clip.placeholder')} />
           <div className="rw-console-clip-row">
-            <button className="btn btn-primary btn-sm" disabled={!sendText || status !== 'connected'} onClick={() => { try { rfb.current?.clipboardPasteFrom(sendText); } catch { /* ignore */ } }}>{t('remote.console.clip.send')}</button>
+            <button className="btn btn-primary btn-sm" disabled={!sendText || status !== 'connected'} onClick={() => { try { rfb.current?.clipboardPasteFrom(sendText); } catch { /* not connected: the button is disabled then anyway */ } }}>{t('remote.console.clip.send')}</button>
             <button className="btn btn-secondary btn-sm" disabled={!sendText || status !== 'connected'} onClick={() => { if (rfb.current) typeText(rfb.current, sendText); }}>{t('remote.console.clip.type')}</button>
             <span className="rw-console-clip-hint">{t('remote.console.clip.hint')}</span>
           </div>
           <label>{t('remote.console.clip.fromVm')}</label>
           <div className="rw-console-clip-row">
             <input readOnly value={vmClip} placeholder={t('remote.console.clip.fromVmEmpty')} />
-            <button className="btn btn-secondary btn-sm" disabled={!vmClip} onClick={() => navigator.clipboard.writeText(vmClip).catch(() => { /* ignore */ })}>{t('common.copy')}</button>
+            <button className="btn btn-secondary btn-sm" disabled={!vmClip} onClick={() => navigator.clipboard.writeText(vmClip).catch(() => { /* clipboard refused: the text stays on screen to select */ })}>{t('common.copy')}</button>
           </div>
         </div>
       )}

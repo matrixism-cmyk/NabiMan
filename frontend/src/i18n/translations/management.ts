@@ -109,6 +109,7 @@ const t: T = {
   // --- Database ---
   'db.title': { ko: '데이터베이스', en: 'Database', ja: 'データベース' },
   'db.engine': { ko: '엔진', en: 'Engine', ja: 'エンジン' },
+  'db.backupsFailed': { ko: '백업 목록을 불러오지 못했습니다: {message}', en: 'Could not load the backup list: {message}', ja: 'バックアップ一覧を読み込めませんでした: {message}' },
   'db.version': { ko: '버전', en: 'Version', ja: 'バージョン' },
   'db.connections': { ko: '연결 수', en: 'Connections', ja: '接続数' },
   'db.slowQueries': { ko: '슬로우 쿼리', en: 'Slow Queries', ja: 'スロークエリ' },

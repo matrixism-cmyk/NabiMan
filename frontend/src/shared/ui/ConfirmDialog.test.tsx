@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { I18nProvider, sharedStrings } from '../i18n';
-import { ConfirmHost, confirmDialog } from './ConfirmDialog';
+import { ConfirmHost, confirmDialog, noticeDialog } from './ConfirmDialog';
 import Modal from './Modal';
 
 beforeEach(() => localStorage.setItem('nabiman_lang', 'ko'));
@@ -64,4 +64,17 @@ test('a modal keeps keys to itself and returns focus when it closes', async () =
   expect(close).toHaveBeenCalledTimes(2);
   rerender(<div onKeyDown={outer}><button>behind</button></div>);
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+});
+
+test('a notice tells in the app modal with one button, instead of alert()', async () => {
+  window.alert = jest.fn();
+  host();
+  let shown: Promise<void> = Promise.resolve();
+  act(() => { shown = noticeDialog('세션을 끝내지 못했습니다.'); });
+  const dialog = await screen.findByRole('alertdialog');
+  expect(dialog).toHaveTextContent('세션을 끝내지 못했습니다.');
+  expect(screen.queryByRole('button', { name: '취소' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '확인' }));
+  await shown;
+  expect(window.alert).not.toHaveBeenCalled();
 });

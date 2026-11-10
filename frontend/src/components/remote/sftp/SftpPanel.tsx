@@ -108,7 +108,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
   const here = listing?.path || '';
   const pickers = useUploadPickers((dropped) => transfers.upload(here, dropped));
   const pathOf = useCallback((name: string) => joinPath(current.current, name), []);
-  const columns = useColumns(source);
+  const columns = useColumns(source, (why) => setError(`${t('sftp.columnsSaveFailed')}${why ? ` (${why})` : ''}`));
   const visible = useMemo(
     () => sortEntries((listing?.entries || []).filter((e) => showHidden || !e.name.startsWith('.')), columns.state.sort),
     [listing, showHidden, columns.state.sort],

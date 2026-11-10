@@ -92,7 +92,7 @@ export default function RecordingPlayer({ sid, label, onClose }: { sid: string; 
     loadCast(sid).then((c) => {
       if (!live) return;
       cast.current = c;
-      try { term0.resize(c.cols, c.rows); } catch { /* ignore */ }
+      try { term0.resize(c.cols, c.rows); } catch { /* odd header size: replay at the default size */ }
       setDuration(c.duration); setReady(true);
     }).catch((e) => { if (live) setError(e instanceof Error ? e.message : 'error'); });
     return () => { live = false; cancelAnimationFrame(raf.current); term0.dispose(); term.current = null; };

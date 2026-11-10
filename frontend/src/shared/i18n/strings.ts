@@ -38,6 +38,7 @@ const strings: Translations = {
   'notice.unexpected': { ko: '예기치 않은 오류가 있었습니다: {message}', en: 'An unexpected error occurred: {message}', ja: '予期しないエラーが発生しました: {message}' },
   'notice.unexpectedHint': { ko: '화면이 이상하게 보이면 새로고침해 주세요.', en: 'If something looks wrong, reload the page.', ja: '表示がおかしい場合は再読み込みしてください。' },
   'notice.repeat': { ko: '({count}번)', en: '(×{count})', ja: '（{count}回）' },
+  'confirm.noticeTitle': { ko: '알림', en: 'Notice', ja: 'お知らせ' },
   'confirm.more': { ko: '외 {count}개', en: 'and {count} more', ja: 'ほか {count} 件' },
   'app.logout': { ko: '로그아웃', en: 'Logout', ja: 'ログアウト' },
   'app.hideChrome': { ko: '상단 접기 (로고·메뉴 숨기기)', en: 'Fold away the top (logo and menu)', ja: '上部をたたむ（ロゴ・メニューを隠す）' },

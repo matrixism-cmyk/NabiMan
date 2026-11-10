@@ -21,11 +21,18 @@ export default function RdpDrivePanel({ target, onClose }: { target: string; onC
   const { t } = useT();
   const [files, setFiles] = useState<DriveFile[] | null>(null);
   const [busy, setBusy] = useState('');
+  // An empty drive and an unreadable one look alike without this.
+  const [problem, setProblem] = useState('');
 
   const reload = useCallback(() => {
-    listDriveFiles(target).then((r) => { if (r.success && r.data) setFiles(r.data); else setFiles((f) => f || []); })
-      .catch(() => setFiles((f) => f || []));
-  }, [target]);
+    listDriveFiles(target).then((r) => {
+      if (r.success && r.data) { setFiles(r.data); setProblem(''); }
+      else { setFiles((f) => f || []); setProblem(t('remote.console.drive.listFailed', { message: r.message || '' })); }
+    }).catch((e: unknown) => {
+      setFiles((f) => f || []);
+      setProblem(t('remote.console.drive.listFailed', { message: e instanceof Error ? e.message : String(e) }));
+    });
+  }, [target, t]);
   useEffect(() => { reload(); }, [reload]);
   useVisibleInterval(reload, REFRESH_MS);
 
@@ -33,9 +40,11 @@ export default function RdpDrivePanel({ target, onClose }: { target: string; onC
     setBusy(name);
     try {
       const res = await fetchDriveFile(target, name);
-      if (!res.ok) throw new Error('download failed');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       saveBlob(await res.blob(), name);
-    } catch { /* ignore */ } finally { setBusy(''); }
+    } catch (e) {
+      setProblem(t('remote.console.drive.downloadFailed', { name, message: e instanceof Error ? e.message : String(e) }));
+    } finally { setBusy(''); }
   };
 
   const sorted = files ? [...files].sort((a, b) => b.modified - a.modified) : [];
@@ -47,6 +56,7 @@ export default function RdpDrivePanel({ target, onClose }: { target: string; onC
         <button className="btn btn-secondary btn-sm" title={t('common.refresh')} onClick={reload}>↻</button>
         <button className="btn btn-secondary btn-sm" onClick={onClose}>✕</button>
       </div>
+      {problem && <div role="alert" className="message" onClick={() => setProblem('')}>{problem}</div>}
       <div className="rw-drive-list">
         {!files && <p className="text-secondary">{t('common.loading')}</p>}
         {files && files.length === 0 && <p className="text-secondary">{t('remote.console.drive.empty')}</p>}

@@ -169,7 +169,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
       const reader = new Guacamole.StringReader(stream);
       let text = '';
       reader.ontext = (t2: string) => { text += t2; };
-      reader.onend = () => { navigator.clipboard.writeText(text).catch(() => { /* ignore */ }); };
+      reader.onend = () => { navigator.clipboard.writeText(text).catch(() => { /* clipboard refused: the text stays on screen to select */ }); };
     };
     // guacd's redirected drive becomes available — keep it for file transfer.
     c.onfilesystem = (object: any) => { filesystem.current = object; if (live) setDriveReady(true); };
@@ -242,7 +242,7 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
       el.removeEventListener('mousedown', focusScreen, true);
       el.removeEventListener('mouseenter', pushClipboard);
       window.removeEventListener('focus', pushClipboard);
-      try { if (kb) { kb.onkeydown = null; kb.onkeyup = null; } } catch { /* ignore */ }
+      try { if (kb) { kb.onkeydown = null; kb.onkeyup = null; } } catch { /* teardown: the keyboard may already be gone */ }
       try { c.disconnect(); } catch { /* already gone */ }
       client.current = null; keyboard.current = null;
     };

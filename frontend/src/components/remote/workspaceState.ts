@@ -32,12 +32,12 @@ export function readSelection(): Selection {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed.kind === 'string') return parsed as Selection;
     }
-  } catch { /* ignore */ }
+  } catch { /* unreadable saved state: start from the default */ }
   return { kind: 'overview' };
 }
 
 export function rememberSelection(selection: Selection) {
-  try { localStorage.setItem(SELECTION_KEY, JSON.stringify(selection)); } catch { /* ignore */ }
+  try { localStorage.setItem(SELECTION_KEY, JSON.stringify(selection)); } catch { /* unreadable saved state: start from the default */ }
 }
 
 /** What the work area had open, so a reload puts the operator back in it. */
@@ -59,12 +59,12 @@ export function readPaneState(): PaneState {
   try {
     const parsed = JSON.parse(sessionStorage.getItem(PANE_KEY) || 'null');
     if (parsed && typeof parsed.view === 'string' && Array.isArray(parsed.connected)) return parsed as PaneState;
-  } catch { /* ignore */ }
+  } catch { /* unreadable saved state: start from the default */ }
   return { view: 'sessions', connected: [] };
 }
 
 export function rememberPaneState(state: PaneState) {
-  try { sessionStorage.setItem(PANE_KEY, JSON.stringify(state)); } catch { /* ignore */ }
+  try { sessionStorage.setItem(PANE_KEY, JSON.stringify(state)); } catch { /* unreadable saved state: start from the default */ }
 }
 
 /** The tmux label the backend gives a session on this server. */

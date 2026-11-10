@@ -13,14 +13,14 @@ export function useFocusMode(): { focusMode: boolean; enterFocus: () => void; ex
     setFocusMode(true);
     const el = document.documentElement;
     const lockEscape = () => (navigator as Navigator & { keyboard?: { lock?: (keys: string[]) => Promise<void> } })
-      .keyboard?.lock?.(['Escape']).catch(() => undefined);
+      .keyboard?.lock?.(['Escape']).catch(() => undefined /* a nicety: Escape still exits focus mode without the lock */);
     if (el.requestFullscreen) el.requestFullscreen().then(lockEscape).catch(() => { /* denied/unsupported */ });
   }, []);
 
   const exitFocus = useCallback(() => {
     setFocusMode(false);
     if (document.fullscreenElement && document.exitFullscreen) {
-      document.exitFullscreen().catch(() => { /* ignore */ });
+      document.exitFullscreen().catch(() => { /* already out of fullscreen */ });
     }
   }, []);
 

@@ -41,7 +41,7 @@ export function applyTerminalFont(term: Terminal, id: string | undefined, ready:
   if (font.face) loads.push(document.fonts?.load(`${size}px "${font.face}"`, 'W'));
   term.options.fontFamily = font.family;
   if (!document.fonts) return;
-  void Promise.all(loads).catch(() => undefined).then(() => {
+  void Promise.all(loads).catch(() => undefined /* a font that fails to load falls back to the next in the stack */).then(() => {
     if (!alive()) return;
     // A different string makes xterm measure the cell again, now with the real font.
     term.options.fontFamily = `${font.family} `;

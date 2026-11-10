@@ -97,7 +97,7 @@ export async function saveInto(
     }
     await out.close();
   } catch (err) {
-    await out.abort().catch(() => undefined);
+    await out.abort().catch(() => undefined /* cleanup of a partial file; the save already failed visibly */);
     throw err;
   }
 }
