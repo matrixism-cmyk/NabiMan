@@ -174,3 +174,28 @@ fn the_guide_is_there_short_and_dated() {
     assert_eq!(guide_updated("no date"), None);
 }
 
+#[test]
+fn a_pasted_guide_says_whom_it_is_for() {
+    let lead = super::super::claude_control_http::Lead { address: "nabiman-5d [1eb0c4]".into(), tile: "nabiman".into() };
+    let h = super::super::claude_control_http::header("review", "pty_02", Some("review-3a [946528]"), Some(&lead));
+    assert_eq!(h.lines().filter(|l| l.starts_with('>')).count(), 3);
+    assert!(h.contains("«review» (pty_02)") && h.contains("`review-3a [946528]`") && h.contains("`nabiman-5d [1eb0c4]`"));
+    let h = super::super::claude_control_http::header("docs", "pty_04", None, None);
+    assert_eq!(h.lines().filter(|l| l.starts_with('>')).count(), 2);
+    assert!(h.contains("nabiman-claude list"));
+}
+
+#[test]
+fn the_guide_is_for_every_staff_account_and_status_and_close_for_administrators() {
+    use crate::models::UserRole;
+    use crate::route_access::{member_reachable, staff_allowed};
+    for role in [UserRole::Operator, UserRole::Viewer] {
+        assert!(staff_allowed(&role, "GET", "/api/orchestration/guide"), "{role:?}");
+        assert!(!staff_allowed(&role, "GET", "/api/terminal/sessions/pty_1/status"), "{role:?}");
+        assert!(!staff_allowed(&role, "POST", "/api/terminal/sessions/pty_1/close"), "{role:?}");
+    }
+    assert!(!member_reachable("GET", "/api/orchestration/guide"), "remote-only members get 403");
+    // Reachable under the member rules for `/sessions/{id}/…`; the handlers refuse members.
+    let route = crate::route_access::lookup("/api/terminal/sessions/pty_1/close").unwrap();
+    assert_eq!((route.class, route.member), (crate::route_access::Class::Admin, crate::route_access::Member::Handler));
+}

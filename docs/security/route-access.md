@@ -32,9 +32,9 @@ NabiMan 의 API 는 허용 목록 방식입니다. 등록된 모든 경로가 �
 
 ## 요약
 
-- 등록된 API 경로: 331개
-- 공개 31 · 관리자 전용 95 · 조회 52 · 운영 147 · 계정 6
-- 원격 회원이 닿는 경로: 61개 (메서드 지정 25 · 본인 것만 15 · 서버 규칙 21)
+- 등록된 API 경로: 334개
+- 공개 31 · 관리자 전용 97 · 조회 52 · 운영 148 · 계정 6
+- 원격 회원이 닿는 경로: 63개 (메서드 지정 25 · 본인 것만 17 · 서버 규칙 21)
 
 ## 검토가 필요해 보이는 권한 (바꾸지 않고 그대로 옮김)
 
@@ -239,6 +239,7 @@ NabiMan 의 API 는 허용 목록 방식입니다. 등록된 모든 경로가 �
 | `/api/notifications/templates/{id}` | 운영 | 모든 메서드 | GET | — |  |
 | `/api/notifications/test` | 운영 | 모든 메서드 | GET | — |  |
 | `/api/openapi.json` | 운영 | 모든 메서드 | GET | — |  |
+| `/api/orchestration/guide` | 운영 | 모든 메서드 | GET | — |  |
 | `/api/packages/install` | 조회 | GET | GET | — |  |
 | `/api/packages/installed` | 조회 | GET | GET | — |  |
 | `/api/packages/remove` | 조회 | GET | GET | — |  |
@@ -336,6 +337,7 @@ NabiMan 의 API 는 허용 목록 방식입니다. 등록된 모든 경로가 �
 | `/api/terminal/sessions` | 관리자 전용 | — | — | GET |  |
 | `/api/terminal/sessions/{id}` | 관리자 전용 | — | — | 본인 것만 (처리기에서 확인) |  |
 | `/api/terminal/sessions/{id}/claude` | 관리자 전용 | — | — | 본인 것만 (처리기에서 확인) |  |
+| `/api/terminal/sessions/{id}/close` | 관리자 전용 | — | — | 본인 것만 (처리기에서 확인) |  |
 | `/api/terminal/sessions/{id}/keepalive` | 관리자 전용 | — | — | 본인 것만 (처리기에서 확인) |  |
 | `/api/terminal/sessions/{id}/name` | 관리자 전용 | — | — | 본인 것만 (처리기에서 확인) |  |
 | `/api/terminal/sessions/{id}/scrollback` | 관리자 전용 | — | — | 본인 것만 (처리기에서 확인) |  |
@@ -343,6 +345,7 @@ NabiMan 의 API 는 허용 목록 방식입니다. 등록된 모든 경로가 �
 | `/api/terminal/sessions/{id}/settings` | 관리자 전용 | — | — | 본인 것만 (처리기에서 확인) |  |
 | `/api/terminal/sessions/{id}/share` | 관리자 전용 | — | — | — |  |
 | `/api/terminal/sessions/{id}/share-link` | 관리자 전용 | — | — | 본인 것만 (처리기에서 확인) |  |
+| `/api/terminal/sessions/{id}/status` | 관리자 전용 | — | — | 본인 것만 (처리기에서 확인) |  |
 | `/api/terminal/sessions/{id}/timeout` | 관리자 전용 | — | — | 본인 것만 (처리기에서 확인) |  |
 | `/api/terminal/settings` | 관리자 전용 | — | — | GET, PUT |  |
 | `/api/terminal/sftp/columns` | 관리자 전용 | — | — | GET, PUT |  |

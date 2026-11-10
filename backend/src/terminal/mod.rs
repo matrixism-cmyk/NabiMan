@@ -11,6 +11,7 @@ pub(crate) mod topology;
 mod claude_lead;
 mod claude_links;
 mod claude_control;
+mod claude_control_http;
 mod claude_control_ops;
 mod claude_remote_start;
 mod claude_remote;
@@ -368,6 +369,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     session_order::configure(cfg);
     claude_start::configure(cfg);
     claude_lead::configure(cfg);
+    claude_control_http::configure(cfg);
     claude_events::configure(cfg);
     topology::configure(cfg);
     office_preview::configure(cfg);

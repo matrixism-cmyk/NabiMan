@@ -52,6 +52,10 @@ pub fn permission(user: &NabimanUser, method: &str, path: &str) -> bool {
     if !user.restricted() {
         return crate::rbac::check_permission(&user.role, method, path);
     }
+    // The orchestration guide is the same text for every account.
+    if path == "/api/orchestration/guide" && method == "GET" {
+        return true;
+    }
     if matches!(path, "/api/users/me" | "/api/users") && method == "GET" {
         return true;
     }
