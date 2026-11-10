@@ -12,6 +12,7 @@ mod backup;
 mod charts;
 mod config_manager;
 mod containers;
+mod cors;
 mod cron;
 mod database;
 mod diagnostics;
@@ -71,7 +72,6 @@ mod traffic;
 mod updates;
 mod users;
 mod vhost;
-use actix_cors::Cors;
 use actix_files as afs;
 use actix_web::body::EitherBody;
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
@@ -152,40 +152,6 @@ where
         }
         let svc = self.service.clone();
         Box::pin(async move { svc.call(req).await.map(|res| res.map_into_left_body()) })
-    }
-}
-
-fn build_cors() -> Cors {
-    match std::env::var("NABIMAN_CORS_ORIGINS") {
-        Ok(origins) if !origins.is_empty() => {
-            let mut cors = Cors::default()
-                .allow_any_method()
-                .expose_headers(["X-Nabiman-MFA-Required"])
-                .allowed_headers([
-                    "Content-Type",
-                    "Authorization",
-                    "X-Auth-Token",
-                    "X-API-Key",
-                    "X-File-Path",
-                ])
-                .max_age(3600);
-            for origin in origins.split(',') {
-                cors = cors.allowed_origin(origin.trim());
-            }
-            cors
-        }
-        _ => Cors::default()
-            .allow_any_origin()
-            .allow_any_method()
-            .expose_headers(["X-Nabiman-MFA-Required"])
-            .allowed_headers([
-                "Content-Type",
-                "Authorization",
-                "X-Auth-Token",
-                "X-API-Key",
-                "X-File-Path",
-            ])
-            .max_age(3600),
     }
 }
 
@@ -284,7 +250,7 @@ async fn main() -> std::io::Result<()> {
                 sess_store.clone(),
                 usr_store.clone(),
             ))
-            .wrap(build_cors())
+            .wrap(cors::build_cors())
             .wrap(audit_middleware::AuditMiddleware::new(aud_log.clone(), audit_forwarding.clone()))
             .app_data(web::Data::new(secret))
             .app_data(web::Data::new(pw_store))

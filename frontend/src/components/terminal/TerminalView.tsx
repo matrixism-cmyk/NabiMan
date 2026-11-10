@@ -14,6 +14,7 @@ import { buildTerminalUrl, ticketedTerminalUrl, ticketedShareUrl } from './termi
 import { bufKey, markEnded, paneEnded, readStored, sidKey, storedSessionId, writeStored } from './terminalStorage';
 import { useTerminalZoom } from './useTerminalZoom';
 import { useTerminalHandle } from './useTerminalHandle';
+import { useTerminalLayout } from './useTerminalLayout';
 import { useT } from '../../shared/i18n';
 
 import type { TerminalStatus, TerminalViewHandle, TerminalViewProps } from './terminalTypes';
@@ -334,44 +335,7 @@ const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
 
-  // Keep the screen sized to its container (window drag/resize, layout change).
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    let frame = 0;
-    const observer = new ResizeObserver(() => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(zoom.relayout);
-    });
-    observer.observe(el);
-    return () => { cancelAnimationFrame(frame); observer.disconnect(); };
-  }, [zoom.relayout]);
-
-  useEffect(() => {
-    const term = termRef.current;
-    if (!term) return;
-    term.options.scrollback = settings.scrollback_lines;
-    if (settings.font_family !== appliedFamilyRef.current) {
-      appliedFamilyRef.current = settings.font_family;
-      applyTerminalFont(term, settings.font_family, zoom.relayout, () => termRef.current === term);
-    }
-    // Changing the size in settings is deliberate, so it clears a pane's zoom.
-    if (settings.font_size !== appliedFontRef.current) {
-      appliedFontRef.current = settings.font_size;
-      zoom.forget(settings.font_size);
-      return;
-    }
-    zoom.relayout();
-  }, [settings.font_family, settings.font_size, settings.scrollback_lines, zoom]);
-
-  useEffect(() => {
-    if (!active) return;
-    const id = window.setTimeout(() => {
-      zoom.relayout();
-      termRef.current?.focus();
-    }, 50);
-    return () => window.clearTimeout(id);
-  }, [active, zoom]);
+  useTerminalLayout({ containerRef, termRef, settings, active, zoom, appliedFontRef, appliedFamilyRef });
 
   useTerminalHandle(ref, {
     termRef, wsRef, endedRef, everConnectedRef, attemptsRef, sessionIdRef,

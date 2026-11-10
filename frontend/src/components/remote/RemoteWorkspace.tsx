@@ -20,6 +20,7 @@ import TargetSessionsView from './TargetSessionsView';
 import { installPanelZoom, zoomStyle } from './panelZoom';
 import TargetRail from './TargetRail';
 import AdhocConnect from './AdhocConnect';
+import ConnectCard from './ConnectCard';
 import ConsoleArea from './ConsoleArea';
 import { VmConsole } from './vncApi';
 import { useConsoleActions } from './useConsoleActions';
@@ -297,26 +298,9 @@ export default function RemoteWorkspace() {
             </div>
           )}
           {!showTerminalPane && terminalVisible && terminalTarget && (
-            <div className="rw-view rw-connect">
-              <div className="rw-connect-card">
-                <h3>{headTitle}</h3>
-                <code>{headSub}</code>
-                <p className="text-secondary">{t('remote.connectHint')}</p>
-                <div className="btn-group">
-                  <button className="btn btn-primary" onClick={() => connect(false)}>{t('remote.connect')}</button>
-                  {liveCount > 0 && (
-                    <button className="btn btn-secondary" onClick={() => setServerView('sessions')}>
-                      {t('remote.showRunning', { count: liveCount })}
-                    </button>
-                  )}
-                  {selectedServer?.has_password && (
-                    <button className="btn btn-secondary" onClick={() => connect(true)} title={t('remote.manualPasswordHint')}>
-                      ⌨ {t('remote.manualPassword')}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
+            <ConnectCard title={headTitle} address={headSub} liveCount={liveCount}
+              hasPassword={Boolean(selectedServer?.has_password)}
+              onConnect={connect} onShowRunning={() => setServerView('sessions')} />
           )}
           {selection.kind === 'overview' && (
             <div className="rw-view rw-view-scroll" data-zoom-key="sessions" style={zoomStyle('sessions')}>

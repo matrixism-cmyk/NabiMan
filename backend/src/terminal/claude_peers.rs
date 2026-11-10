@@ -18,23 +18,31 @@
 //! this server's tmux; so a file left behind, or one written to claim
 //! someone else's process, shows nothing.
 
+#[path = "claude_peers_link.rs"]
+mod link;
+#[path = "claude_peers_models.rs"]
+mod models;
+#[path = "claude_peers_procs.rs"]
+mod procs;
+#[path = "claude_peers_records.rs"]
+mod records;
+
 use std::collections::HashMap;
-use std::fs;
-use std::io::Read;
-use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
+use link::link;
+use models::last_model;
+pub(crate) use models::model_ok;
+use procs::{local_agents, panes};
+pub(crate) use procs::{stat_fields, tmux_session_of_pid};
+use records::{alive, read_record, session_files, session_of, Record};
+
 /// How long one look is reused: the list and every open window ask often.
 const FRESH: Duration = Duration::from_secs(2);
-const MAX_FILES: usize = 400;
-const MAX_FILE: u64 = 16 * 1024;
-/// How far up the parent processes a pane's shell is looked for.
-const MAX_HOPS: usize = 32;
 /// The shortest ref Claude Code prints; longer only to tell two apart.
 const MIN_REF: usize = 6;
 
@@ -154,40 +162,6 @@ pub(crate) fn look() -> Arc<HashMap<String, Seen>> {
     seen
 }
 
-struct Panes {
-    server_pid: u32,
-    /// The shell tmux started in each pane, to the tmux session it is in.
-    session_of: HashMap<u32, String>,
-}
-
-fn panes() -> Option<Panes> {
-    // Plain names only: a time format (`#{session_activity}`) once crashed
-    // the tmux server it was asked of, taking every session with it.
-    let out = super::session::tmux()
-        .args(["list-panes", "-a", "-F", "#{pid}\t#{pane_pid}\t#{session_name}"])
-        .output()
-        .ok()?;
-    if !out.status.success() {
-        return None;
-    }
-    parse_panes(&String::from_utf8_lossy(&out.stdout))
-}
-
-fn parse_panes(text: &str) -> Option<Panes> {
-    let mut p = Panes { server_pid: 0, session_of: HashMap::new() };
-    for line in text.lines() {
-        let f: Vec<&str> = line.split('\t').collect();
-        if f.len() != 3 {
-            continue;
-        }
-        p.server_pid = f[0].parse().ok()?;
-        if let Ok(pane_pid) = f[1].parse() {
-            p.session_of.insert(pane_pid, f[2].to_string());
-        }
-    }
-    (p.server_pid != 0).then_some(p)
-}
-
 fn scan() -> HashMap<String, Seen> {
     let Some(panes) = panes() else { return HashMap::new() };
     let mut seen: HashMap<String, Seen> = HashMap::new();
@@ -280,322 +254,6 @@ fn add_remote(remote: &super::claude_remote::Snapshot, seen: &mut HashMap<String
     }
 }
 
-/// `%XX` escapes in a peer address (Claude Code escapes unusual characters).
-fn unescape(s: &str) -> String {
-    let bytes = s.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let Some(b) = s.get(i + 1..i + 3).and_then(|h| u8::from_str_radix(h, 16).ok()) {
-                out.push(b);
-                i += 3;
-                continue;
-            }
-        }
-        out.push(bytes[i]);
-        i += 1;
-    }
-    String::from_utf8(out).unwrap_or_else(|_| s.to_string())
-}
-
-/// Who has been handing work to whom among the sessions found, here and on
-/// the servers the tiles are connected to. A sender is named by its socket on
-/// the receiver's machine (`uds:…`) or, across machines, by its Remote Control
-/// session (`bridge:…`).
-fn link(found: &[(Record, String)], remote: &super::claude_remote::Snapshot, seen: &mut HashMap<String, Seen>) {
-    // Each session's card (tmux name, or a remote one's own id), by address.
-    let mut card: HashMap<String, String> = HashMap::new();
-    for (r, t) in found {
-        card.insert(format!("local|uds:{}", r.sock), t.clone());
-        if let Some(b) = &r.bridge {
-            card.insert(format!("bridge:{b}"), t.clone());
-        }
-    }
-    let mut remote_card: HashMap<(&str, &str), String> = HashMap::new();
-    for p in &remote.peers {
-        if p.sock.is_empty() {
-            continue; // no address (another user's Claude): nothing reaches or leaves it here
-        }
-        let c = p.tile.clone().unwrap_or_else(|| ghost_id(&p.server_id, p));
-        card.insert(format!("{}|uds:{}", p.server_id, p.sock), c.clone());
-        if let Some(b) = &p.bridge {
-            card.insert(format!("bridge:{b}"), c.clone());
-        }
-        // A conversation open in several Claudes writes one transcript: its
-        // messages go to the one in a tile, if any.
-        if p.tile.is_some() || !remote_card.contains_key(&(p.server_id.as_str(), p.session_id.as_str())) {
-            remote_card.insert((p.server_id.as_str(), p.session_id.as_str()), c);
-        }
-    }
-    let sender = |machine: &str, from: &str| -> Option<String> {
-        let from = unescape(from);
-        if from.starts_with("bridge:") {
-            card.get(&from).cloned()
-        } else {
-            card.get(&format!("{machine}|{from}")).cloned()
-        }
-    };
-    let transcripts: Vec<(PathBuf, &str)> = found
-        .iter()
-        .filter_map(|(r, t)| {
-            let dir = r.file.parent()?.parent()?;
-            Some((super::claude_links::transcript_of(dir, &r.cwd, &r.session_id)?, t.as_str()))
-        })
-        .collect();
-    let paths: Vec<PathBuf> = transcripts.iter().map(|(p, _)| p.clone()).collect();
-    let now = super::session::now_unix();
-    let got = super::claude_links::received(&paths);
-    let mut messages = Vec::new();
-    // The latest message along each pair, for the tooltip on its arrow.
-    let mut latest: HashMap<(String, String), (u64, String)> = HashMap::new();
-    let mut note = |f: &str, t: &str, at: u64, said: &str| {
-        let slot = latest.entry((f.to_string(), t.to_string())).or_insert((0, String::new()));
-        if at >= slot.0 && !said.is_empty() {
-            *slot = (at, said.to_string());
-        }
-    };
-    let mut events: Vec<super::claude_events::Seen> = Vec::new();
-    for (path, to) in &transcripts {
-        for (from, at, said) in got.get(path).into_iter().flatten() {
-            if let Some(f) = sender("local", from) {
-                note(&f, to, *at, said);
-                events.push((f.clone(), to.to_string(), *at, said.clone()));
-                messages.push((f, to.to_string(), *at));
-            }
-        }
-    }
-    for (server, receiver, from, at, said) in &remote.messages {
-        let (Some(to), Some(f)) = (remote_card.get(&(server.as_str(), receiver.as_str())), sender(server, from)) else { continue };
-        note(&f, to, *at, said);
-        events.push((f.clone(), to.clone(), *at, said.clone()));
-        messages.push((f, to.clone(), *at));
-    }
-    // The record behind the arrows: each message as an event, with its ends' names now.
-    let mut names: HashMap<String, String> = found.iter().map(|(r, t)| (t.clone(), if r.name.is_empty() { base_name(&r.cwd) } else { r.name.clone() })).collect();
-    for p in &remote.peers {
-        if let Some(t) = &p.tile {
-            names.entry(t.clone()).or_insert_with(|| p.name.clone());
-        }
-    }
-    super::claude_events::record(&events, &names);
-    let links = super::claude_links::links(&messages, now, super::claude_lead::lead_tmux().as_deref());
-    for (from, to) in links.leads {
-        let entry = seen.entry(from.clone()).or_default();
-        entry.orchestrator = links.orchestrators.contains(&from);
-        entry.notes = to.iter().filter_map(|t| Some((t.clone(), latest.get(&(from.clone(), t.clone()))?.clone()))).collect();
-        entry.leads = to;
-    }
-}
-
-/// Every account's `~/.claude/sessions/*.json`, at most `MAX_FILES` of them.
-fn session_files() -> Vec<PathBuf> {
-    let mut homes: Vec<PathBuf> = vec![PathBuf::from("/root")];
-    if let Ok(passwd) = fs::read_to_string("/etc/passwd") {
-        for line in passwd.lines() {
-            let f: Vec<&str> = line.split(':').collect();
-            if f.len() >= 6 && f[2].parse::<u32>().is_ok_and(|uid| (1000..65534).contains(&uid)) {
-                homes.push(PathBuf::from(f[5]));
-            }
-        }
-    }
-    homes.sort();
-    homes.dedup();
-    let mut files = Vec::new();
-    for home in homes {
-        let Ok(dir) = fs::read_dir(home.join(".claude/sessions")) else { continue };
-        for entry in dir.flatten() {
-            let path = entry.path();
-            if path.extension().is_some_and(|e| e == "json") {
-                files.push(path);
-                if files.len() >= MAX_FILES {
-                    return files;
-                }
-            }
-        }
-    }
-    files
-}
-
-#[derive(Debug, PartialEq)]
-struct Record {
-    pid: u32,
-    proc_start: String,
-    sock: String,
-    name: String,
-    cwd: String,
-    busy: bool,
-    /// When `busy` last changed (seconds since 1970).
-    since: Option<u64>,
-    /// Claude Code's version.
-    version: String,
-    session_id: String,
-    /// Its Remote Control session, when that is on.
-    bridge: Option<String>,
-    /// A Claude Code background session (`kind: bg`), run by its daemon rather than a terminal.
-    background: bool,
-    /// The id `claude attach` takes for a background session (its `jobId`).
-    job: String,
-    /// Who wrote the file.
-    uid: u32,
-    /// The record's own path, under the account's `.claude` folder.
-    file: PathBuf,
-}
-
-fn read_record(path: &Path) -> Option<Record> {
-    let file = fs::File::open(path).ok()?;
-    let meta = file.metadata().ok()?;
-    if !meta.is_file() || meta.len() > MAX_FILE {
-        return None;
-    }
-    let mut text = String::new();
-    file.take(MAX_FILE).read_to_string(&mut text).ok()?;
-    parse_record(&text, meta.uid(), path)
-}
-
-fn parse_record(text: &str, uid: u32, file: &Path) -> Option<Record> {
-    let v: serde_json::Value = serde_json::from_str(text).ok()?;
-    let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
-    let rec = Record {
-        pid: u32::try_from(v.get("pid")?.as_u64()?).ok()?,
-        proc_start: s("procStart"),
-        sock: s("messagingSocketPath"),
-        name: clip(&s("name"), 80),
-        cwd: clip(&s("cwd"), 300),
-        busy: s("status") == "busy",
-        since: v.get("statusUpdatedAt").and_then(serde_json::Value::as_u64).map(|ms| ms / 1000),
-        version: clip(&s("version"), 20),
-        session_id: s("sessionId"),
-        bridge: Some(s("bridgeSessionId")).filter(|b| !b.is_empty()),
-        background: s("kind") == "bg",
-        job: s("jobId"),
-        uid,
-        file: file.to_path_buf(),
-    };
-    (!rec.sock.is_empty() && !rec.proc_start.is_empty()).then_some(rec)
-}
-
-fn clip(s: &str, n: usize) -> String {
-    s.chars().filter(|c| !c.is_control()).take(n).collect()
-}
-
-/// The record's process is running: same owner, same start time (not a reused pid).
-fn alive(rec: &Record) -> bool {
-    let proc_dir = PathBuf::from(format!("/proc/{}", rec.pid));
-    let owner = fs::metadata(&proc_dir).map(|m| m.uid()).ok();
-    let start = fs::read_to_string(proc_dir.join("stat")).ok().and_then(|s| stat_fields(&s)).map(|(start, _)| start);
-    owner == Some(rec.uid) && start.as_deref() == Some(rec.proc_start.as_str())
-}
-
-/// The tmux session the record's process runs in, if it is still that
-/// process, the file's owner runs it, and a pane of this tmux server's is
-/// among its parents.
-fn session_of(rec: &Record, panes: &Panes) -> Option<String> {
-    if !alive(rec) {
-        return None;
-    }
-    up_to_pane(rec.pid, panes, |pid| {
-        let stat = fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
-        stat_fields(&stat).map(|(_, ppid)| ppid)
-    })
-}
-
-/// The tmux session a process runs in, found through its parents.
-pub(crate) fn tmux_session_of_pid(pid: u32) -> Option<String> {
-    let panes = panes()?;
-    up_to_pane(pid, &panes, |p| {
-        let stat = fs::read_to_string(format!("/proc/{p}/stat")).ok()?;
-        stat_fields(&stat).map(|(_, ppid)| ppid)
-    })
-}
-
-/// Climbs from `pid` through `parent` to a pane's shell, stopping at the
-/// tmux server itself or after `MAX_HOPS`.
-/// A model name as transcripts and the pages may carry it: letters, digits, `-`, `.`, `[`, `]`.
-pub(crate) fn model_ok(m: &str) -> bool {
-    !m.is_empty() && m.len() <= 60 && m.chars().all(|c| c.is_ascii_alphanumeric() || "-._[]".contains(c))
-}
-
-/// The last `"model":"…"` in a piece of a transcript; synthetic entries are passed over.
-pub(crate) fn model_in(text: &str) -> Option<String> {
-    const KEY: &str = "\"model\":\"";
-    let mut rest = text;
-    let mut found = None;
-    while let Some(i) = rest.find(KEY) {
-        let after = &rest[i + KEY.len()..];
-        let end = after.find('"')?;
-        let m = &after[..end];
-        if model_ok(m) && !m.starts_with('<') && m != "synthetic" {
-            found = Some(m.to_string());
-        }
-        rest = &after[end..];
-    }
-    found
-}
-
-type ModelCache = Mutex<Option<HashMap<PathBuf, (u64, Option<String>)>>>;
-static MODELS: ModelCache = Mutex::new(None);
-
-/// The model that last answered in a transcript, read from its end (and again only when it has grown).
-fn last_model(transcript: &Path) -> Option<String> {
-    let len = fs::metadata(transcript).ok()?.len();
-    let mut guard = MODELS.lock().unwrap_or_else(|e| e.into_inner());
-    let cache = guard.get_or_insert_with(HashMap::new);
-    if let Some((at, model)) = cache.get(transcript) {
-        if *at == len {
-            return model.clone();
-        }
-    }
-    let mut file = fs::File::open(transcript).ok()?;
-    let from = len.saturating_sub(512 * 1024);
-    std::io::Seek::seek(&mut file, std::io::SeekFrom::Start(from)).ok()?;
-    let mut raw = Vec::new();
-    file.take(512 * 1024).read_to_end(&mut raw).ok()?;
-    // Keep what was known when the tail holds no answer (a long tool result, say).
-    let model = model_in(&String::from_utf8_lossy(&raw)).or_else(|| cache.get(transcript).and_then(|(_, m)| m.clone()));
-    if cache.len() > 200 {
-        cache.clear();
-    }
-    cache.insert(transcript.to_path_buf(), (len, model.clone()));
-    model
-}
-
-/// Every agent process under a pane of this tmux server: (tmux session, kind).
-fn local_agents(panes: &Panes) -> Vec<(String, &'static str)> {
-    let parent = |pid: u32| fs::read_to_string(format!("/proc/{pid}/stat")).ok().and_then(|s| stat_fields(&s)).map(|(_, p)| p);
-    let mut out = Vec::new();
-    for entry in fs::read_dir("/proc").into_iter().flatten().flatten() {
-        let Some(pid) = entry.file_name().to_str().and_then(|n| n.parse::<u32>().ok()) else { continue };
-        let Ok(raw) = fs::read(entry.path().join("cmdline")) else { continue };
-        let text = String::from_utf8_lossy(&raw[..raw.len().min(4096)]).to_string();
-        let argv: Vec<&str> = text.split('\0').filter(|a| !a.is_empty()).take(8).collect();
-        let Some(kind) = super::ai_agents::kind_of(&argv) else { continue };
-        if let Some(tmux) = up_to_pane(pid, panes, parent) {
-            out.push((tmux, kind));
-        }
-    }
-    out
-}
-
-fn up_to_pane(mut pid: u32, panes: &Panes, parent: impl Fn(u32) -> Option<u32>) -> Option<String> {
-    for _ in 0..MAX_HOPS {
-        if let Some(session) = panes.session_of.get(&pid) {
-            return Some(session.clone());
-        }
-        if pid <= 1 || pid == panes.server_pid {
-            return None;
-        }
-        pid = parent(pid)?;
-    }
-    None
-}
-
-/// The start time (field 22) and parent (field 4) in `/proc/<pid>/stat`.
-pub(crate) fn stat_fields(stat: &str) -> Option<(String, u32)> {
-    // The command name (field 2) may hold spaces and parentheses.
-    let rest: Vec<&str> = stat[stat.rfind(')')? + 1..].split_whitespace().collect();
-    Some((rest.get(19)?.to_string(), rest.get(1)?.parse().ok()?))
-}
 
 /// Refs as Claude Code prints them: the start of sha256(`session:<socket>`),
 /// six characters, or longer where two would otherwise share a start.
@@ -623,18 +281,10 @@ fn base_name(path: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
 
-    #[test]
-    fn the_model_is_the_last_one_that_answered() {
-        let t = r#"{"message":{"model":"claude-opus-5-5"}}
-{"message":{"model":"<synthetic>"}}
-{"message":{"model":"claude-fable-5-2","content":"x"}}
-{"message":{"model":"bad model!"}}"#;
-        assert_eq!(model_in(t), Some("claude-fable-5-2".to_string()));
-        assert_eq!(model_in("no answers yet"), None);
-        assert!(model_ok("claude-opus-5-5[1m]") && !model_ok("a b") && !model_ok(""));
-    }
-
+    use super::records::parse_record;
+    use super::*;
 
     #[test]
     fn a_background_record_keeps_the_id_attach_takes() {
@@ -645,8 +295,6 @@ mod tests {
         assert_eq!(background("lc:cd2cae1c-62"), None, "a record whose process is not running opens nothing");
         assert_eq!(background("rc:x:y"), None);
     }
-
-    use super::*;
 
     #[test]
     fn refs_match_what_claude_code_prints() {
@@ -661,44 +309,6 @@ mod tests {
         assert!(r.iter().all(|x| x.len() == MIN_REF));
         let one = hex::encode(Sha256::digest(b"session:a"));
         assert_eq!(refs(&["a"])[0], one[..6]);
-    }
-
-    #[test]
-    fn stat_survives_odd_command_names() {
-        let stat = "1406230 (my (odd) cmd) S 1406007 1406230 1 34816 1 4194560 1 2 3 4 5 6 7 8 20 0 12 0 511134282 1 2";
-        assert_eq!(stat_fields(stat), Some(("511134282".to_string(), 1406007)));
-    }
-
-    #[test]
-    fn a_process_belongs_to_the_pane_its_parents_lead_to() {
-        // claude → bash → su → the pane's shell, as `su nabi` in a pane runs it.
-        let panes = parse_panes("427843\t1292830\tnb_a\n427843\t500\tnb_b\n").unwrap();
-        let parents = HashMap::from([(1406230, 1406007), (1406007, 1406005), (1406005, 1292830), (1292830, 427843), (900, 1)]);
-        let parent = |pid: u32| parents.get(&pid).copied();
-        assert_eq!(up_to_pane(1406230, &panes, parent).as_deref(), Some("nb_a"));
-        // Not under any pane: started elsewhere, or reparented to init.
-        assert_eq!(up_to_pane(900, &panes, parent), None);
-        // A loop in a made-up tree ends too.
-        let lp = HashMap::from([(7, 8), (8, 7)]);
-        assert_eq!(up_to_pane(7, &panes, |p| lp.get(&p).copied()), None);
-    }
-
-    #[test]
-    fn a_record_needs_a_socket_and_start_time() {
-        let text = r#"{"pid":7,"procStart":"99","messagingSocketPath":"/s","name":"x\u001b[31m","cwd":"/w","status":"busy"}"#;
-        let rec = parse_record(text, 1000, Path::new("/h/.claude/sessions/7.json")).unwrap();
-        assert_eq!(rec.name, "x[31m");
-        assert!(rec.busy);
-        assert_eq!(parse_record(r#"{"pid":7,"procStart":"99"}"#, 0, Path::new("/x")), None);
-    }
-
-    #[test]
-    fn panes_map_to_their_sessions() {
-        let p = parse_panes("427843\t1292830\tnb_a\n427843\t1672302\tnb_b\n").unwrap();
-        assert_eq!(p.server_pid, 427843);
-        assert_eq!(p.session_of[&1672302], "nb_b");
-        assert_eq!(p.session_of[&1292830], "nb_a");
-        assert!(parse_panes("").is_none());
     }
 
     #[test]
