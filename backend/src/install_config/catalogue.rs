@@ -35,6 +35,9 @@ pub(crate) const KNOWN: &[&str] = &[
     "NABIMAN_DEFAULT_BACKUP_KEEP",
     "NABIMAN_AUDIT_CA_FILE",
     "NABIMAN_AUDIT_FORWARDING_DISABLED",
+    // Logs and monitoring
+    "NABIMAN_LOG",
+    "NABIMAN_LOG_FORMAT",
     // External programs and services
     "NABIMAN_SOFFICE",
     "NABIMAN_RHWP",

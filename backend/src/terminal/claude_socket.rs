@@ -129,7 +129,7 @@ pub(crate) fn start(ctx: Ctx) {
     let path = socket_path();
     let dir = Path::new(&path).parent().unwrap_or(Path::new("/run"));
     if std::fs::create_dir_all(dir).is_err() {
-        eprintln!("claude socket: cannot make {}", dir.display());
+        log_error!("terminal.claude", "claude socket: cannot make its directory", path = dir.display());
         return;
     }
     let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o755));
@@ -137,7 +137,7 @@ pub(crate) fn start(ctx: Ctx) {
     let listener = match UnixListener::bind(&path) {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("claude socket: {e}");
+            log_error!("terminal.claude", "claude socket: cannot listen", error = e);
             return;
         }
     };

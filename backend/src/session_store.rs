@@ -76,7 +76,7 @@ impl Drop for SessionGuard<'_> {
         if let (true, Some(file)) = (self.changed, self.file) {
             prune(&mut self.guard);
             if let Err(e) = save(&self.guard, file) {
-                eprintln!("[sessions] cannot save sign-ins to {}: {e}", file.display());
+                log_error!("sessions", "cannot save sign-ins", path = file.display(), error = e);
             }
             self.saved_at.fetch_max(chrono::Utc::now().timestamp(), Ordering::Relaxed);
         }
@@ -144,7 +144,7 @@ fn load(file: &Path) -> Map {
     let list: Vec<Stored> = match serde_json::from_slice(&bytes) {
         Ok(list) => list,
         Err(e) => {
-            eprintln!("[sessions] {} is unreadable ({e}); everyone signs in again", file.display());
+            log_warn!("sessions", "sign-in file is unreadable; everyone signs in again", path = file.display(), error = e);
             return Map::new();
         }
     };

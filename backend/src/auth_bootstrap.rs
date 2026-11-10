@@ -24,7 +24,7 @@ pub fn new_password_store() -> PasswordStore {
     } else {
         let h = bcrypt::hash(&raw, 10).expect("bcrypt hash failed");
         save_hash_to_file(&h).expect("Could not persist bootstrap password");
-        println!("Password auto-migrated to bcrypt");
+        log_info!("auth", "password auto-migrated to bcrypt");
         h
     };
     Arc::new(std::sync::Mutex::new(hash))
@@ -65,7 +65,7 @@ pub(super) fn load_or_create_jwt_secret(path: &std::path::Path) -> String {
     file.write_all(secret.as_bytes())
         .expect("Could not write JWT secret");
     file.sync_all().expect("Could not sync JWT secret");
-    println!("JWT secret generated");
+    log_info!("auth", "JWT secret generated");
     secret
 }
 

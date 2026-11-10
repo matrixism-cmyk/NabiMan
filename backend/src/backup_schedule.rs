@@ -289,7 +289,7 @@ fn execute(store: BackupScheduleStore, row: Schedule) {
         }
         // Failure leaves a durable running record, recovered as interrupted at startup.
         if store.commit(rows).is_err() {
-            eprintln!("Backup completion could not be persisted; scheduler disabled");
+            log_error!("backup", "backup completion could not be persisted; scheduler disabled", schedule = row.id);
         }
     }
 }

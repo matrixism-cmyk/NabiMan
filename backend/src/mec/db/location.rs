@@ -40,21 +40,24 @@ pub fn adopt_legacy_default() -> io::Result<()> {
     let target = nabiman_server::data_dir().join("mec.db");
     match adopt(&legacy, &target)? {
         Adoption::NothingToDo => {}
-        Adoption::LegacyIgnored => eprintln!(
-            "MEC database: using {}; the old {} is no longer read (remove it once you no longer need it)",
-            target.display(),
-            legacy.display()
+        Adoption::LegacyIgnored => log_warn!(
+            "mec.db",
+            "MEC database: the old file is no longer read (remove it once you no longer need it)",
+            path = target.display(),
+            old = legacy.display()
         ),
-        Adoption::Moved => println!(
-            "MEC database moved from {} to {} (it now lives in the data directory)",
-            legacy.display(),
-            target.display()
+        Adoption::Moved => log_info!(
+            "mec.db",
+            "MEC database moved into the data directory",
+            from = legacy.display(),
+            to = target.display()
         ),
-        Adoption::Copied(aside) => println!(
-            "MEC database copied from {} to {} (other filesystem); the old file is kept as {}",
-            legacy.display(),
-            target.display(),
-            aside.display()
+        Adoption::Copied(aside) => log_info!(
+            "mec.db",
+            "MEC database copied into the data directory (other filesystem); the old file is kept aside",
+            from = legacy.display(),
+            to = target.display(),
+            kept_as = aside.display()
         ),
     }
     Ok(())

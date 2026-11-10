@@ -140,7 +140,7 @@ pub(crate) fn mec_lb_pools_in(get: Lookup) -> Vec<LbPool> {
             (!name.is_empty()).then(|| LbPool { name: name.into(), ranges, auto_assign })
         });
         if pool.is_none() {
-            eprintln!("NABIMAN_MEC_LB_POOLS: cannot read {item:?} (name=first-last [auto])");
+            log_warn!("settings", "NABIMAN_MEC_LB_POOLS: cannot read an entry (name=first-last [auto])", entry = format!("{item:?}"));
         }
         pool
     }).collect()

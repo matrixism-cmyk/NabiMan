@@ -143,7 +143,7 @@ impl State {
         self.appending = false;
         if let Err(error) = result {
             self.error = Some(error);
-            eprintln!("Local audit persistence unavailable ({error}); operation outcome is unchanged; inspect storage before restarting");
+            log_error!("audit", "local audit persistence unavailable; operation outcome is unchanged; inspect storage before restarting", reason = error);
             return Err(error);
         }
         self.last_persisted_at = Some(entry.timestamp.clone());

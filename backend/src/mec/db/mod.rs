@@ -73,7 +73,7 @@ pub fn open_owned(path: PathBuf) -> std::io::Result<OwnedDatabase> {
         ))
     })?;
     if interrupted > 0 {
-        println!("MEC recovery: {interrupted} interrupted jobs require resource verification");
+        log_warn!("mec.db", "MEC recovery: interrupted jobs require resource verification", jobs = interrupted);
     }
     Ok(OwnedDatabase {
         handle,

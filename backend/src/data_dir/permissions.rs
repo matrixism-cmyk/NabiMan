@@ -110,17 +110,19 @@ pub fn log(dir: &Path, report: &Report) {
     };
     let name = |p: &Path| p.strip_prefix(dir).ok().filter(|r| !r.as_os_str().is_empty()).unwrap_or(p).display().to_string();
     if !report.fixed.is_empty() {
-        println!(
-            "Data directory permissions: removed group/other access from {}",
-            show(report.fixed.iter().map(|p| name(p)).collect())
+        log_info!(
+            "data_dir",
+            "data directory permissions: removed group/other access",
+            files = show(report.fixed.iter().map(|p| name(p)).collect())
         );
     }
     if !report.foreign.is_empty() {
-        eprintln!(
-            "Data directory permissions: readable or writable by group/others but not owned by this server (uid {}), left as they are: {}. Fix with chmod go-rwx (go-rw for {}).",
-            unsafe { libc::geteuid() },
-            show(report.foreign.iter().map(|(p, mode, uid)| format!("{} ({:o}, uid {uid})", name(p), mode)).collect()),
-            dir.display()
+        log_warn!(
+            "data_dir",
+            "data directory permissions: readable or writable by group/others but not owned by this server, left as they are; fix with chmod go-rwx (go-rw for the directory)",
+            uid = unsafe { libc::geteuid() },
+            files = show(report.foreign.iter().map(|(p, mode, uid)| format!("{} ({:o}, uid {uid})", name(p), mode)).collect()),
+            path = dir.display()
         );
     }
 }

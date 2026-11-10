@@ -107,7 +107,7 @@ fn check_now() -> Report {
 /// Run once at startup (before the server takes requests): check, keep, and log.
 pub(crate) fn check_at_startup() {
     let report = check_now();
-    println!("{}", summary(&report.tools));
+    log_info!("external_tools", summary(&report.tools));
     *REPORT.lock_safe() = Some(report);
 }
 

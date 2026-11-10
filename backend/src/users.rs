@@ -91,7 +91,7 @@ pub fn new_user_store(pw_hash: &str) -> UserStore {
     };
     let users = vec![admin];
     save_users(&users).expect("Failed to persist initial admin user");
-    println!("Default admin user created from existing password");
+    log_info!("users", "default admin user created from existing password");
     Arc::new(Mutex::new(users))
 }
 
@@ -184,7 +184,7 @@ pub fn update_last_login(store: &UserStore, username: &str) {
         u.last_login = Some(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string());
     }
     if let Err(error) = commit_users(&mut users, previous) {
-        eprintln!("Could not persist last login for {username}: {error}");
+        log_warn!("users", "could not persist last login", user = username, error = error);
     }
 }
 

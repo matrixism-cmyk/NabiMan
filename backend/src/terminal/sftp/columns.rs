@@ -32,7 +32,7 @@ fn file() -> PathBuf {
 fn load(file: &Path) -> Map {
     let Ok(bytes) = std::fs::read(file) else { return Map::new() };
     serde_json::from_slice(&bytes).unwrap_or_else(|e| {
-        eprintln!("[sftp] {} is unreadable ({e}); column layouts start empty", file.display());
+        log_warn!("sftp", "column layout file is unreadable; layouts start empty", path = file.display(), error = e);
         Map::new()
     })
 }

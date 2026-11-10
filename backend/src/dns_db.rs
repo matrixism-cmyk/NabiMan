@@ -40,7 +40,7 @@ fn auth(file: &Path, password: Option<String>) -> Auth {
         return Auth::OptionFile(file.to_path_buf());
     }
     if file.exists() {
-        eprintln!("DNS statistics: {} is readable by others and is ignored; chmod 600 it", file.display());
+        log_warn!("dns", "DNS statistics file is readable by others and is ignored; chmod 600 it", path = file.display());
     }
     match password {
         Some(pw) if !pw.is_empty() => Auth::Env(pw),

@@ -84,7 +84,7 @@ impl Actor for SerialBridge {
         ctx.text(serde_json::json!({ "path": self.link }).to_string());
         ctx.run_interval(PING_EVERY, |act, ctx| {
             if act.heard.elapsed() > SILENT_LIMIT {
-                eprintln!("[serial] {}: browser silent for {}s, closing", act.link, act.heard.elapsed().as_secs());
+                log_info!("serial", "browser silent, closing", link = act.link, silent_secs = act.heard.elapsed().as_secs());
                 ctx.stop();
                 return;
             }
@@ -100,7 +100,7 @@ impl Actor for SerialBridge {
             ctx.run_interval(SESSION_CHECK_EVERY, |act, ctx| {
                 let Some(scope) = &act.session else { return };
                 if !scope.grant.valid() || !session_admits(&scope.store, &scope.sid, &scope.grant) {
-                    eprintln!("[serial] {}: session {} or its access is gone", act.link, scope.sid);
+                    log_info!("serial", "session or its access is gone", link = act.link, session = scope.sid);
                     ctx.close(Some(ws::CloseReason {
                         code: ws::CloseCode::Policy,
                         description: Some("session closed or access revoked".into()),
@@ -124,7 +124,7 @@ impl Actor for SerialBridge {
 
     fn stopped(&mut self, _: &mut Self::Context) {
         self.to_socat = None;
-        eprintln!("[serial] {}: bridge closed after {}s", self.link, self.started.elapsed().as_secs());
+        log_info!("serial", "bridge closed", link = self.link, open_secs = self.started.elapsed().as_secs());
         for path in [self.link.clone(), format!("{}.cmd", self.link), format!("{}.ack", self.link)] {
             let _ = std::fs::remove_file(path);
         }
@@ -161,12 +161,12 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for SerialBridge {
             }
             Ok(ws::Message::Ping(p)) => ctx.pong(&p),
             Ok(ws::Message::Close(reason)) => {
-                eprintln!("[serial] {}: browser closed the socket ({:?})", self.link, reason);
+                log_info!("serial", "browser closed the socket", link = self.link, reason = format!("{reason:?}"));
                 ctx.close(None);
                 ctx.stop();
             }
             Err(e) => {
-                eprintln!("[serial] {}: socket error: {e}", self.link);
+                log_warn!("serial", "socket error", link = self.link, error = e);
                 ctx.close(None);
                 ctx.stop();
             }
@@ -236,7 +236,7 @@ async fn pump(link: String, mut rx: mpsc::UnboundedReceiver<Vec<u8>>, addr: acti
     {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("[serial] {link}: cannot start socat: {e}");
+            log_error!("serial", "cannot start socat", link = link, error = e);
             addr.do_send(FromSocat::Closed);
             return;
         }
@@ -260,7 +260,7 @@ async fn pump(link: String, mut rx: mpsc::UnboundedReceiver<Vec<u8>>, addr: acti
         }
     };
     if why != "socket gone" {
-        eprintln!("[serial] {link}: relay ended: {why}");
+        log_info!("serial", "relay ended", link = link, why = why);
     }
     let _ = child.kill().await;
     addr.do_send(FromSocat::Closed);

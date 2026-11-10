@@ -120,7 +120,7 @@ impl Forwarder {
         let result = operation(guard.as_mut().ok_or(Error::Storage)?);
         if matches!(result, Err(Error::Storage)) {
             *self.0.failure.lock_safe() = Some(Error::Storage);
-            eprintln!("Audit forwarding storage unavailable; local journal and completed operation outcomes are unchanged");
+            log_error!("audit.forwarding", "audit forwarding storage unavailable; local journal and completed operation outcomes are unchanged");
         }
         result
     }

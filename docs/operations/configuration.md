@@ -92,6 +92,15 @@ TOML입니다. 키 이름이 곧 환경 변수 이름입니다.
 | `audit_ca_file` | `NABIMAN_AUDIT_CA_FILE` | 시스템 인증서 | 감사 기록 외부 전송에 쓸 CA 파일 |
 | `audit_forwarding_disabled` | `NABIMAN_AUDIT_FORWARDING_DISABLED` | 꺼짐 | `1`이면 감사 기록 외부 전송을 멈춤 |
 
+### 로그와 모니터링
+
+자세한 내용은 [monitoring.md](monitoring.md) 에 있습니다.
+
+| 파일 키 | 환경 변수 | 기본값 | 하는 일 |
+|---|---|---|---|
+| `log` | `NABIMAN_LOG` | `info` | 로그 수준. 전체와 대상별로: `warn,http=info`, `debug`, `off` |
+| `log_format` | `NABIMAN_LOG_FORMAT` | `text` | `json`이면 한 줄에 JSON 하나 |
+
 ### 외부 프로그램과 서비스
 
 | 파일 키 | 환경 변수 | 기본값 | 하는 일 |

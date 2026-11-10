@@ -226,7 +226,7 @@ pub fn start(state: web::Data<MecState>, users: UserStore) {
         let mut cursor = 0usize;
         loop {
             if let Err(_) = sweep_page(&state, &users, cursor).await {
-                eprintln!("Managed membership scan could not complete; no unverified outcome is reported as revoked");
+                log_warn!("mec.membership", "managed membership scan could not complete; no unverified outcome is reported as revoked");
             }
             cursor = cursor.wrapping_add(100);
             tokio::time::sleep(std::time::Duration::from_secs(30)).await;

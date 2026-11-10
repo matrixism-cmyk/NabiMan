@@ -27,7 +27,7 @@ impl Prepared {
     /// what a brand-new data directory starts with.
     pub fn seed_defaults(&self) {
         if let Some(note) = crate::backup::seed_default_schedule(&nabiman_server::data_dir(), self.fresh) {
-            println!("{note}");
+            log_info!("backup", note);
         }
     }
 }

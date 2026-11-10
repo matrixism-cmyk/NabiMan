@@ -82,9 +82,7 @@ impl std::fmt::Display for UserPublicationFailure {
 /// Stop all workers/connections; restart must flush and validate the observed file.
 pub(super) fn reject_ambiguous_publication(failure: UserPublicationFailure) -> String {
     if failure.published {
-        eprintln!(
-            "User database publication is uncertain; terminating server for storage recovery"
-        );
+        log_error!("users", "user database publication is uncertain; terminating server for storage recovery");
         std::process::exit(78);
     }
     failure.error

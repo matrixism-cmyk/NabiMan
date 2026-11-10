@@ -73,7 +73,7 @@ pub fn report_once(name: &'static str, error: &rusqlite::Error) {
     let mut seen = REPORTED.lock_safe();
     if !seen.contains(&name) {
         seen.push(name);
-        eprintln!("Cannot open {name}: {error}");
+        log_error!("storage", "cannot open a database", name = name, error = error);
     }
 }
 

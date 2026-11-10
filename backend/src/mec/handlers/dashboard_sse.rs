@@ -38,7 +38,7 @@ pub fn start_poller(state: &web::Data<MecState>) {
                 }
                 // A transient upstream failure (kube 401, metrics-server down)
                 // keeps the last good snapshot; the client shows it as stale.
-                Err(e) => eprintln!("[mec] dashboard poll failed: {}", e),
+                Err(e) => log_warn!("mec", "dashboard poll failed", error = e),
             }
         }
     });

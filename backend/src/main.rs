@@ -182,7 +182,7 @@ fn main() -> std::io::Result<()> {
     terminal::recording::run_if_asked();
     // The settings file joins the environment while this is the only thread.
     install_config::apply_at_startup().map_err(|e| {
-        eprintln!("{e}");
+        log_error!("settings", e);
         std::io::Error::new(std::io::ErrorKind::InvalidInput, e)
     })?;
     actix_web::rt::System::new().block_on(serve())
@@ -193,7 +193,7 @@ async fn serve() -> std::io::Result<()> {
         return Err(std::io::Error::last_os_error());
     }
     // One server per data directory: taken before any store opens it, held until exit.
-    let storage = data_dir::prepare().inspect_err(|e| eprintln!("{e}"))?;
+    let storage = data_dir::prepare().inspect_err(|e| log_error!("data_dir", e))?;
     let runtime_identity = web::Data::new(runtime_identity::RuntimeIdentity::capture()?);
     let mec_mode = mec::services::bootstrap::ServiceMode::from_env()
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
@@ -292,6 +292,8 @@ async fn serve() -> std::io::Result<()> {
             ))
             .wrap(cors::build_cors())
             .wrap(audit_middleware::AuditMiddleware::new(aud_log.clone(), audit_forwarding.clone()))
+            // Outermost: one log line per request, whatever answered it.
+            .wrap(observability::request_log::RequestLog)
             .app_data(web::Data::new(secret))
             .app_data(web::Data::new(pw_store))
             .app_data(web::Data::new(usr_store))

@@ -225,7 +225,7 @@ pub(super) fn prepare_insert(
 }
 pub(super) fn persist(path: &Path, map: &HashMap<String, TmuxSession>) {
     if publish(path, map).is_err() {
-        eprintln!("Terminal registry publication failed; terminating server for storage recovery");
+        log_error!("terminal", "terminal registry publication failed; terminating server for storage recovery");
         std::process::exit(79);
     }
 }

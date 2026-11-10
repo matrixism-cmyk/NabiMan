@@ -119,9 +119,9 @@ pub(crate) fn apply_at_startup() -> Result<(), String> {
     for (name, value) in &set {
         std::env::set_var(name, value);
     }
-    println!("Settings: {} ({} from the file, {} overridden by the environment)", path.display(), report.from_file.len(), report.overridden.len());
+    log_info!("settings", "settings file read", path = path.display(), from_file = report.from_file.len(), overridden = report.overridden.len());
     for name in &report.unknown {
-        eprintln!("Settings: {name} in {} is not a setting NabiMan knows (a typo?)", path.display());
+        log_warn!("settings", "the settings file names a setting NabiMan does not know (a typo?)", name = name, path = path.display());
     }
     let _ = LOADED.set(report);
     Ok(())

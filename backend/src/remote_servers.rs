@@ -69,10 +69,7 @@ pub fn server_password(srv: &RemoteServer) -> Option<String> {
     match secret_store::open(secret_store::Binding::server_password(&srv.id), &srv.password_enc) {
         Ok(pw) => Some(pw),
         Err(e) => {
-            eprintln!(
-                "remote_servers: cannot decrypt password for {}: {}",
-                srv.id, e
-            );
+            log_warn!("remote", "cannot decrypt a server's stored password", server = srv.id, error = e);
             None
         }
     }

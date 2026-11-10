@@ -115,17 +115,12 @@ impl AxgateService for AxgateReal {
         let cleaned = super::preprocess::clean(&cfg);
         let rules = super::parser::parse_nat_rules(&cleaned);
         if std::env::var("NABIMAN_MEC_AXGATE_DEBUG").is_ok() {
-            eprintln!(
-                "[axgate:debug] raw_len={} cleaned_len={} rules={}",
-                cfg.len(),
-                cleaned.len(),
-                rules.len(),
-            );
+            log_info!("mec.axgate", "config parsed", raw_len = cfg.len(), cleaned_len = cleaned.len(), rules = rules.len());
         }
         if std::env::var("NABIMAN_MEC_AXGATE_DUMP_CONFIG").is_ok() {
             let path = "/tmp/axgate-running-config.txt";
             let _ = std::fs::write(path, &cleaned);
-            eprintln!("[axgate:debug] cleaned config written to {}", path);
+            log_info!("mec.axgate", "cleaned config written", path = path);
         }
         Ok(rules)
     }

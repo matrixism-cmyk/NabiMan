@@ -79,7 +79,7 @@ fn file() -> PathBuf {
 fn load(file: &Path) -> Map {
     let Ok(bytes) = std::fs::read(file) else { return Map::new() };
     serde_json::from_slice(&bytes).unwrap_or_else(|e| {
-        eprintln!("[terminal] {} is unreadable ({e}); sessions follow the account settings", file.display());
+        log_warn!("terminal", "session settings file is unreadable; sessions follow the account settings", path = file.display(), error = e);
         Map::new()
     })
 }

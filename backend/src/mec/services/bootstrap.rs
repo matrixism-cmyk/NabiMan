@@ -56,11 +56,11 @@ async fn bootstrap_kube(mode: ServiceMode) -> KubeServiceArc {
 async fn kube_from_config(cfg: KubeRealConfig) -> KubeServiceArc {
     match KubeReal::connect(cfg).await {
         Ok(real) => {
-            eprintln!("[mec] kube: real client configured; health is checked live");
+            log_info!("mec", "kube: real client configured; health is checked live");
             Arc::new(real)
         }
         Err(_) => {
-            eprintln!("[mec] kube: configuration failed; demo fallback disabled");
+            log_error!("mec", "kube: configuration failed; demo fallback disabled");
             Arc::new(UnavailableService::new(
                 "kubernetes",
                 "configuration unavailable; check kubeconfig",
@@ -80,11 +80,11 @@ fn rancher_from_config(config: Option<RancherRealConfig>) -> RancherServiceArc {
     match config {
         Some(cfg) => match RancherReal::new(cfg) {
             Ok(r) => {
-                eprintln!("[mec] rancher: real client configured");
+                log_info!("mec", "rancher: real client configured");
                 Arc::new(r)
             }
             Err(_) => {
-                eprintln!("[mec] rancher: configuration failed; demo fallback disabled");
+                log_error!("mec", "rancher: configuration failed; demo fallback disabled");
                 Arc::new(UnavailableService::new(
                     "rancher",
                     "configuration unavailable",
@@ -108,7 +108,7 @@ fn bootstrap_axgate(mode: ServiceMode) -> AxgateServiceArc {
 fn axgate_from_config(config: Option<AxgateRealConfig>) -> AxgateServiceArc {
     match config {
         Some(cfg) => {
-            eprintln!("[mec] axgate: real client configured");
+            log_info!("mec", "axgate: real client configured");
             Arc::new(AxgateReal::new(cfg))
         }
         None => Arc::new(UnavailableService::new(
@@ -129,11 +129,11 @@ fn harbor_from_config(config: Option<HarborRealConfig>) -> HarborServiceArc {
     match config {
         Some(cfg) => match HarborReal::new(cfg) {
             Ok(r) => {
-                eprintln!("[mec] harbor: real client configured");
+                log_info!("mec", "harbor: real client configured");
                 Arc::new(r)
             }
             Err(_) => {
-                eprintln!("[mec] harbor: configuration failed; demo fallback disabled");
+                log_error!("mec", "harbor: configuration failed; demo fallback disabled");
                 Arc::new(UnavailableService::new(
                     "harbor",
                     "configuration unavailable",

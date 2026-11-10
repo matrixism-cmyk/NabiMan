@@ -233,10 +233,7 @@ fn persistence_failure(state: &MecState, operation: &membership_store::Operation
     )
     .is_err()
     {
-        eprintln!(
-            "Membership operation {} requires reconciliation; final state could not be persisted",
-            operation.id
-        );
+        log_error!("mec.membership", "membership operation requires reconciliation; final state could not be persisted", operation = operation.id);
     }
     database_failure_response(operation)
 }

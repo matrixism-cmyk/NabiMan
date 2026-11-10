@@ -122,7 +122,7 @@ async fn ws_session_serial(
     }
     let dir = serial_dir().join(&owner).join(&sid);
     if let Err(e) = private_dir(&dir) {
-        eprintln!("[serial] cannot prepare {}: {e}", dir.display());
+        log_error!("serial", "cannot prepare the device directory", path = dir.display(), error = e);
         return Ok(HttpResponse::InternalServerError().finish());
     }
     let link = dir.join(&safe).to_string_lossy().into_owned();

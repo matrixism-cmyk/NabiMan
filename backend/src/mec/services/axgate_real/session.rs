@@ -142,10 +142,7 @@ impl AxgateSession {
         // Step 1: wait for the CLI-level Password prompt.
         let greet = read_until_idle(&mut channel, idle, start, overall).await?;
         if debug {
-            eprintln!(
-                "[axgate:greet] {:?}",
-                greet.chars().take(200).collect::<String>()
-            );
+            log_info!("mec.axgate", "greeting", text = format!("{:?}", greet.chars().take(200).collect::<String>()));
         }
 
         if greet.contains("blocked for") {
@@ -165,10 +162,7 @@ impl AxgateSession {
         write_line(&mut channel, &self.password).await?;
         let after_pw = read_until_idle(&mut channel, idle, start, overall).await?;
         if debug {
-            eprintln!(
-                "[axgate:after_pw] {:?}",
-                after_pw.chars().take(200).collect::<String>()
-            );
+            log_info!("mec.axgate", "after password", text = format!("{:?}", after_pw.chars().take(200).collect::<String>()));
         }
         if after_pw.contains("blocked for") || after_pw.contains("Username:") {
             return Err(upstream(format!(

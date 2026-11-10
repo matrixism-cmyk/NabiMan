@@ -33,7 +33,7 @@ pub(crate) fn parse(list: &str) -> Vec<Network> {
         .filter_map(|s| {
             let net = crate::access_rules::parse_network(s);
             if net.is_none() {
-                eprintln!("NABIMAN_TRUSTED_PROXIES: '{s}' is not an address or network; ignored");
+                log_warn!("settings", "NABIMAN_TRUSTED_PROXIES: an entry is not an address or network; ignored", entry = s);
             }
             net
         })

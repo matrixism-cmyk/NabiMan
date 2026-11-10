@@ -186,10 +186,7 @@ pub fn restore_sessions(store: &PtyStore) {
         tmux_session_state(&session.tmux_name).unwrap_or(true)
     });
     if !map.is_empty() {
-        println!(
-            "Terminal: retained {} registered tmux session(s)",
-            map.len()
-        );
+        log_info!("terminal", "retained registered tmux sessions", sessions = map.len());
         // Mouse and clipboard bindings live on the tmux server, so sessions
         // started by an older build pick up the current ones here.
         if let Some(path) = write_tmux_conf(default_scrollback()) {
