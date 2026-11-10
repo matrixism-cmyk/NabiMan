@@ -28,7 +28,7 @@ export default function LiveIndicator({ lastUpdated, intervalMs, refreshing }: P
 
   const secs = lastUpdated ? Math.max(0, Math.floor((Date.now() - lastUpdated) / 1000)) : 0;
   const stale = intervalMs ? secs * 1000 > intervalMs * 2 : false;
-  const color = refreshing ? '#3b82f6' : stale ? '#f59e0b' : '#10b981';
+  const color = refreshing ? 'var(--info)' : stale ? 'var(--warning)' : 'var(--success)';
 
   return (
     <span

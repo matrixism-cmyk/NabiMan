@@ -9,12 +9,12 @@ export type StatusTone =
   | 'running';
 
 const TONE_STYLES: Record<StatusTone, React.CSSProperties> = {
-  success: { background: '#d1fae5', color: '#065f46', borderColor: '#10b981' },
-  warning: { background: '#fef3c7', color: '#92400e', borderColor: '#f59e0b' },
-  error: { background: '#fee2e2', color: '#991b1b', borderColor: '#ef4444' },
-  info: { background: '#dbeafe', color: '#1e40af', borderColor: '#3b82f6' },
-  neutral: { background: '#f3f4f6', color: '#374151', borderColor: '#9ca3af' },
-  running: { background: '#ede9fe', color: '#5b21b6', borderColor: '#8b5cf6' },
+  success: { background: 'var(--success-soft)', color: 'var(--success-strong)', borderColor: 'var(--success)' },
+  warning: { background: 'var(--warning-soft)', color: 'var(--warning-strong)', borderColor: 'var(--warning)' },
+  error: { background: 'var(--danger-soft)', color: 'var(--danger-strong)', borderColor: 'var(--danger)' },
+  info: { background: 'var(--info-soft)', color: 'var(--info-strong)', borderColor: 'var(--info)' },
+  neutral: { background: 'var(--surface-alt)', color: 'var(--text)', borderColor: 'var(--text-muted)' },
+  running: { background: 'var(--running-soft)', color: 'var(--running-strong)', borderColor: 'var(--running)' },
 };
 
 /// 문자열 값을 StatusTone 으로 매핑. 일관된 색상 체계를 전체 MEC 패널에

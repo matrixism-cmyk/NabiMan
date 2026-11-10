@@ -62,7 +62,7 @@ export default function NodeTaintsEditor({ taints, onPatch }: Props) {
         <tbody>
           {taints.length === 0 ? (
             <tr>
-              <td colSpan={4} style={{ color: '#6b7280', fontStyle: 'italic' }}>
+              <td colSpan={4} style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
                 {t('mec.node.taints.empty')}
               </td>
             </tr>
@@ -92,7 +92,7 @@ export default function NodeTaintsEditor({ taints, onPatch }: Props) {
         style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}
       >
         <label style={{ flex: '1 1 140px' }}>
-          <div style={{ fontSize: '11px', color: '#6b7280' }}>Key</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Key</div>
           <input
             required
             value={key}
@@ -101,7 +101,7 @@ export default function NodeTaintsEditor({ taints, onPatch }: Props) {
           />
         </label>
         <label style={{ flex: '1 1 140px' }}>
-          <div style={{ fontSize: '11px', color: '#6b7280' }}>{t('mec.node.taints.valueOptional')}</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{t('mec.node.taints.valueOptional')}</div>
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
@@ -109,7 +109,7 @@ export default function NodeTaintsEditor({ taints, onPatch }: Props) {
           />
         </label>
         <label style={{ flex: '0 0 160px' }}>
-          <div style={{ fontSize: '11px', color: '#6b7280' }}>Effect</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Effect</div>
           <select
             value={effect}
             onChange={(e) => setEffect(e.target.value as Taint['effect'])}

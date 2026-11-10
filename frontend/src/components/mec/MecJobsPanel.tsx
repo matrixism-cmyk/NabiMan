@@ -31,16 +31,16 @@ interface JobSummary {
 
 function ProgressBar({ value, tone }: { value: number; tone: string }) {
   const color =
-    tone === 'completed' ? '#10b981' :
-    tone === 'failed' ? '#ef4444' :
-    tone === 'unknown_result' ? '#d97706' :
-    tone === 'cancelled' ? '#9ca3af' :
-    '#3b82f6';
+    tone === 'completed' ? 'var(--success)' :
+    tone === 'failed' ? 'var(--danger)' :
+    tone === 'unknown_result' ? 'var(--warning-strong)' :
+    tone === 'cancelled' ? 'var(--text-muted)' :
+    'var(--info)';
   return (
     <div style={{ minWidth: '100px' }}>
       <div
         style={{
-          background: '#f3f4f6',
+          background: 'var(--surface-alt)',
           height: '8px',
           borderRadius: '4px',
           overflow: 'hidden',
@@ -55,7 +55,7 @@ function ProgressBar({ value, tone }: { value: number; tone: string }) {
           }}
         />
       </div>
-      <span style={{ fontSize: '11px', color: '#6b7280' }}>{value}%</span>
+      <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{value}%</span>
     </div>
   );
 }
@@ -132,7 +132,7 @@ export default function MecJobsPanel() {
         />
       </Toolbar>
 
-      {loading && !data && <div style={{ color: '#6b7280' }}>{t('mec.state.loading')}</div>}
+      {loading && !data && <div style={{ color: 'var(--text-secondary)' }}>{t('mec.state.loading')}</div>}
 
       <SortableTable<JobSummary>
         data={jobs}
@@ -168,7 +168,7 @@ export default function MecJobsPanel() {
                 {(j.status.error || j.status.reason) && (
                   <div
                     style={{
-                      color: '#ef4444',
+                      color: 'var(--danger)',
                       fontSize: '11px',
                       marginTop: '2px',
                       maxWidth: '220px',
@@ -200,7 +200,7 @@ export default function MecJobsPanel() {
             accessor: (j) =>
               j.steps.filter((s) => s.status === 'completed').length,
             render: (j) => (
-              <span style={{ fontSize: '12px', color: '#6b7280' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                 {j.steps.filter((s) => s.status === 'completed').length}/
                 {j.steps.length}
               </span>
@@ -225,7 +225,7 @@ export default function MecJobsPanel() {
               j.completed_at ? (
                 formatDateTime(j.completed_at)
               ) : (
-                <span style={{ color: '#d1d5db' }}>-</span>
+                <span style={{ color: 'var(--border)' }}>-</span>
               ),
             width: '170px',
             sortable: true,

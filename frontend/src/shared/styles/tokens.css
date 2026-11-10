@@ -1,0 +1,42 @@
+/*
+ * Colours derived from the theme (ThemeProvider sets --bg, --surface, --text,
+ * --success, … on :root). Components use these instead of hex values, so a
+ * badge or a progress bar reads well on the light theme and the dark ones
+ * alike: "-soft" is a tinted background, "-strong" the tone's text on it.
+ */
+:root {
+  --info: #3b82f6;
+  --running: #8b5cf6;
+  --text-muted: color-mix(in srgb, var(--text-secondary) 78%, var(--bg));
+  --track: color-mix(in srgb, var(--border) 85%, var(--text) 15%);
+  --on-accent: #ffffff;
+  --shadow: #00000040;
+  --success-soft: color-mix(in srgb, var(--success) 16%, var(--surface));
+  --warning-soft: color-mix(in srgb, var(--warning) 16%, var(--surface));
+  --danger-soft: color-mix(in srgb, var(--danger) 16%, var(--surface));
+  --info-soft: color-mix(in srgb, var(--info) 16%, var(--surface));
+  --running-soft: color-mix(in srgb, var(--running) 16%, var(--surface));
+  --neutral-soft: var(--surface-alt);
+  --success-strong: color-mix(in srgb, var(--success) 62%, var(--text));
+  --warning-strong: color-mix(in srgb, var(--warning) 62%, var(--text));
+  --danger-strong: color-mix(in srgb, var(--danger) 62%, var(--text));
+  --info-strong: color-mix(in srgb, var(--info) 62%, var(--text));
+  --running-strong: color-mix(in srgb, var(--running) 62%, var(--text));
+  --neutral-strong: var(--text);
+  /* A terminal or a remote screen keeps a dark ground in every theme. */
+  --screen-bg: #0b0d10;
+  --screen-fg: #e0e6ed;
+}
+:root[data-theme-mode="light"] {
+  --info: #2563eb;
+  --running: #7c3aed;
+  --shadow: #0000001f;
+  --success-soft: color-mix(in srgb, var(--success) 13%, var(--surface));
+  --warning-soft: color-mix(in srgb, var(--warning) 15%, var(--surface));
+  --danger-soft: color-mix(in srgb, var(--danger) 11%, var(--surface));
+  --success-strong: color-mix(in srgb, var(--success) 55%, #000);
+  --warning-strong: color-mix(in srgb, var(--warning) 50%, #000);
+  --danger-strong: color-mix(in srgb, var(--danger) 62%, #000);
+  --info-strong: color-mix(in srgb, var(--info) 70%, #000);
+  --running-strong: color-mix(in srgb, var(--running) 70%, #000);
+}

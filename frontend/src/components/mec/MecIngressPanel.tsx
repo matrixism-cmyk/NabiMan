@@ -122,8 +122,8 @@ export default function MecIngressPanel() {
         <form
           onSubmit={submit}
           style={{
-            background: 'white',
-            border: '1px solid #e5e7eb',
+            background: 'var(--surface)',
+            border: '1px solid var(--track)',
             padding: '14px',
             borderRadius: '8px',
             marginBottom: '12px',
@@ -226,7 +226,7 @@ export default function MecIngressPanel() {
         />
       </Toolbar>
 
-      {loading && !data && <div style={{ color: '#6b7280' }}>{t('mec.state.loading')}</div>}
+      {loading && !data && <div style={{ color: 'var(--text-secondary)' }}>{t('mec.state.loading')}</div>}
 
       <SortableTable<IngressRow>
         data={data || []}
@@ -253,7 +253,7 @@ export default function MecIngressPanel() {
             header: 'Class',
             accessor: (i) => i.class || '',
             render: (i) =>
-              i.class || <span style={{ color: '#d1d5db' }}>-</span>,
+              i.class || <span style={{ color: 'var(--border)' }}>-</span>,
             sortable: true,
           },
           {

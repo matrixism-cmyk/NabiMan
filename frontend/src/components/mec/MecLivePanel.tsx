@@ -70,7 +70,7 @@ export default function MecLivePanel() {
       }
     >
       <ErrorBanner error={err || undefined} />
-      {!s && !err && <div style={{ color: '#6b7280' }}>{t('mec.state.loading')}</div>}
+      {!s && !err && <div style={{ color: 'var(--text-secondary)' }}>{t('mec.state.loading')}</div>}
 
       {s && (
         <div className="mec-fade-in-up">
@@ -137,10 +137,10 @@ export default function MecLivePanel() {
             <Section title={t('mec.live.podDist')}>
               <DonutChart
                 slices={[
-                  { label: 'Running', value: s.pods.running, color: '#10b981' },
-                  { label: 'Pending', value: s.pods.pending, color: '#f59e0b' },
-                  { label: 'Failed', value: s.pods.failed, color: '#ef4444' },
-                  { label: 'Succeeded', value: s.pods.succeeded, color: '#3b82f6' },
+                  { label: 'Running', value: s.pods.running, color: 'var(--success)' },
+                  { label: 'Pending', value: s.pods.pending, color: 'var(--warning)' },
+                  { label: 'Failed', value: s.pods.failed, color: 'var(--danger)' },
+                  { label: 'Succeeded', value: s.pods.succeeded, color: 'var(--info)' },
                 ]}
                 centerLabel={`${s.pods.running}`}
                 centerSublabel={t('mec.live.podTotal', { total: s.pods.total })}
@@ -186,7 +186,7 @@ export default function MecLivePanel() {
                       style={{
                         fontSize: '11px',
                         fontWeight: 600,
-                        color: e.event_type === 'Warning' ? '#ef4444' : '#10b981',
+                        color: e.event_type === 'Warning' ? 'var(--danger)' : 'var(--success)',
                       }}
                     >
                       {e.event_type === 'Warning' ? '⚠ Warning' : 'Normal'}
@@ -209,8 +209,8 @@ export default function MecLivePanel() {
                   accessor: (e) => `${e.kind}/${e.name}`,
                   render: (e) => (
                     <>
-                      <span style={{ color: '#6b7280' }}>{e.namespace ? `${e.namespace}/` : ''}</span>
-                      <span style={{ color: '#9ca3af' }}>{e.kind} </span>
+                      <span style={{ color: 'var(--text-secondary)' }}>{e.namespace ? `${e.namespace}/` : ''}</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{e.kind} </span>
                       <code>{e.name}</code>
                     </>
                   ),

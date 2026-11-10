@@ -134,10 +134,10 @@ export default function MecNocPanel({ onNavigate, onEnterFocus }: Props) {
               <DonutChart legend="side"
                 centerLabel={`${s.pods.running}`} centerSublabel={`/ ${s.pods.total}`}
                 slices={[
-                  { label: 'Running', value: s.pods.running, color: '#10b981' },
-                  { label: 'Pending', value: s.pods.pending, color: '#f59e0b' },
-                  { label: 'Failed', value: s.pods.failed, color: '#ef4444' },
-                  { label: 'Succeeded', value: s.pods.succeeded, color: '#3b82f6' },
+                  { label: 'Running', value: s.pods.running, color: 'var(--success)' },
+                  { label: 'Pending', value: s.pods.pending, color: 'var(--warning)' },
+                  { label: 'Failed', value: s.pods.failed, color: 'var(--danger)' },
+                  { label: 'Succeeded', value: s.pods.succeeded, color: 'var(--info)' },
                 ]} />
             </Section>
             <Section title={t('noc.tenants')}>
@@ -187,7 +187,7 @@ export default function MecNocPanel({ onNavigate, onEnterFocus }: Props) {
                 { key: 'reason', header: 'Reason', accessor: (e) => e.reason, width: '120px', sortable: true,
                   render: (e) => <code style={{ fontSize: '12px' }}>{e.reason}</code> },
                 { key: 'object', header: 'Object', accessor: (e) => `${e.kind}/${e.name}`, sortable: true,
-                  render: (e) => <><span style={{ color: '#6b7280' }}>{e.namespace ? `${e.namespace}/` : ''}{e.kind} </span><code>{e.name}</code></> },
+                  render: (e) => <><span style={{ color: 'var(--text-secondary)' }}>{e.namespace ? `${e.namespace}/` : ''}{e.kind} </span><code>{e.name}</code></> },
                 { key: 'message', header: 'Message', accessor: (e) => e.message, wrap: true, sortable: false },
               ]} />
           </Section>

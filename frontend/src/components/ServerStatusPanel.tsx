@@ -20,7 +20,7 @@ function formatUptime(seconds: number): string {
 
 function ProgressBar({ value, max, label }: { value: number; max: number; label: string }) {
   const pct = max > 0 ? (value / max) * 100 : 0;
-  const color = pct > 90 ? '#e74c3c' : pct > 70 ? '#f39c12' : '#2ecc71';
+  const color = pct > 90 ? 'var(--danger)' : pct > 70 ? 'var(--warning)' : 'var(--success)';
   return (
     <div className="progress-item">
       <div className="progress-label">

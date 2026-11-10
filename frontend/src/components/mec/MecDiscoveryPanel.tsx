@@ -62,9 +62,9 @@ export default function MecDiscoveryPanel() {
 
       <div
         style={{
-          background: '#f0f9ff',
-          borderLeft: '3px solid #3b82f6',
-          color: '#1e40af',
+          background: 'var(--info-soft)',
+          borderLeft: '3px solid var(--info)',
+          color: 'var(--info-strong)',
           padding: '10px 14px',
           borderRadius: '6px',
           fontSize: '13px',
@@ -85,7 +85,7 @@ export default function MecDiscoveryPanel() {
         />
       </Toolbar>
 
-      {loading && !data && <div style={{ color: '#6b7280' }}>{t('mec.disc.scanning')}</div>}
+      {loading && !data && <div style={{ color: 'var(--text-secondary)' }}>{t('mec.disc.scanning')}</div>}
 
       <SortableTable<DiscoveredTenant>
         data={rows}
@@ -119,7 +119,7 @@ export default function MecDiscoveryPanel() {
                   )
                   .slice(0, 4)
                   .map(([k, v]) => `${k}=${v}`)
-                  .join(', ') || <span style={{ color: '#d1d5db' }}>-</span>}
+                  .join(', ') || <span style={{ color: 'var(--border)' }}>-</span>}
               </span>
             ),
             sortable: true,
@@ -144,7 +144,7 @@ export default function MecDiscoveryPanel() {
             width: '120px',
             render: (r) =>
               r.already_managed ? (
-                <span style={{ color: '#9ca3af', fontSize: '12px' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
                   {t('mec.disc.registered')}
                 </span>
               ) : (

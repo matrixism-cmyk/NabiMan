@@ -20,7 +20,7 @@ export default function SwapPanel() {
   if (!data) return null;
 
   const usePct = data.total > 0 ? (data.used / data.total * 100) : 0;
-  const color = usePct > 80 ? '#e74c3c' : usePct > 50 ? '#f39c12' : '#2ecc71';
+  const color = usePct > 80 ? 'var(--danger)' : usePct > 50 ? 'var(--warning)' : 'var(--success)';
 
   return (
     <div className="panel">

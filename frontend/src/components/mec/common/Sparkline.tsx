@@ -15,7 +15,7 @@ export default function Sparkline({
   data,
   width = 96,
   height = 28,
-  color = '#3b82f6',
+  color = 'var(--info)',
   fill = true,
 }: Props) {
   if (!data || data.length < 2) return null;

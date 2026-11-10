@@ -88,7 +88,7 @@ export default function JobProgress({ jobId }: Props) {
     <div style={{ padding: '8px 0' }}>
       <div
         style={{
-          background: '#e5e7eb',
+          background: 'var(--track)',
           height: '12px',
           borderRadius: '3px',
           overflow: 'hidden',
@@ -112,11 +112,11 @@ export default function JobProgress({ jobId }: Props) {
             ? (isOpen ? t('mec.jobs.stateRunning') : t('mec.jobs.stateConnecting'))
             : finalStatus === 'unknown_result' ? t('mec.jobs.stateUnknownResult') : finalStatus}
         </strong>
-        {error && <span style={{ color: '#ef4444' }}> — {error}</span>}
+        {error && <span style={{ color: 'var(--danger)' }}> — {error}</span>}
         {terminalError && (
           <div
             style={{
-              color: '#ef4444',
+              color: 'var(--danger)',
               marginTop: '4px',
               fontSize: '12px',
             }}
@@ -127,7 +127,7 @@ export default function JobProgress({ jobId }: Props) {
       </div>
 
       {finalStatus === 'unknown_result' && (
-        <div role="alert" style={{ color: '#92400e', background: '#fffbeb', padding: '10px', marginBottom: '12px' }}>
+        <div role="alert" style={{ color: 'var(--warning-strong)', background: 'var(--warning-soft)', padding: '10px', marginBottom: '12px' }}>
           {t('mec.jobs.verifyBeforeRetry')}
         </div>
       )}
@@ -154,19 +154,19 @@ export default function JobProgress({ jobId }: Props) {
           return (
             <li
               key={name}
-              style={{ padding: '3px 0', color: finalStatus === 'unknown_result' && s.status === 'running' ? '#d97706' : stepColor(s.status) }}
+              style={{ padding: '3px 0', color: finalStatus === 'unknown_result' && s.status === 'running' ? 'var(--warning-strong)' : stepColor(s.status) }}
             >
               <span style={{ display: 'inline-block', width: '18px' }}>
                 {icon}
               </span>
               {s.name}
               {s.duration_ms != null && (
-                <span style={{ color: '#9ca3af', marginLeft: '8px' }}>
+                <span style={{ color: 'var(--text-muted)', marginLeft: '8px' }}>
                   ({s.duration_ms}ms)
                 </span>
               )}
               {s.reason && (
-                <span style={{ color: '#ef4444', marginLeft: '8px' }}>
+                <span style={{ color: 'var(--danger)', marginLeft: '8px' }}>
                   — {s.reason}
                 </span>
               )}
@@ -179,15 +179,15 @@ export default function JobProgress({ jobId }: Props) {
 }
 
 function barColor(state: string): string {
-  if (state === 'completed') return '#10b981';
-  if (state === 'failed') return '#ef4444';
-  if (state === 'unknown_result') return '#d97706';
-  return '#3b82f6';
+  if (state === 'completed') return 'var(--success)';
+  if (state === 'failed') return 'var(--danger)';
+  if (state === 'unknown_result') return 'var(--warning-strong)';
+  return 'var(--info)';
 }
 
 function stepColor(state: string): string {
-  if (state === 'completed') return '#10b981';
-  if (state === 'failed') return '#ef4444';
-  if (state === 'running') return '#3b82f6';
-  return '#6b7280';
+  if (state === 'completed') return 'var(--success)';
+  if (state === 'failed') return 'var(--danger)';
+  if (state === 'running') return 'var(--info)';
+  return 'var(--text-secondary)';
 }

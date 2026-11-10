@@ -38,7 +38,7 @@ export default function MecAuditPanel() {
         />
       </Toolbar>
 
-      {loading && !data && <div style={{ color: '#6b7280' }}>{t('mec.state.loading')}</div>}
+      {loading && !data && <div style={{ color: 'var(--text-secondary)' }}>{t('mec.state.loading')}</div>}
 
       <SortableTable<AuditLog>
         data={logs}
@@ -76,8 +76,8 @@ export default function MecAuditPanel() {
             accessor: (r) => `${r.resource_type}/${r.resource_id}`,
             render: (r) => (
               <>
-                <span style={{ color: '#6b7280' }}>{r.resource_type}</span>
-                <span style={{ color: '#d1d5db', margin: '0 4px' }}>/</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{r.resource_type}</span>
+                <span style={{ color: 'var(--border)', margin: '0 4px' }}>/</span>
                 <code>{r.resource_id}</code>
               </>
             ),
@@ -119,14 +119,14 @@ export default function MecAuditPanel() {
                     }}
                   >
                     {r.operations.map((op, i) => (
-                      <li key={i} style={{ color: '#6b7280' }}>
+                      <li key={i} style={{ color: 'var(--text-secondary)' }}>
                         {op.name} → {op.status} ({op.duration_ms}ms)
                       </li>
                     ))}
                   </ul>
                 </details>
               ) : (
-                <span style={{ color: '#d1d5db' }}>0</span>
+                <span style={{ color: 'var(--border)' }}>0</span>
               ),
             align: 'right',
             width: '70px',

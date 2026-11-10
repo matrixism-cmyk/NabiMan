@@ -51,7 +51,7 @@ export default function NodeLabelsEditor({ labels, onPatch }: Props) {
         <tbody>
           {entries.length === 0 ? (
             <tr>
-              <td colSpan={3} style={{ color: '#6b7280', fontStyle: 'italic' }}>
+              <td colSpan={3} style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
                 {t('mec.node.labels.empty')}
               </td>
             </tr>
@@ -81,7 +81,7 @@ export default function NodeLabelsEditor({ labels, onPatch }: Props) {
         style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}
       >
         <label style={{ flex: '1 1 200px' }}>
-          <div style={{ fontSize: '11px', color: '#6b7280' }}>Key</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Key</div>
           <input
             required
             value={key}
@@ -91,7 +91,7 @@ export default function NodeLabelsEditor({ labels, onPatch }: Props) {
           />
         </label>
         <label style={{ flex: '1 1 200px' }}>
-          <div style={{ fontSize: '11px', color: '#6b7280' }}>Value</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Value</div>
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}

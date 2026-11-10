@@ -80,7 +80,7 @@
   text-align: left; transition: all 0.2s;
   border-left: 3px solid transparent;
 }
-.sidebar-btn:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+.sidebar-btn:hover { color: var(--text); background: color-mix(in srgb, var(--text) 3%, transparent); }
 .sidebar-btn.active {
   color: var(--primary); background: rgba(59,130,246,0.08);
   border-left-color: var(--primary); font-weight: 500;
@@ -123,14 +123,14 @@
 
 /* Info grid */
 .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 16px; }
-.info-item { display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.03); border-radius: 4px; }
+.info-item { display: flex; justify-content: space-between; padding: 8px 12px; background: color-mix(in srgb, var(--text) 3%, transparent); border-radius: 4px; }
 .info-label { color: var(--text-secondary); font-size: 13px; }
 .info-value { font-weight: 600; font-size: 13px; }
 
 /* Progress */
 .progress-section { display: flex; flex-direction: column; gap: 12px; }
 .progress-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
-.progress-bar { height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; }
+.progress-bar { height: 8px; background: color-mix(in srgb, var(--text) 10%, transparent); border-radius: 4px; overflow: hidden; }
 .progress-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
 
 /* Table */
@@ -183,7 +183,7 @@
   border: 1px solid var(--border);
   background: var(--surface);
 }
-.noc-marquee-ok { color: #10b981; }
+.noc-marquee-ok { color: var(--success); }
 .noc-marquee-crit { border-color: rgba(239,68,68,0.5); }
 .noc-marquee-warn { border-color: rgba(245,158,11,0.5); }
 .noc-marquee-track {
@@ -241,7 +241,7 @@
 
 /* Charts */
 .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
-.chart-box { background: rgba(255,255,255,0.03); border-radius: 6px; padding: 12px; }
+.chart-box { background: color-mix(in srgb, var(--text) 3%, transparent); border-radius: 6px; padding: 12px; }
 .chart-header { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; }
 .chart-value { font-weight: 600; color: var(--text); }
 .chart-svg { width: 100%; height: 60px; }
@@ -251,7 +251,7 @@
 
 /* Buttons */
 
-.btn-success { background: var(--success); color: #fff; }
+.btn-success { background: var(--success); color: var(--on-accent); }
 
 /* Text utilities */
 .text-success { color: var(--success); }
@@ -262,7 +262,7 @@
 /* Inputs */
 
 /* Forms */
-.inline-form { background: rgba(255,255,255,0.03); padding: 16px; border-radius: 6px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 10px; }
+.inline-form { background: color-mix(in srgb, var(--text) 3%, transparent); padding: 16px; border-radius: 6px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 10px; }
 .inline-form input { padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 13px; }
 .inline-form input:focus { outline: none; border-color: var(--primary); }
 
@@ -295,9 +295,9 @@
 .cmdk-input:focus { outline: none; }
 .cmdk-list { max-height: 46vh; overflow-y: auto; padding: 6px; }
 .cmdk-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 6px; cursor: pointer; color: var(--text); font-size: 14px; }
-.cmdk-item-active { background: var(--primary); color: #fff; }
+.cmdk-item-active { background: var(--primary); color: var(--primary-fg); }
 .cmdk-cat { font-size: 12px; color: var(--text-secondary); }
-.cmdk-item-active .cmdk-cat { color: rgba(255,255,255,0.85); }
+.cmdk-item-active .cmdk-cat { color: color-mix(in srgb, var(--primary-fg) 85%, transparent); }
 .cmdk-empty { padding: 20px; text-align: center; color: var(--text-secondary); font-size: 14px; }
 .cmdk-hint { padding: 8px 14px; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: 12px; }
 

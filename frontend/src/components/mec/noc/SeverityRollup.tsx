@@ -16,8 +16,8 @@ const CELLS: { key: keyof Props; tone: StatusTone; labelKey: string }[] = [
 ];
 
 const COLOR: Record<StatusTone, string> = {
-  success: '#10b981', warning: '#f59e0b', error: '#ef4444',
-  info: '#3b82f6', neutral: '#9ca3af', running: '#8b5cf6',
+  success: 'var(--success)', warning: 'var(--warning)', error: 'var(--danger)',
+  info: 'var(--info)', neutral: 'var(--text-muted)', running: 'var(--running)',
 };
 
 function Cell({ value, tone, label }: { value: number; tone: StatusTone; label: string }) {

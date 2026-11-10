@@ -87,9 +87,9 @@ export default function Step2Node({ state, setState }: Props) {
                   </td>
                   <td>
                     {n.current_tenant ? (
-                      <span style={{ color: '#ef4444' }}>{n.current_tenant}</span>
+                      <span style={{ color: 'var(--danger)' }}>{n.current_tenant}</span>
                     ) : (
-                      <span style={{ color: '#10b981' }}>{t('mec.wizard.s2.available')}</span>
+                      <span style={{ color: 'var(--success)' }}>{t('mec.wizard.s2.available')}</span>
                     )}
                   </td>
                 </tr>

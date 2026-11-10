@@ -8,9 +8,9 @@ interface Props {
 }
 
 const SEV_COLOR: Record<Severity, string> = {
-  critical: '#ef4444',
-  caution: '#f59e0b',
-  ok: '#10b981',
+  critical: 'var(--danger)',
+  caution: 'var(--warning)',
+  ok: 'var(--success)',
 };
 const SEV_RANK: Record<Severity, number> = { critical: 0, caution: 1, ok: 2 };
 

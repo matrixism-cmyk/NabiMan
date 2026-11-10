@@ -104,7 +104,7 @@ export default function MecDashboardPanel({ onNavigate }: Props) {
       <ErrorBanner error={summaryQuery.error || undefined} />
 
       {!s && summaryQuery.loading && (
-        <div style={{ color: '#6b7280' }}>{t('mec.state.loading')}</div>
+        <div style={{ color: 'var(--text-secondary)' }}>{t('mec.state.loading')}</div>
       )}
 
       {s && (
@@ -171,8 +171,8 @@ export default function MecDashboardPanel({ onNavigate }: Props) {
             <Section title={t('mec.dash.gpuAllocation')}>
               <DonutChart
                 slices={[
-                  { label: t('mec.dash.gpuAllocated'), value: s.gpu.allocated_slots, color: '#3b82f6' },
-                  { label: t('mec.dash.gpuAvailable'), value: s.gpu.available_slots, color: '#e5e7eb' },
+                  { label: t('mec.dash.gpuAllocated'), value: s.gpu.allocated_slots, color: 'var(--info)' },
+                  { label: t('mec.dash.gpuAvailable'), value: s.gpu.available_slots, color: 'var(--track)' },
                 ]}
                 centerLabel={`${pct(s.gpu.allocated_slots, s.gpu.total_slots)}%`}
                 centerSublabel={`${s.gpu.allocated_slots}/${s.gpu.total_slots}`}
@@ -183,11 +183,11 @@ export default function MecDashboardPanel({ onNavigate }: Props) {
             <Section title={t('mec.dash.nodeStatus')}>
               <DonutChart
                 slices={[
-                  { label: 'Ready', value: s.nodes.ready, color: '#10b981' },
+                  { label: 'Ready', value: s.nodes.ready, color: 'var(--success)' },
                   {
                     label: 'Not Ready',
                     value: Math.max(0, s.nodes.total - s.nodes.ready),
-                    color: '#ef4444',
+                    color: 'var(--danger)',
                   },
                 ]}
                 centerLabel={`${s.nodes.ready}`}
@@ -221,7 +221,7 @@ export default function MecDashboardPanel({ onNavigate }: Props) {
 
           <Section title={t('mec.dash.recentActivity')} marginTop="24px">
             {activityQuery.error && (
-              <div style={{ color: '#ef4444', fontSize: '13px' }}>
+              <div style={{ color: 'var(--danger)', fontSize: '13px' }}>
                 {activityQuery.error}
               </div>
             )}
@@ -261,8 +261,8 @@ export default function MecDashboardPanel({ onNavigate }: Props) {
                   accessor: (r) => `${r.resource_type}:${r.resource_id}`,
                   render: (r) => (
                     <>
-                      <span style={{ color: '#6b7280' }}>{r.resource_type}</span>
-                      <span style={{ color: '#d1d5db', margin: '0 4px' }}>/</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>{r.resource_type}</span>
+                      <span style={{ color: 'var(--border)', margin: '0 4px' }}>/</span>
                       <code>{r.resource_id}</code>
                     </>
                   ),

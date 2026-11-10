@@ -39,13 +39,13 @@ function StatusCard({
   icon: React.ReactNode;
 }) {
   const mock = isMock(entry.endpoint);
-  const color = !entry.connected ? '#ef4444' : mock ? '#9ca3af' : '#10b981';
+  const color = !entry.connected ? 'var(--danger)' : mock ? 'var(--text-muted)' : 'var(--success)';
   return (
     <div
       style={{
-        background: 'white',
+        background: 'var(--surface)',
         borderRadius: '8px',
-        border: '1px solid #e5e7eb',
+        border: '1px solid var(--track)',
         borderLeft: `3px solid ${color}`,
         padding: '16px',
         display: 'flex',
@@ -77,14 +77,14 @@ function StatusCard({
           {mock ? 'Mock' : entry.connected ? 'connected' : 'disconnected'}
         </StatusBadge>
       </div>
-      <div style={{ fontSize: '12px', color: '#6b7280' }}>
+      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
         <div>
-          <span style={{ color: '#9ca3af' }}>endpoint:</span>{' '}
+          <span style={{ color: 'var(--text-muted)' }}>endpoint:</span>{' '}
           <code style={{ fontSize: '11px' }}>{entry.endpoint}</code>
         </div>
         {entry.latency_ms !== null && entry.latency_ms !== undefined && (
           <div style={{ marginTop: '4px' }}>
-            <span style={{ color: '#9ca3af' }}>latency:</span>{' '}
+            <span style={{ color: 'var(--text-muted)' }}>latency:</span>{' '}
             <StatusBadge tone={latencyTone(entry.latency_ms)}>
               {entry.latency_ms}ms
             </StatusBadge>
@@ -94,8 +94,8 @@ function StatusCard({
           <div
             style={{
               marginTop: '6px',
-              color: '#991b1b',
-              background: '#fee2e2',
+              color: 'var(--danger-strong)',
+              background: 'var(--danger-soft)',
               padding: '4px 8px',
               borderRadius: '4px',
               fontSize: '11px',
@@ -137,7 +137,7 @@ export default function MecHealthPanel() {
       }
     >
       <ErrorBanner error={error || undefined} />
-      {loading && !data && <div style={{ color: '#6b7280' }}>{t('mec.health.checking')}</div>}
+      {loading && !data && <div style={{ color: 'var(--text-secondary)' }}>{t('mec.health.checking')}</div>}
 
       {data && (
         <div

@@ -176,7 +176,7 @@ export default function TenantsPanel() {
         />
       </Toolbar>
 
-      {loading && !data && <div style={{ color: '#6b7280' }}>{t('mec.state.loading')}</div>}
+      {loading && !data && <div style={{ color: 'var(--text-secondary)' }}>{t('mec.state.loading')}</div>}
 
       <SortableTable<Tenant>
         data={tenants}
@@ -204,7 +204,7 @@ export default function TenantsPanel() {
             header: t('mec.tenant.col.namespace'),
             accessor: (row) => row.namespace,
             render: (row) => (
-              <span style={{ color: '#6b7280' }}>{row.namespace}</span>
+              <span style={{ color: 'var(--text-secondary)' }}>{row.namespace}</span>
             ),
             sortable: true,
           },
@@ -216,7 +216,7 @@ export default function TenantsPanel() {
               row.allocation.node ? (
                 <StatusBadge tone="info">{row.allocation.node}</StatusBadge>
               ) : (
-                <span style={{ color: '#9ca3af' }}>{t('mec.tenant.shared')}</span>
+                <span style={{ color: 'var(--text-muted)' }}>{t('mec.tenant.shared')}</span>
               ),
             sortable: true,
           },
@@ -227,13 +227,13 @@ export default function TenantsPanel() {
             render: (row) =>
               row.quota.gpu > 0 ? (
                 <span>
-                  <span style={{ color: '#6b7280' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>
                     {row.allocation.gpu_label || ''}
                   </span>{' '}
                   × <strong>{row.quota.gpu}</strong>
                 </span>
               ) : (
-                <span style={{ color: '#d1d5db' }}>-</span>
+                <span style={{ color: 'var(--border)' }}>-</span>
               ),
             align: 'right',
             sortable: true,

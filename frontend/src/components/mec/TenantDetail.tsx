@@ -71,7 +71,7 @@ export default function TenantDetail({ tenantId, onClose }: Props) {
               border: 'none',
               padding: '8px 16px',
               cursor: 'pointer',
-              borderBottom: tab === tabItem.key ? '2px solid #3b82f6' : '2px solid transparent',
+              borderBottom: tab === tabItem.key ? '2px solid var(--info)' : '2px solid transparent',
               fontWeight: tab === tabItem.key ? 600 : 400,
               color: tab === tabItem.key ? 'var(--text)' : 'var(--text-secondary)',
             }}

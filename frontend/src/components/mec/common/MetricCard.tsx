@@ -18,12 +18,12 @@ interface Props {
 }
 
 const TONE_BG: Record<StatusTone, string> = {
-  success: '#10b981',
-  warning: '#f59e0b',
-  error: '#ef4444',
-  info: '#3b82f6',
-  neutral: '#6b7280',
-  running: '#8b5cf6',
+  success: 'var(--success)',
+  warning: 'var(--warning)',
+  error: 'var(--danger)',
+  info: 'var(--info)',
+  neutral: 'var(--text-secondary)',
+  running: 'var(--running)',
 };
 
 export default function MetricCard({
@@ -150,7 +150,7 @@ export default function MetricCard({
               marginLeft: '6px',
               fontSize: '13px',
               color:
-                trend === 'up' ? '#10b981' : trend === 'down' ? '#ef4444' : '#9ca3af',
+                trend === 'up' ? 'var(--success)' : trend === 'down' ? 'var(--danger)' : 'var(--text-muted)',
             }}
           >
             {trend === 'up' ? '↑' : trend === 'down' ? '↓' : '→'}

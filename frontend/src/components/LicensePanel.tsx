@@ -48,8 +48,8 @@ export default function LicensePanel() {
 
   const tierBadgeStyle = (tier: string): React.CSSProperties => {
     switch (tier.toLowerCase()) {
-      case 'pro': return { backgroundColor: '#3b82f6', color: '#fff' };
-      case 'enterprise': return { backgroundColor: '#f59e0b', color: '#fff' };
+      case 'pro': return { backgroundColor: 'var(--info)', color: 'var(--on-accent)' };
+      case 'enterprise': return { backgroundColor: 'var(--warning)', color: 'var(--on-accent)' };
       default: return {};
     }
   };
@@ -130,7 +130,7 @@ export default function LicensePanel() {
                   className="progress-fill"
                   style={{
                     width: `${trialProgress}%`,
-                    backgroundColor: data.trial_days_remaining < 7 ? '#e74c3c' : '#f39c12',
+                    backgroundColor: data.trial_days_remaining < 7 ? 'var(--danger)' : 'var(--warning)',
                   }}
                 />
               </div>

@@ -24,7 +24,7 @@ function modelColor(m: string): string {
   for (const k of Object.keys(MODEL_COLORS)) {
     if (m.toUpperCase().includes(k)) return MODEL_COLORS[k];
   }
-  return '#3b82f6';
+  return 'var(--info)';
 }
 
 export default function MecGpuPanel() {
@@ -49,7 +49,7 @@ export default function MecGpuPanel() {
       }
     >
       <ErrorBanner error={error || undefined} />
-      {loading && !data && <div style={{ color: '#6b7280' }}>{t('mec.state.loading')}</div>}
+      {loading && !data && <div style={{ color: 'var(--text-secondary)' }}>{t('mec.state.loading')}</div>}
 
       {data && (
         <>
@@ -91,8 +91,8 @@ export default function MecGpuPanel() {
             <Section title={t('mec.gpu.overallUsage')}>
               <DonutChart
                 slices={[
-                  { label: t('mec.gpu.sliceAllocated'), value: data.allocated_slots, color: '#3b82f6' },
-                  { label: t('mec.gpu.sliceAvailable'), value: data.available_slots, color: '#e5e7eb' },
+                  { label: t('mec.gpu.sliceAllocated'), value: data.allocated_slots, color: 'var(--info)' },
+                  { label: t('mec.gpu.sliceAvailable'), value: data.available_slots, color: 'var(--track)' },
                 ]}
                 centerLabel={`${pct}%`}
                 centerSublabel={`${data.allocated_slots}/${data.total_slots}`}

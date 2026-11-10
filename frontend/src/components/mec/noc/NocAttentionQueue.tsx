@@ -8,7 +8,7 @@ interface Props {
   onPick?: (tab: string) => void;
 }
 
-const COLOR = { error: '#ef4444', warning: '#f59e0b' } as const;
+const COLOR = { error: 'var(--danger)', warning: 'var(--warning)' } as const;
 
 /// Severity-sorted actionable worklist. Each row: glyph + color + text, with a
 /// drill-down affordance into the relevant MEC panel.
@@ -16,7 +16,7 @@ export default function NocAttentionQueue({ items, onPick }: Props) {
   const { t } = useT();
   if (!items.length) {
     return (
-      <div style={{ color: '#10b981', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 2px' }}>
+      <div style={{ color: 'var(--success)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 2px' }}>
         <span>{severityGlyph('success')}</span>
         <span>{t('noc.attentionEmpty')}</span>
       </div>
@@ -25,7 +25,7 @@ export default function NocAttentionQueue({ items, onPick }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
       {items.map((s) => {
-        const color = COLOR[s.tone as 'error' | 'warning'] || '#9ca3af';
+        const color = COLOR[s.tone as 'error' | 'warning'] || 'var(--text-muted)';
         return (
           <button
             key={s.id}

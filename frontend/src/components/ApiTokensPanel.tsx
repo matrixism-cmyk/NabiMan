@@ -24,7 +24,7 @@ function ApiDocs() {
     <details className="api-docs" style={{ margin: '12px 0', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px' }}>
       <summary style={{ cursor: 'pointer', fontWeight: 600 }}>{t('tokens.docs.title')}</summary>
       <p style={{ fontSize: 13 }}>{t('tokens.docs.auth')}</p>
-      <pre style={{ fontSize: 12, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', background: 'var(--bg-secondary, rgba(127,127,127,.1))', padding: 8, borderRadius: 6 }}>{`Authorization: Bearer nbm_…
+      <pre style={{ fontSize: 12, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', background: 'var(--surface-alt)', padding: 8, borderRadius: 6 }}>{`Authorization: Bearer nbm_…
 X-API-Key: nbm_…   ${t('tokens.docs.orHeader')}`}</pre>
       <table className="data-table" style={{ fontSize: 13 }}>
         <thead><tr><th>{t('tokens.scopes')}</th><th>{t('tokens.docs.endpoint')}</th></tr></thead>
@@ -33,7 +33,7 @@ X-API-Key: nbm_…   ${t('tokens.docs.orHeader')}`}</pre>
         ))}</tbody>
       </table>
       <p style={{ fontSize: 13 }}>{t('tokens.docs.example')}</p>
-      <pre style={{ fontSize: 12, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', background: 'var(--bg-secondary, rgba(127,127,127,.1))', padding: 8, borderRadius: 6 }}>{curl}</pre>
+      <pre style={{ fontSize: 12, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', background: 'var(--surface-alt)', padding: 8, borderRadius: 6 }}>{curl}</pre>
       <p style={{ fontSize: 12 }}>{t('tokens.docs.notes')} <a href="/api/openapi.json" target="_blank" rel="noreferrer">/api/openapi.json</a></p>
     </details>
   );

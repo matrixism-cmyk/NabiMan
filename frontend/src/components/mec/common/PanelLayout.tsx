@@ -156,11 +156,11 @@ export function ErrorBanner({ error }: { error?: string | null }) {
   return (
     <div
       style={{
-        background: '#fee2e2',
-        color: '#991b1b',
+        background: 'var(--danger-soft)',
+        color: 'var(--danger-strong)',
         padding: '8px 12px',
         borderRadius: '6px',
-        borderLeft: '3px solid #ef4444',
+        borderLeft: '3px solid var(--danger)',
         fontSize: '13px',
         marginBottom: '12px',
       }}

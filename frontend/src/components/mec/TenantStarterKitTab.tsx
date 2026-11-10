@@ -71,7 +71,7 @@ export default function TenantStarterKitTab({ tenantId, onChanged }: Props) {
   return (
     <div className="panel-card">
       <h3 style={{ marginTop: 0 }}>{t('mec.tenant.tab.starter')}</h3>
-      <p style={{ color: '#6b7280', fontSize: '14px' }}>
+      <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
         {t('mec.tenant.starter.description')}
       </p>
 
@@ -81,8 +81,8 @@ export default function TenantStarterKitTab({ tenantId, onChanged }: Props) {
         <div
           className="panel-card"
           style={{
-            background: '#fef3c7',
-            borderColor: '#f59e0b',
+            background: 'var(--warning-soft)',
+            borderColor: 'var(--warning)',
             marginTop: '12px',
             marginBottom: '12px',
           }}
@@ -93,7 +93,7 @@ export default function TenantStarterKitTab({ tenantId, onChanged }: Props) {
             <div>SSH password: <strong>{result.ssh_password}</strong></div>
             <div>VS Code password: <strong>{result.vscode_password}</strong></div>
           </div>
-          <p style={{ fontSize: '12px', color: '#92400e', marginBottom: 0 }}>
+          <p style={{ fontSize: '12px', color: 'var(--warning-strong)', marginBottom: 0 }}>
             {t('mec.tenant.starter.passwordWarning')}
           </p>
         </div>

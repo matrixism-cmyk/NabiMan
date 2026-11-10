@@ -28,7 +28,7 @@ export default function NocAlertMarquee({ items, owner }: Props) {
 
   const ownerSuffix = owner ? ` · ${t('noc.owner')}: ${owner}` : '';
   const chips = alerts.map((s) => {
-    const color = s.tone === 'error' ? '#ef4444' : '#f59e0b';
+    const color = s.tone === 'error' ? 'var(--danger)' : 'var(--warning)';
     return (
       <span key={s.id} style={{ color, marginRight: '28px' }}>
         {severityGlyph(s.tone)} {s.text}

@@ -72,7 +72,7 @@
   display: grid; grid-template-columns: var(--sftp-cols, 20px minmax(0, 1fr) auto auto); gap: 8px; align-items: center;
   padding: 3px 8px; cursor: default; user-select: none; border: 1px solid transparent;
 }
-.sftp-row:hover { background: rgba(255, 255, 255, 0.04); }
+.sftp-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent); }
 .sftp-row.is-selected { background: rgba(59, 130, 246, 0.18); }
 .sftp-body:focus-visible .sftp-row.is-selected { border-color: rgba(59, 130, 246, 0.6); }
 .sftp-row.is-drop { border-color: var(--primary); background: rgba(59, 130, 246, 0.25); }

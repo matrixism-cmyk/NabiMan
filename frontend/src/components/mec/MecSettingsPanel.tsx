@@ -43,8 +43,8 @@ function Badge({ ok, label }: { ok: boolean; label: string }) {
         padding: '2px 8px',
         borderRadius: '10px',
         fontSize: '11px',
-        background: ok ? '#d1fae5' : '#fee2e2',
-        color: ok ? '#065f46' : '#991b1b',
+        background: ok ? 'var(--success-soft)' : 'var(--danger-soft)',
+        color: ok ? 'var(--success-strong)' : 'var(--danger-strong)',
       }}
     >
       {ok ? '✓ ' + label : '✗ ' + label}
@@ -68,12 +68,12 @@ function Row({
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: '8px 0',
-        borderBottom: '1px solid #e5e7eb',
+        borderBottom: '1px solid var(--track)',
       }}
     >
       <div>
         <div style={{ fontWeight: 500 }}>{label}</div>
-        <div style={{ fontSize: '12px', color: '#6b7280', fontFamily: 'monospace' }}>
+        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
           {value || '-'}
         </div>
       </div>
@@ -115,8 +115,8 @@ export default function MecSettingsPanel() {
             <div
               className="panel-card"
               style={{
-                background: '#fef3c7',
-                borderLeft: '4px solid #f59e0b',
+                background: 'var(--warning-soft)',
+                borderLeft: '4px solid var(--warning)',
                 marginBottom: '16px',
               }}
             >
@@ -185,7 +185,7 @@ export default function MecSettingsPanel() {
             style={{ marginBottom: '16px' }}
           >
             <h3 style={{ marginTop: 0 }}>{t('mec.settings.themeTitle')}</h3>
-            <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '12px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '12px' }}>
               {t('mec.settings.themeBody')}
             </p>
             <ThemeSelector />
@@ -198,13 +198,13 @@ export default function MecSettingsPanel() {
                 {copied ? t('mec.settings.copied') : t('mec.settings.copy')}
               </button>
             </div>
-            <p style={{ color: '#6b7280', fontSize: '13px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
               {t('mec.settings.dropinBodyBefore')} <code>/etc/systemd/system/nabiman.service.d/mec.conf</code> {t('mec.settings.dropinBodyAfter')}
             </p>
             <pre
               style={{
-                background: '#0f172a',
-                color: '#e2e8f0',
+                background: 'var(--screen-bg)',
+                color: 'var(--screen-fg)',
                 padding: '12px',
                 borderRadius: '6px',
                 fontSize: '12px',

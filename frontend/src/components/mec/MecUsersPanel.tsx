@@ -144,7 +144,7 @@ export default function MecUsersPanel() {
             }}
           >
             <label style={{ flex: '1 1 160px' }}>
-              <div style={{ fontSize: '11px', color: '#6b7280' }}>Username</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Username</div>
               <input
                 required
                 value={form.username}
@@ -154,7 +154,7 @@ export default function MecUsersPanel() {
               />
             </label>
             <label style={{ flex: '1 1 200px' }}>
-              <div style={{ fontSize: '11px', color: '#6b7280' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                 {t('mec.users.initialPassword')}
               </div>
               <input
@@ -187,7 +187,7 @@ export default function MecUsersPanel() {
         />
       </Toolbar>
 
-      {loading && !data && <div style={{ color: '#6b7280' }}>{t('mec.state.loading')}</div>}
+      {loading && !data && <div style={{ color: 'var(--text-secondary)' }}>{t('mec.state.loading')}</div>}
 
       <SortableTable<RancherUser>
         data={users}
@@ -215,7 +215,7 @@ export default function MecUsersPanel() {
             header: t('mec.users.colDisplayName'),
             accessor: (u) => u.display_name || '',
             render: (u) =>
-              u.display_name || <span style={{ color: '#d1d5db' }}>-</span>,
+              u.display_name || <span style={{ color: 'var(--border)' }}>-</span>,
             sortable: true,
           },
           {

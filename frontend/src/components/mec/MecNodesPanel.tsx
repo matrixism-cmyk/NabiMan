@@ -106,7 +106,7 @@ export default function MecNodesPanel() {
         />
       </Toolbar>
 
-      {loading && !data && <div style={{ color: '#6b7280' }}>{t('mec.state.loading')}</div>}
+      {loading && !data && <div style={{ color: 'var(--text-secondary)' }}>{t('mec.state.loading')}</div>}
 
       <SortableTable<MecNode>
         data={nodes}
@@ -136,7 +136,7 @@ export default function MecNodesPanel() {
             header: t('mec.node.col.roles'),
             accessor: (n) => n.roles.join(','),
             render: (n) => (
-              <span style={{ color: '#6b7280' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>
                 {n.roles.join(', ') || 'worker'}
               </span>
             ),
@@ -172,14 +172,14 @@ export default function MecNodesPanel() {
             render: (n) =>
               n.gpu_info ? (
                 <span>
-                  <span style={{ color: '#6b7280' }}>{n.gpu_info.model}</span>
-                  <span style={{ margin: '0 4px', color: '#d1d5db' }}>·</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{n.gpu_info.model}</span>
+                  <span style={{ margin: '0 4px', color: 'var(--border)' }}>·</span>
                   <span style={{ fontWeight: 600 }}>
                     {n.gpu_info.count}×({n.gpu_info.total_slots})
                   </span>
                 </span>
               ) : (
-                <span style={{ color: '#d1d5db' }}>-</span>
+                <span style={{ color: 'var(--border)' }}>-</span>
               ),
             sortable: true,
           },
@@ -191,7 +191,7 @@ export default function MecNodesPanel() {
               n.gpu_info ? (
                 <StatusBadge tone="info">{n.gpu_info.mode}</StatusBadge>
               ) : (
-                <span style={{ color: '#d1d5db' }}>-</span>
+                <span style={{ color: 'var(--border)' }}>-</span>
               ),
             sortable: true,
           },
@@ -203,7 +203,7 @@ export default function MecNodesPanel() {
               n.current_tenant ? (
                 <StatusBadge tone="info">{n.current_tenant}</StatusBadge>
               ) : (
-                <span style={{ color: '#9ca3af' }}>{t('mec.node.unallocated')}</span>
+                <span style={{ color: 'var(--text-muted)' }}>{t('mec.node.unallocated')}</span>
               ),
             sortable: true,
           },
@@ -224,7 +224,7 @@ export default function MecNodesPanel() {
                   {n.taints.length}
                 </span>
               ) : (
-                <span style={{ color: '#d1d5db' }}>0</span>
+                <span style={{ color: 'var(--border)' }}>0</span>
               ),
             align: 'right',
             width: '70px',

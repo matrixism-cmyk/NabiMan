@@ -44,7 +44,7 @@ export default function NodeGpuModeForm({ currentMode, onSwitch }: Props) {
       style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}
     >
       <label style={{ flex: '1 1 180px' }}>
-        <div style={{ fontSize: '11px', color: '#6b7280' }}>{t('mec.node.gpuMode.newMode')}</div>
+        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{t('mec.node.gpuMode.newMode')}</div>
         <select
           value={mode}
           onChange={(e) => setMode(e.target.value)}
@@ -59,7 +59,7 @@ export default function NodeGpuModeForm({ currentMode, onSwitch }: Props) {
       </label>
       {mode === 'time-slicing' && (
         <label style={{ flex: '0 0 120px' }}>
-          <div style={{ fontSize: '11px', color: '#6b7280' }}>Replicas</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Replicas</div>
           <input
             type="number"
             min={1}

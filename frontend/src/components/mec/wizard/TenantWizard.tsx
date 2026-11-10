@@ -88,7 +88,7 @@ export default function TenantWizard({ onCreated, onCancel }: Props) {
           gap: '4px',
           marginBottom: '16px',
           fontSize: '12px',
-          color: '#6b7280',
+          color: 'var(--text-secondary)',
         }}
       >
         {[1, 2, 3, 4].map((s) => (
@@ -98,8 +98,8 @@ export default function TenantWizard({ onCreated, onCancel }: Props) {
               flex: 1,
               padding: '6px',
               textAlign: 'center',
-              background: s === step ? '#3b82f6' : s < step ? '#d1fae5' : '#e5e7eb',
-              color: s === step ? 'white' : '#374151',
+              background: s === step ? 'var(--info)' : s < step ? 'var(--success-soft)' : 'var(--track)',
+              color: s === step ? 'var(--on-accent)' : 'var(--text)',
               borderRadius: '3px',
               fontWeight: s === step ? 600 : 400,
             }}

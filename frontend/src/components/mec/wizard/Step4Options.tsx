@@ -55,7 +55,7 @@ export default function Step4Options({ state, setState }: Props) {
 
       <div
         className="panel-card"
-        style={{ marginTop: '16px', background: '#f3f4f6' }}
+        style={{ marginTop: '16px', background: 'var(--surface-alt)' }}
       >
         <h4 style={{ marginTop: 0 }}>{t('mec.wizard.s4.confirm')}</h4>
         <dl style={{ margin: 0, fontSize: '13px' }}>

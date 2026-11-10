@@ -21,7 +21,7 @@ function fmtSpeed(b: number): string {
 }
 
 function UsageBar({ percent }: { percent: number }) {
-  const color = percent > 90 ? '#e74c3c' : percent > 70 ? '#f39c12' : '#2ecc71';
+  const color = percent > 90 ? 'var(--danger)' : percent > 70 ? 'var(--warning)' : 'var(--success)';
   return (
     <div className="progress-bar" style={{ width: '120px', display: 'inline-block' }}>
       <div className="progress-fill" style={{ width: `${percent}%`, backgroundColor: color }} />

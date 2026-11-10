@@ -20,9 +20,9 @@ interface Props {
 /// Horizontal bar with label on the left, value on the right.
 /// Pure SVG/divs, no chart library dependency.
 function thresholdColor(ratio: number): string {
-  if (ratio >= 0.9) return '#ef4444';
-  if (ratio >= 0.7) return '#f59e0b';
-  return '#10b981';
+  if (ratio >= 0.9) return 'var(--danger)';
+  if (ratio >= 0.7) return 'var(--warning)';
+  return 'var(--success)';
 }
 
 export default function BarChart({ data, maxOverall, showValue = true }: Props) {

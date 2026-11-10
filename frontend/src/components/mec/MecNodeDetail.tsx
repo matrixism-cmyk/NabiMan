@@ -166,7 +166,7 @@ export default function MecNodeDetail({ nodeName, onClose }: Props) {
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase' }}>
+      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
         {label}
       </div>
       <div style={{ fontSize: '15px', fontWeight: 500 }}>{value}</div>

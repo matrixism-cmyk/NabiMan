@@ -20,6 +20,6 @@
 .mkeys-key:active:not(:disabled) { background: rgba(59, 130, 246, 0.25); border-color: var(--primary); }
 .mkeys-key:disabled { opacity: .4; }
 .mkeys-mod { font-family: inherit; font-size: 13px; }
-.mkeys-mod.is-on { color: #fff; background: var(--primary); border-color: var(--primary); }
+.mkeys-mod.is-on { color: var(--primary-fg); background: var(--primary); border-color: var(--primary); }
 .mkeys-kbd { font-size: 17px; }
 .mkeys.is-off .mkeys-scroll { opacity: .6; }
