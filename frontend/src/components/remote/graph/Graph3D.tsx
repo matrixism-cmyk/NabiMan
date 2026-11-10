@@ -18,10 +18,10 @@ interface Props {
 type N = GraphNode & { x?: number; y?: number; z?: number; fx?: number; fy?: number; fz?: number };
 type L = {
   id: string; source: string | N; target: string | N; live: boolean; strength: number; color: string; note: string;
-  kind: 'order' | 'host' | 'conn' | 'ghost' | 'report';
+  kind: 'order' | 'host' | 'conn' | 'net' | 'ghost' | 'report';
 };
 
-const radius = (n: GraphNode) => (n.kind === 'server' ? 11 : n.lead ? 15 : (n.claude ? 9 : 6.5) + Math.min(n.heat || 0, 12) * 0.25);
+const radius = (n: GraphNode) => (n.kind === 'device' ? (n.device === 'internet' ? 14 : n.device === 'firewall' ? 9 : 6) : n.kind === 'server' ? 11 : n.lead ? 15 : (n.claude ? 9 : 6.5) + Math.min(n.heat || 0, 12) * 0.25);
 const REPORT_COLOR = '#7dd3fc';
 
 /** A colour dimmed towards the background, as an arrow fades once its work is done. */
@@ -49,6 +49,31 @@ function serverObject(n: GraphNode) {
   group.add(label(`▣ ${n.name}`, 6.2, '#e6edf3', -(r + 8), true));
   if (n.sub) group.add(label(n.sub, 4.2, '#9da7b3', -(r + 15.5)));
   if (n.status && n.status !== 'online') group.add(label(n.status, 3.8, '#f87171', -(r + 21)));
+  return group;
+}
+
+const DEVICE_MARK: Record<string, string> = { firewall: '⛨', router: '⇄', gateway: '⇄', switch: '☰', node: '▦', vip: '◇', dongle: '⌁', internet: '◎', storage: '⛁', other: '◻' };
+const DEVICE_COLOR: Record<string, string> = { firewall: '#f87171', router: '#fbbf24', gateway: '#fbbf24', switch: '#38bdf8', node: '#a3e635', vip: '#c4b5fd', dongle: '#f472b6', internet: '#e2e8f0', storage: '#fb923c', other: '#94a3b8' };
+
+/** A network device: a small solid by its kind (a wall for the firewall, a rack for a node…), with name and address. */
+function deviceObject(n: GraphNode) {
+  const group = new THREE.Group();
+  const r = radius(n);
+  const kind = n.device || 'other';
+  const color = new THREE.Color(DEVICE_COLOR[kind] || DEVICE_COLOR.other);
+  const solid = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.45, roughness: 0.5, metalness: 0.3, flatShading: true });
+  const shape = kind === 'firewall' ? new THREE.BoxGeometry(r * 2.4, r * 1.5, r * 0.5)
+    : kind === 'node' ? new THREE.BoxGeometry(r * 2, r * 0.9, r * 1.6)
+    : kind === 'switch' ? new THREE.CylinderGeometry(r, r, r * 0.45, 6)
+    : kind === 'storage' ? new THREE.CylinderGeometry(r * 0.8, r * 0.8, r * 1.3, 16)
+    : kind === 'vip' ? new THREE.OctahedronGeometry(r * 0.8, 0)
+    : kind === 'internet' ? new THREE.SphereGeometry(r, 14, 10)
+    : new THREE.OctahedronGeometry(r, 0);
+  const mesh = new THREE.Mesh(shape, kind === 'internet' ? new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.6 }) : solid);
+  if (kind === 'internet' || kind === 'vip') mesh.userData.turn = true;
+  group.add(mesh);
+  group.add(label(`${DEVICE_MARK[kind] || ''} ${n.name}`, kind === 'firewall' || kind === 'internet' ? 5.6 : 4.4, '#cbd5e1', -(r + 6.5), true));
+  if (n.sub) group.add(label(n.sub, 3.5, '#8391a5', -(r + 12)));
   return group;
 }
 
@@ -100,11 +125,11 @@ export default function Graph3D({ graph, selected, onSelect, onHoverEdge, autoRo
     const g = new (ForceGraph3D as any)(el, { controlType: 'orbit' })
       .backgroundColor('rgba(0,0,0,0)')
       .showNavInfo(false)
-      .nodeThreeObject((n: N) => (n.kind === 'server' ? serverObject(n) : sessionObject(n)))
+      .nodeThreeObject((n: N) => (n.kind === 'device' ? deviceObject(n) : n.kind === 'server' ? serverObject(n) : sessionObject(n)))
       .nodeLabel(() => '')
       .linkVisibility((l: L) => l.kind !== 'ghost' && l.kind !== 'report')
-      .linkColor((l: L) => (shown(l) ? dim(l.color, l.strength) : dim(l.color, l.kind === 'conn' ? 0.45 : 0.3)))
-      .linkWidth((l: L) => (shown(l) ? (l.live ? 2 : 1) : l.kind === 'conn' ? 0.5 : 0.25))
+      .linkColor((l: L) => (shown(l) ? dim(l.color, l.strength) : dim(l.color, l.kind === 'net' ? 0.6 : l.kind === 'conn' ? 0.45 : 0.3)))
+      .linkWidth((l: L) => (shown(l) ? (l.live ? 2 : 1) : l.kind === 'net' ? 0.6 : l.kind === 'conn' ? 0.5 : 0.25))
       .linkOpacity(0.85)
       .linkCurvature((l: L) => (shown(l) ? 0.12 : 0))
       .linkDirectionalArrowLength((l: L) => (shown(l) ? 5.5 : 0))
@@ -115,7 +140,7 @@ export default function Graph3D({ graph, selected, onSelect, onHoverEdge, autoRo
       .linkDirectionalParticleSpeed(0.008)
       .linkDirectionalParticleColor((l: L) => (l.kind === 'report' ? REPORT_COLOR : l.color))
       .onNodeClick((n: N) => {
-        handlers.current.onSelect(n.kind === 'server' ? null : n.id);
+        handlers.current.onSelect(n.kind === 'server' || n.kind === 'device' ? null : n.id);
         const d = Math.hypot(n.x || 0, n.y || 0, n.z || 0) || 1;
         const k = 1 + 120 / d;
         g.cameraPosition({ x: (n.x || 0) * k, y: (n.y || 0) * k, z: (n.z || 0) * k + (d < 5 ? 150 : 0) }, n, 900);
@@ -123,10 +148,10 @@ export default function Graph3D({ graph, selected, onSelect, onHoverEdge, autoRo
       .onBackgroundClick(() => handlers.current.onSelect(null))
       .onLinkHover((l: L | null) => handlers.current.onHoverEdge(l?.note || null, pointer.current.x, pointer.current.y));
     // Sessions stay by their machine; machines keep their distance from each other.
-    g.d3Force('charge')?.strength((n: N) => (n.kind === 'server' ? -420 : -110)).distanceMax(320);
+    g.d3Force('charge')?.strength((n: N) => (n.kind === 'server' ? -420 : n.kind === 'device' ? -260 : -110)).distanceMax(320);
     g.d3Force('link')
-      ?.distance((l: L) => (l.kind === 'host' ? 42 : l.kind === 'conn' ? 150 : l.kind === 'ghost' ? 150 : l.kind === 'report' ? 90 : 95))
-      .strength((l: L) => (l.kind === 'host' ? 1 : l.kind === 'conn' ? 0.5 : l.kind === 'ghost' ? 0.25 : l.kind === 'report' ? 0 : 0.15));
+      ?.distance((l: L) => (l.kind === 'net' ? 60 : l.kind === 'host' ? 42 : l.kind === 'conn' ? 150 : l.kind === 'ghost' ? 150 : l.kind === 'report' ? 90 : 95))
+      .strength((l: L) => (l.kind === 'net' ? 0.7 : l.kind === 'host' ? 1 : l.kind === 'conn' ? 0.5 : l.kind === 'ghost' ? 0.25 : l.kind === 'report' ? 0 : 0.15));
     // Start close: the layout settles within a few hundred units of the centre.
     g.cameraPosition({ x: 0, y: 80, z: 420 });
     g.cooldownTicks(160);

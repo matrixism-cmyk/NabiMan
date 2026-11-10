@@ -45,3 +45,19 @@ it('the work map adds the machines sessions run on, what each is doing and how b
   expect(by.a).toEqual(expect.objectContaining({ kind: 'session', task: '그림 갱신', heat: 2 }));
   expect(g.edges.map((e: any) => `${e.kind || 'order'}:${e.id}`).sort()).toEqual(['conn:conn>host:10.0.0.9', 'conn:conn>srv:s1', 'host:host>a', 'host:host>b', 'host:host>lead', 'order:lead>a']);
 });
+
+it('the work map lays the network between the machines when a topology is entered', () => {
+  const { buildWorkMap } = require('./graphModel');
+  const sessions = [s('lead', 'local', { lead: true }), s('a', 'ssh:jcia@spark.bebo.kr:22')];
+  const servers = [{ id: 's1', name: 'nvidia', host: 'spark.bebo.kr' }];
+  const topology = { devices: [{ key: 'fw', name: '방화벽', kind: 'firewall', address: '1.2.3.4', note: '' }, { key: 'pc', name: '동글 PC', kind: 'dongle', address: '', note: '' }, { key: 'vip', name: 'bebo', kind: 'vip', address: '', note: '' }],
+    links: [{ from: 'fw', to: 'pc', label: 'NAT' }], hosts: [{ device: 'pc', server_host: 'spark.bebo.kr' }, { device: 'vip', server_host: 'localhost' }] };
+  const g = buildWorkMap(sessions, [], servers, [], '이 서버', topology);
+  expect(g.nodes.filter((n: any) => n.kind === 'device').map((n: any) => [n.id, n.device])).toEqual([['dev:fw', 'firewall'], ['dev:pc', 'dongle'], ['dev:vip', 'vip']]);
+  const ids = g.edges.map((e: any) => e.id);
+  expect(ids).toEqual(expect.arrayContaining(['net>fw>pc', 'net>pc>srv:s1', 'net>vip>host:local']));
+  // The network path replaces the plain thread from NabiMan to that server.
+  expect(ids).not.toContain('conn>srv:s1');
+  // Without a topology nothing changes.
+  expect(buildWorkMap(sessions, [], servers, [], '이 서버', null).nodes.some((n: any) => n.kind === 'device')).toBe(false);
+});

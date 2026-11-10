@@ -4,7 +4,7 @@ import { useT } from '../../../shared/i18n';
 import ClaudeAddress from '../../terminal/ClaudeAddress';
 import type { SessionLink } from '../SessionLinks';
 import type { SessionInfo } from '../SessionsView';
-import { buildGraph, buildWorkMap, MapEvent, MapServer, ViewMode } from './graphModel';
+import { buildGraph, buildWorkMap, MapEvent, MapServer, Topology, ViewMode } from './graphModel';
 import type { Layout2D } from './Graph2D';
 import './session-graph.css';
 
@@ -15,6 +15,7 @@ const Graph3D = React.lazy(() => import('./Graph3D'));
 const LAYOUTS: Layout2D[] = ['concentric', 'tree', 'free'];
 const LAYOUT_KEY = 'nabiman_graph2d_layout';
 const ROTATE_KEY = 'nabiman_graph3d_rotate';
+const NETWORK_KEY = 'nabiman_graph3d_network';
 const stored = (key: string, fallback: string) => { try { return localStorage.getItem(key) || fallback; } catch { return fallback; } };
 const store = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* private mode */ } };
 
@@ -43,9 +44,12 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
   const [servers, setServers] = useState<MapServer[]>([]);
   const [events, setEvents] = useState<MapEvent[]>([]);
   const newest = useRef(0);
+  const [topology, setTopology] = useState<Topology | null>(null);
+  const [network, setNetwork] = useState(() => stored(NETWORK_KEY, '1') === '1');
   useEffect(() => {
     if (mode !== 'graph3d') return undefined;
     let live = true;
+    apiRequest('/api/terminal/topology').then((r: any) => { if (live && r?.success && r.data?.devices) setTopology(r.data); }).catch(() => undefined);
     apiRequest('/api/remote-servers').then((r: any) => { if (live && r?.success && Array.isArray(r.data)) setServers(r.data); }).catch(() => undefined);
     const pull = () => apiRequest(`/api/terminal/claude-events?window=3600&after=${newest.current}`).then((r: any) => {
       if (!live || !r?.success || !Array.isArray(r.data) || !r.data.length) return;
@@ -57,16 +61,16 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
     return () => { live = false; window.clearInterval(timer); };
   }, [mode]);
   const graph = useMemo(
-    () => (mode === 'graph3d' ? buildWorkMap(sessions, links, servers, events, t('graph.legend.local')) : buildGraph(sessions, links)),
+    () => (mode === 'graph3d' ? buildWorkMap(sessions, links, servers, events, t('graph.legend.local'), network ? topology : null) : buildGraph(sessions, links)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sessions, links, servers, events, mode],
+    [sessions, links, servers, events, mode, topology, network],
   );
   const [selected, setSelected] = useState<string | null>(null);
   const [tip, setTip] = useState<{ note: string; x: number; y: number } | null>(null);
   const [layout, setLayout] = useState<Layout2D>(() => stored(LAYOUT_KEY, 'concentric') as Layout2D);
   const [rotate, setRotate] = useState(() => stored(ROTATE_KEY, '1') === '1');
   const picked = sessions.find((s) => s.id === selected) || null;
-  const groups = Array.from(new Map(graph.nodes.map((n) => [n.group, n.color])).entries());
+  const groups = Array.from(new Map(graph.nodes.filter((n) => n.kind !== 'device').map((n) => [n.group, n.color])).entries());
   const clock = (at: number) => new Date(at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
   const onHoverEdge = (note: string | null, x: number, y: number) => setTip(note ? { note, x, y } : null);
   const webgl = mode !== 'graph3d' || hasWebGL();
@@ -88,6 +92,10 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
         {mode === 'graph3d' && (
           <button type="button" className={`btn btn-sm ${rotate ? 'btn-primary' : 'btn-secondary'}`} aria-pressed={rotate}
             onClick={() => { setRotate(!rotate); store(ROTATE_KEY, rotate ? '0' : '1'); }}>⟳ {t('graph.rotate')}</button>
+        )}
+        {mode === 'graph3d' && !!topology?.devices.length && (
+          <button type="button" className={`btn btn-sm ${network ? 'btn-primary' : 'btn-secondary'}`} aria-pressed={network}
+            onClick={() => { setNetwork(!network); store(NETWORK_KEY, network ? '0' : '1'); }}>⛨ {t('graph.network', { count: topology.devices.length })}</button>
         )}
         <div className="session-graph-legend">
           <span className="session-graph-key is-lead">★ {t('graph.legend.lead')}</span>

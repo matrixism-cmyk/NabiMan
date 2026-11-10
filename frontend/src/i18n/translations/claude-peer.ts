@@ -83,6 +83,7 @@ const t: T = {
   'graph.ended': { ko: '종료됨', en: 'Ended', ja: '終了' },
   'graph.close': { ko: '닫기', en: 'Close', ja: '閉じる' },
   'graph.timeline': { ko: '최근 주고받은 메시지', en: 'Recent messages', ja: '最近のメッセージ' },
+  'graph.network': { ko: '네트워크 장비 {count}', en: 'Network devices {count}', ja: 'ネットワーク機器 {count}' },
 };
 
 export default t;

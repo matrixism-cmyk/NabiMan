@@ -35,7 +35,9 @@ export interface GraphNode {
   /** One colour per group, so sessions of one server read as a set. */
   color: string;
   /** What it is on the work map: a session (default) or the machine sessions run on. */
-  kind?: 'session' | 'server';
+  kind?: 'session' | 'server' | 'device';
+  /** A network device's kind: firewall, router, switch, node, vip, gateway, dongle, internet, storage, other. */
+  device?: string;
   /** A second line: a server's address, a session's Claude. */
   sub?: string;
   /** A server's state as last checked. */
@@ -57,7 +59,7 @@ export interface GraphEdge {
   color: string;
   note: string;
   /** `order` (default): a hand-off. `host`: a server and a session on it. `conn`: NabiMan's hold on a server. */
-  kind?: 'order' | 'host' | 'conn';
+  kind?: 'order' | 'host' | 'conn' | 'net';
 }
 
 export interface Graph { nodes: GraphNode[]; edges: GraphEdge[] }
@@ -141,7 +143,14 @@ export interface MapEvent { id: number; at: number; from: string | null; to: str
  * on (this one and each server a session is connected to), tied together so
  * each machine's sessions gather round it.
  */
-export function buildWorkMap(sessions: SessionInfo[], links: SessionLink[], servers: MapServer[], events: MapEvent[], here: string): Graph {
+/** The network as an administrator entered it: devices, links, and which device each server sits behind. */
+export interface Topology {
+  devices: { key: string; name: string; kind: string; address: string; note: string }[];
+  links: { from: string; to: string; label: string }[];
+  hosts: { device: string; server_host: string }[];
+}
+
+export function buildWorkMap(sessions: SessionInfo[], links: SessionLink[], servers: MapServer[], events: MapEvent[], here: string, topology?: Topology | null): Graph {
   const g = buildGraph(sessions, links);
   const heat = new Map<string, number>();
   const task = new Map<string, string>();
@@ -176,5 +185,21 @@ export function buildWorkMap(sessions: SessionInfo[], links: SessionLink[], serv
     g.nodes.push({ id: 'host:local', kind: 'server', group: 'local', color: GROUP_COLORS[0], claude: '', busy: false, lead: false, orchestrator: false, alive: true, name: here, sub: '' });
   }
   void hub;
+  // The network between the machines: each device, its links, and the machines behind it.
+  if (topology?.devices.length) {
+    const tie = new Map(topology.hosts.map((h) => [h.server_host, h.device]));
+    for (const d of topology.devices) {
+      g.nodes.push({ id: `dev:${d.key}`, kind: 'device', device: d.kind, name: d.name, sub: d.address, group: 'network', color: '#94a3b8', claude: '', busy: false, lead: false, orchestrator: false, alive: true, task: d.note });
+    }
+    for (const l of topology.links) g.edges.push({ id: `net>${l.from}>${l.to}`, from: `dev:${l.from}`, to: `dev:${l.to}`, live: false, strength: 0.5, color: '#64748b', note: l.label, kind: 'net' });
+    for (const [id, node] of Array.from(made)) {
+      const host = id === 'host:local' ? 'localhost' : servers.find((x) => `srv:${x.id}` === id)?.host || node.group;
+      const device = tie.get(host);
+      if (!device) continue;
+      g.edges.push({ id: `net>${device}>${id}`, from: `dev:${device}`, to: id, live: false, strength: 0.5, color: node.color, note: '', kind: 'net' });
+      // The network path stands in for the plain thread from NabiMan.
+      g.edges = g.edges.filter((e) => e.id !== `conn>${id}`);
+    }
+  }
   return g;
 }
