@@ -5,6 +5,8 @@ import ReleaseInventoryPanel from './ReleaseInventoryPanel';
 
 interface RuntimeIdentity {
   package_version: string;
+  /** The commit it was built from (`…-dirty`, or `unknown` without git). */
+  git_commit?: string;
   executable_sha256: string;
   instance_id: string;
   started_at: string;
@@ -20,6 +22,7 @@ export default function RuntimeIdentityPanel() {
     {error && <p role="alert">{error}</p>}
     {!error && data && <dl>
       <dt>{t('diagnostics.packageVersion')}</dt><dd>{data.package_version}</dd>
+      {data.git_commit && <><dt>{t('diagnostics.gitCommit')}</dt><dd><code>{data.git_commit}</code></dd></>}
       <dt>{t('diagnostics.startedAt')}</dt><dd><time dateTime={data.started_at}>{data.started_at}</time></dd>
       <dt>{t('diagnostics.instanceId')}</dt><dd><code>{data.instance_id}</code></dd>
       <dt>{t('diagnostics.executableHash')}</dt><dd><code style={{ overflowWrap: 'anywhere' }}>{data.executable_sha256}</code></dd>

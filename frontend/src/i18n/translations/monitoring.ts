@@ -92,6 +92,7 @@ const t: T = {
   'diagnostics.runtime': { ko: '실행 중인 서버 버전', en: 'Running Server Version', ja: '実行中のサーバーバージョン' },
   'diagnostics.runtimeHint': { ko: '배포 기록과 실행 파일 지문을 비교해 업데이트 반영 여부를 확인할 수 있습니다. 지원 요청 시 이 정보를 함께 전달하세요.', en: 'Compare the executable fingerprint with your deployment record to confirm the update. Include this information in support requests.', ja: '実行ファイルの指紋をデプロイ記録と比較して更新を確認できます。サポートへのお問い合わせにもこの情報をご利用ください。' },
   'diagnostics.packageVersion': { ko: '패키지 버전', en: 'Package version', ja: 'パッケージバージョン' },
+  'diagnostics.gitCommit': { ko: '빌드 커밋', en: 'Build commit', ja: 'ビルドコミット' },
   'diagnostics.startedAt': { ko: '서버 시작 시각', en: 'Server started at', ja: 'サーバー起動時刻' },
   'diagnostics.instanceId': { ko: '실행 인스턴스 ID', en: 'Instance ID', ja: 'インスタンスID' },
   'diagnostics.executableHash': { ko: '실행 파일 SHA-256', en: 'Executable SHA-256', ja: '実行ファイルSHA-256' },
