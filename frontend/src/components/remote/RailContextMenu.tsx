@@ -9,6 +9,8 @@ export interface RailMenuItem {
   disabled?: boolean;
   /** Draw a divider above this item. */
   separated?: boolean;
+  /** Leave the menu open once picked: the item reports back in the footer. */
+  keepOpen?: boolean;
   onSelect: () => void;
 }
 
@@ -21,6 +23,10 @@ interface Props {
   onClose: () => void;
   /** The element that opened the menu, focused again once it closes. */
   opener?: HTMLElement | null;
+  /** Below the items: a hint, or how the last pick went. */
+  footer?: React.ReactNode;
+  /** Extra class on the menu, for a menu shown outside the remote workspace. */
+  className?: string;
 }
 
 /** Room to leave between the menu and the edge of the window. */
@@ -36,7 +42,7 @@ const EDGE = 8;
  * opened from. Shift+F10 and the menu key open it on a focused entry too,
  * since browsers report those as the same contextmenu event.
  */
-export default function RailContextMenu({ x, y, title, items, onClose, opener }: Props) {
+export default function RailContextMenu({ x, y, title, items, onClose, opener, footer, className = '' }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; maxHeight?: number }>({ left: x, top: y });
 
@@ -107,7 +113,7 @@ export default function RailContextMenu({ x, y, title, items, onClose, opener }:
   return createPortal(
     <div
       ref={ref}
-      className="rw-menu"
+      className={`rw-menu ${className}`}
       role="menu"
       aria-label={title}
       style={{ left: pos.left, top: pos.top, maxHeight: pos.maxHeight, overflowY: pos.maxHeight ? 'auto' : undefined }}
@@ -122,13 +128,14 @@ export default function RailContextMenu({ x, y, title, items, onClose, opener }:
             role="menuitem"
             className={`rw-menu-item ${item.danger ? 'is-danger' : ''}`}
             disabled={item.disabled}
-            onClick={() => { onClose(); item.onSelect(); }}
+            onClick={() => { if (!item.keepOpen) onClose(); item.onSelect(); }}
           >
             <span className="rw-menu-icon" aria-hidden="true">{item.icon || ''}</span>
             {item.label}
           </button>
         </React.Fragment>
       ))}
+      {footer && <div className="rw-menu-footer">{footer}</div>}
     </div>
   , document.body);
 }

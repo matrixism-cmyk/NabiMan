@@ -7,6 +7,7 @@ import { useT } from '../../shared/i18n';
 import ShareDialog from './ShareDialog';
 import SessionNameEdit from './SessionNameEdit';
 import ClaudeAddress, { useClaudePeers } from './ClaudeAddress';
+import AiGuideButton from './AiGuideButton';
 import { apiRequest } from '../../shared/api/useApi';
 import type { SessionInfo } from '../remote/SessionsView';
 import { clamp, MIN_H, MIN_W, TASKBAR_H, TermWindow } from './windowGeometry';
@@ -164,6 +165,7 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
           <button title={t('terminal.newSession')} onClick={(e) => { e.stopPropagation(); viewRef.current?.newSession(); }}>+</button>
           {sessionId && (<>
             <button title={t('share.hint')} onClick={(e) => { e.stopPropagation(); setShowShare(true); }}>🔗</button>
+            <AiGuideButton variant="bar" sessionId={sessionId} handle={viewRef} connected={status === 'connected'} />
             <button title={t('terminal.sessionSettings')} aria-label={t('terminal.sessionSettings')}
               onClick={(e) => { e.stopPropagation(); setShowSettings(true); }}>⚙</button>
           </>)}

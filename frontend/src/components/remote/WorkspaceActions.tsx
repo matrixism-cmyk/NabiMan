@@ -3,6 +3,7 @@ import { useT } from '../../shared/i18n';
 import type { TerminalStatus, TerminalViewHandle } from '../terminal/TerminalView';
 import SessionNameEdit from '../terminal/SessionNameEdit';
 import ClaudeAddress, { useClaudePeers } from '../terminal/ClaudeAddress';
+import AiGuideButton from '../terminal/AiGuideButton';
 import AccountDictation from '../terminal/dictation/AccountDictation';
 import { useVoiceReply } from '../terminal/dictation/useVoiceReply';
 import Modal from '../../shared/ui/Modal';
@@ -73,6 +74,7 @@ export default function WorkspaceActions(props: Props) {
             {terminal.sessionId && (<>
               <SessionNameEdit sessionId={terminal.sessionId} onRenamed={props.onRenamed} name={terminal.sessionName} />
               <ClaudeAddress peers={claude} />
+              <AiGuideButton variant="head" sessionId={terminal.sessionId} handle={viewRef} connected={terminal.status === 'connected'} />
               {sharing && (
                 <button className="btn btn-secondary btn-sm" onClick={props.onShareSession} title={t('share.hint')}>
                   🔗 {t('share.button')}
@@ -98,6 +100,9 @@ export default function WorkspaceActions(props: Props) {
           role="img" aria-label={statusText(terminal.status)} title={statusText(terminal.status)} />
       )}
       {dictation}
+      {terminal?.sessionId && (
+        <AiGuideButton variant="icon" sessionId={terminal.sessionId} handle={viewRef} connected={terminal.status === 'connected'} />
+      )}
       {props.files && (
         <button type="button" className={`rw-icon-btn ${props.files.open ? 'is-on' : ''}`} aria-pressed={props.files.open}
           aria-label={t('sftp.show')} title={t('sftp.show')} onClick={props.files.toggle}>📁</button>
