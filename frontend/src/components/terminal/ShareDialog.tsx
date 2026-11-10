@@ -4,6 +4,7 @@ import { apiPost, apiRequest } from '../../shared/api/useApi';
 import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useGrants, useSharing } from '../remote/member';
+import { formatDateTime } from '../../shared/i18n/format';
 
 export interface ShareLink {
   token: string;
@@ -52,7 +53,7 @@ const shareUrl = (token: string) => `${window.location.origin}/share/${token}`;
 
 function formatExpiry(unix: number, t: (k: string) => string): string {
   if (unix === 0 || isPermanent(unix)) return t('share.forever');
-  return new Date(unix * 1000).toLocaleString();
+  return formatDateTime(unix * 1000);
 }
 
 interface Props {

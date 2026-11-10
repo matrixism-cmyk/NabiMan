@@ -3,6 +3,7 @@ import { useT } from '../../i18n';
 import { useMecList } from '../../hooks/mec/useMecApi';
 import { AuditLog } from '../../types/mec';
 import { ErrorBanner, SortableTable, StatusBadge } from './common';
+import { formatDateTime } from '../../shared/i18n/format';
 
 interface Props {
   tenantId: string;
@@ -44,7 +45,7 @@ export default function TenantAuditTab({ tenantId }: Props) {
             key: 'timestamp',
             header: t('mec.col.time'),
             accessor: (r) => r.timestamp,
-            render: (r) => new Date(r.timestamp).toLocaleString(),
+            render: (r) => formatDateTime(r.timestamp),
             width: '170px',
             sortable: true,
           },

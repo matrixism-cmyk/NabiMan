@@ -7,6 +7,7 @@ import MemberAccessFields, { accessActive } from '../MemberAccessFields';
 import TenantAccessInspection from '../TenantAccessInspection';
 import { matches, STATUS_LABEL, STATUS_TONE } from './userModel';
 import './users.css';
+import { formatDateTime } from '../../shared/i18n/format';
 
 /**
  * A scope manager's members: the approved accounts in the servers and tenants
@@ -114,7 +115,7 @@ export default function ScopeMembersPanel({ me, initialScope = '' }: { me: Membe
                   <span>{label(m)} · {t(membershipRole[m.role])}</span>
                   <span className="text-secondary">{accessActive(m) ? t('scopeMembers.allowed') : t('scopeMembers.blocked')}
                     {m.kind === 'server' && m.role !== 'viewer' && m.allow_exec === false ? t('scopeMembers.execBlocked') : ''}
-                    {m.expires_at ? t('scopeMembers.expires', { when: new Date(m.expires_at).toLocaleString() }) : ''}</span>
+                    {m.expires_at ? t('scopeMembers.expires', { when: formatDateTime(m.expires_at) }) : ''}</span>
                   {m.kind === 'tenant' && u.id !== me.id && m.role !== 'admin' && manages(m) && (
                     <button className="btn btn-sm btn-secondary" onClick={() => setInspection({ tenantId: m.scope_id, userId: u.id })}>{t('users.inspectAccess')}</button>
                   )}

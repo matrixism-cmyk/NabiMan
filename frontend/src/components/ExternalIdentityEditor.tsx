@@ -3,6 +3,7 @@ import { fetchWithRefresh } from '../shared/api/useApi';
 import { MemberUser } from './MembershipEditor';
 import { useT } from '../i18n';
 import './membership-management.css';
+import { formatDateTime } from '../shared/i18n/format';
 interface Link { remote_user_id: string; remote_username: string; verified_at: string; linked_by: string; reason: string }
 interface Snapshot { realm: string; link: Link | null }
 export default function ExternalIdentityEditor({ user, onClose }: { user: MemberUser; onClose: () => void }) {
@@ -36,7 +37,7 @@ export default function ExternalIdentityEditor({ user, onClose }: { user: Member
       <p>{t('identity.realm')}<code>{snapshot.realm}</code></p>
       {snapshot.link ? <dl className="external-identity-details">
         <dt>{t('identity.linked')}</dt><dd>{snapshot.link.remote_username} · {snapshot.link.remote_user_id}</dd>
-        <dt>{t('identity.verified')}</dt><dd>{new Date(snapshot.link.verified_at).toLocaleString()} · {snapshot.link.linked_by}</dd>
+        <dt>{t('identity.verified')}</dt><dd>{formatDateTime(snapshot.link.verified_at)} · {snapshot.link.linked_by}</dd>
         <dt>{t('identity.reason')}</dt><dd>{snapshot.link.reason}</dd>
       </dl> : <form onSubmit={async e => {
         e.preventDefault(); setBusy(true); setError('');

@@ -4,6 +4,7 @@ import { useLongPress } from '../../../shared/ui/useLongPress';
 import { formatSize, isFolder, modeString, SftpEntry } from './sftpApi';
 import SftpHeader from './SftpHeader';
 import { ColumnKey, Columns, fileType, minWidth, ownerGroup, template } from './sftpColumns';
+import { formatDateTime } from '../../../shared/i18n/format';
 
 export interface Editing {
   mode: 'new' | 'rename';
@@ -73,7 +74,7 @@ function when(mtime: number | null): string {
   if (!mtime) return '';
   const date = new Date(mtime * 1000);
   const sameYear = date.getFullYear() === new Date().getFullYear();
-  return date.toLocaleString(undefined, sameYear
+  return formatDateTime(date, sameYear
     ? { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }
     : { year: 'numeric', month: '2-digit', day: '2-digit' });
 }

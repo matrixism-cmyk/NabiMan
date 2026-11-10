@@ -3,6 +3,7 @@ import { useT } from '../../../shared/i18n';
 import Modal from '../../../shared/ui/Modal';
 import { formatSize, modeString, SftpSource } from './sftpApi';
 import { checksum, usage, UsageCount, UsageInside, UsageItem, UsageLine } from './sftpUsage';
+import { formatDateTime, formatNumber } from '../../../shared/i18n/format';
 
 interface Props {
   source: SftpSource;
@@ -15,9 +16,9 @@ interface Props {
 
 type Phase = 'counting' | 'done' | 'stopped' | 'failed';
 
-const n = (v: number) => v.toLocaleString();
+const n = (v: number) => formatNumber(v);
 const exact = (bytes: number) => `${formatSize(bytes)} (${n(bytes)} B)`;
-const fullTime = (mtime: number | null) => (mtime ? new Date(mtime * 1000).toLocaleString() : '-');
+const fullTime = (mtime: number | null) => (mtime ? formatDateTime(mtime * 1000) : '-');
 
 /**
  * Properties of one entry or many: what each is, and — for folders — how many
@@ -143,7 +144,7 @@ function Notes({ phase, last, count, paths }: { phase: Phase; last: UsageLine | 
   if (phase === 'counting' && count && count.dirs > 500) notes.push(t('sftp.props.slow'));
   if (phase === 'stopped') notes.push(t('sftp.props.stopped'));
   if (last?.capped) notes.push(t(`sftp.props.capped.${last.capped}`));
-  if (count?.unreadable) notes.push(t('sftp.props.unreadable', { count: count.unreadable.toLocaleString() }));
+  if (count?.unreadable) notes.push(t('sftp.props.unreadable', { count: formatNumber(count.unreadable) }));
   if (paths.includes('/')) notes.push(t('sftp.props.system'));
   return notes.length ? <ul className="sftp-props-notes text-secondary">{notes.map((x) => <li key={x}>{x}</li>)}</ul> : null;
 }

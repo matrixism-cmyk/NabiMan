@@ -15,6 +15,7 @@ import {
   Section,
   SortableTable,
 } from './common';
+import { formatTime } from '../../shared/i18n/format';
 
 const REFRESH_INTERVAL = 10_000;
 
@@ -172,7 +173,7 @@ export default function MecLivePanel() {
                   key: 'time',
                   header: t('mec.col.time'),
                   accessor: (e) => e.last_time || '',
-                  render: (e) => (e.last_time ? new Date(e.last_time).toLocaleTimeString() : '-'),
+                  render: (e) => (e.last_time ? formatTime(e.last_time) : '-'),
                   width: '90px',
                   sortable: true,
                 },

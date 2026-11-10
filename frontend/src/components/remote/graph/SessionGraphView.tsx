@@ -18,6 +18,7 @@ import { useReplay } from './view/useReplay';
 import { hasWebGL } from './view/webglProbe';
 import './session-graph.css';
 import { startVisibleInterval } from '../../../shared/ui/useVisibleInterval';
+import { formatTime } from '../../../shared/i18n/format';
 
 // The graph libraries are large: fetched only when a graph is asked for.
 const Graph2D = React.lazy(() => import('./Graph2D'));
@@ -127,7 +128,7 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
   // The saved server behind a machine node (`local` for this one); none for a host that is not saved.
   const machineId = machine ? (machine.id === 'host:local' ? 'local' : machine.id.startsWith('srv:') ? machine.id.slice(4) : null) : null;
   const groups = Array.from(new Map(graph.nodes.filter((n) => n.kind !== 'device').map((n) => [n.group, n.color])).entries());
-  const clock = (at: number) => new Date(at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  const clock = (at: number) => formatTime(at * 1000, { hour: '2-digit', minute: '2-digit', hour12: false });
   const onHoverEdge = (note: string | null, x: number, y: number) => setTip(note ? { note, x, y } : null);
   const webgl = mode !== 'graph3d' || hasWebGL();
   const is3d = mode === 'graph3d';

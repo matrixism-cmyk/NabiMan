@@ -4,6 +4,7 @@ import { RemoteServer, RemoteServerStatus } from './remoteTypes';
 import ProtocolBadges from './ProtocolBadges';
 import { addressOf, hasShell } from './protocols';
 import { useT } from '../../shared/i18n';
+import { formatDateTime } from '../../shared/i18n/format';
 import { useMember } from './member';
 import './remote-base.css';
 
@@ -92,7 +93,7 @@ export default function MultiServerDashboard() {
                   </div>
                 ) : srv.last_checked ? (
                   <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4 }}>
-                    Last: {srv.last_checked}
+                    {t('remote.lastChecked')}: {srv.last_checked ? formatDateTime(srv.last_checked) : '—'}
                   </div>
                 ) : null}
               </div>

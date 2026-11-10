@@ -4,6 +4,7 @@ import { DEFAULT_TERMINAL_SETTINGS, TerminalSettings, useTerminalSettings } from
 import FontPicker from './FontPicker';
 import RendererSettings from './RendererSettings';
 import { readRendererChoice, RendererChoice, writeRendererChoice } from './renderers';
+import { formatNumber } from '../../shared/i18n/format';
 
 const SCROLLBACK_PRESETS = [1000, 5000, 10000, 50000, 100000];
 const TIMEOUT_PRESETS: { label: string; value: number }[] = [
@@ -64,7 +65,7 @@ export default function TerminalSettingsForm({ onDone }: { onDone?: () => void }
                 key={n} type="button"
                 className={`btn btn-sm ${draft.scrollback_lines === n ? 'btn-primary' : 'btn-secondary'}`}
                 onClick={() => set('scrollback_lines', n)}
-              >{n.toLocaleString()}</button>
+              >{formatNumber(n)}</button>
             ))}
           </div>
           <small className="text-secondary">{t('terminal.scrollbackHint')}</small>

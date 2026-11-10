@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { StatusTone, tone as toneFor } from './StatusBadge';
 import { useCountUp } from '../../../hooks/mec/useCountUp';
 import Sparkline from './Sparkline';
+import { formatNumber } from '../../../shared/i18n/format';
 
 interface Props {
   label: string;
@@ -45,7 +46,7 @@ export default function MetricCard({
   // Animate numeric values; render anything else verbatim.
   const numeric = typeof value === 'number' ? value : null;
   const animated = useCountUp(numeric ?? 0);
-  const display = numeric !== null ? Math.round(animated).toLocaleString() : value;
+  const display = numeric !== null ? formatNumber(Math.round(animated)) : value;
 
   // Brief "pop" on the value whenever the number changes.
   const [pop, setPop] = useState(false);

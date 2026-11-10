@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { mecPost, useMecList } from '../../hooks/mec/useMecApi';
 import { useT } from '../../i18n';
 import { ErrorBanner, Section } from './common';
+import { formatDateTime } from '../../shared/i18n/format';
 interface Operation { id: string; operation: 'create' | 'delete'; state: 'applying' | 'completed' | 'unknown_result'; realm: string; remote_user_id: string; role_template: string; binding_id: string | null; actor: string; updated_at: string; error: string | null }
 export default function MembershipOperations({ tenantId, revision }: { tenantId: string; revision: number }) {
   const { t, lang } = useT();
@@ -22,7 +23,7 @@ function History({ tenantId, t, lang }: { tenantId: string; t: ReturnType<typeof
         <dt>Rancher</dt><dd>{op.realm}</dd>
         <dt>{t('mec.tenant.members.colBindingId')}</dt><dd>{op.binding_id || t('mec.membershipOperations.unverified')}</dd>
         <dt>{t('mec.membershipOperations.actor')}</dt><dd>{op.actor}</dd>
-        <dt>{t('mec.membershipOperations.updated')}</dt><dd>{new Date(op.updated_at).toLocaleString(lang)}</dd>
+        <dt>{t('mec.membershipOperations.updated')}</dt><dd>{formatDateTime(op.updated_at, undefined, lang)}</dd>
       </dl>
       {op.state !== 'completed' && <p role="status">{t('mec.membershipOperations.doNotRetry')}</p>}
       {op.error && <p>{op.error}</p>}

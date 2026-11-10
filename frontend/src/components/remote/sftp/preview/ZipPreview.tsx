@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useT } from '../../../../shared/i18n';
 import { formatSize, readRange } from '../sftpApi';
 import { findEnd, readDirectory, readZip64End, TAIL, ZipEntry } from './zipIndex';
+import { formatNumber } from '../../../../shared/i18n/format';
 
 interface Props {
   url: string;
@@ -43,7 +44,7 @@ export default function ZipPreview({ url, size, onFacts }: Props) {
       setEntries(list);
       const files = list.filter((e) => !e.folder);
       const total = files.reduce((n, e) => n + e.size, 0);
-      onFacts(t('preview.zipFacts', { count: files.length.toLocaleString(), size: formatSize(total) }));
+      onFacts(t('preview.zipFacts', { count: formatNumber(files.length), size: formatSize(total) }));
     })().catch((e: unknown) => {
       if (!abort.signal.aborted) setError(e instanceof Error ? e.message : t('preview.zipBroken'));
     });
@@ -69,7 +70,7 @@ export default function ZipPreview({ url, size, onFacts }: Props) {
           ))}
         </tbody>
       </table>
-      {entries.length > SHOWN && <p className="preview-note">{t('preview.zipMore', { count: (entries.length - SHOWN).toLocaleString() })}</p>}
+      {entries.length > SHOWN && <p className="preview-note">{t('preview.zipMore', { count: formatNumber(entries.length - SHOWN) })}</p>}
     </div>
   );
 }

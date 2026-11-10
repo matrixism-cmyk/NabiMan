@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { fetchWithRefresh } from '../shared/api/useApi';
 import { useT } from '../i18n';
 import './membership-management.css';
+import { formatDateTime } from '../shared/i18n/format';
 interface Binding { id: string; user_id: string; role_template: string }
 interface Report {
   local_username: string; inspected_at: string; source_access_allowed: boolean;
@@ -37,7 +38,7 @@ export default function TenantAccessInspection({ tenantId, userId, onClose, onIn
     {!report && !error && <p>{t('membership.access.loading')}</p>}
     {report && <>
       <dl className="external-identity-details">
-        <dt>{t('membership.access.checkedAt')}</dt><dd>{new Date(report.inspected_at).toLocaleString(lang)}</dd>
+        <dt>{t('membership.access.checkedAt')}</dt><dd>{formatDateTime(report.inspected_at, undefined, lang)}</dd>
         <dt>{t('membership.access.localAccess')}</dt><dd>{booleanLabel(report.source_access_allowed)}</dd>
         <dt>Rancher / project</dt><dd>{report.realm} · {report.project_id || t('membership.access.unknown')}</dd>
         <dt>{t('membership.access.identity')}</dt><dd>{report.identity_link ? `${report.identity_link.remote_username} · ${report.identity_link.remote_user_id}` : t('membership.access.blocker.identity_unlinked')}</dd>

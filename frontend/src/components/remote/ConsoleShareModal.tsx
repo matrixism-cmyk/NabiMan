@@ -3,6 +3,7 @@ import Modal from '../../shared/ui/Modal';
 import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import { ConsoleShare, createShare, listShares, revokeShare, shareLink } from './vncApi';
+import { formatDateTime } from '../../shared/i18n/format';
 
 // Mirrors the terminal share's expiry choices (in seconds; 0 = until revoked).
 const EXPIRY: { key: string; secs: number }[] = [
@@ -49,7 +50,7 @@ export default function ConsoleShareModal({ console: key, label, onClose }: {
     if (!(await confirmDialog({ message: t('remote.console.share.revokeConfirm'), danger: true, confirmLabel: t('remote.console.share.revoke') }))) return;
     await revokeShare(key, token); if (issued.endsWith(token)) setIssued(''); reload();
   };
-  const when = (ms: number) => (ms >= PERMANENT ? t('share.forever') : new Date(ms * 1000).toLocaleString());
+  const when = (ms: number) => (ms >= PERMANENT ? t('share.forever') : formatDateTime(ms * 1000));
 
   return (
     <Modal className="share-dialog console-share" onClose={onClose} title={`${t('remote.console.share.title')} · ${label}`}>

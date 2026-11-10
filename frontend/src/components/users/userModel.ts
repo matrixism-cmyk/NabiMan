@@ -1,5 +1,6 @@
 import type { MemberUser } from '../MembershipEditor';
 import type { TFn } from '../../i18n';
+import { formatDateTime, formatDate } from '../../shared/i18n/format';
 
 export type Role = 'admin' | 'remote' | 'viewer' | 'operator';
 export type Status = MemberUser['status'];
@@ -43,7 +44,7 @@ export function when(value?: string | number | null): string {
   const date = typeof value === 'number'
     ? new Date(value * 1000)
     : new Date(/^\d{4}-\d\d-\d\d \d/.test(value) ? `${value.replace(' ', 'T')}Z` : value);
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? String(value) : formatDateTime(date);
 }
 
 /** How long ago, roughly, for a list. */
@@ -56,7 +57,7 @@ export function ago(t: TFn, value?: string | null): string {
   if (secs < 3600) return t('users.ago.minutes', { n: Math.floor(secs / 60) });
   if (secs < 86400) return t('users.ago.hours', { n: Math.floor(secs / 3600) });
   if (secs < 86400 * 30) return t('users.ago.days', { n: Math.floor(secs / 86400) });
-  return date.toLocaleDateString();
+  return formatDate(date);
 }
 
 /** Whether the account's time is over (the server agrees: it no longer signs in). */
@@ -66,7 +67,7 @@ export const expired = (u: MemberUser) => Boolean(u.access?.expires_at && Date.p
 export function restrictions(t: TFn, u: MemberUser): string[] {
   const out: string[] = [];
   const a = u.access;
-  if (a?.expires_at) out.push(expired(u) ? t('users.limit.expired') : `~${new Date(a.expires_at).toLocaleDateString()}`);
+  if (a?.expires_at) out.push(expired(u) ? t('users.limit.expired') : `~${formatDate(a.expires_at)}`);
   if (a?.allowed_networks?.length) out.push(t('users.limit.ip'));
   if (a?.allowed_hours) out.push(t('users.limit.hours'));
   if (a?.require_mfa && !u.totp_enabled) out.push(t('users.limit.mfaNeeded'));

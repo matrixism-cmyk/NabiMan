@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../../shared/api/useApi';
 import { useT } from '../../i18n';
 import type { AccessRules, MemberUser } from '../MembershipEditor';
+import { formatDateTime } from '../../shared/i18n/format';
 
 const HOURS = Array.from({ length: 25 }, (_, h) => h);
 
@@ -57,7 +58,7 @@ export default function AccessRulesForm({ user, busy, update }: Props) {
           </div>
         </div>
         <p className="text-secondary">{draft.expires_at
-          ? t('users.access.until', { when: new Date(draft.expires_at).toLocaleString() })
+          ? t('users.access.until', { when: formatDateTime(draft.expires_at) })
           : t('users.access.forever')}</p>
       </section>
 

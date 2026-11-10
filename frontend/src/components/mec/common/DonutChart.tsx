@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatNumber } from '../../../shared/i18n/format';
 
 export interface DonutSlice {
   label: string;
@@ -166,7 +167,7 @@ export default function DonutChart({
               fontVariantNumeric: 'tabular-nums',
             }}
           >
-            {p.slice.value.toLocaleString()}
+            {formatNumber(p.slice.value)}
           </span>
         </div>
       ))}

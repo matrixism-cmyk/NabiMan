@@ -12,6 +12,7 @@ import {
   StatusBadge,
   Toolbar,
 } from './common';
+import { formatDate } from '../../shared/i18n/format';
 
 interface HarborProject {
   id: number;
@@ -299,7 +300,7 @@ export default function MecStoragePanel() {
               key: 'created',
               header: t('mec.storage.colCreated'),
               accessor: (p) => p.created_at,
-              render: (p) => new Date(p.created_at).toLocaleDateString(),
+              render: (p) => formatDate(p.created_at),
               width: '120px',
               sortable: true,
             },

@@ -16,6 +16,7 @@ import NocNodeWall from './noc/NocNodeWall';
 import NocAttentionQueue from './noc/NocAttentionQueue';
 import NocAlertMarquee from './noc/NocAlertMarquee';
 import { useBranding } from '../../shared/branding/branding';
+import { formatTime } from '../../shared/i18n/format';
 
 const REFRESH = 10_000;
 const STALE_MS = 40_000;
@@ -180,7 +181,7 @@ export default function MecNocPanel({ onNavigate, onEnterFocus }: Props) {
               defaultSortKey="time" defaultSortDir="desc" maxHeight="320px"
               columns={[
                 { key: 'time', header: '⏱', accessor: (e) => e.last_time || '',
-                  render: (e) => (e.last_time ? new Date(e.last_time).toLocaleTimeString() : '-'), width: '90px', sortable: true },
+                  render: (e) => (e.last_time ? formatTime(e.last_time) : '-'), width: '90px', sortable: true },
                 { key: 'type', header: 'Type', accessor: (e) => e.event_type, width: '90px', sortable: true,
                   render: (e) => <StatusBadge tone={e.event_type === 'Warning' ? 'warning' : 'success'}>{e.event_type}</StatusBadge> },
                 { key: 'reason', header: 'Reason', accessor: (e) => e.reason, width: '120px', sortable: true,

@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatNumber } from '../../../shared/i18n/format';
 
 export interface BarDatum {
   label: string;
@@ -52,8 +53,8 @@ export default function BarChart({ data, maxOverall, showValue = true }: Props) 
                     fontVariantNumeric: 'tabular-nums',
                   }}
                 >
-                  {d.value.toLocaleString()}
-                  {d.max !== undefined && ` / ${d.max.toLocaleString()}`}
+                  {formatNumber(d.value)}
+                  {d.max !== undefined && ` / ${formatNumber(d.max)}`}
                   {' '}
                   <span style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>
                     ({Math.round(ratio * 100)}%)

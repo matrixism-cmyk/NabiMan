@@ -6,6 +6,7 @@ import { fontOf, TERMINAL_FONTS } from './terminalFonts';
 import { PAUSES } from './dictation/PauseField';
 import { DictationSetup, dictationSetup } from './dictation/sockets';
 import { reloadSession, saveSessionOverrides, SessionOverrides, useSessionEntry } from './sessionSettings';
+import { formatNumber } from '../../shared/i18n/format';
 
 const TIMEOUTS = [0, 1800, 3600, 21600, 86400, 604800];
 
@@ -101,7 +102,7 @@ export default function SessionSettingsForm({ sessionId, onDone }: { sessionId: 
           value={draft.font_size ?? base.font_size}
           onChange={(e) => set('font_size', Math.min(28, Math.max(8, parseInt(e.target.value, 10) || base.font_size)))} />
       </Field>
-      <Field id="ss-scroll" label={t('terminal.scrollbackLines')} inherited={base.scrollback_lines.toLocaleString()}
+      <Field id="ss-scroll" label={t('terminal.scrollbackLines')} inherited={formatNumber(base.scrollback_lines)}
         following={draft.scrollback_lines == null} onFollow={follow('scrollback_lines', base.scrollback_lines)}>
         <input id="ss-scroll" type="number" min={100} max={200000} step={1000} className="filter-input" style={{ width: 140 }}
           value={draft.scrollback_lines ?? base.scrollback_lines}

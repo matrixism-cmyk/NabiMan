@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { setFormatLang } from './format';
 
 export type Lang = 'ko' | 'en' | 'ja';
 /** Each key's words in every language. */
@@ -52,6 +53,8 @@ export function interpolate(text: string, vars?: Record<string, string | number>
  */
 export function I18nProvider({ translations, children }: { translations: Translations; children: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>(getSavedLang);
+  // Before the children render, so the dates they format follow this language.
+  setFormatLang(lang);
 
   const setLang = useCallback((newLang: Lang) => {
     setLangState(newLang);

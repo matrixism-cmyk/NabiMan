@@ -10,6 +10,7 @@ import { ErrorBoundary } from '../../shared/ui/ErrorBoundary';
 import { readView, saveView, VIEW_MODES, ViewMode } from './graph/graphModel';
 import AgentIcons from './graph/AgentIcons';
 import { useGrants, useMember, useSharing } from './member';
+import { formatNumber } from '../../shared/i18n/format';
 
 export interface SessionInfo {
   id: string; label: string; owner: string; ws_count: number; shared: boolean;
@@ -326,7 +327,7 @@ export default function SessionsView({
             <div className="session-meta">
               <span>{t('terminal.viewers')} {session.ws_count}</span>
               <span>{formatAge(session.age_secs)}</span>
-              <span>{t('terminal.lines', { n: session.scrollback.toLocaleString() })}</span>
+              <span>{t('terminal.lines', { n: formatNumber(session.scrollback) })}</span>
               <span>{session.owner}</span>
             </div>
 

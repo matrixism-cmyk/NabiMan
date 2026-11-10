@@ -12,6 +12,7 @@ import {
   StatusBadge,
   Toolbar,
 } from './common';
+import { formatDateTime } from '../../shared/i18n/format';
 
 interface JobSummary {
   id: string;
@@ -212,7 +213,7 @@ export default function MecJobsPanel() {
             key: 'started_at',
             header: t('mec.jobs.colStarted'),
             accessor: (j) => j.started_at,
-            render: (j) => new Date(j.started_at).toLocaleString(),
+            render: (j) => formatDateTime(j.started_at),
             width: '170px',
             sortable: true,
           },
@@ -222,7 +223,7 @@ export default function MecJobsPanel() {
             accessor: (j) => j.completed_at || '',
             render: (j) =>
               j.completed_at ? (
-                new Date(j.completed_at).toLocaleString()
+                formatDateTime(j.completed_at)
               ) : (
                 <span style={{ color: '#d1d5db' }}>-</span>
               ),

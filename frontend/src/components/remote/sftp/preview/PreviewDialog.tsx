@@ -12,6 +12,7 @@ import FilePreview from './FilePreview';
 import { previewOf, STREAMED } from './previewKinds';
 import { Encoding, ENCODINGS } from './textContent';
 import './preview.css';
+import { formatNumber } from '../../../../shared/i18n/format';
 
 interface Props {
   source: SftpSource;
@@ -135,9 +136,9 @@ export default function PreviewDialog({ source, dir, files, start, onDownload, o
         <span className="preview-facts">
           {formatSize(entry.size)}
           {size && ` · ${size.width} × ${size.height}`}
-          {text && ` · ${t('preview.lines', { count: text.lines.toLocaleString() })} · ${text.encoding.toUpperCase()}`}
+          {text && ` · ${t('preview.lines', { count: formatNumber(text.lines) })} · ${text.encoding.toUpperCase()}`}
           {text && spec.language && spec.language !== 'plaintext' && ` · ${spec.language}`}
-          {pages !== null && ` · ${t('preview.pages', { count: pages.toLocaleString() })}`}
+          {pages !== null && ` · ${t('preview.pages', { count: formatNumber(pages) })}`}
           {facts && ` · ${facts}`}
           {many && ` · ${at + 1} / ${files.length}`}
         </span>

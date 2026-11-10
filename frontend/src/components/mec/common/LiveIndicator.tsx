@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useT } from '../../../i18n';
+import { formatDateTime } from '../../../shared/i18n/format';
 
 interface Props {
   /** Timestamp (ms) of the last successful data load. */
@@ -31,7 +32,7 @@ export default function LiveIndicator({ lastUpdated, intervalMs, refreshing }: P
 
   return (
     <span
-      title={lastUpdated ? new Date(lastUpdated).toLocaleString() : undefined}
+      title={lastUpdated ? formatDateTime(lastUpdated) : undefined}
       style={{
         display: 'inline-flex',
         alignItems: 'center',

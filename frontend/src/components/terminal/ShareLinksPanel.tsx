@@ -4,6 +4,7 @@ import { useT } from '../../shared/i18n';
 import { isPermanent, ShareLink } from './ShareDialog';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import { useVisibleInterval } from '../../shared/ui/useVisibleInterval';
+import { formatDateTime } from '../../shared/i18n/format';
 
 const shareUrl = (token: string) => `${window.location.origin}/share/${token}`;
 
@@ -35,11 +36,11 @@ function remaining(expires: number, t: (k: string) => string): string {
 }
 
 function used(unix: number, t: (k: string) => string): string {
-  return unix === 0 ? t('share.neverUsed') : new Date(unix * 1000).toLocaleString();
+  return unix === 0 ? t('share.neverUsed') : formatDateTime(unix * 1000);
 }
 
 function exactExpiry(expires: number, t: (k: string) => string): string {
-  return expires === 0 || isPermanent(expires) ? t('share.forever') : new Date(expires * 1000).toLocaleString();
+  return expires === 0 || isPermanent(expires) ? t('share.forever') : formatDateTime(expires * 1000);
 }
 
 /** Every link this account has handed out, wherever it was created. */

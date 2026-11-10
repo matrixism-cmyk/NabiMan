@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useT } from '../../i18n';
 import { fetchWithRefresh } from '../../shared/api/useApi';
 import { StatusBadge } from './common';
+import { formatDateTime } from '../../shared/i18n/format';
 
 export interface RecoveryReport {
   checked_at: string; configured_mode: string; records_conflict: boolean;
@@ -41,7 +42,7 @@ export default function RecoveryInspection({ jobId }: { jobId: string }) {
     {loading && <p role="status">{t('mec.state.loading')}</p>}
     {error && <p role="alert">{error}</p>}
     {report && <>
-      <p>{t('mec.recovery.checkedAt')}: {new Date(report.checked_at).toLocaleString()}</p>
+      <p>{t('mec.recovery.checkedAt')}: {formatDateTime(report.checked_at)}</p>
       {report.configured_mode === 'mock' && <p role="alert">{t('mec.recovery.demo')}</p>}
       {report.records_conflict && <p role="alert">{t('mec.recovery.conflict')}</p>}
       <div style={{ overflowX: 'auto' }}><table className="data-table" style={{ width: '100%' }}>

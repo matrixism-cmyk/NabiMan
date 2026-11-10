@@ -2,6 +2,7 @@ import React from 'react';
 import { useT } from '../../i18n';
 import { Tenant } from '../../types/mec';
 import { Field, FieldGrid, Section, StatusBadge } from './common';
+import { formatDateTime } from '../../shared/i18n/format';
 
 interface Props {
   tenant: Tenant;
@@ -52,11 +53,11 @@ export default function TenantOverviewTab({ tenant }: Props) {
         <FieldGrid>
           <Field
             label={t('mec.tenant.overview.created')}
-            value={new Date(tenant.created_at).toLocaleString()}
+            value={formatDateTime(tenant.created_at)}
           />
           <Field
             label={t('mec.tenant.overview.updated')}
-            value={new Date(tenant.updated_at).toLocaleString()}
+            value={formatDateTime(tenant.updated_at)}
           />
         </FieldGrid>
       </Section>

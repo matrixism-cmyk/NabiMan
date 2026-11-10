@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/i18n';
 import { startVisibleInterval } from '../../../shared/ui/useVisibleInterval';
+import { formatTime, formatNumber } from '../../../shared/i18n/format';
 
 interface Attacker { ip: string; count: number; last: number; users: string[]; internal: boolean; banned: boolean }
 interface Login { ip: string; user: string; at: number; method: string }
@@ -42,7 +43,7 @@ export default function AttackPanel({ id, name, sub, onClose }: { id: string | n
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, windowMin]);
 
-  const clock = (at: number) => (at ? new Date(at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '–');
+  const clock = (at: number) => (at ? formatTime(at * 1000, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '–');
   const label = (m: number) => (m < 60 ? t('attack.minutes', { n: m }) : t('attack.hours', { n: m / 60 }));
   const peak = Math.max(1, ...(report?.per_minute || []));
   const outside = report ? report.attackers.filter((a) => !a.internal) : [];
@@ -66,7 +67,7 @@ export default function AttackPanel({ id, name, sub, onClose }: { id: string | n
       {report && report.readable && (
         <>
           <div className={`attack-total${outside.length ? ' is-hot' : ''}`}>
-            <b>{report.failed.toLocaleString()}</b>
+            <b>{formatNumber(report.failed)}</b>
             <span>{t('attack.total', { sources: report.sources })}</span>
           </div>
           <div className="attack-kinds">

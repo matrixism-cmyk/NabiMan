@@ -3,13 +3,14 @@ import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import RecordingPlayer from './RecordingPlayer';
 import { deleteRecording, getSettings, listRecordings, Recording, RecordingSettings, saveSettings } from './recordingsApi';
+import { formatDateTime } from '../../shared/i18n/format';
 
 function size(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
-const when = (ms: number) => (ms ? new Date(ms).toLocaleString() : '—');
+const when = (ms: number) => (ms ? formatDateTime(ms) : '—');
 
 /** The super administrator's session recordings: the on/off policy, and the
  *  list with a player. Everything here is off until an administrator turns it on. */

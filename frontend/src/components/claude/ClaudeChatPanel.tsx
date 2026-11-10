@@ -5,6 +5,7 @@ import { getSettings, VoiceSettings, VoiceStatus } from './claudeApi';
 import { useVoiceChat } from './useVoiceChat';
 import Waveform from '../terminal/dictation/Waveform';
 import './claude.css';
+import { formatDateTime } from '../../shared/i18n/format';
 
 /**
  * On a phone, the conversation takes exactly the rest of the screen below
@@ -32,7 +33,7 @@ function useFitHeight(ref: React.RefObject<HTMLElement | null>) {
   }, [ref]);
 }
 
-const when = (sec: number) => new Date(sec * 1000).toLocaleString(undefined, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+const when = (sec: number) => formatDateTime(sec * 1000, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
 
 /**
  * Talking with Claude: "새 채팅" starts a conversation and listens; what is
