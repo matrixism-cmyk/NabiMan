@@ -4,6 +4,7 @@ import { useT } from '../i18n';
 import EncryptedBackupPanel from './EncryptedBackupPanel';
 import { useSortable } from '../hooks/useSortable';
 import { confirmDialog } from '../shared/ui/ConfirmDialog';
+import { useVisibleInterval } from '../shared/ui/useVisibleInterval';
 
 interface BackupEntry { id: string; source: string; filename: string; size: number; created: string; }
 interface BackupSchedule { id: string; name: string; paths: string[]; cron_expr: string; compression: boolean; enabled: boolean; last_run: string | null; next_run: string | null; last_result?: { state: string; started_at: string; finished_at: string | null; filename: string | null; error: string | null } | null; }
@@ -43,9 +44,8 @@ export default function BackupPanel() {
   useEffect(() => {
     if (tab !== 'schedules') return;
     fetchSchedules();
-    const timer = window.setInterval(fetchSchedules, 5000);
-    return () => window.clearInterval(timer);
   }, [tab, fetchSchedules]);
+  useVisibleInterval(fetchSchedules, tab === 'schedules' ? 5000 : 0);
 
   const createBackup = async () => {
     if (!path.trim()) return;

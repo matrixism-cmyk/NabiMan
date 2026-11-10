@@ -4,6 +4,7 @@ import { SslCertificate } from '../types';
 import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';
 import { confirmDialog } from '../shared/ui/ConfirmDialog';
+import { startVisibleInterval } from '../shared/ui/useVisibleInterval';
 
 interface RenewStatus { domain: string; status: string; message: string; started_at: string; }
 
@@ -13,16 +14,16 @@ export default function SslPanel() {
   const [renewMsg, setRenewMsg] = useState('');
   const [renewing, setRenewing] = useState('');
   const [renewError, setRenewError] = useState('');
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<(() => void) | null>(null);
 
-  useEffect(() => { return () => { if (pollRef.current) clearInterval(pollRef.current); }; }, []);
+  useEffect(() => () => { pollRef.current?.(); }, []);
 
   // Asks every 3 s how the certbot run for `domain` went, until it is over.
   // A failed ask is said on screen and the polling stops: it would only fail again.
   const pollStatus = (domain: string, doneKey: string) => {
-    if (pollRef.current) clearInterval(pollRef.current);
-    const stop = () => { if (pollRef.current) clearInterval(pollRef.current); pollRef.current = null; setRenewing(''); };
-    pollRef.current = setInterval(async () => {
+    pollRef.current?.();
+    const stop = () => { pollRef.current?.(); pollRef.current = null; setRenewing(''); };
+    pollRef.current = startVisibleInterval(async () => {
       try {
         const json = await apiRequest<RenewStatus>(`/api/ssl/renew/${encodeURIComponent(domain)}`);
         if (!json.success) { stop(); setRenewError(`${domain}: ${json.message || t('ssl.statusFailed')}`); return; }

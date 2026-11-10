@@ -7,6 +7,7 @@ import { noticeText, serialSupported, setTranslator, type Notice } from './seria
 import { openMonitor } from './serialMonitorChannel';
 import { usbLabel } from './usbNames';
 import './serial-monitor.css';
+import { startVisibleInterval } from '../../shared/ui/useVisibleInterval';
 
 const BAUDS = [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600];
 const LIST_EVERY_MS = 3000;
@@ -47,8 +48,8 @@ export default function SessionDevicesDialog({ sessionId, sessionName, onClose }
       if (live && r?.success && Array.isArray(r.data)) setListed(r.data);
     };
     void load();
-    const timer = setInterval(() => { void load(); }, LIST_EVERY_MS);
-    return () => { live = false; clearInterval(timer); };
+    const stopPolling = startVisibleInterval(() => { void load(); }, LIST_EVERY_MS);
+    return () => { live = false; stopPolling(); };
   }, [sessionId]);
 
   const add = async () => {

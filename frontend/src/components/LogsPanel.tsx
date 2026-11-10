@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useApi, apiPost } from '../shared/api/useApi';
 import { LogEntry } from '../types';
 import { useT } from '../i18n';
+import { useVisibleInterval } from '../shared/ui/useVisibleInterval';
 
 export default function LogsPanel() {
   const { t } = useT();
@@ -30,12 +31,8 @@ export default function LogsPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!autoRefresh) return;
-    const id = setInterval(fetchLogs, 5000);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoRefresh, unit, priority, lines]);
+  // Always the latest filters; resting while the tab is hidden.
+  useVisibleInterval(fetchLogs, autoRefresh ? 5000 : 0);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });

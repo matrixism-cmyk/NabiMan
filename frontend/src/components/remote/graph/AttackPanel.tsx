@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/i18n';
+import { startVisibleInterval } from '../../../shared/ui/useVisibleInterval';
 
 interface Attacker { ip: string; count: number; last: number; users: string[]; internal: boolean; banned: boolean }
 interface Login { ip: string; user: string; at: number; method: string }
@@ -36,8 +37,8 @@ export default function AttackPanel({ id, name, sub, onClose }: { id: string | n
         .finally(() => { if (!gone) setLoading(false); });
     };
     load();
-    const timer = window.setInterval(load, REFRESH_MS);
-    return () => { gone = true; window.clearInterval(timer); };
+    const stopPolling = startVisibleInterval(load, REFRESH_MS);
+    return () => { gone = true; stopPolling(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, windowMin]);
 

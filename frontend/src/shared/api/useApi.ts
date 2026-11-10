@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useVisibleInterval } from '../ui/useVisibleInterval';
 
 /** Every NabiMan API answers in this shape. */
 export interface ApiResponse<T> {
@@ -202,13 +203,9 @@ export function useApi<T>(endpoint: string, interval?: number) {
     } finally { if (isCurrent(session)) setLoading(false); }
   }, [endpoint]);
 
-  useEffect(() => {
-    fetchData();
-    if (interval) {
-      const id = setInterval(fetchData, interval);
-      return () => clearInterval(id);
-    }
-  }, [fetchData, interval]);
+  useEffect(() => { fetchData(); }, [fetchData]);
+  // A hidden tab stops polling and catches up the moment it is shown again.
+  useVisibleInterval(fetchData, interval);
 
   return { data, loading, error, refetch: fetchData };
 }

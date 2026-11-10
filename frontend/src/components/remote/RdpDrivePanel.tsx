@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useT } from '../../shared/i18n';
 import { DriveFile, fetchDriveFile, listDriveFiles } from './vncApi';
 import { saveBlob } from './consoleDownload';
+import { useVisibleInterval } from '../../shared/ui/useVisibleInterval';
 
 /** How often the open panel looks at the drive again. */
 const REFRESH_MS = 3000;
@@ -25,11 +26,8 @@ export default function RdpDrivePanel({ target, onClose }: { target: string; onC
     listDriveFiles(target).then((r) => { if (r.success && r.data) setFiles(r.data); else setFiles((f) => f || []); })
       .catch(() => setFiles((f) => f || []));
   }, [target]);
-  useEffect(() => {
-    reload();
-    const timer = window.setInterval(() => { if (!document.hidden) reload(); }, REFRESH_MS);
-    return () => window.clearInterval(timer);
-  }, [reload]);
+  useEffect(() => { reload(); }, [reload]);
+  useVisibleInterval(reload, REFRESH_MS);
 
   const download = async (name: string) => {
     setBusy(name);

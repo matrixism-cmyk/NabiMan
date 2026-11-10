@@ -3,6 +3,7 @@ import { apiRequest } from '../../shared/api/useApi';
 import { useT } from '../../shared/i18n';
 import { isPermanent, ShareLink } from './ShareDialog';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
+import { useVisibleInterval } from '../../shared/ui/useVisibleInterval';
 
 const shareUrl = (token: string) => `${window.location.origin}/share/${token}`;
 
@@ -58,13 +59,9 @@ export default function ShareLinksPanel() {
 
   const [, setTick] = useState(0);
 
-  useEffect(() => {
-    load();
-    const id = window.setInterval(load, 30000);
-    // Re-render between fetches so "45분" counts down rather than sitting still.
-    const tick = window.setInterval(() => setTick((n) => n + 1), 30000);
-    return () => { window.clearInterval(id); window.clearInterval(tick); };
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
+  // Each fetch also re-renders, so "45분" counts down rather than sitting still.
+  useVisibleInterval(() => { load(); setTick((n) => n + 1); }, 30000);
 
   const revoke = async (link: ShareLink) => {
     if (!(await confirmDialog({ message: t('share.revokeConfirm'), danger: true, confirmLabel: t('common.delete') }))) return;

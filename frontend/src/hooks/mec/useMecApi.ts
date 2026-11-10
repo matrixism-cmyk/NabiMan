@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { MecListResponse, MecResponse } from '../../types/mec';
 import { fetchWithRefresh } from '../../shared/api/useApi';
+import { useVisibleInterval } from '../../shared/ui/useVisibleInterval';
 
 const API_BASE = process.env.REACT_APP_API_URL || '';
 
@@ -80,13 +81,9 @@ export function useMecApi<T>(endpoint: string, interval?: number): UseMecApiResu
     }
   }, [endpoint]);
 
-  useEffect(() => {
-    fetchData();
-    if (interval && endpoint) {
-      const id = setInterval(fetchData, interval);
-      return () => clearInterval(id);
-    }
-  }, [fetchData, interval, endpoint]);
+  useEffect(() => { fetchData(); }, [fetchData]);
+  // A hidden tab stops polling and catches up the moment it is shown again.
+  useVisibleInterval(fetchData, endpoint ? interval : 0);
 
   return { data, loading, error, refetch: fetchData };
 }
@@ -113,13 +110,9 @@ export function useMecList<T>(endpoint: string, interval?: number): UseMecApiRes
     }
   }, [endpoint]);
 
-  useEffect(() => {
-    fetchData();
-    if (interval && endpoint) {
-      const id = setInterval(fetchData, interval);
-      return () => clearInterval(id);
-    }
-  }, [fetchData, interval, endpoint]);
+  useEffect(() => { fetchData(); }, [fetchData]);
+  // A hidden tab stops polling and catches up the moment it is shown again.
+  useVisibleInterval(fetchData, endpoint ? interval : 0);
 
   return { data, loading, error, refetch: fetchData };
 }

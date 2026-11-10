@@ -10,6 +10,7 @@ import TopologyEditor from './TopologyEditor';
 import AgentIcons from './AgentIcons';
 import AttackPanel from './AttackPanel';
 import './session-graph.css';
+import { startVisibleInterval } from '../../../shared/ui/useVisibleInterval';
 
 // The graph libraries are large: fetched only when a graph is asked for.
 const Graph2D = React.lazy(() => import('./Graph2D'));
@@ -75,8 +76,8 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
       setEvents((old) => [...old, ...r.data].slice(-300));
     }).catch(() => undefined);
     void pull();
-    const timer = window.setInterval(pull, 3000);
-    return () => { live = false; window.clearInterval(timer); };
+    const stopPulling = startVisibleInterval(() => { void pull(); }, 3000);
+    return () => { live = false; stopPulling(); };
   }, [mode]);
   const graph = useMemo(
     () => (mode === 'graph3d' ? buildWorkMap(sessions, links, servers, events, t('graph.legend.local'), network ? topology : null, facts) : buildGraph(sessions, links)),

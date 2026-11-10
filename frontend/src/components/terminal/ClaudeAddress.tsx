@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../../shared/api/useApi';
 import { useT } from '../../shared/i18n';
 import './claude-address.css';
+import { startVisibleInterval } from '../../shared/ui/useVisibleInterval';
 
 /** A Claude Code session running in a terminal session. */
 export interface ClaudePeer {
@@ -36,15 +37,13 @@ export function useClaudePeers(sessionId: string | undefined): ClaudePeer[] {
     if (!sessionId) return undefined;
     let live = true;
     const look = () => {
-      if (document.visibilityState === 'hidden') return;
       apiRequest<ClaudeInfo>(`/api/terminal/sessions/${encodeURIComponent(sessionId)}/claude`)
         .then((res) => { if (live && res.success) setPeers(res.data?.claude || []); })
         .catch(() => { /* keep what was shown */ });
     };
     look();
-    const timer = window.setInterval(look, EVERY_MS);
-    document.addEventListener('visibilitychange', look);
-    return () => { live = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', look); };
+    const stopLooking = startVisibleInterval(look, EVERY_MS);
+    return () => { live = false; stopLooking(); };
   }, [sessionId]);
   return peers;
 }
