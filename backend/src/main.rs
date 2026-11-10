@@ -43,6 +43,7 @@ mod remote;
 mod remote_host_trust;
 mod remote_probe;
 mod remote_servers;
+mod server_facts;
 mod runtime_identity;
 mod scope_access;
 mod scope_settings;

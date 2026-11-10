@@ -5,6 +5,7 @@ pub(super) fn save_probe_results(
     results: &[RemoteServerStatus],
 ) -> Result<(), String> {
     let _guard = SERVER_WRITES.lock().unwrap_or_else(|e| e.into_inner());
+    crate::server_facts::record(results);
     let mut latest = load_servers()?;
     merge_probe_results(&mut latest, snapshot, results);
     save_servers(&mut latest)

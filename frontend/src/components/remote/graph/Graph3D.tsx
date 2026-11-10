@@ -27,6 +27,10 @@ const REPORT_COLOR = '#7dd3fc';
 /** Where the network's lowest tier stands above the lead, and the step between tiers. */
 const BASE_Y = 70;
 const TIER_GAP = 58;
+/** The height the machines stand at when the network is drawn. */
+const SERVER_Y = 14;
+/** The height the sessions hang at under them. */
+const SESSION_Y = -30;
 
 /** A colour dimmed towards the background, as an arrow fades once its work is done. */
 function dim(hex: string, strength: number) {
@@ -52,7 +56,9 @@ function serverObject(n: GraphNode) {
   group.add(new THREE.Mesh(new THREE.IcosahedronGeometry(r * 0.55, 0), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.55, flatShading: true, transparent: true, opacity: n.alive ? 0.95 : 0.4 })));
   group.add(label(`▣ ${n.name}`, 6.2, '#e6edf3', -(r + 8), true));
   if (n.sub) group.add(label(n.sub, 4.2, '#9da7b3', -(r + 15.5)));
-  if (n.status && n.status !== 'online') group.add(label(n.status, 3.8, '#f87171', -(r + 21)));
+  let y = r + 21;
+  if (n.status && n.status !== 'online') { group.add(label(n.status, 3.8, '#f87171', -y)); y += 5.5; }
+  for (const line of n.info || []) { group.add(label(line.length > 44 ? `${line.slice(0, 43)}…` : line, 3.6, '#7f8ea3', -y)); y += 5.2; }
   return group;
 }
 
@@ -125,7 +131,7 @@ export default function Graph3D({ graph, selected, onSelect, onHoverEdge, autoRo
   handlers.current = { onSelect, onHoverEdge };
   const lastEvent = useRef<number | null>(null);
   const shape = graph.nodes.map((n) => n.id).join(',') + '|' + graph.edges.map((e) => e.id).join(',');
-  const signature = signatureOf(graph) + graph.nodes.map((n) => `${n.task || ''}|${n.heat || 0}|${n.status || ''}`).join(';');
+  const signature = signatureOf(graph) + graph.nodes.map((n) => `${n.task || ''}|${n.heat || 0}|${n.status || ''}|${(n.info || []).join('/')}`).join(';');
 
   useEffect(() => {
     const el = box.current;
@@ -158,9 +164,9 @@ export default function Graph3D({ graph, selected, onSelect, onHoverEdge, autoRo
       .onLinkHover((l: L | null) => handlers.current.onHoverEdge(l?.note || null, pointer.current.x, pointer.current.y));
     // Sessions stay by their machine; machines keep their distance from each other. The devices push
     // only gently and nearby: a strong push from the whole fixed tier above pressed everything below it down.
-    g.d3Force('charge')?.strength((n: N) => (n.kind === 'server' ? -420 : n.kind === 'device' ? -200 : -110)).distanceMax(200);
+    g.d3Force('charge')?.strength((n: N) => (n.kind === 'server' ? -260 : n.kind === 'device' ? -80 : -55)).distanceMax(130);
     g.d3Force('link')
-      ?.distance((l: L) => (l.kind === 'net' ? 60 : l.kind === 'host' ? 42 : l.kind === 'conn' ? 150 : l.kind === 'ghost' ? 150 : l.kind === 'report' ? 90 : 95))
+      ?.distance((l: L) => (l.kind === 'net' ? 60 : l.kind === 'host' ? 66 : l.kind === 'conn' ? 150 : l.kind === 'ghost' ? 150 : l.kind === 'report' ? 90 : 95))
       .strength((l: L) => (l.kind === 'net' ? 0.7 : l.kind === 'host' ? 1 : l.kind === 'conn' ? 0.5 : l.kind === 'ghost' ? 0.25 : l.kind === 'report' ? 0 : 0.15));
     // Start close: the layout settles within a few hundred units of the centre.
     g.cameraPosition({ x: 0, y: 150, z: 560 });
@@ -177,6 +183,8 @@ export default function Graph3D({ graph, selected, onSelect, onHoverEdge, autoRo
     stars.setAttribute('position', new THREE.BufferAttribute(pts, 3));
     scene.add(new THREE.Points(stars, new THREE.PointsMaterial({ color: '#7c93b8', size: 1.6, transparent: true, opacity: 0.55, sizeAttenuation: true })));
     fg.current = g;
+    // For looking at the layout from the browser's console (and the screenshot check).
+    (el as any).__graph = g;
 
     const move = (e: MouseEvent) => { pointer.current = { x: e.clientX, y: e.clientY }; };
     el.addEventListener('mousemove', move);
@@ -216,12 +224,18 @@ export default function Graph3D({ graph, selected, onSelect, onHoverEdge, autoRo
     // Keep where the nodes already are, so a refresh does not throw them about.
     const before = new Map<string, N>((g.graphData().nodes as N[]).map((n) => [n.id, n]));
     const deepest = Math.max(0, ...graph.nodes.map((n) => n.layer ?? 0));
+    const tiered = graph.nodes.some((n) => n.kind === 'device');
     const nodes: N[] = graph.nodes.map((n) => {
       const old = before.get(n.id);
       const next: N = { ...n, x: old?.x, y: old?.y, z: old?.z };
       if (n.lead) { next.fx = 0; next.fy = 0; next.fz = 0; }
       // The network stands in tiers above the sessions: the internet on top, each hop inwards a step down.
       if (n.kind === 'device') next.fy = BASE_Y + (deepest - (n.layer ?? deepest)) * TIER_GAP;
+      // With the network drawn, the machines stand in a tier of their own just under it (level with the lead),
+      // each one's sessions hanging close below: left free, the tiers above pressed the busiest machine far down.
+      if (n.kind === 'server' && tiered) next.fy = SERVER_Y;
+      // …and the sessions in a tier just under their machines, spread round them.
+      if (n.kind === 'session' && !n.lead && tiered) next.fy = SESSION_Y;
       return next;
     });
     const links: L[] = graph.edges.map((e) => ({ id: e.id, source: e.from, target: e.to, live: e.live, strength: e.strength, color: e.color, note: e.note, kind: e.kind || 'order' }));

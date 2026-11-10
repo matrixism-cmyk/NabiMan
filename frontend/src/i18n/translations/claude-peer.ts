@@ -119,6 +119,9 @@ const t: T = {
   'topology.kind.internet': { ko: '인터넷', en: 'Internet', ja: 'Internet' },
   'topology.kind.storage': { ko: '스토리지', en: 'Storage', ja: 'Storage' },
   'topology.kind.other': { ko: '기타', en: 'Other', ja: 'Other' },
+  'graph.check': { ko: '서버 점검', en: 'Check servers', ja: 'サーバー点検' },
+  'graph.checking': { ko: '점검 중…', en: 'Checking…', ja: '点検中…' },
+  'graph.checkHint': { ko: '저장된 모든 서버에 접속해 OS, CPU, 메모리, 디스크를 다시 읽어 옵니다(「전체 확인」과 같습니다).', en: 'Connects to every saved server and reads its OS, CPU, memory and disk again.', ja: '保存されたすべてのサーバーに接続して状態を読み直します。' },
 };
 
 export default t;

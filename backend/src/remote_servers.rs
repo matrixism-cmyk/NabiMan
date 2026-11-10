@@ -165,6 +165,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("", web::get().to(list_servers))
             .route("", web::post().to(add_server))
             .route("/check-all", web::post().to(check_all_servers))
+            .route("/facts", web::get().to(crate::server_facts::facts))
             .route("/ssh-key", web::get().to(ssh_keys::get_ssh_key_info))
             .route("/ssh-ca", web::get().to(ssh_ca))
             .route(

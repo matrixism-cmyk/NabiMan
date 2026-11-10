@@ -4,7 +4,7 @@ import { useT } from '../../../shared/i18n';
 import ClaudeAddress from '../../terminal/ClaudeAddress';
 import type { SessionLink } from '../SessionLinks';
 import type { SessionInfo } from '../SessionsView';
-import { buildGraph, buildWorkMap, MapEvent, MapServer, Topology, ViewMode } from './graphModel';
+import { buildGraph, buildWorkMap, MapEvent, MapServer, ServerFacts, Topology, ViewMode } from './graphModel';
 import type { Layout2D } from './Graph2D';
 import TopologyEditor from './TopologyEditor';
 import AgentIcons from './AgentIcons';
@@ -48,10 +48,24 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
   const newest = useRef(0);
   const [topology, setTopology] = useState<Topology | null>(null);
   const [editing, setEditing] = useState(false);
+  const [facts, setFacts] = useState<ServerFacts[]>([]);
+  const [checking, setChecking] = useState(false);
+  const loadFacts = () => apiRequest('/api/remote-servers/facts').then((r: any) => { if (r?.success && Array.isArray(r.data)) setFacts(r.data); }).catch(() => undefined);
+  // Asks every saved server how it is (the same check as 「전체 확인」), then shows what they said.
+  const checkAll = async () => {
+    setChecking(true);
+    try {
+      await apiRequest('/api/remote-servers/check-all', { method: 'POST' });
+      const r: any = await apiRequest('/api/remote-servers');
+      if (r?.success && Array.isArray(r.data)) setServers(r.data);
+      await loadFacts();
+    } catch { /* shown as stale facts */ } finally { setChecking(false); }
+  };
   const [network, setNetwork] = useState(() => stored(NETWORK_KEY, '1') === '1');
   useEffect(() => {
     if (mode !== 'graph3d') return undefined;
     let live = true;
+    void loadFacts();
     apiRequest('/api/terminal/topology').then((r: any) => { if (live && r?.success && r.data?.devices) setTopology(r.data); }).catch(() => undefined);
     apiRequest('/api/remote-servers').then((r: any) => { if (live && r?.success && Array.isArray(r.data)) setServers(r.data); }).catch(() => undefined);
     const pull = () => apiRequest(`/api/terminal/claude-events?window=3600&after=${newest.current}`).then((r: any) => {
@@ -64,9 +78,9 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
     return () => { live = false; window.clearInterval(timer); };
   }, [mode]);
   const graph = useMemo(
-    () => (mode === 'graph3d' ? buildWorkMap(sessions, links, servers, events, t('graph.legend.local'), network ? topology : null) : buildGraph(sessions, links)),
+    () => (mode === 'graph3d' ? buildWorkMap(sessions, links, servers, events, t('graph.legend.local'), network ? topology : null, facts) : buildGraph(sessions, links)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sessions, links, servers, events, mode, topology, network],
+    [sessions, links, servers, events, mode, topology, network, facts],
   );
   const [selected, setSelected] = useState<string | null>(null);
   const [tip, setTip] = useState<{ note: string; x: number; y: number } | null>(null);
@@ -99,6 +113,9 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
         {mode === 'graph3d' && !!topology?.devices.length && (
           <button type="button" className={`btn btn-sm ${network ? 'btn-primary' : 'btn-secondary'}`} aria-pressed={network}
             onClick={() => { setNetwork(!network); store(NETWORK_KEY, network ? '0' : '1'); }}>⛨ {t('graph.network', { count: topology.devices.length })}</button>
+        )}
+        {mode === 'graph3d' && (
+          <button type="button" className="btn btn-secondary btn-sm" disabled={checking} onClick={() => void checkAll()} title={t('graph.checkHint')}>⟳ {t(checking ? 'graph.checking' : 'graph.check')}</button>
         )}
         {mode === 'graph3d' && (
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditing(true)} title={t('topology.note')}>✎ {t('topology.edit')}</button>

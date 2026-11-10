@@ -48,6 +48,8 @@ export interface GraphNode {
   sub?: string;
   /** A server's state as last checked. */
   status?: string;
+  /** More lines about a machine: its OS, and CPU · memory · disk as last checked. */
+  info?: string[];
   /** What a busy session is working on: the first line of the last request it got. */
   task?: string;
   /** Messages to or from it in the window: busier ones are drawn larger. */
@@ -143,6 +145,8 @@ export const signatureOf = (g: Graph) => [
 
 /** A saved server, as the work map needs it. */
 export interface MapServer { id: string; name: string; host: string; port?: number; status?: string }
+/** What a server said about itself when last checked. */
+export interface ServerFacts { id: string; status: string; hostname: string; os: string; uptime: string; cpu: string; memory: string; disk: string; load: string; checked_at: string }
 /** A message between two Claude sessions, from the record. */
 export interface MapEvent { id: number; at: number; from: string | null; to: string | null; from_name: string; to_name: string; text: string }
 
@@ -158,7 +162,7 @@ export interface Topology {
   hosts: { device: string; server_host: string }[];
 }
 
-export function buildWorkMap(sessions: SessionInfo[], links: SessionLink[], servers: MapServer[], events: MapEvent[], here: string, topology?: Topology | null): Graph {
+export function buildWorkMap(sessions: SessionInfo[], links: SessionLink[], servers: MapServer[], events: MapEvent[], here: string, topology?: Topology | null, facts?: ServerFacts[]): Graph {
   const g = buildGraph(sessions, links);
   const heat = new Map<string, number>();
   const task = new Map<string, string>();
@@ -182,6 +186,11 @@ export function buildWorkMap(sessions: SessionInfo[], links: SessionLink[], serv
         sub: n.group === 'local' ? '' : `${server?.host || n.group}${server?.port && server.port !== 22 ? `:${server.port}` : ''}`,
         status: server?.status,
       };
+      const f = server && facts?.find((x) => x.id === server.id);
+      if (f) {
+        const use = [f.cpu && `CPU ${f.cpu}`, f.memory && `MEM ${f.memory}`, f.disk && `DISK ${f.disk}`].filter(Boolean).join(' · ');
+        node.info = [f.os, use, f.uptime].filter((x) => x && x !== 'unknown') as string[];
+      }
       made.set(id, node);
       g.nodes.push(node);
       // NabiMan (the lead's machine) holds a connection to every other machine.
