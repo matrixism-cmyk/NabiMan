@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
-"""Packaging-time lockfile inventory and artifact receipt, not a signed build attestation."""
-import argparse,base64,datetime,hashlib,json,pathlib,subprocess,urllib.parse,uuid
+"""Packaging-time lockfile inventory and artifact receipt, not a signed build attestation.
+
+Actions:
+  generate  CycloneDX SBOM + inventory receipt in the static dir (--licenses adds SPDX
+            licence expressions from a `licenses` run to the SBOM components)
+  verify    re-check a receipt against the binaries and static files
+  licenses  third-party licence inventory and policy (packaging/licenses.json): writes
+            NOTICE, THIRD_PARTY_LICENSES.md and licenses.json to --out, and exits 1 when a
+            shipped package's licence is not allowed (unless --report-only)
+"""
+import argparse,base64,datetime,hashlib,json,pathlib,subprocess,sys,urllib.parse,uuid
 EXCLUDED={'release-bom.cdx.json','release-inventory.json'}
 def sha(path):
  with path.open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest() if hasattr(hashlib,'file_digest') else hashlib.sha256(f.read()).hexdigest()
@@ -65,13 +74,23 @@ def inventory(source):
    'component':{'type':'application','bom-ref':root,'name':'NabiMan','version':npm['version']},
    'properties':[{'name':'nabiman:scope','value':'Declared lockfile inventory, including development/optional/platform packages; not measured binary or browser-bundle composition. System libraries and resolved peer graph are incomplete.'},{'name':'nabiman:unresolved-npm-edges','value':str(unresolved)}]},
   'components':components,'dependencies':[{'ref':root,'dependsOn':roots}]+edges,'compositions':[{'aggregate':'incomplete','assemblies':[root]}]}
-def generate(source,binary,static):
- bom=inventory(source);write(static/'release-bom.cdx.json',bom)
+def add_licenses(bom,licenses):
+ """SPDX expressions from licenses.json onto the matching SBOM components."""
+ known={(row['ecosystem'],row['name'],str(row['version'])):row for row in json.loads(licenses.read_text())['packages']}
+ for c in bom['components']:
+  row=known.get((c['purl'].split(':',1)[1].split('/',1)[0],c['name'],c['version']))
+  if not row:continue
+  c['licenses']=[{'expression':row['license']}] if row['license']!='NOASSERTION' else [{'license':{'name':'NOASSERTION'}}]
+  c['properties']=[p for p in c.get('properties',[]) if p['name']!='nabiman:inventory']+[{'name':'nabiman:license-status','value':row['status']},{'name':'nabiman:shipped','value':str(row['shipped']).lower()}]
+def generate(source,binary,static,licenses=None):
+ bom=inventory(source)
+ if licenses:add_licenses(bom,licenses)
+ write(static/'release-bom.cdx.json',bom)
  artifacts={name:{'sha256':sha(binary.parent/name),'size':(binary.parent/name).stat().st_size} for name in ['nabiman-server','nabiman-privileged-helper','nabiman-recovery']}
  receipt={'schema_version':1,'kind':'unsigned-packaging-inventory','created_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
   'artifacts':artifacts,'inputs':{name:sha(source/name) for name in ['backend/Cargo.lock','frontend/package-lock.json','scripts/management-recovery.py']},
   'static':files(static),'sbom_sha256':sha(static/'release-bom.cdx.json'),'components':len(bom['components']),
-  'limitations':['Lockfile inventory is not measured artifact composition','No source-to-binary, reproducible-build or publisher-signature proof','No complete license review, vulnerability scan or system-library inventory']}
+  'limitations':['Lockfile inventory is not measured artifact composition','No source-to-binary or reproducible-build proof; publisher authenticity comes from the detached minisign signature, not from this receipt','Licence data is declared metadata checked against packaging/licenses.json, not a legal review; no vulnerability scan or system-library inventory']}
  write(static/'release-inventory.json',receipt);verify(source,binary,static)
  print(json.dumps({'components':receipt['components'],'unsigned':True,'artifact_checks_passed':True}))
 def verify(source,binary,static):
@@ -84,6 +103,25 @@ def verify(source,binary,static):
   path=pathlib.PurePosixPath(name);assert not path.is_absolute() and '..' not in path.parts
   p=static/name;assert not p.is_symlink() and sha(p)==entry['sha256'] and p.stat().st_size==entry['size']
  assert receipt['sbom_sha256']==sha(static/'release-bom.cdx.json')
+PRODUCT_NOTICE="""NabiMan
+Copyright (c) 2026 XOS. All rights reserved.
+NabiMan is proprietary software distributed under the NabiMan Proprietary License (LICENSE)."""
+def licenses(source,out,policy,node_modules,arch,report_only):
+ sys.path.insert(0,str(pathlib.Path(__file__).resolve().parent));import release_licenses as rl
+ pol,rows=rl.collect(source,policy,node_modules,arch);summary=rl.write_outputs(pol,rows,out,PRODUCT_NOTICE)
+ shipped=[r for r in rows if r['shipped']]
+ print(json.dumps({'packages':len(rows),'shipped':len(shipped),'shipped_licenses':summary['shipped_licenses'],
+  'not_shipped_needing_review':sorted({r['license'] for r in rows if not r['shipped'] and r['status'] in ('review','rejected')}),
+  'problems':summary['problems'],'out':str(out)},ensure_ascii=False,indent=1))
+ if summary['problems'] and not report_only:raise SystemExit('Licence policy failed for shipped packages (see above); fix the dependency or record a review in packaging/licenses.json')
 if __name__=='__main__':
- parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('action',choices=['generate','verify']);parser.add_argument('--source',type=pathlib.Path,required=True);parser.add_argument('--binary',type=pathlib.Path,required=True);parser.add_argument('--static',type=pathlib.Path,required=True);a=parser.parse_args()
- (generate if a.action=='generate' else verify)(a.source.resolve(),a.binary.resolve(),a.static.resolve())
+ parser=argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter);parser.add_argument('action',choices=['generate','verify','licenses']);parser.add_argument('--source',type=pathlib.Path,required=True)
+ parser.add_argument('--binary',type=pathlib.Path);parser.add_argument('--static',type=pathlib.Path);parser.add_argument('--licenses',type=pathlib.Path,help='generate: licenses.json from a licenses run')
+ parser.add_argument('--out',type=pathlib.Path);parser.add_argument('--policy',type=pathlib.Path);parser.add_argument('--node-modules',type=pathlib.Path);parser.add_argument('--arch');parser.add_argument('--report-only',action='store_true');a=parser.parse_args()
+ if a.action=='licenses':
+  if not a.out:parser.error('licenses needs --out')
+  licenses(a.source.resolve(),a.out.resolve(),(a.policy or a.source/'packaging/licenses.json').resolve(),a.node_modules.resolve() if a.node_modules else None,a.arch,a.report_only)
+ else:
+  if not (a.binary and a.static):parser.error(a.action+' needs --binary and --static')
+  if a.action=='generate':generate(a.source.resolve(),a.binary.resolve(),a.static.resolve(),a.licenses.resolve() if a.licenses else None)
+  else:verify(a.source.resolve(),a.binary.resolve(),a.static.resolve())

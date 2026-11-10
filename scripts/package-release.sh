@@ -23,14 +23,21 @@ if [ ! -x "$binary" ] || [ ! -x "$helper" ] || [ ! -x "$recovery" ] || [ ! -f "$
     exit 1
 fi
 
-python3 "$repo_root/scripts/release-inventory.py" generate --source "$repo_root" --binary "$binary" --static "$frontend"
-
 mkdir -p "$output"
 output=$(cd "$output" && pwd)
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
-
 mkdir -p "$stage/nabiman/static"
+
+# Third-party licences: NOTICE, THIRD_PARTY_LICENSES.md and licenses.json go into the
+# package; a shipped dependency outside packaging/licenses.json fails the release here.
+license_args=(--source "$repo_root" --out "$stage/nabiman" --arch "$arch")
+node_modules=${NABIMAN_NODE_MODULES:-$repo_root/frontend/node_modules}
+if [ -d "$node_modules" ]; then license_args+=(--node-modules "$node_modules"); fi
+python3 "$repo_root/scripts/release-inventory.py" licenses "${license_args[@]}"
+python3 "$repo_root/scripts/release-inventory.py" generate --source "$repo_root" --binary "$binary" --static "$frontend" \
+    --licenses "$stage/nabiman/licenses.json"
+cp "$repo_root/LICENSE" "$stage/nabiman/LICENSE"
 cp "$binary" "$stage/nabiman/nabiman-server"
 cp "$helper" "$stage/nabiman/nabiman-privileged-helper"
 install -m 755 "$recovery" "$stage/nabiman/nabiman-recovery"
@@ -58,5 +65,6 @@ python3 "$repo_root/scripts/verify-release.py" "$output/$name"
 cp "$stage/nabiman/static/release-bom.cdx.json" "$output/$name.cdx.json"
 cp "$stage/nabiman/release-manifest.json" "$output/$name.manifest.json"
 cp "$stage/nabiman/static/release-inventory.json" "$output/$name.inventory.json"
+cp "$stage/nabiman/licenses.json" "$output/$name.licenses.json"
 cp "$repo_root/scripts/verify-release.py" "$output/verify-release.py"
 echo "Created verified $output/$name with lockfile inventory and manifest"

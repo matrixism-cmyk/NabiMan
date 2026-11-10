@@ -102,7 +102,7 @@ def verify(archive,extract_to=None):
   expected=receipt['files']
   regular={m.name:m for m in members if m.isfile() and m.name!=MANIFEST}
   if set(expected)!=set(regular):raise ValueError('Manifest file set differs from package')
-  required={'nabiman/nabiman-server','nabiman/nabiman-privileged-helper','nabiman/nabiman-recovery','nabiman/management-recovery.py','nabiman/verify-release.py','nabiman/static/index.html','nabiman/static/release-inventory.json','nabiman/static/release-bom.cdx.json'}
+  required={'nabiman/nabiman-server','nabiman/nabiman-privileged-helper','nabiman/nabiman-recovery','nabiman/management-recovery.py','nabiman/verify-release.py','nabiman/static/index.html','nabiman/static/release-inventory.json','nabiman/static/release-bom.cdx.json','nabiman/LICENSE','nabiman/NOTICE','nabiman/THIRD_PARTY_LICENSES.md'}
   if not required.issubset(regular):raise ValueError('Incomplete release')
   for name,member in regular.items():
    entry=expected[name]

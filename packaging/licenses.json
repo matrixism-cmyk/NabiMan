@@ -1,0 +1,24 @@
+{
+  "_comment": "Third-party licence policy for release packages (scripts/release_licenses.py). Mirrors backend/deny.toml [licenses].allow for Cargo and applies the same rules to npm. A shipped package passes when its SPDX expression can be satisfied by 'allow' or 'allow_with_conditions' ids. Ids matching 'review' patterns fail the release until the exact package@version is listed in 'reviewed' with a reason. Anything else (unknown, missing, NOASSERTION) fails.",
+  "allow": [
+    "MIT", "MIT-0", "Apache-2.0", "BSD-1-Clause", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Zlib",
+    "Unicode-3.0", "Unicode-DFS-2016", "CC0-1.0", "0BSD", "BSL-1.0", "Unlicense", "BlueOak-1.0.0",
+    "CDLA-Permissive-2.0", "OpenSSL", "Python-2.0", "WTFPL"
+  ],
+  "allow_with_conditions": {
+    "MPL-2.0": "File-level copyleft: ship the source of MPL-covered files unmodified or publish our changes to them; linking from proprietary code is fine.",
+    "CC-BY-4.0": "Attribution: keep the notice in THIRD_PARTY_LICENSES.md (data packages such as caniuse-lite)."
+  },
+  "exceptions": ["LLVM-exception"],
+  "aliases": {
+    "Apache 2.0": "Apache-2.0",
+    "Apache2": "Apache-2.0",
+    "BSD": "BSD-3-Clause",
+    "MIT License": "MIT"
+  },
+  "review": ["GPL-*", "LGPL-*", "AGPL-*", "EPL-*", "CDDL-*", "MPL-1.*", "CC-BY-SA-*", "CC-BY-NC-*", "SSPL-*", "BUSL-*", "EUPL-*", "OSL-*"],
+  "clarify": {
+    "cargo:jsonpath-rust": {"license": "MIT", "reason": "Cargo.toml has only license-file = LICENSE, which is the MIT text (same clarification as backend/deny.toml)."}
+  },
+  "reviewed": {}
+}
