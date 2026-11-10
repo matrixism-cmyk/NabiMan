@@ -12,39 +12,11 @@ use crate::models::{AccessRules, HourWindow, NabimanUser};
 /// At most this many addresses or networks per account.
 pub const MAX_NETWORKS: usize = 32;
 
-/// The address the person is at. NabiMan normally runs behind a proxy on the
-/// same machine, which adds the address it was reached from to
-/// `X-Forwarded-For`; only then is that header believed, and its right-most
-/// public address is taken (the left can be anything the browser sent). On
-/// a private network with no public address in it, its left-most is.
+/// The address the person is at: the peer, or — when the peer is a trusted
+/// proxy (`NABIMAN_TRUSTED_PROXIES`, default this machine) — the right-most
+/// address in `X-Forwarded-For` that is not one; see `trusted_proxy`.
 pub fn client_ip(req: &HttpRequest) -> Option<IpAddr> {
-    let peer = req.peer_addr()?.ip();
-    if !peer.is_loopback() {
-        return Some(peer);
-    }
-    let chain: Vec<IpAddr> = req
-        .headers()
-        .get_all("x-forwarded-for")
-        .filter_map(|v| v.to_str().ok())
-        .flat_map(|v| v.split(','))
-        .filter_map(|a| a.trim().parse().ok())
-        .collect();
-    chain
-        .iter()
-        .rev()
-        .find(|ip| public(**ip))
-        .or(chain.first())
-        .copied()
-        .or(Some(peer))
-}
-
-fn public(ip: IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(v4) => !(v4.is_loopback() || v4.is_private() || v4.is_link_local() || v4.is_unspecified()
-            || (v4.octets()[0] == 100 && (v4.octets()[1] & 0xc0) == 64)),
-        IpAddr::V6(v6) => !(v6.is_loopback() || v6.is_unspecified() || (v6.segments()[0] & 0xfe00) == 0xfc00
-            || (v6.segments()[0] & 0xffc0) == 0xfe80),
-    }
+    crate::trusted_proxy::client_ip(req)
 }
 
 /// `203.0.113.7` or `203.0.113.0/24` (IPv6 too), as an address and prefix.
@@ -60,7 +32,7 @@ pub fn parse_network(text: &str) -> Option<(IpAddr, u8)> {
     (bits <= max).then_some((addr, bits))
 }
 
-fn in_network(ip: IpAddr, (net, bits): (IpAddr, u8)) -> bool {
+pub(crate) fn in_network(ip: IpAddr, (net, bits): (IpAddr, u8)) -> bool {
     let ip = match ip {
         IpAddr::V6(v6) => v6.to_ipv4_mapped().map(IpAddr::V4).unwrap_or(ip),
         v4 => v4,

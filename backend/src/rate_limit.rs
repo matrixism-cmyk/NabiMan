@@ -92,10 +92,10 @@ where
                 async move { service.call(req).await.map(|r| r.map_into_left_body()) },
             );
         }
-        // Never trust client-controlled Forwarded / X-Forwarded-For headers.
-        let peer = req
-            .peer_addr()
-            .map(|a| a.ip().to_string())
+        // The real client behind a trusted proxy (NABIMAN_TRUSTED_PROXIES);
+        // forwarding headers from anyone else are ignored.
+        let peer = crate::trusted_proxy::client_ip(req.request())
+            .map(|ip| ip.to_string())
             .unwrap_or_else(|| "unknown".into());
         let permit = Permit::begin(&self.state, &peer, Instant::now());
         Box::pin(async move {
@@ -150,13 +150,15 @@ where
                 let parsed = serde_json::from_slice::<Identity>(&bytes);
                 let name =
                     match parsed {
-                        Ok(v) => v.username.unwrap_or_else(|| {
-                            if req.path() == "/api/auth/login" {
-                                "admin".into()
-                            } else {
-                                String::new()
-                            }
-                        }),
+                        // A password sign-in names its account; there is no default one.
+                        Ok(Identity { username: None }) if req.path() == "/api/auth/login" => {
+                            return Ok(req
+                                .into_response(HttpResponse::BadRequest().json(
+                                    ApiResponse::<()>::error("Username is required"),
+                                ))
+                                .map_into_right_body())
+                        }
+                        Ok(v) => v.username.unwrap_or_default(),
                         Err(_) => {
                             return Ok(req
                                 .into_response(HttpResponse::BadRequest().json(

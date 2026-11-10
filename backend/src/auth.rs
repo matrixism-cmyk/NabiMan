@@ -85,10 +85,14 @@ pub async fn login(
     secret: web::Data<JwtSecret>,
     sessions: web::Data<SessionStore>,
 ) -> HttpResponse {
-    let username = body.username.as_deref().unwrap_or("admin");
+    let Some(username) = body.username.as_deref().filter(|name| !name.is_empty()) else {
+        return HttpResponse::BadRequest().json(ApiResponse::<()>::error("Username is required"));
+    };
     let user = match crate::users::find_user_by_name(&user_store, username) {
         Some(u) => u,
         None => {
+            // As slow as a wrong password, so the timing names no accounts.
+            crate::password_check::verify_absent(&body.password).await;
             return HttpResponse::Unauthorized()
                 .json(ApiResponse::<()>::error("Invalid credentials"))
         }
@@ -161,17 +165,15 @@ pub async fn change_password(
         Some(u) if Some(u.id.as_str()) == verified_user_id(&req).as_deref() => u,
         _ => return HttpResponse::Ok().json(ApiResponse::<()>::error("User not found")),
     };
-    if !bcrypt::verify(&body.current_password, &user.password_hash).unwrap_or(false) {
+    if !crate::password_check::verify(&body.current_password, &user.password_hash).await.unwrap_or(false) {
         return HttpResponse::Ok().json(ApiResponse::<()>::error("Current password is incorrect"));
     }
-    if body.new_password.len() < 8 {
-        return HttpResponse::Ok().json(ApiResponse::<()>::error(
-            "Password must be at least 8 characters",
-        ));
+    if !crate::password_policy::acceptable(&body.new_password) {
+        return HttpResponse::Ok().json(ApiResponse::<()>::error(crate::password_policy::RULE));
     }
-    let new_hash = match bcrypt::hash(&body.new_password, 10) {
+    let new_hash = match crate::password_check::hash(&body.new_password, 10).await {
         Ok(h) => h,
-        Err(e) => return HttpResponse::Ok().json(ApiResponse::<()>::error(&e.to_string())),
+        Err(e) => return HttpResponse::Ok().json(ApiResponse::<()>::error(&e)),
     };
     match crate::users::update_password(&user_store, &user.id, &user.password_hash, new_hash) {
         Ok(()) => {

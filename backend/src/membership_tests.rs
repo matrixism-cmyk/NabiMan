@@ -160,8 +160,8 @@ fn old_memberships_keep_access_without_new_fields() {
 
 #[test]
 fn a_sign_up_password_needs_eight_characters_and_fits_bcrypt() {
-    assert!(super::valid_signup_password("abcd1234"));
-    assert!(!super::valid_signup_password("abcd123"));
-    assert!(super::valid_signup_password("비밀번호여덟자다"), "eight Korean letters are eight characters");
+    assert!(super::valid_signup_password("abcd1234efgh"));
+    assert!(!super::valid_signup_password("abcd1234efg"));
+    assert!(super::valid_signup_password("비밀번호는열두글자입니다"), "twelve Korean letters are twelve characters");
     assert!(!super::valid_signup_password(&"a".repeat(73)), "bcrypt reads only 72 bytes");
 }

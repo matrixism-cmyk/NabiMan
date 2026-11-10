@@ -104,6 +104,7 @@ async fn verify_login(
     let invalid =
         || HttpResponse::Unauthorized().json(ApiResponse::<()>::error("Invalid credentials"));
     let Some(snapshot) = crate::users::find_user_by_name(&user_store, &body.username) else {
+        crate::password_check::verify_absent(&body.password).await;
         return invalid();
     };
     if !snapshot.active()

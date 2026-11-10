@@ -7,7 +7,7 @@ fn attempt(path: &str, user: &str, peer: &str) -> test::TestRequest {
         .set_json(serde_json::json!({"username":user,"password":"fixture"}))
 }
 #[actix_web::test]
-async fn account_limit_crosses_routes_sources_and_forged_forwarding() {
+async fn account_limit_crosses_routes_and_ignores_forwarding_from_untrusted_peers() {
     let app = test::init_service(
         App::new()
             .wrap(RateLimiter::new())
@@ -20,16 +20,13 @@ async fn account_limit_crosses_routes_sources_and_forged_forwarding() {
         } else {
             "/api/auth/2fa/verify"
         };
-        let response = test::call_service(
-            &app,
-            attempt(path, "account", &format!("127.0.0.{}:1000", i + 1)).to_request(),
-        )
-        .await;
+        let response = test::call_service(&app, attempt(path, "account", "198.51.100.7:1000").to_request()).await;
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
+    // Not a trusted proxy: its X-Forwarded-For does not make it someone else.
     let response = test::call_service(
         &app,
-        attempt("/api/auth/ldap/login", "ACCOUNT", "127.0.0.9:1000")
+        attempt("/api/auth/ldap/login", "ACCOUNT", "198.51.100.7:1001")
             .insert_header(("X-Forwarded-For", "203.0.113.45"))
             .to_request(),
     )
@@ -45,16 +42,32 @@ async fn account_limit_crosses_routes_sources_and_forged_forwarding() {
         .unwrap();
     assert!((1..=300).contains(&retry));
     assert_eq!(response.headers().get("Cache-Control").unwrap(), "no-store");
-    // One attacked account does not exhaust other accounts behind the same proxy.
-    assert_eq!(
-        test::call_service(
-            &app,
-            attempt("/api/auth/login", "different", "127.0.0.1:1000").to_request()
-        )
-        .await
-        .status(),
-        StatusCode::UNAUTHORIZED
-    );
+    for (user, peer) in [("different", "198.51.100.7:1000"), ("account", "192.0.2.10:1000")] {
+        // Another account from there, and the account's owner from elsewhere, still get through.
+        let status = test::call_service(&app, attempt("/api/auth/login", user, peer).to_request()).await.status();
+        assert_eq!(status, StatusCode::UNAUTHORIZED, "{user} from {peer}");
+    }
+}
+#[actix_web::test]
+async fn behind_the_local_proxy_each_client_has_its_own_budget() {
+    let app = test::init_service(
+        App::new()
+            .wrap(RateLimiter::new())
+            .default_service(web::to(|| async { HttpResponse::Unauthorized().finish() })),
+    )
+    .await;
+    let via_proxy = |user: &str, chain: &str| {
+        attempt("/api/auth/login", user, "127.0.0.1:5000").insert_header(("X-Forwarded-For", chain.to_string()))
+    };
+    for i in 0..5 {
+        // The attacker varies the forged left entry; nginx appended the real one.
+        let chain = format!("10.9.9.{i}, 203.0.113.66");
+        assert_eq!(test::call_service(&app, via_proxy("admin", &chain).to_request()).await.status(), StatusCode::UNAUTHORIZED);
+    }
+    let blocked = test::call_service(&app, via_proxy("admin", "1.1.1.1, 203.0.113.66").to_request()).await;
+    assert_eq!(blocked.status(), StatusCode::TOO_MANY_REQUESTS);
+    let owner = test::call_service(&app, via_proxy("admin", "198.51.100.20").to_request()).await;
+    assert_eq!(owner.status(), StatusCode::UNAUTHORIZED, "the same proxy, another client");
 }
 #[actix_web::test]
 async fn successful_requests_preserve_payload_but_network_budget_still_applies() {
@@ -154,34 +167,22 @@ async fn oversized_or_ambiguous_payloads_do_not_reach_authentication() {
     }
 }
 #[actix_web::test]
-async fn missing_local_username_cannot_bypass_admin_account_limit() {
-    let app = test::init_service(
-        App::new()
-            .wrap(RateLimiter::new())
-            .default_service(web::to(|| async { HttpResponse::Unauthorized().finish() })),
+async fn a_password_sign_in_without_a_username_is_refused() {
+    let app = test::init_service(App::new().wrap(RateLimiter::new()).default_service(web::to(
+        || async {
+            panic!("A sign-in without a username reached authentication");
+            #[allow(unreachable_code)]
+            HttpResponse::Ok().finish()
+        },
+    )))
+    .await;
+    let response = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri("/api/auth/login")
+            .set_json(serde_json::json!({"password":"fixture"}))
+            .to_request(),
     )
     .await;
-    for _ in 0..5 {
-        assert_eq!(
-            test::call_service(
-                &app,
-                test::TestRequest::post()
-                    .uri("/api/auth/login")
-                    .set_json(serde_json::json!({"password":"fixture"}))
-                    .to_request()
-            )
-            .await
-            .status(),
-            StatusCode::UNAUTHORIZED
-        );
-    }
-    assert_eq!(
-        test::call_service(
-            &app,
-            attempt("/api/auth/login", "admin", "127.0.0.2:1000").to_request()
-        )
-        .await
-        .status(),
-        StatusCode::TOO_MANY_REQUESTS
-    );
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }

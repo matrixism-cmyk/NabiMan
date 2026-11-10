@@ -231,19 +231,18 @@ async fn create_user(
             "Username: alphanumeric, _, - only",
         ));
     }
-    if body.password.len() < 8 {
-        return HttpResponse::Ok().json(ApiResponse::<()>::error(
-            "Password must be at least 8 characters",
-        ));
+    if !crate::password_policy::acceptable(&body.password) {
+        return HttpResponse::Ok().json(ApiResponse::<()>::error(crate::password_policy::RULE));
     }
+    // Hashed on the blocking pool, before the store is locked.
+    let hash = match crate::password_check::hash(&body.password, 10).await {
+        Ok(h) => h,
+        Err(e) => return HttpResponse::Ok().json(ApiResponse::<()>::error(&e)),
+    };
     let mut users = store.lock_safe();
     if users.iter().any(|u| u.username == body.username) {
         return HttpResponse::Ok().json(ApiResponse::<()>::error("Username already exists"));
     }
-    let hash = match bcrypt::hash(&body.password, 10) {
-        Ok(h) => h,
-        Err(e) => return HttpResponse::Ok().json(ApiResponse::<()>::error(&e.to_string())),
-    };
     let user = NabimanUser {
         share_authorization_version: uuid::Uuid::new_v4().to_string(),
         id: generate_id(),
@@ -281,6 +280,17 @@ async fn update_user(
         return r;
     }
     let user_id = path.into_inner();
+    let new_hash = match &body.password {
+        Some(pw) if !crate::password_policy::acceptable(pw) => {
+            return HttpResponse::Ok().json(ApiResponse::<()>::error(crate::password_policy::RULE))
+        }
+        // On the blocking pool, before the store is locked.
+        Some(pw) => match crate::password_check::hash(pw, 10).await {
+            Ok(hash) => Some(hash),
+            Err(error) => return HttpResponse::InternalServerError().json(ApiResponse::<()>::error(&error)),
+        },
+        None => None,
+    };
     let mut users = store.lock_safe();
     let previous = users.clone();
     let admin_count = users.iter().filter(|u| u.super_admin()).count();
@@ -300,20 +310,9 @@ async fn update_user(
         None => return HttpResponse::Ok().json(ApiResponse::<()>::error("User not found")),
     };
     let target_username = user.username.clone();
-    let password_changed = body.password.is_some();
-    if let Some(ref pw) = body.password {
-        if pw.len() < 8 {
-            return HttpResponse::Ok().json(ApiResponse::<()>::error(
-                "Password must be at least 8 characters",
-            ));
-        }
-        user.password_hash = match bcrypt::hash(pw, 10) {
-            Ok(hash) => hash,
-            Err(error) => {
-                return HttpResponse::InternalServerError()
-                    .json(ApiResponse::<()>::error(&error.to_string()))
-            }
-        };
+    let password_changed = new_hash.is_some();
+    if let Some(hash) = new_hash {
+        user.password_hash = hash;
     }
     if let Some(ref role) = body.role {
         user.role = role.clone();
