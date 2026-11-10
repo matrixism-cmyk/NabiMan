@@ -1,10 +1,71 @@
+//! Headers every response carries: no framing by other sites, no sniffing,
+//! a Content-Security-Policy fitted to the built SPA, and HSTS when the
+//! request came over HTTPS.
+//!
+//! The policy (`policy`) allows what the SPA actually does, and nothing else:
+//! - scripts only from this origin (no inline script in index.html); plus
+//!   `'wasm-unsafe-eval'` for WebAssembly (the terminal's image addon decodes
+//!   sixel with it, pdf.js its image codecs) and `blob:` for the dictation
+//!   AudioWorklet, which is loaded from a blob URL;
+//! - styles from this origin and inline (xterm.js and React insert `<style>`
+//!   elements; the recovery page has an inline `<style>`);
+//! - images, audio and video also as `data:`/`blob:` (2FA QR code, SFTP
+//!   previews, speech playback); fonts also as `data:`;
+//! - connections to this origin, its WebSocket (`ws:`/`wss:` on the same
+//!   host, spelled out for browsers whose `'self'` does not cover them) and
+//!   `blob:`; workers from this origin or `blob:` (pdf.js);
+//! - frames from this origin and https://fix.bebo.kr (the feedback panel the
+//!   admin launcher in public/fixhub-admin.js opens);
+//! - `frame-ancestors 'self'`, `object-src 'none'`, `base-uri 'self'`,
+//!   `form-action 'self'`.
+//!
+//! `NABIMAN_CSP=off` sends no policy; any other value replaces it verbatim.
+//! `NABIMAN_HSTS=true` always sends HSTS, `false` never; unset, it is sent
+//! when a trusted proxy (`NABIMAN_TRUSTED_PROXIES`) says the request came
+//! over HTTPS (`X-Forwarded-Proto: https`).
 use actix_web::{
     dev::{Service, ServiceRequest, ServiceResponse, Transform},
+    http::header::{HeaderName, HeaderValue},
     Error,
 };
 use std::future::{ready, Future, Ready};
 use std::pin::Pin;
 use std::rc::Rc;
+
+const FEEDBACK_ORIGIN: &str = "https://fix.bebo.kr";
+const HSTS: &str = "max-age=31536000; includeSubDomains";
+
+/// A Host header fit to be written into the policy.
+fn plain_host(host: &str) -> Option<&str> {
+    (!host.is_empty() && host.len() <= 255 && host.chars().all(|c| c.is_ascii_alphanumeric() || ".-:[]".contains(c)))
+        .then_some(host)
+}
+
+/// The Content-Security-Policy for a request to `host`, or `None` when
+/// switched off (`setting` is `NABIMAN_CSP`).
+pub(crate) fn policy(setting: Option<&str>, host: Option<&str>) -> Option<String> {
+    match setting.map(str::trim) {
+        Some(off) if off.eq_ignore_ascii_case("off") => return None,
+        Some(custom) if !custom.is_empty() => return Some(custom.to_string()),
+        _ => {}
+    }
+    let sockets = host.and_then(plain_host).map(|h| format!(" ws://{h} wss://{h}")).unwrap_or_default();
+    Some(format!(
+        "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; \
+         img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; \
+         connect-src 'self'{sockets} blob:; worker-src 'self' blob:; frame-src 'self' {FEEDBACK_ORIGIN}; \
+         frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+    ))
+}
+
+/// Whether to send HSTS (`setting` is `NABIMAN_HSTS`).
+pub(crate) fn hsts(setting: Option<&str>, over_https: bool) -> bool {
+    match setting.map(str::trim) {
+        Some("true") => true,
+        Some("false") => false,
+        _ => over_https,
+    }
+}
 
 pub struct SecurityHeaders;
 
@@ -20,9 +81,7 @@ where
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ready(Ok(SecurityHeadersMiddleware {
-            service: Rc::new(service),
-        }))
+        ready(Ok(SecurityHeadersMiddleware { service: Rc::new(service) }))
     }
 }
 
@@ -39,46 +98,100 @@ where
     type Error = Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
-    fn poll_ready(
-        &self,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), Self::Error>> {
         self.service.poll_ready(cx)
     }
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
+        let host = req.headers().get("host").and_then(|h| h.to_str().ok()).map(str::to_owned);
+        let csp = policy(std::env::var("NABIMAN_CSP").ok().as_deref(), host.as_deref());
+        // NabiMan speaks plain HTTP itself; HTTPS ends at the proxy, whose word
+        // is taken only when it is trusted (actix's connection_info believes anyone).
+        let https = crate::trusted_proxy::forwarded_https(
+            req.peer_addr().map(|a| a.ip()),
+            req.headers(),
+            crate::trusted_proxy::trusted(),
+        );
+        let send_hsts = hsts(std::env::var("NABIMAN_HSTS").ok().as_deref(), https);
         let svc = self.service.clone();
         Box::pin(async move {
             let mut res = svc.call(req).await?;
             let headers = res.headers_mut();
-            headers.insert(
-                actix_web::http::header::X_FRAME_OPTIONS,
-                "DENY".parse().unwrap(),
-            );
-            headers.insert(
-                actix_web::http::header::X_CONTENT_TYPE_OPTIONS,
-                "nosniff".parse().unwrap(),
-            );
-            headers.insert(
-                "X-XSS-Protection".parse().unwrap(),
-                "1; mode=block".parse().unwrap(),
-            );
-            headers.insert(
-                "Referrer-Policy".parse().unwrap(),
-                "strict-origin-when-cross-origin".parse().unwrap(),
-            );
-            headers.insert(
-                "Permissions-Policy".parse().unwrap(),
-                "camera=(), microphone=(self), geolocation=()".parse().unwrap(),
-            );
-            // HSTS only if behind TLS proxy (controlled by env)
-            if std::env::var("NABIMAN_HSTS").unwrap_or_default() == "true" {
-                headers.insert(
-                    actix_web::http::header::STRICT_TRANSPORT_SECURITY,
-                    "max-age=31536000; includeSubDomains".parse().unwrap(),
-                );
+            let mut set = |name: &'static str, value: &str| {
+                if let Ok(value) = HeaderValue::from_str(value) {
+                    headers.insert(HeaderName::from_static(name), value);
+                }
+            };
+            // Same rule as frame-ancestors 'self', for browsers without CSP.
+            set("x-frame-options", "SAMEORIGIN");
+            set("x-content-type-options", "nosniff");
+            set("x-xss-protection", "1; mode=block");
+            set("referrer-policy", "strict-origin-when-cross-origin");
+            set("permissions-policy", "camera=(), microphone=(self), geolocation=()");
+            if let Some(csp) = &csp {
+                set("content-security-policy", csp);
+            }
+            if send_hsts {
+                set("strict-transport-security", HSTS);
             }
             Ok(res)
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use actix_web::{test as awtest, web, App, HttpResponse};
+
+    #[test]
+    fn the_policy_covers_what_the_spa_needs_and_closes_the_rest() {
+        let p = policy(None, Some("nabiman.example:8443")).unwrap();
+        for part in [
+            "default-src 'self'",
+            "script-src 'self' 'wasm-unsafe-eval' blob:",
+            "connect-src 'self' ws://nabiman.example:8443 wss://nabiman.example:8443 blob:",
+            "frame-src 'self' https://fix.bebo.kr",
+            "frame-ancestors 'self'",
+            "object-src 'none'",
+            "base-uri 'self'",
+            "img-src 'self' data: blob:",
+        ] {
+            assert!(p.contains(part), "{part} in {p}");
+        }
+        assert!(!p.contains("'unsafe-eval'") && !p.contains("script-src 'self' 'unsafe-inline'"));
+        // A Host header cannot write directives into the policy.
+        let p = policy(None, Some("evil; script-src *")).unwrap();
+        assert!(p.contains("connect-src 'self' blob:") && !p.contains("evil"));
+        assert_eq!(policy(Some("off"), None), None);
+        assert_eq!(policy(Some("default-src 'none'"), None).as_deref(), Some("default-src 'none'"));
+    }
+
+    #[test]
+    fn hsts_follows_https_unless_set() {
+        assert!(hsts(None, true) && !hsts(None, false));
+        assert!(hsts(Some("true"), false) && !hsts(Some("false"), true));
+    }
+
+    async fn headers(peer: &str, proto: Option<&str>) -> actix_web::http::header::HeaderMap {
+        let app = awtest::init_service(App::new().wrap(SecurityHeaders).route("/", web::get().to(HttpResponse::Ok))).await;
+        let mut req = awtest::TestRequest::get().uri("/").peer_addr(peer.parse().unwrap()).insert_header(("Host", "n.example"));
+        if let Some(proto) = proto {
+            req = req.insert_header(("X-Forwarded-Proto", proto));
+        }
+        awtest::call_service(&app, req.to_request()).await.headers().clone()
+    }
+
+    #[actix_web::test]
+    async fn hsts_when_the_local_proxy_saw_https() {
+        if std::env::var_os("NABIMAN_HSTS").is_some() || std::env::var_os("NABIMAN_CSP").is_some() {
+            return; // the environment overrides what is tested here
+        }
+        let h = headers("127.0.0.1:4000", Some("https")).await;
+        assert_eq!(h.get("strict-transport-security").unwrap(), HSTS);
+        assert!(h.get("content-security-policy").unwrap().to_str().unwrap().contains("wss://n.example"));
+        assert_eq!(h.get("x-frame-options").unwrap(), "SAMEORIGIN");
+        assert!(headers("127.0.0.1:4000", Some("http")).await.get("strict-transport-security").is_none());
+        assert!(headers("203.0.113.9:4000", Some("https")).await.get("strict-transport-security").is_none(), "only from a trusted proxy");
     }
 }
