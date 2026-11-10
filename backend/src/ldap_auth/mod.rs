@@ -2,6 +2,7 @@ use crate::models::ApiResponse;
 use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
 
+mod bind;
 mod config;
 mod ldif;
 
@@ -138,82 +139,25 @@ pub fn ldap_authenticate(username: &str, password: &str) -> Result<LdapAuthResul
 
     let (host, port) =
         parse_ldap_host_port(&cfg.server_url).ok_or("Cannot parse LDAP server URL")?;
-
-    // Step 1: Search for user DN using service account
-    let user_filter = cfg.user_filter.replace("{username}", username);
     let ldap_uri = if cfg.tls || cfg.server_url.starts_with("ldaps://") {
         format!("ldaps://{}:{}", host, port)
     } else {
         format!("ldap://{}:{}", host, port)
     };
 
-    let mut search_args = vec![
-        "-x".to_string(),
-        "-H".to_string(),
-        ldap_uri.clone(),
-        "-b".to_string(),
-        cfg.search_base.clone(),
-        "-LLL".to_string(),
-    ];
-
-    if !cfg.bind_dn.is_empty() {
-        search_args.extend(["-D".to_string(), cfg.bind_dn.clone()]);
-        search_args.extend(["-w".to_string(), cfg.bind_password.clone()]);
-    }
-
-    search_args.push(user_filter);
-    search_args.push("dn".to_string());
-    search_args.push("memberOf".to_string());
-
-    let search_output = std::process::Command::new("ldapsearch")
-        .args(&search_args)
-        .output()
-        .map_err(|e| format!("ldapsearch not available: {}", e))?;
-
-    let stdout = String::from_utf8_lossy(&search_output.stdout);
+    // Step 1: find the user's DN with the service account.
+    let stdout = bind::find_user(&cfg, &ldap_uri, username)?;
     let user_dn =
         parse_dn_from_ldif(&stdout).ok_or_else(|| "User not found in LDAP".to_string())?;
 
-    // Step 2: Bind as the user to verify password
-    let bind_output = std::process::Command::new("ldapsearch")
-        .args([
-            "-x",
-            "-H",
-            &ldap_uri,
-            "-D",
-            &user_dn,
-            "-w",
-            password,
-            "-b",
-            &user_dn,
-            "-s",
-            "base",
-            "-LLL",
-            "(objectClass=*)",
-            "dn",
-        ])
-        .output()
-        .map_err(|e| format!("ldapsearch bind failed: {}", e))?;
+    // Step 2: bind as the user to verify the password.
+    bind::bind_as(&ldap_uri, &user_dn, password)?;
 
-    if !bind_output.status.success() {
-        let stderr = String::from_utf8_lossy(&bind_output.stderr);
-        if stderr.contains("Invalid credentials") || stderr.contains("49") {
-            return Err("Invalid LDAP credentials".into());
-        }
-        return Err(format!("LDAP bind failed: {}", stderr.trim()));
-    }
-
-    // Step 3: Determine role from group membership
+    // Step 3: the role from group membership (the same DN, not a substring).
     let member_of_groups = parse_member_of(&stdout);
-    let role = if member_of_groups
-        .iter()
-        .any(|g| g.contains(&cfg.admin_group) || cfg.admin_group.contains(g))
-    {
+    let role = if bind::member_of(&member_of_groups, &cfg.admin_group) {
         "admin"
-    } else if member_of_groups
-        .iter()
-        .any(|g| g.contains(&cfg.operator_group) || cfg.operator_group.contains(g))
-    {
+    } else if bind::member_of(&member_of_groups, &cfg.operator_group) {
         "operator"
     } else {
         "viewer"
@@ -232,9 +176,11 @@ async fn ldap_login(
     sessions: web::Data<crate::jwt_sessions::SessionStore>,
     user_store: web::Data<crate::users::UserStore>,
 ) -> HttpResponse {
-    let result = match ldap_authenticate(&body.username, &body.password) {
-        Ok(r) => r,
-        Err(_) => {
+    // ldapsearch runs twice: on the blocking pool, each run bounded.
+    let (username, password) = (body.username.clone(), body.password.clone());
+    let result = match web::block(move || ldap_authenticate(&username, &password)).await {
+        Ok(Ok(r)) => r,
+        _ => {
             return HttpResponse::Unauthorized()
                 .json(ApiResponse::<()>::error("Invalid credentials"))
         }

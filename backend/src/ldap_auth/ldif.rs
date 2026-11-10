@@ -54,21 +54,15 @@ pub fn parse_member_of(ldif: &str) -> Vec<String> {
 }
 
 fn base64_decode(input: &str) -> Result<String, String> {
-    // Simple base64 decode for DN
-    let output = std::process::Command::new("base64")
-        .arg("-d")
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .spawn()
-        .and_then(|mut child| {
-            use std::io::Write;
-            if let Some(ref mut stdin) = child.stdin {
-                let _ = stdin.write_all(input.as_bytes());
-            }
-            child.wait_with_output()
-        })
+    // A DN given as base64 (`dn:: …`), decoded by the system tool, bounded.
+    let mut cmd = std::process::Command::new("base64");
+    cmd.arg("-d");
+    let out = crate::bounded_command::capture(&mut cmd, Some(input.as_bytes()), crate::bounded_command::deadline::QUICK, 64 * 1024)
         .map_err(|e| e.to_string())?;
-    String::from_utf8(output.stdout).map_err(|e| e.to_string())
+    if !out.status.success() || out.truncated {
+        return Err("Undecodable DN".into());
+    }
+    String::from_utf8(out.stdout).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

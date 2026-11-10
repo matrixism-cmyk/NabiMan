@@ -52,7 +52,21 @@ impl Drop for PwFile {
 }
 
 pub fn write_password_file(password: &str) -> Result<PwFile, String> {
-    let dir = pw_dir();
+    // sshpass -f reads the first line, so a trailing newline is expected.
+    write_secret(&format!("{password}\n"))
+}
+
+/// A 0600 file holding exactly `secret`, for tools that read the whole file
+/// as the password (`ldapsearch -y`). Removed on drop like the others.
+pub fn write_secret_file(secret: &str) -> Result<PwFile, String> {
+    write_secret(secret)
+}
+
+fn write_secret(contents: &str) -> Result<PwFile, String> {
+    write_secret_in(&pw_dir(), contents)
+}
+
+pub(crate) fn write_secret_in(dir: &str, contents: &str) -> Result<PwFile, String> {
     fs::create_dir_all(&dir).map_err(|e| format!("pw dir: {}", e))?;
     let _ = fs::set_permissions(&dir, fs::Permissions::from_mode(0o700));
     let name = {
@@ -66,8 +80,7 @@ pub fn write_password_file(password: &str) -> Result<PwFile, String> {
         .mode(0o600)
         .open(&name)
         .map_err(|e| format!("pw file: {}", e))?;
-    // sshpass -f reads the first line, so a trailing newline is expected.
-    writeln!(f, "{}", password).map_err(|e| format!("pw write: {}", e))?;
+    f.write_all(contents.as_bytes()).map_err(|e| format!("pw write: {}", e))?;
     Ok(PwFile {
         path: name,
         keep: false,
