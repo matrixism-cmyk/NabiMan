@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 export interface RailMenuItem {
@@ -102,7 +103,8 @@ export default function RailContextMenu({ x, y, title, items, onClose, opener }:
     };
   }, [onClose, opener]);
 
-  return (
+  // On the page itself: inside a zoomed panel (Ctrl + wheel) a fixed menu would be zoomed again.
+  return createPortal(
     <div
       ref={ref}
       className="rw-menu"
@@ -128,5 +130,5 @@ export default function RailContextMenu({ x, y, title, items, onClose, opener }:
         </React.Fragment>
       ))}
     </div>
-  );
+  , document.body);
 }

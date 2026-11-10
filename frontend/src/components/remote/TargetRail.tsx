@@ -9,6 +9,7 @@ import {
   addressOf, hasFiles, hasShell, hasTerminal, matchesProtocol, PROTOCOL_FILTERS, protocolName, protocolsOf, ProtocolFilter,
 } from './protocols';
 import { RailAction, Selection } from './workspaceState';
+import { zoomStyle } from './panelZoom';
 import { assignedTo, useGrants, useMember } from './member';
 
 interface Props {
@@ -153,7 +154,7 @@ export default function TargetRail({
   }
 
   return (
-    <aside className="rw-rail">
+    <aside className="rw-rail" data-zoom-key="rail" style={zoomStyle('rail')}>
         <div className="rw-rail-head">
           <span className="rw-rail-count">
             <strong>{online}</strong>/{servers.length} {t('common.online')}

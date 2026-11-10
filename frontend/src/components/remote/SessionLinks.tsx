@@ -112,10 +112,12 @@ const laneOf = (i: number, gap: number) => {
 
 function draw(grid: HTMLDivElement, links: SessionLink[]): Drawn[] {
   const box = grid.getBoundingClientRect();
+  // Under a panel zoom (Ctrl + wheel) the page sees the grid scaled; draw in its own units.
+  const scale = grid.offsetWidth ? box.width / grid.offsetWidth : 1;
   const style = getComputedStyle(grid);
   const gx = parseFloat(style.columnGap) || 12;
   const gy = parseFloat(style.rowGap) || 12;
-  const rel = (r: DOMRect): Box => ({ l: r.left - box.left, t: r.top - box.top, r: r.right - box.left, b: r.bottom - box.top });
+  const rel = (r: DOMRect): Box => ({ l: (r.left - box.left) / scale, t: (r.top - box.top) / scale, r: (r.right - box.left) / scale, b: (r.bottom - box.top) / scale });
   const byId = new Map<string, Box>();
   grid.querySelectorAll<HTMLElement>('[data-session-id]').forEach((el) => byId.set(el.dataset.sessionId || '', rel(el.getBoundingClientRect())));
   const cards = Array.from(byId.values());
@@ -179,7 +181,8 @@ export default function SessionLinks({ grid, links, layout }: Props) {
   if (drawn.length === 0) return null;
   const at = (e: React.MouseEvent, key: string) => {
     const box = grid?.getBoundingClientRect();
-    if (box) setHover({ key, x: e.clientX - box.left, y: e.clientY - box.top });
+    const scale = box && grid?.offsetWidth ? box.width / grid.offsetWidth : 1;
+    if (box) setHover({ key, x: (e.clientX - box.left) / scale, y: (e.clientY - box.top) / scale });
   };
   const hovered = hover ? drawn.find((l) => l.key === hover.key) : undefined;
   const colorOf = (key: string) => colorIndex(key.split('>')[0]);

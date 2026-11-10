@@ -17,6 +17,7 @@ import { ServerStatusView, ServerExecView, ServerSettingsView } from './ServerDe
 import SessionsView, { SessionInfo } from './SessionsView';
 import ClaudeStartDialog from './ClaudeStartDialog';
 import TargetSessionsView from './TargetSessionsView';
+import { installPanelZoom, zoomStyle } from './panelZoom';
 import TargetRail from './TargetRail';
 import AdhocConnect from './AdhocConnect';
 import ConsoleArea from './ConsoleArea';
@@ -48,6 +49,8 @@ import './remote-workspace.css';
  * full screen with a way back, a key bar under the terminal, and the file
  * panel over it on demand.
  */
+installPanelZoom();
+
 export default function RemoteWorkspace() {
   const { t } = useT();
   const member = useMember();
@@ -316,7 +319,7 @@ export default function RemoteWorkspace() {
             </div>
           )}
           {selection.kind === 'overview' && (
-            <div className="rw-view rw-view-scroll">
+            <div className="rw-view rw-view-scroll" data-zoom-key="sessions" style={zoomStyle('sessions')}>
               {overviewView === 'summary' && <MultiServerDashboard />}
               {overviewView === 'sessions' && (
                 <SessionsView sessions={sessions} currentSessionId={currentSessionId}

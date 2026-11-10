@@ -1,6 +1,7 @@
 import React, { RefObject, useRef, useState } from 'react';
 import { useT } from '../../../shared/i18n';
 import ColumnChooser from './ColumnChooser';
+import { zoomAt } from '../panelZoom';
 import { ColumnKey, Columns, MAX_WIDTH, MIN_WIDTH } from './sftpColumns';
 
 interface Props {
@@ -36,12 +37,14 @@ export default function SftpHeader({ columns, listRef }: Props) {
     e.stopPropagation();
     const handle = e.currentTarget;
     const cell = handle.parentElement as HTMLElement;
-    const start = { x: e.clientX, width: cell.getBoundingClientRect().width };
+    // Pointer distances are on screen; widths are in the panel's own (unzoomed) units.
+    const z = zoomAt(cell);
+    const start = { x: e.clientX, width: cell.getBoundingClientRect().width / z };
     handle.setPointerCapture(e.pointerId);
     dragged.current = false;
     const move = (ev: PointerEvent) => {
       if (Math.abs(ev.clientX - start.x) > 2) dragged.current = true;
-      columns.setWidth(key, start.width + ev.clientX - start.x);
+      columns.setWidth(key, start.width + (ev.clientX - start.x) / z);
     };
     const up = () => {
       handle.removeEventListener('pointermove', move);

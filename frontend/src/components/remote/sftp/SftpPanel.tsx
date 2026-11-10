@@ -18,6 +18,7 @@ import { useUploadPickers } from './useUploadPickers';
 import {
   baseName, isFolder, joinPath, listDir, makeDir, movePath, removePath, SftpEntry, SftpListing, SftpSource, shellQuote,
 } from './sftpApi';
+import { zoomStyle } from '../panelZoom';
 import { confirmDialog } from '../../../shared/ui/ConfirmDialog';
 
 interface Props {
@@ -266,7 +267,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
   );
 
   return (
-    <aside className="sftp" aria-label={t('sftp.panelLabel', { name: serverName })}
+    <aside className="sftp" data-zoom-key="sftp" style={zoomStyle('sftp')} aria-label={t('sftp.panelLabel', { name: serverName })}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropOn(null); }}>
       <div className="sftp-head">
         <strong>{t('sftp.title')}</strong>

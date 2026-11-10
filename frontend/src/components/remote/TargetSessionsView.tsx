@@ -1,5 +1,6 @@
 import React from 'react';
 import { useT } from '../../shared/i18n';
+import { zoomStyle } from './panelZoom';
 import SessionsView, { SessionInfo } from './SessionsView';
 
 interface Props {
@@ -27,7 +28,7 @@ export default function TargetSessionsView({
 }: Props) {
   const { t } = useT();
   return (
-    <div className="rw-view rw-view-scroll">
+    <div className="rw-view rw-view-scroll" data-zoom-key="sessions" style={zoomStyle('sessions')}>
       <SessionsView
         sessions={sessions}
         context={allSessions}

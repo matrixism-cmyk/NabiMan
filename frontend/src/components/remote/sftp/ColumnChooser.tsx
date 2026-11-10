@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useT } from '../../../shared/i18n';
 import { Columns, ColumnKey, OPTIONAL } from './sftpColumns';
@@ -48,7 +49,8 @@ export default function ColumnChooser({ x, y, columns, label, opener, onClose }:
     };
   }, [onClose, opener]);
 
-  return (
+  // On the page itself: inside a zoomed panel (Ctrl + wheel) a fixed menu would be zoomed again.
+  return createPortal(
     <div ref={ref} className="sftp-colmenu" role="dialog" aria-label={t('sftp.col.available')}
       style={{ left: pos.left, top: pos.top }} onClick={(e) => e.stopPropagation()}>
       <div className="sftp-colmenu-title">{t('sftp.col.available')}</div>
@@ -75,5 +77,5 @@ export default function ColumnChooser({ x, y, columns, label, opener, onClose }:
       </ul>
       <button type="button" className="sftp-colmenu-reset" onClick={() => { columns.reset(); }}>↺ {t('sftp.col.reset')}</button>
     </div>
-  );
+  , document.body);
 }
