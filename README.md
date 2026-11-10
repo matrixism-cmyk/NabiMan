@@ -389,12 +389,14 @@ tar -xzf legacy-review/archive.tar.gz --no-same-owner --no-same-permissions --ke
 
 ## 관리 데이터 오프라인 복구
 
+데이터 디렉터리의 구성, 실행 중에 만드는 일관된 스냅숏(`nabiman-recovery snapshot`/`restore-state`), 기본 자동 백업 예약, 잠금과 스키마 마이그레이션은 [데이터 디렉터리와 백업·복원](docs/operations/data-and-backup.md)에 정리되어 있습니다.
+
 **관리 → 백업 → 관리 데이터 복구 · 운영자 도구**에서 운영 안내를 엽니다. 배포 패키지에는 `nabiman-recovery`와 `management-recovery.py`가 함께 들어갑니다. 운영자가 API를 정지한 뒤 auth 저장소·SQLite DB·실행 바이너리·정적 UI를 하나의 age 묶음으로 캡처할 수 있습니다. 도구는 서비스를 자동으로 정지하거나 복원본을 활성화하지 않습니다. 실행 중인 API의 저장소 소유 잠금을 획득할 수 없으면 캡처를 거부합니다.
 
 ```sh
 umask 077
 python3 /opt/nabiman/management-recovery.py capture \
-  --auth /var/lib/nabiman --database /var/lib/nabiman-mec/mec.db \
+  --auth /var/lib/nabiman --database /var/lib/nabiman/mec.db \
   --runtime /opt/nabiman/nabiman-server --static /opt/nabiman/static \
   --output /var/backups/nabiman-recovery
 python3 /opt/nabiman/management-recovery.py restore \
