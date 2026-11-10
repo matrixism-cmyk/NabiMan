@@ -58,7 +58,7 @@ async fn authenticated_identity_ignores_spoofed_headers_and_unverified_claims() 
                 web::get().to(mec::handlers::jobs::recovery),
             )
             .route(
-                "/api/mec/v1/actor",
+                "/api/mec/v1/dashboard/summary",
                 web::get().to(|req: actix_web::HttpRequest| async move {
                     match mec::handlers::util::current_user(&req) {
                         Ok(user) => HttpResponse::Ok().json(user),
@@ -81,7 +81,7 @@ async fn authenticated_identity_ignores_spoofed_headers_and_unverified_claims() 
             token.clone()
         };
         let req = actix_web::test::TestRequest::get()
-            .uri("/api/mec/v1/actor")
+            .uri("/api/mec/v1/dashboard/summary")
             .insert_header((header, value))
             .insert_header(("X-User", "admin"))
             .to_request();
@@ -126,7 +126,7 @@ async fn authenticated_identity_ignores_spoofed_headers_and_unverified_claims() 
     );
     let forged = sign(b"wrong-key");
     let req = actix_web::test::TestRequest::get()
-        .uri("/api/mec/v1/actor")
+        .uri("/api/mec/v1/dashboard/summary")
         .insert_header(("Authorization", format!("Bearer {forged}")))
         .insert_header(("X-User", "admin"))
         .to_request();

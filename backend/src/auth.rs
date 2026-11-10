@@ -260,6 +260,21 @@ pub enum AuthDecision {
     MfaRequired,
 }
 
+/// The API routes reached without signing in (besides the extension
+/// points' public prefixes): signing in itself.
+pub(crate) fn public_route(method: &str, path: &str) -> bool {
+    matches!(
+        path,
+        "/api/auth/login"
+            | "/api/auth/register"
+            | "/api/auth/refresh"
+            | "/api/auth/2fa/verify"
+            | "/api/auth/oauth/callback"
+            | "/api/auth/ldap/login"
+    ) || (method == "GET"
+        && matches!(path, "/api/auth/oauth/authorize" | "/api/auth/oauth/provider" | "/api/auth/ldap/provider"))
+}
+
 pub fn check_auth(
     req: &ServiceRequest,
     secret: &JwtSecret,
@@ -269,19 +284,7 @@ pub fn check_auth(
     req.extensions_mut().remove::<VerifiedPrincipal>();
     let Ok(path) = crate::auth_gate::routed_path(req) else { return AuthDecision::BadRequest };
     let points = ExtensionPoints::of(req.app_data::<web::Data<ExtensionPoints>>());
-    if path == "/api/auth/login"
-        || path == "/api/auth/register"
-        || path == "/api/auth/refresh"
-        || path == "/api/auth/2fa/verify"
-        || path == "/api/auth/oauth/callback"
-        || path == "/api/auth/ldap/login"
-        || (req.method() == actix_web::http::Method::GET
-            && matches!(
-                path,
-                "/api/auth/oauth/authorize"
-                    | "/api/auth/oauth/provider"
-                    | "/api/auth/ldap/provider"
-            ))
+    if public_route(req.method().as_str(), path)
         || points.public_prefixes.iter().any(|p| path.starts_with(p))
         || !path.starts_with("/api/")
     {

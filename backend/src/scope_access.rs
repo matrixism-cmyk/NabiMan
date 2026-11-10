@@ -1,6 +1,18 @@
 //! Closed by default: membership accounts cannot access global host administration.
 use crate::models::{NabimanUser, ScopeKind, UserRole};
 
+/// What every active account may call, whatever its role or scope: its
+/// second factor's state and recovery codes, and its own sign-ins.
+pub(crate) fn every_account(method: &str, path: &str) -> bool {
+    (path == "/api/auth/2fa/status" && method == "GET")
+        || (path == "/api/auth/2fa/recovery-codes" && method == "POST")
+        || (path == "/api/auth/sessions" && method == "GET")
+        || (matches!(
+            path,
+            "/api/auth/sessions/revoke" | "/api/auth/sessions/revoke-all" | "/api/auth/sessions/revoke-others"
+        ) && method == "POST")
+}
+
 pub fn permission(user: &NabimanUser, method: &str, path: &str) -> bool {
     if !user.active() {
         return false;
@@ -12,19 +24,7 @@ pub fn permission(user: &NabimanUser, method: &str, path: &str) -> bool {
     {
         return false;
     }
-    if (path == "/api/auth/2fa/status" && method == "GET")
-        || (path == "/api/auth/2fa/recovery-codes" && method == "POST")
-    {
-        return true;
-    }
-    if (path == "/api/auth/sessions" && method == "GET")
-        || (matches!(
-            path,
-            "/api/auth/sessions/revoke"
-                | "/api/auth/sessions/revoke-all"
-                | "/api/auth/sessions/revoke-others"
-        ) && method == "POST")
-    {
+    if every_account(method, path) {
         return true;
     }
     if user.super_admin() {

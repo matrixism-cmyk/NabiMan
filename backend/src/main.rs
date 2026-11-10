@@ -3,6 +3,7 @@ mod bounded_command;
 mod access_rules;
 mod accounts;
 mod alert_rules;
+mod app_routes;
 mod api_keys;
 mod audit;
 mod audit_forwarding;
@@ -49,6 +50,7 @@ mod private_storage;
 mod processes;
 mod rate_limit;
 mod rbac;
+mod route_access;
 mod remote;
 mod remote_host_trust;
 mod remote_probe;
@@ -86,7 +88,9 @@ use actix_files as afs;
 use lock_safe::LockExt;
 use actix_web::body::EitherBody;
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
-use actix_web::{web, App, HttpResponse, HttpServer};
+use actix_web::{web, App, HttpServer};
+#[cfg(test)]
+use actix_web::HttpResponse;
 use std::future::{ready, Future, Ready};
 use std::pin::Pin;
 use std::rc::Rc;
@@ -286,51 +290,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(helper_client.clone())
             .app_data(runtime_identity.clone())
             .app_data(mec_state.clone())
-            .configure(auth::config)
-            .configure(external_identities::config)
-            .configure(users::config)
-            .configure(scope_settings::config)
-            .configure(jwt_sessions::config)
-            .configure(totp::config)
-            .configure(server_status::config)
-            .configure(network::config)
-            .configure(accounts::config)
-            .configure(config_manager::config)
-            .configure(traffic::config)
-            .configure(packages::config)
-            .configure(terminal::config)
-            .configure(terminal_tickets::config)
-            .configure(containers::config)
-            .configure(services::config)
-            .configure(firewall::config)
-            .configure(logs::config)
-            .configure(cron::config)
-            .configure(processes::config)
-            .configure(disks::config)
-            .configure(remote_servers::config)
-            .configure(updates::config)
-            .configure(diagnostics::config)
-            .configure(ssl::config)
-            .configure(charts::config)
-            .configure(file_manager::config)
-            .configure(backup::config)
-            .configure(audit_forwarding::config)
-            .configure(audit::config)
-            .configure(database::config)
-            .configure(mail::config)
-            .configure(swap::config)
-            .configure(sessions::config)
-            .configure(dns::config)
-            .configure(vhost::config)
-            .configure(license::config)
-            .configure(notifications::config)
-            .configure(alert_rules::config)
-            .configure(ip_block::config)
-            .configure(api_keys::config)
-            .configure(ldap_auth::config)
-            .configure(oauth::config)
-            .configure(openapi::config)
-            .configure(mec::config)
+            .configure(app_routes::configure)
             .service(
                 afs::Files::new("/", &static_dir)
                     .index_file("index.html")

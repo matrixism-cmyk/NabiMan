@@ -1,6 +1,8 @@
 use crate::models::UserRole;
 
-/// Check if a role is allowed to access a given method+path
+/// Check if a role is allowed to access a given method+path. Operators and
+/// viewers get only what `route_access` lists for the route; a path it does
+/// not list is refused to them.
 pub fn check_permission(role: &UserRole, method: &str, path: &str) -> bool {
     if in_scope(path, "/api/backup") || in_scope(path, "/api/audit") || in_scope(path, "/api/apikeys") {
         return *role == UserRole::Admin;
@@ -10,8 +12,7 @@ pub fn check_permission(role: &UserRole, method: &str, path: &str) -> bool {
     }
     match role {
         UserRole::Admin => true,
-        UserRole::Operator => is_operator_allowed(method, path),
-        UserRole::Viewer => is_viewer_allowed(method, path),
+        UserRole::Operator | UserRole::Viewer => crate::route_access::staff_allowed(role, method, path),
         // Remote-only members are let in by `member_servers`, never by role.
         UserRole::Remote => false,
     }
@@ -24,94 +25,20 @@ fn in_scope(path: &str, scope: &str) -> bool {
             .is_some_and(|rest| rest.starts_with('/'))
 }
 
-fn is_viewer_allowed(method: &str, path: &str) -> bool {
-    // A terminal and root-owned files remain privileged even when read with GET.
-    if method == "GET" {
-        if path == "/api/terminal"
-            || path.starts_with("/api/terminal/")
-            || path == "/api/files"
-            || path.starts_with("/api/files/")
-            || path == "/api/vhost/config"
-            || path.starts_with("/api/vhost/config/")
-        {
-            return false;
-        }
-        if path.starts_with("/api/config/") && path != "/api/config/services" {
-            return false;
-        }
-        return true;
-    }
-    if matches!(
-        path,
-        "/api/auth/change-password"
-            | "/api/auth/logout"
-            | "/api/auth/activity"
-            | "/api/auth/2fa/setup"
-            | "/api/auth/2fa/verify-setup"
-            | "/api/auth/2fa/disable"
-    ) {
-        return true;
-    }
-    false
-}
-
-fn is_operator_allowed(method: &str, path: &str) -> bool {
-    // These endpoints can read credentials, run arbitrary commands, or rewrite
-    // root-owned files. They must not be available to operational accounts.
-    if ["/api/terminal", "/api/files"]
-        .iter()
-        .any(|scope| in_scope(path, scope))
-    {
-        return false;
-    }
-    if in_scope(path, "/api/config") {
-        return path == "/api/config/services" && method == "GET";
-    }
-    if in_scope(path, "/api/vhost/config") {
-        return false;
-    }
-    if method == "GET" {
-        return true;
-    }
-    if matches!(
-        path,
-        "/api/auth/change-password"
-            | "/api/auth/logout"
-            | "/api/auth/activity"
-            | "/api/auth/2fa/setup"
-            | "/api/auth/2fa/verify-setup"
-            | "/api/auth/2fa/disable"
-    ) {
-        return true;
-    }
-    if path == "/api/packages/search" || path == "/api/logs" {
-        return true;
-    }
-    if [
-        "/api/users",
-        "/api/accounts",
-        "/api/cron",
-        "/api/backup",
-        "/api/packages",
-        "/api/remote-servers",
-        "/api/vhost",
-        "/api/database",
-        "/api/apikeys",
-        "/api/auth/sessions",
-        "/api/auth/ldap",
-        "/api/auth/oauth",
-    ]
-    .iter()
-    .any(|scope| in_scope(path, scope))
-    {
-        return false;
-    }
-    true
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_route_nobody_classified_is_closed_to_everyone_but_admins() {
+        for role in [UserRole::Operator, UserRole::Viewer, UserRole::Remote] {
+            for method in ["GET", "POST"] {
+                assert!(!check_permission(&role, method, "/api/brand-new-endpoint"), "{role:?} {method}");
+                assert!(!check_permission(&role, method, "/api/server/status/extra"), "{role:?} {method}");
+            }
+        }
+        assert!(check_permission(&UserRole::Admin, "POST", "/api/brand-new-endpoint"));
+    }
 
     #[test]
     fn admin_can_do_everything() {

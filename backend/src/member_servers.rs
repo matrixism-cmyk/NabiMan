@@ -108,8 +108,15 @@ pub fn keeps_shares(user: &NabimanUser) -> bool {
 }
 
 /// What a member may call: their account, the terminal and its files, and
-/// their own servers. Everything else stays closed.
+/// their own servers. Everything else stays closed: a route must be listed
+/// for members in `route_access`, and then pass the rules below.
 pub fn permitted(user: &NabimanUser, method: &str, path: &str) -> bool {
+    crate::route_access::member_reachable(method, path) && rules(user, method, path)
+}
+
+/// The member rules proper: switches an administrator set, and whose server
+/// or session the path names.
+pub(crate) fn rules(user: &NabimanUser, method: &str, path: &str) -> bool {
     let granted = &user.remote_permissions;
     // What an administrator may switch off for this member.
     if path.starts_with("/api/terminal/dictation") && !granted.dictation {
