@@ -1,6 +1,7 @@
 //! The data directory as a whole: what must hold before any store opens it.
 
 pub mod lock;
+pub mod permissions;
 
 /// The data directory, locked for this server, and whether it was brand new.
 pub struct Prepared {
@@ -17,6 +18,7 @@ pub fn prepare() -> std::io::Result<Prepared> {
     let fresh = !dir.join("users.json").exists() && !dir.join("backup_schedules.json").exists();
     // Before the MEC database is opened: it may still be at its old ./data/mec.db.
     crate::mec::db::location::adopt_legacy_default()?;
+    permissions::log(&dir, &permissions::enforce(&dir));
     Ok(Prepared { _lock: held, fresh })
 }
 
