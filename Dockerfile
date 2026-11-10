@@ -12,6 +12,8 @@ WORKDIR /app/backend
 COPY backend/Cargo.toml backend/Cargo.lock ./
 RUN mkdir src && echo 'fn main(){}' > src/main.rs && cargo build --release && rm -rf src
 COPY backend/src ./src
+# The orchestration guide is built into the binary (include_str!).
+COPY docs/orchestration/guide-ko.md /app/docs/orchestration/guide-ko.md
 RUN touch src/main.rs && cargo build --release
 
 # Stage 3: Final image

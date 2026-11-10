@@ -7,3 +7,4 @@ backend/static/
 .idea/
 .vscode/
 docs/
+!docs/orchestration/guide-ko.md
