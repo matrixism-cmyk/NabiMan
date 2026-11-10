@@ -155,6 +155,7 @@ const t: T = {
   'license.state.trial_expired': { ko: "체험 기간이 종료되었습니다.", en: "Trial period ended.", ja: "試用期間が終了しました。" },
   'license.activated': { ko: '라이선스가 활성화되었습니다', en: 'License activated', ja: 'ライセンスを有効化しました' },
   'license.invalidKey': { ko: '유효하지 않은 라이선스 키', en: 'Invalid license key', ja: '無効なライセンスキー' },
+  'panel.loading': { ko: '화면을 불러오는 중…', en: 'Loading this screen…', ja: '画面を読み込み中…' },
   'confirm.title': { ko: '확인', en: 'Confirm', ja: '確認' },
   'confirm.dangerTitle': { ko: '정말 진행할까요?', en: 'Are you sure?', ja: '本当に実行しますか?' },
 };

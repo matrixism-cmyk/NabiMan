@@ -1,8 +1,7 @@
 import React, { useEffect } from 'react';
 import { useApi } from '../../shared/api/useApi';
 import { useT } from '../../shared/i18n';
-import VncConsoleView from './VncConsoleView';
-import RdpConsoleView from './RdpConsoleView';
+import { ConsoleSuspense, RdpConsoleView, VncConsoleView } from './lazyConsoles';
 import { VmConsole } from './vncApi';
 
 /** A VM console detached into its own browser window (`/remote#console/<vm>`),
@@ -26,8 +25,8 @@ export default function ConsolePopout() {
   return (
     <div className="rw-console-popout">
       {isRdp || found?.protocol === 'rdp'
-        ? <RdpConsoleView target={vm} label={label} popout />
-        : <VncConsoleView vm={vm} label={label} popout />}
+        ? <ConsoleSuspense><RdpConsoleView target={vm} label={label} popout /></ConsoleSuspense>
+        : <ConsoleSuspense><VncConsoleView vm={vm} label={label} popout /></ConsoleSuspense>}
     </div>
   );
 }

@@ -1,59 +1,64 @@
-import React from 'react';
-import MfaPanel from './MfaPanel';
-import ClaudeChatPanel from './claude/ClaudeChatPanel';
-import AppSettingsPanel from './AppSettingsPanel';
-import ClaudeSettingsPanel from './claude/ClaudeSettingsPanel';
-import LoginSessionsPanel from './LoginSessionsPanel';
+import React, { lazy, Suspense } from 'react';
 import { Tab } from '../nav';
+import { useT } from '../i18n';
+import { ErrorBoundary } from '../shared/ui/ErrorBoundary';
+// Eager: the first screen after login, and what App.tsx imports anyway.
+import MfaPanel from './MfaPanel';
 import ServerStatusPanel from './ServerStatusPanel';
-import NetworkPanel from './NetworkPanel';
-import AccountsPanel from './AccountsPanel';
-import ConfigPanel from './ConfigPanel';
-import TrafficPanel from './TrafficPanel';
-import PackagesPanel from './PackagesPanel';
-import ContainersPanel from './ContainersPanel';
-import ServicesPanel from './ServicesPanel';
-import FirewallPanel from './FirewallPanel';
-import LogsPanel from './LogsPanel';
-import CronPanel from './CronPanel';
-import ProcessesPanel from './ProcessesPanel';
-import DisksPanel from './DisksPanel';
 import RemoteWorkspace from './remote/RemoteWorkspace';
-import UpdatesPanel from './UpdatesPanel';
-import DiagnosticsPanel from './DiagnosticsPanel';
-import SslPanel from './SslPanel';
-import ChartsPanel from './ChartsPanel';
-import FileManagerPanel from './FileManagerPanel';
-import BackupPanel from './BackupPanel';
-import AuditPanel from './AuditPanel';
-import DatabasePanel from './DatabasePanel';
-import MailPanel from './MailPanel';
-import SwapPanel from './SwapPanel';
-import SessionsPanel from './SessionsPanel';
-import DnsPanel from './DnsPanel';
-import ScopeSettingsPanel from './ScopeSettingsPanel';
-import UserManagementPanel from './UserManagementPanel';
-import NotificationsPanel from './NotificationsPanel';
-import AlertRulesPanel from './AlertRulesPanel';
-import VhostPanel from './VhostPanel';
-import IpBlockPanel from './IpBlockPanel';
-import LicensePanel from './LicensePanel';
-import EnterpriseAuthPanel from './EnterpriseAuthPanel';
-import MecDashboardPanel from './mec/MecDashboardPanel';
-import MecNocPanel from './mec/MecNocPanel';
-import MecLivePanel from './mec/MecLivePanel';
-import TenantsPanel from './mec/TenantsPanel';
-import MecNodesPanel from './mec/MecNodesPanel';
-import MecGpuPanel from './mec/MecGpuPanel';
-import MecFirewallPanel from './mec/MecFirewallPanel';
-import MecAuditPanel from './mec/MecAuditPanel';
-import MecJobsPanel from './mec/MecJobsPanel';
-import MecStoragePanel from './mec/MecStoragePanel';
-import MecHealthPanel from './mec/MecHealthPanel';
-import MecSettingsPanel from './mec/MecSettingsPanel';
-import MecIngressPanel from './mec/MecIngressPanel';
-import MecDiscoveryPanel from './mec/MecDiscoveryPanel';
-import MecUsersPanel from './mec/MecUsersPanel';
+
+// Every other panel is its own chunk, fetched the first time its tab opens.
+const ClaudeChatPanel = lazy(() => import('./claude/ClaudeChatPanel'));
+const AppSettingsPanel = lazy(() => import('./AppSettingsPanel'));
+const ClaudeSettingsPanel = lazy(() => import('./claude/ClaudeSettingsPanel'));
+const LoginSessionsPanel = lazy(() => import('./LoginSessionsPanel'));
+const NetworkPanel = lazy(() => import('./NetworkPanel'));
+const AccountsPanel = lazy(() => import('./AccountsPanel'));
+const ConfigPanel = lazy(() => import('./ConfigPanel'));
+const TrafficPanel = lazy(() => import('./TrafficPanel'));
+const PackagesPanel = lazy(() => import('./PackagesPanel'));
+const ContainersPanel = lazy(() => import('./ContainersPanel'));
+const ServicesPanel = lazy(() => import('./ServicesPanel'));
+const FirewallPanel = lazy(() => import('./FirewallPanel'));
+const LogsPanel = lazy(() => import('./LogsPanel'));
+const CronPanel = lazy(() => import('./CronPanel'));
+const ProcessesPanel = lazy(() => import('./ProcessesPanel'));
+const DisksPanel = lazy(() => import('./DisksPanel'));
+const UpdatesPanel = lazy(() => import('./UpdatesPanel'));
+const DiagnosticsPanel = lazy(() => import('./DiagnosticsPanel'));
+const SslPanel = lazy(() => import('./SslPanel'));
+const ChartsPanel = lazy(() => import('./ChartsPanel'));
+const FileManagerPanel = lazy(() => import('./FileManagerPanel'));
+const BackupPanel = lazy(() => import('./BackupPanel'));
+const AuditPanel = lazy(() => import('./AuditPanel'));
+const DatabasePanel = lazy(() => import('./DatabasePanel'));
+const MailPanel = lazy(() => import('./MailPanel'));
+const SwapPanel = lazy(() => import('./SwapPanel'));
+const SessionsPanel = lazy(() => import('./SessionsPanel'));
+const DnsPanel = lazy(() => import('./DnsPanel'));
+const ScopeSettingsPanel = lazy(() => import('./ScopeSettingsPanel'));
+const UserManagementPanel = lazy(() => import('./UserManagementPanel'));
+const NotificationsPanel = lazy(() => import('./NotificationsPanel'));
+const AlertRulesPanel = lazy(() => import('./AlertRulesPanel'));
+const VhostPanel = lazy(() => import('./VhostPanel'));
+const IpBlockPanel = lazy(() => import('./IpBlockPanel'));
+const LicensePanel = lazy(() => import('./LicensePanel'));
+const EnterpriseAuthPanel = lazy(() => import('./EnterpriseAuthPanel'));
+const MecDashboardPanel = lazy(() => import('./mec/MecDashboardPanel'));
+const MecNocPanel = lazy(() => import('./mec/MecNocPanel'));
+const MecLivePanel = lazy(() => import('./mec/MecLivePanel'));
+const TenantsPanel = lazy(() => import('./mec/TenantsPanel'));
+const MecNodesPanel = lazy(() => import('./mec/MecNodesPanel'));
+const MecGpuPanel = lazy(() => import('./mec/MecGpuPanel'));
+const MecFirewallPanel = lazy(() => import('./mec/MecFirewallPanel'));
+const MecAuditPanel = lazy(() => import('./mec/MecAuditPanel'));
+const MecJobsPanel = lazy(() => import('./mec/MecJobsPanel'));
+const MecStoragePanel = lazy(() => import('./mec/MecStoragePanel'));
+const MecHealthPanel = lazy(() => import('./mec/MecHealthPanel'));
+const MecSettingsPanel = lazy(() => import('./mec/MecSettingsPanel'));
+const MecIngressPanel = lazy(() => import('./mec/MecIngressPanel'));
+const MecDiscoveryPanel = lazy(() => import('./mec/MecDiscoveryPanel'));
+const MecUsersPanel = lazy(() => import('./mec/MecUsersPanel'));
 
 interface Props {
   activeTab: Tab;
@@ -61,9 +66,25 @@ interface Props {
   onEnterFocus: () => void;
 }
 
-/// Renders the panel for the active tab. Extracted from App.tsx so the shell
-/// stays within the line budget.
+function PanelLoading() {
+  const { t } = useT();
+  return <div className="panel loading" role="status">{t('panel.loading')}</div>;
+}
+
+/// Renders the panel for the active tab, each in its own error boundary, with
+/// a short "loading" while a panel's chunk arrives. Extracted from App.tsx so
+/// the shell stays within the line budget.
 export default function PanelOutlet({ activeTab, onNavigate, onEnterFocus }: Props) {
+  return (
+    <ErrorBoundary key={activeTab} region={`panel:${activeTab}`}>
+      <Suspense fallback={<PanelLoading />}>
+        {panelFor(activeTab, onNavigate, onEnterFocus)}
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+
+function panelFor(activeTab: Tab, onNavigate: Props['onNavigate'], onEnterFocus: Props['onEnterFocus']) {
   switch (activeTab) {
     case 'mfa': return <MfaPanel />;
     case 'claudeChat': return <ClaudeChatPanel />;

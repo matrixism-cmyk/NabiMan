@@ -162,6 +162,7 @@ const t: T = {
   'remote.console.share.revoke': { ko: '폐기', en: 'Revoke', ja: '取り消し' },
   'remote.console.share.revokeConfirm': { ko: '이 공유 링크를 폐기할까요? 즉시 접속이 끊깁니다.', en: 'Revoke this share link? It stops working at once.', ja: 'この共有リンクを取り消しますか？即時に無効になります。' },
   'remote.console.share.gone': { ko: '만료되었거나 폐기된 공유 링크입니다.', en: 'This share link has expired or been revoked.', ja: '期限切れか取り消された共有リンクです。' },
+  'remote.console.loading': { ko: '콘솔 화면을 불러오는 중…', en: 'Loading the console…', ja: 'コンソール画面を読み込み中…' },
   'remote.console.add': { ko: '+ 콘솔 추가', en: '+ Add console', ja: '+ コンソール追加' },
   'remote.console.deleteConfirm': { ko: "'{label}' 콘솔을 삭제할까요?", en: 'Delete the console "{label}"?', ja: 'コンソール「{label}」を削除しますか？' },
   'remote.console.form.addTitle': { ko: '외부 VNC 콘솔 추가', en: 'Add external VNC console', ja: '外部 VNC コンソール追加' },

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useT } from '../../shared/i18n';
-import VncConsoleView from './VncConsoleView';
-import RdpConsoleView from './RdpConsoleView';
+import { ConsoleSuspense, RdpConsoleView, VncConsoleView } from './lazyConsoles';
 import { shareInfo, ShareInfo } from './vncApi';
 import type { ConsoleShare } from './consoleView';
 
@@ -44,8 +43,8 @@ export default function ConsoleSharePage({ token }: { token: string }) {
   return (
     <div className="rw-console-popout">
       {info.protocol === 'rdp'
-        ? <RdpConsoleView target={token} label={info.label} popout share={share} />
-        : <VncConsoleView vm={token} label={info.label} popout share={share} />}
+        ? <ConsoleSuspense><RdpConsoleView target={token} label={info.label} popout share={share} /></ConsoleSuspense>
+        : <ConsoleSuspense><VncConsoleView vm={token} label={info.label} popout share={share} /></ConsoleSuspense>}
     </div>
   );
 }

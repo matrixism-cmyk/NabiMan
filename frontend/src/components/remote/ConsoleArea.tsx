@@ -1,8 +1,7 @@
 import React from 'react';
 import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
-import VncConsoleView from './VncConsoleView';
-import RdpConsoleView from './RdpConsoleView';
+import { ConsoleSuspense, RdpConsoleView, VncConsoleView } from './lazyConsoles';
 import VncConsoleForm from './VncConsoleForm';
 import { deleteConsole, VmConsole } from './vncApi';
 import { Selection } from './workspaceState';
@@ -33,9 +32,9 @@ export default function ConsoleArea({ selection, consoles, canManage, onSelect, 
       await deleteConsole(vm); await onChanged(); onSelect({ kind: 'overview' });
     };
     const common = { label, canEdit: canMng, onEdit: edit, onDelete: del, canGrant: canManage, onGrant: () => onAccess(vm, label), canShare: true, onShare: () => onShare(vm, label) };
-    return <ErrorBoundary region="console" resetKey={vm}>{rec?.protocol === 'rdp'
+    return <ErrorBoundary region="console" resetKey={vm}><ConsoleSuspense>{rec?.protocol === 'rdp'
       ? <RdpConsoleView target={vm} {...common} />
-      : <VncConsoleView vm={vm} {...common} />}</ErrorBoundary>;
+      : <VncConsoleView vm={vm} {...common} />}</ConsoleSuspense></ErrorBoundary>;
   }
   if (selection.kind === 'console-form') {
     const edit = selection.edit;
