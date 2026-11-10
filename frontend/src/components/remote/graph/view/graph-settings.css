@@ -1,0 +1,55 @@
+/* The 3D map in the simple style (Obsidian-like): a plain dark stage, or a light one on light themes. */
+.session-graph.is-3d.is-simple .session-graph-stage { background: radial-gradient(900px 600px at 50% 45%, rgba(148, 163, 184, 0.06), transparent 70%), #0d1117; }
+.session-graph.is-3d.is-simple.is-light .session-graph-stage { background: radial-gradient(900px 600px at 50% 45%, rgba(255, 255, 255, 0.9), transparent 70%), #eef1f4; }
+.session-graph.is-light .session-graph-hint { color: #57606a; }
+
+/* The settings panel: at the stage's right, under the toolbar; it steps aside for a session's panel. */
+.graph-settings {
+  position: absolute; top: 12px; right: 12px; z-index: 3; width: min(280px, calc(100% - 24px)); max-height: calc(100% - 24px); overflow: auto;
+  display: flex; flex-direction: column; gap: 2px; padding: 6px; border-radius: 10px; font-size: 12.5px;
+  background: color-mix(in srgb, var(--surface, #16222f) 92%, transparent); backdrop-filter: blur(8px);
+  border: 1px solid var(--border); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35); color: var(--text);
+}
+.session-graph-stage.has-panel .graph-settings { right: calc(min(380px, 100% - 24px) + 24px); }
+@media (max-width: 900px) { .session-graph-stage.has-panel .graph-settings { display: none; } }
+.graph-settings-section + .graph-settings-section { border-top: 1px solid var(--border); }
+.graph-settings-head { all: unset; box-sizing: border-box; display: flex; gap: 6px; width: 100%; padding: 7px 6px; cursor: pointer; font-weight: 600; color: var(--text); }
+.graph-settings-head:hover { color: var(--primary); }
+.graph-settings-head:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; border-radius: 6px; }
+.graph-settings-body { display: flex; flex-direction: column; gap: 7px; padding: 2px 6px 10px; }
+.graph-settings-toggle, .graph-settings-slider { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--text-secondary); }
+.graph-settings-slider { flex-direction: column; align-items: stretch; gap: 3px; }
+.graph-settings-slider input { width: 100%; margin: 0; accent-color: var(--primary); }
+.graph-settings-toggle input { accent-color: var(--primary); width: 15px; height: 15px; margin: 0; }
+.graph-settings-search { width: 100%; box-sizing: border-box; margin: 0; padding: 6px 8px; font-size: 12.5px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+.graph-settings-note { margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--text-secondary); opacity: 0.85; }
+.graph-settings-style { display: flex; }
+.graph-settings-style .btn { flex: 1; }
+.graph-settings-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; color: var(--text-secondary); }
+.graph-settings-legend li { display: flex; align-items: center; gap: 6px; }
+.graph-settings-legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; background: #8b949e; }
+.graph-settings-legend .is-lead { color: #f59e0b; font-weight: 600; }
+.graph-settings-legend .is-busy { color: #22c55e; font-weight: 600; }
+
+/* The local graph: a chip in the toolbar to go back to the whole. */
+.graph-local-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 4px 2px 10px; border-radius: 999px; font-size: 12px; border: 1px solid var(--primary); color: var(--primary); }
+.graph-local-chip button { all: unset; cursor: pointer; padding: 1px 6px; border-radius: 999px; }
+.graph-local-chip button:hover, .graph-local-chip button:focus-visible { background: color-mix(in srgb, var(--primary) 18%, transparent); }
+.session-graph-local { display: flex; gap: 6px; align-items: center; }
+.graph-local-depth { margin: 0; padding: 3px 6px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+
+/* The time-lapse's clock, at the bottom of the stage. */
+.graph-replay-bar {
+  position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%); z-index: 3; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center;
+  padding: 6px 10px; border-radius: 999px; font-size: 12px; max-width: calc(100% - 24px);
+  background: color-mix(in srgb, var(--surface, #16222f) 92%, transparent); border: 1px solid var(--border); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); color: var(--text);
+}
+.graph-replay-dot { width: 8px; height: 8px; border-radius: 50%; background: #f87171; animation: graph-replay-blink 1s ease-in-out infinite; }
+@keyframes graph-replay-blink { 50% { opacity: 0.3; } }
+.graph-replay-clock { font-variant-numeric: tabular-nums; font-weight: 600; }
+.graph-replay-track { width: 120px; height: 4px; border-radius: 2px; background: rgba(148, 163, 184, 0.25); overflow: hidden; }
+.graph-replay-track i { display: block; height: 100%; background: var(--primary); }
+.graph-replay-count { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.graph-replay-bar select { margin: 0; padding: 2px 6px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+.graph-replay-hint { color: var(--text-secondary); font-size: 11px; }
+@media (prefers-reduced-motion: reduce) { .graph-replay-dot { animation: none; } }

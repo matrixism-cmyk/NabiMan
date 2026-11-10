@@ -1,14 +1,20 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { apiRequest } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/i18n';
-import ClaudeAddress from '../../terminal/ClaudeAddress';
 import type { SessionLink } from '../SessionLinks';
 import type { SessionInfo } from '../SessionsView';
 import { buildGraph, buildWorkMap, MapEvent, MapServer, ServerFacts, Topology, ViewMode } from './graphModel';
 import type { Layout2D } from './Graph2D';
 import TopologyEditor from './TopologyEditor';
-import AgentIcons from './AgentIcons';
 import AttackPanel from './AttackPanel';
+import SessionPanel from './SessionPanel';
+import GraphSettingsPanel from './GraphSettingsPanel';
+import ReplayBar from './ReplayBar';
+import { GraphSettings, loadSettings, saveSettings } from './view/graphSettings';
+import { filterGraph, localSubset, searchMatches } from './view/graphFocus';
+import { useLightTheme, useReducedMotion } from './view/graphTheme';
+import { REPLAY_WINDOW } from './view/graphReplay';
+import { useReplay } from './view/useReplay';
 import './session-graph.css';
 import { startVisibleInterval } from '../../../shared/ui/useVisibleInterval';
 
@@ -18,8 +24,6 @@ const Graph3D = React.lazy(() => import('./Graph3D'));
 
 const LAYOUTS: Layout2D[] = ['concentric', 'tree', 'free'];
 const LAYOUT_KEY = 'nabiman_graph2d_layout';
-const ROTATE_KEY = 'nabiman_graph3d_rotate';
-const NETWORK_KEY = 'nabiman_graph3d_network';
 const stored = (key: string, fallback: string) => { try { return localStorage.getItem(key) || fallback; } catch { return fallback; } };
 const store = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* private mode */ } };
 
@@ -66,7 +70,18 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
       await loadFacts();
     } catch (e) { setProblem(t('graph.checkFailed', { message: e instanceof Error ? e.message : String(e) })); } finally { setChecking(false); }
   };
-  const [network, setNetwork] = useState(() => stored(NETWORK_KEY, '1') === '1');
+  // The 3D map's settings panel (as in Obsidian), its search, the local graph and the time-lapse.
+  const [settings, setSettings] = useState<GraphSettings>(() => loadSettings());
+  const change = (patch: Partial<GraphSettings>) => setSettings((old) => { const next = { ...old, ...patch }; saveSettings(next); return next; });
+  const [search, setSearch] = useState('');
+  const [flyTo, setFlyTo] = useState<{ id: string; seq: number } | null>(null);
+  const [local, setLocal] = useState<{ id: string; depth: number } | null>(null);
+  const [bursts, setBursts] = useState<{ seq: number; list: MapEvent[] } | null>(null);
+  const replay = useReplay((list) => setBursts((b) => ({ seq: (b?.seq || 0) + 1, list })));
+  const [replayNote, setReplayNote] = useState('');
+  const light = useLightTheme();
+  const reducedMotion = useReducedMotion();
+  const network = settings.showDevices;
   useEffect(() => {
     if (mode !== 'graph3d') return undefined;
     let live = true;
@@ -84,15 +99,38 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
     return () => { live = false; stopPulling(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
-  const graph = useMemo(
+  const full = useMemo(
     () => (mode === 'graph3d' ? buildWorkMap(sessions, links, servers, events, t('graph.legend.local'), network ? topology : null, facts) : buildGraph(sessions, links)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [sessions, links, servers, events, mode, topology, network, facts],
   );
+  const { showDevices, showEnded, showServers, showOrphans } = settings;
+  const graph = useMemo(() => {
+    if (mode !== 'graph3d') return full;
+    const shown = filterGraph(full, { showDevices, showEnded, showServers, showOrphans });
+    return local ? localSubset(shown, local.id, local.depth) : shown;
+  }, [full, mode, showDevices, showEnded, showServers, showOrphans, local]);
+  const matches = useMemo(() => (mode === 'graph3d' ? searchMatches(graph.nodes, search) : []), [graph, search, mode]);
+  // The time-lapse: the last day's record, fetched when asked for (the live feed keeps only the last hour).
+  const startReplay = async () => {
+    setReplayNote(t('graph.replay.loading'));
+    try {
+      const r: any = await apiRequest(`/api/terminal/claude-events?window=${REPLAY_WINDOW}&after=0`);
+      const day: MapEvent[] = r?.success && Array.isArray(r.data) ? r.data : [];
+      setReplayNote(replay.start([...day, ...events], settings.replaySpeed) ? '' : t('graph.replay.empty'));
+    } catch (e) { setReplayNote(t('graph.replay.failed', { message: e instanceof Error ? e.message : String(e) })); }
+  };
+  const stopReplay = () => { if (replay.state.playing) replay.stop(); };
+  useEffect(() => {
+    if (!replay.state.playing) return undefined;
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') replay.stop(); };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replay.state.playing]);
   const [selected, setSelected] = useState<string | null>(null);
   const [tip, setTip] = useState<{ note: string; x: number; y: number } | null>(null);
   const [layout, setLayout] = useState<Layout2D>(() => stored(LAYOUT_KEY, 'concentric') as Layout2D);
-  const [rotate, setRotate] = useState(() => stored(ROTATE_KEY, '1') === '1');
   const picked = sessions.find((s) => s.id === selected) || null;
   const machine = mode === 'graph3d' ? graph.nodes.find((n) => n.id === selected && n.kind === 'server') || null : null;
   // The saved server behind a machine node (`local` for this one); none for a host that is not saved.
@@ -101,12 +139,11 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
   const clock = (at: number) => new Date(at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
   const onHoverEdge = (note: string | null, x: number, y: number) => setTip(note ? { note, x, y } : null);
   const webgl = mode !== 'graph3d' || hasWebGL();
-  const incoming = picked ? links.filter((l) => l.to === picked.id) : [];
-  const outgoing = picked ? links.filter((l) => l.from === picked.id) : [];
-  const nameOf = (id: string) => { const s = sessions.find((x) => x.id === id); return s?.claude?.[0]?.name || s?.title || s?.label || id; };
+  const is3d = mode === 'graph3d';
+  const localName = local ? graph.nodes.find((n) => n.id === local.id)?.name || full.nodes.find((n) => n.id === local.id)?.name || local.id : '';
 
   return (
-    <div className={`session-graph ${mode === 'graph3d' ? 'is-3d' : ''}`}>
+    <div className={`session-graph ${is3d ? `is-3d is-${settings.style}` : ''} ${is3d && light && settings.style === 'simple' ? 'is-light' : ''}`}>
       <div className="session-graph-bar">
         {mode === 'graph2d' && (
           <div className="btn-group" role="group" aria-label={t('graph.layout')}>
@@ -116,66 +153,63 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
             ))}
           </div>
         )}
-        {mode === 'graph3d' && (
-          <button type="button" className={`btn btn-sm ${rotate ? 'btn-primary' : 'btn-secondary'}`} aria-pressed={rotate}
-            onClick={() => { setRotate(!rotate); store(ROTATE_KEY, rotate ? '0' : '1'); }}>⟳ {t('graph.rotate')}</button>
+        {is3d && (
+          <button type="button" className={`btn btn-sm ${settings.panel ? 'btn-primary' : 'btn-secondary'}`} aria-pressed={settings.panel} aria-expanded={settings.panel}
+            data-testid="graph-settings-toggle" onClick={() => change({ panel: !settings.panel })}>⚙ {t('graph.settings')}</button>
         )}
-        {mode === 'graph3d' && !!topology?.devices.length && (
-          <button type="button" className={`btn btn-sm ${network ? 'btn-primary' : 'btn-secondary'}`} aria-pressed={network}
-            onClick={() => { setNetwork(!network); store(NETWORK_KEY, network ? '0' : '1'); }}>⛨ {t('graph.network', { count: topology.devices.length })}</button>
+        {is3d && (
+          <button type="button" className={`btn btn-sm ${replay.state.playing ? 'btn-primary' : 'btn-secondary'}`} aria-pressed={replay.state.playing} data-testid="graph-replay"
+            title={t('graph.replay.hint')} onClick={() => (replay.state.playing ? replay.stop() : void startReplay())}>{replay.state.playing ? '■' : '▶'} {t('graph.replay')}</button>
         )}
-        {mode === 'graph3d' && (
+        {is3d && (
           <button type="button" className="btn btn-secondary btn-sm" disabled={checking} onClick={() => void checkAll()} title={t('graph.checkHint')}>⟳ {t(checking ? 'graph.checking' : 'graph.check')}</button>
         )}
-        {mode === 'graph3d' && (
+        {is3d && (
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditing(true)} title={t('topology.note')}>✎ {t('topology.edit')}</button>
         )}
+        {is3d && local && (
+          <span className="graph-local-chip" data-testid="graph-local-chip">
+            ◎ {t('graph.local.chip', { name: localName, depth: local.depth })}
+            <button type="button" onClick={() => setLocal(null)} aria-label={t('graph.local.back')} title={t('graph.local.back')}>✕</button>
+          </span>
+        )}
         <div className="session-graph-legend">
-          <span className="session-graph-key is-lead">★ {t('graph.legend.lead')}</span>
-          <span className="session-graph-key is-busy">● {t('graph.legend.busy')}</span>
-          {groups.map(([g, color]) => (
+          {!is3d && <span className="session-graph-key is-lead">★ {t('graph.legend.lead')}</span>}
+          {!is3d && <span className="session-graph-key is-busy">● {t('graph.legend.busy')}</span>}
+          {!is3d && groups.map(([g, color]) => (
             <span key={g} className="session-graph-key"><i style={{ background: color }} />{g === 'local' ? t('graph.legend.local') : g}</span>
           ))}
           <span className="session-graph-count">{t('graph.count', { sessions: sessions.length, links: links.length })}</span>
         </div>
       </div>
       {problem && <div role="alert" className="message" onClick={() => setProblem('')}>{problem}</div>}
-      <div className="session-graph-stage">
+      {replayNote && <div role="status" className="message" onClick={() => setReplayNote('')}>{replayNote}</div>}
+      <div className={`session-graph-stage ${picked || machine ? 'has-panel' : ''}`}
+        onPointerDownCapture={(e) => { if (!(e.target as HTMLElement).closest('.graph-replay-bar, .graph-settings')) stopReplay(); }}
+        onWheelCapture={(e) => { if (!(e.target as HTMLElement).closest('.graph-replay-bar, .graph-settings, .session-graph-panel')) stopReplay(); }}>
         {webgl ? (
           <Suspense fallback={<p className="session-graph-wait">{t('graph.loading')}</p>}>
             {mode === 'graph2d'
               ? <Graph2D graph={graph} layout={layout} selected={selected} onSelect={setSelected} onHoverEdge={onHoverEdge} />
-              : <Graph3D graph={graph} selected={selected} onSelect={setSelected} onHoverEdge={onHoverEdge} autoRotate={rotate} events={events} />}
+              : <Graph3D graph={graph} selected={selected} onSelect={setSelected} onHoverEdge={onHoverEdge} settings={settings} light={light}
+                  reducedMotion={reducedMotion} highlight={matches} flyTo={flyTo} events={events} bursts={bursts}
+                  fitKey={local ? `${local.id}:${local.depth}` : ''} />}
           </Suspense>
         ) : <p className="session-graph-wait" role="alert">{t('graph.noWebgl')}</p>}
         <p className="session-graph-hint">{t(mode === 'graph2d' ? 'graph.hint2d' : 'graph.hint3d')}</p>
+        {is3d && settings.panel && (
+          <GraphSettingsPanel settings={settings} onChange={change} search={search} onSearch={setSearch} matches={matches.length}
+            onSearchEnter={() => { if (matches[0]) setFlyTo({ id: matches[0], seq: (flyTo?.seq || 0) + 1 }); }}
+            groups={groups} devices={topology?.devices.length || 0} tiered={graph.nodes.some((n) => n.kind === 'device')} />
+        )}
+        {is3d && replay.state.playing && (
+          <ReplayBar state={replay.state} speed={settings.replaySpeed} onStop={replay.stop}
+            onSpeed={(v) => { change({ replaySpeed: v }); replay.setSpeed(v); }} />
+        )}
         {machine && <AttackPanel id={machineId} name={machine.name} sub={machine.sub} onClose={() => setSelected(null)} />}
         {picked && (
-          <aside className="session-graph-panel" aria-label={picked.title || picked.label}>
-            <div className="session-graph-panel-head">
-              <strong>{picked.lead ? '★ ' : ''}{picked.title || picked.label}</strong>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSelected(null)} aria-label={t('graph.close')}>✕</button>
-            </div>
-            <code className="session-label">{picked.label}</code>
-            <div className="session-graph-badges">
-              {picked.lead && <span className="session-work-badge is-orchestrator">{t('claudePeer.lead', { count: outgoing.length })}</span>}
-              {picked.busy && <span className="session-work-badge">{t('claudePeer.working')}</span>}
-              {!picked.alive && <span className="session-work-badge is-still">{t('graph.ended')}</span>}
-            </div>
-            <AgentIcons kinds={picked.agents} claude={picked.claude?.[0]} />
-            <ClaudeAddress variant="card" peers={picked.claude || []} />
-            {(incoming.length > 0 || outgoing.length > 0) && (
-              <ul className="session-graph-rel">
-                {incoming.map((l) => <li key={l.from}><span className="is-in">←</span> {nameOf(l.from)}</li>)}
-                {outgoing.map((l) => <li key={l.to}><span className="is-out">→</span> {nameOf(l.to)}</li>)}
-              </ul>
-            )}
-            <pre className="session-graph-preview">{picked.preview || t('graph.noPreview')}</pre>
-            <div className="session-actions">
-              <button className="btn btn-primary btn-sm" disabled={!picked.alive} onClick={() => onAttach(picked)}>{t('terminal.join')}</button>
-              <button className="btn btn-secondary btn-sm" disabled={!picked.alive} onClick={() => onPopOut(picked)} title={t('remote.detachHint')}>⧉</button>
-            </div>
-          </aside>
+          <SessionPanel picked={picked} sessions={sessions} links={links} onAttach={onAttach} onPopOut={onPopOut} onClose={() => setSelected(null)}
+            onLocal={is3d ? (depth) => setLocal({ id: picked.id, depth }) : undefined} />
         )}
       </div>
       {mode === 'graph3d' && events.length > 0 && (
