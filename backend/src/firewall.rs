@@ -1,7 +1,8 @@
 use crate::models::{
     ApiResponse, FirewallAddRuleRequest, FirewallDeleteRuleRequest, FirewallRule, FirewallStatus,
 };
-use actix_web::{web, HttpResponse};
+use actix_web::{web, HttpRequest, HttpResponse};
+use nabiman_server::privileged::client::Client;
 
 fn run_cmd(cmd: &str, args: &[&str]) -> Result<String, String> {
     let output = std::process::Command::new(cmd)
@@ -49,7 +50,7 @@ fn detect_backend() -> FwBackend {
     }
 }
 
-fn parse_ufw_rules(output: &str) -> Vec<FirewallRule> {
+pub(crate) fn parse_ufw_rules(output: &str) -> Vec<FirewallRule> {
     let mut rules = Vec::new();
     let mut num = 1u32;
     for line in output.lines() {
@@ -89,7 +90,7 @@ fn parse_ufw_rules(output: &str) -> Vec<FirewallRule> {
     rules
 }
 
-fn parse_iptables_rules(output: &str) -> Vec<FirewallRule> {
+pub(crate) fn parse_iptables_rules(output: &str) -> Vec<FirewallRule> {
     let mut rules = Vec::new();
     let mut num = 1u32;
     for line in output.lines() {
@@ -126,7 +127,40 @@ fn parse_iptables_rules(output: &str) -> Vec<FirewallRule> {
     rules
 }
 
-async fn get_status() -> HttpResponse {
+/// The open ports in `firewall-cmd --list-all`, as rules.
+pub(crate) fn parse_firewalld_ports(ports_output: &str) -> Vec<FirewallRule> {
+    let mut rules = Vec::new();
+    let mut num = 1u32;
+    for line in ports_output.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("ports:") {
+            let ports_str = trimmed.trim_start_matches("ports:").trim();
+            for port_entry in ports_str.split_whitespace() {
+                let (port, proto) = if port_entry.contains('/') {
+                    let pp: Vec<&str> = port_entry.split('/').collect();
+                    (pp[0].to_string(), pp.get(1).unwrap_or(&"tcp").to_string())
+                } else {
+                    (port_entry.to_string(), "tcp".to_string())
+                };
+                rules.push(FirewallRule {
+                    number: num,
+                    action: "ALLOW".to_string(),
+                    protocol: proto,
+                    port,
+                    source: "any".to_string(),
+                    destination: "any".to_string(),
+                });
+                num += 1;
+            }
+        }
+    }
+    rules
+}
+
+async fn get_status(req: HttpRequest, client: web::Data<Client>) -> HttpResponse {
+    if crate::run_mode::is_service() {
+        return crate::system_helper::firewall_status(req, client).await;
+    }
     match detect_backend() {
         FwBackend::Ufw => {
             let active = run_cmd("ufw", &["status"])
@@ -145,31 +179,7 @@ async fn get_status() -> HttpResponse {
                 .map(|o| o.trim() == "running")
                 .unwrap_or(false);
             let ports_output = run_cmd("firewall-cmd", &["--list-all"]).unwrap_or_default();
-            let mut rules = Vec::new();
-            let mut num = 1u32;
-            for line in ports_output.lines() {
-                let trimmed = line.trim();
-                if trimmed.starts_with("ports:") {
-                    let ports_str = trimmed.trim_start_matches("ports:").trim();
-                    for port_entry in ports_str.split_whitespace() {
-                        let (port, proto) = if port_entry.contains('/') {
-                            let pp: Vec<&str> = port_entry.split('/').collect();
-                            (pp[0].to_string(), pp.get(1).unwrap_or(&"tcp").to_string())
-                        } else {
-                            (port_entry.to_string(), "tcp".to_string())
-                        };
-                        rules.push(FirewallRule {
-                            number: num,
-                            action: "ALLOW".to_string(),
-                            protocol: proto,
-                            port,
-                            source: "any".to_string(),
-                            destination: "any".to_string(),
-                        });
-                        num += 1;
-                    }
-                }
-            }
+            let rules = parse_firewalld_ports(&ports_output);
             HttpResponse::Ok().json(ApiResponse::ok(FirewallStatus {
                 backend: "firewalld".to_string(),
                 active,
@@ -205,7 +215,10 @@ fn validate_protocol(proto: &str) -> bool {
     matches!(proto, "tcp" | "udp" | "any")
 }
 
-async fn add_rule(body: web::Json<FirewallAddRuleRequest>) -> HttpResponse {
+async fn add_rule(req: HttpRequest, client: web::Data<Client>, body: web::Json<FirewallAddRuleRequest>) -> HttpResponse {
+    if crate::run_mode::is_service() {
+        return crate::system_helper::firewall_add(req, client, &body).await;
+    }
     if !validate_port(&body.port) {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid port"));
     }
@@ -271,7 +284,10 @@ async fn add_rule(body: web::Json<FirewallAddRuleRequest>) -> HttpResponse {
     }
 }
 
-async fn delete_rule(body: web::Json<FirewallDeleteRuleRequest>) -> HttpResponse {
+async fn delete_rule(req: HttpRequest, client: web::Data<Client>, body: web::Json<FirewallDeleteRuleRequest>) -> HttpResponse {
+    if crate::run_mode::is_service() {
+        return crate::system_helper::firewall_delete(req, client, &body).await;
+    }
     let num_str = body.number.to_string();
     let result = match detect_backend() {
         FwBackend::Ufw => run_cmd("ufw", &["--force", "delete", &num_str]),

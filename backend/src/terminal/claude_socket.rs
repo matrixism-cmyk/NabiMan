@@ -320,6 +320,9 @@ fn open(ask: Ask, uid: u32, pid: u32, store: &PtyStore) -> Answer {
             Err(_) => return refuse("terminal capacity reached"),
         };
         let size = (200, 50);
+        if let Err(e) = claude_start::startable(&start.user) {
+            return refuse(e);
+        }
         if let Err(e) = session::create_tmux_session(&tmux_name, Some(&claude_start::command(&start)), SCROLLBACK, size) {
             return refuse(format!("tmux: {e}"));
         }

@@ -13,6 +13,7 @@
 # port = 8080
 # static = "/usr/share/nabiman/static"
 # data_dir = "/var/lib/nabiman"        # only in /etc/nabiman/nabiman.toml
+# run_mode = "root"                   # "service": unprivileged API + root helper (install.sh --mode service)
 
 # The web
 # product_name = "NabiMan"

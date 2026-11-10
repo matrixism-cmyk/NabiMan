@@ -77,6 +77,28 @@ fn user_of(uid: u32) -> Option<Account> {
     accounts().into_iter().find(|a| a.name == name)
 }
 
+/// Whether this process may start a session as `user`: always as root (it
+/// switches with `su`); in service mode only as the service user itself.
+pub(crate) fn startable_in(user: &str, service: bool, own: Option<&str>) -> Result<(), String> {
+    if !service || own == Some(user) {
+        return Ok(());
+    }
+    Err(format!("{user} 계정으로 시작할 수 없습니다: NabiMan이 권한 없는 서비스로 실행 중입니다 / starting a session as {user} is not available while NabiMan runs as an unprivileged service (run_mode = service): su/runuser to another account needs root"))
+}
+
+/// The name of the account this process runs as.
+fn own_account() -> Option<String> {
+    let uid = unsafe { libc::geteuid() };
+    fs::read_to_string("/etc/passwd").ok()?.lines().find_map(|l| {
+        let f: Vec<&str> = l.split(':').collect();
+        (f.len() >= 7 && f[2].parse::<u32>().ok() == Some(uid)).then(|| f[0].to_string())
+    })
+}
+
+pub(crate) fn startable(user: &str) -> Result<(), String> {
+    startable_in(user, crate::run_mode::is_service(), own_account().as_deref())
+}
+
 pub(crate) fn accounts() -> Vec<Account> {
     let passwd = fs::read_to_string("/etc/passwd").unwrap_or_default();
     accounts_in(&passwd, |home| Path::new(home).is_dir())
@@ -117,6 +139,7 @@ pub(crate) fn from_query(query: &str) -> Result<Option<Start>, String> {
         let owner = user_of(bg.uid).ok_or("세션 주인 계정을 찾지 못했습니다 / its owner has no usable account here")?;
         let dir = if Path::new(&bg.cwd).is_dir() { bg.cwd } else { owner.home };
         let title = bg.name.chars().filter(|c| !c.is_control()).take(MAX_TITLE_LEN).collect();
+        startable(&owner.name)?;
         return Ok(Some(Start { user: owner.name, dir, skip_permissions: false, resume: false, title, prompt: None, root_shell_after: true, attach: Some(bg.job) }));
     }
     let Some(user) = param(query, "start_user") else {
@@ -126,6 +149,7 @@ pub(crate) fn from_query(query: &str) -> Result<Option<Start>, String> {
     if !valid_user(&user) || !known.iter().any(|a| a.name == user) {
         return Err("이 서버에 없는 사용자입니다 / unknown user".into());
     }
+    startable(&user)?;
     let dir = param(query, "start_dir").unwrap_or_default();
     if dir.is_empty() || dir.len() > MAX_DIR_LEN || !dir.starts_with('/') || dir.chars().any(char::is_control) {
         return Err("디렉토리는 /로 시작하는 절대 경로여야 합니다 / the directory must be an absolute path".into());
@@ -178,7 +202,8 @@ pub(crate) fn command(start: &Start) -> String {
         claude.push_str(&quote(prompt));
     }
     let inner = format!("cd {} && {}; exec bash -l", quote(&start.dir), claude);
-    let run = if start.user == "root" {
+    // In service mode `startable` has allowed only the service user: no `su`.
+    let run = if start.user == "root" || crate::run_mode::is_service() {
         format!("bash -l -c {}", quote(&inner))
     } else {
         format!("su --pty -l {} -c {}", start.user, quote(&inner))

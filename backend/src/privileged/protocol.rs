@@ -1,7 +1,10 @@
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::io::{self, Read, Write};
 
+/// A request, and every frame the helper reads.
 pub const MAX_FRAME: usize = 4096;
+/// A system operation's reply, which carries a command's (bounded) output; read only by the API.
+pub const MAX_REPLY: usize = 64 * 1024;
 pub const VERSION: u32 = 1;
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -30,7 +33,18 @@ impl ServiceAction {
 pub enum Operation {
     Execute { unit: String, action: ServiceAction },
     Inspect { operation_id: String },
+    /// The firewall's rules as its tool prints them (ufw, firewalld, iptables).
+    FirewallStatus {},
+    /// Allow or deny one port or port range (`port..=port_end`).
+    FirewallAdd { verdict: Verdict, protocol: Protocol, port: u16, port_end: Option<u16> },
+    /// Delete rule `number` as `FirewallStatus` lists it (ufw, iptables).
+    FirewallDelete { number: u32 },
+    /// Refresh the package lists (`apt-get update`, `dnf makecache`).
+    PackageRefresh {},
+    /// Upgrade every package, or the one named, from the configured repositories.
+    PackageUpgrade { package: Option<String> },
 }
+pub use super::system_ops::{Outcome, Protocol, SystemReply, Verdict};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Request {
@@ -95,10 +109,13 @@ pub fn is_id(id: &str) -> bool {
     uuid::Uuid::parse_str(id).is_ok_and(|value| value.to_string() == id)
 }
 pub fn read_frame<T: DeserializeOwned>(reader: &mut impl Read) -> io::Result<T> {
+    read_frame_within(reader, MAX_FRAME)
+}
+pub fn read_frame_within<T: DeserializeOwned>(reader: &mut impl Read, max: usize) -> io::Result<T> {
     let mut header = [0u8; 4];
     reader.read_exact(&mut header)?;
     let len = u32::from_be_bytes(header) as usize;
-    if len == 0 || len > MAX_FRAME {
+    if len == 0 || len > max {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
             "Invalid frame size",
@@ -110,8 +127,11 @@ pub fn read_frame<T: DeserializeOwned>(reader: &mut impl Read) -> io::Result<T> 
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid helper message"))
 }
 pub fn write_frame<T: Serialize>(writer: &mut impl Write, value: &T) -> io::Result<()> {
+    write_frame_within(writer, value, MAX_FRAME)
+}
+pub fn write_frame_within<T: Serialize>(writer: &mut impl Write, value: &T, max: usize) -> io::Result<()> {
     let bytes = serde_json::to_vec(value).map_err(io::Error::other)?;
-    if bytes.is_empty() || bytes.len() > MAX_FRAME {
+    if bytes.is_empty() || bytes.len() > max {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
             "Invalid frame size",

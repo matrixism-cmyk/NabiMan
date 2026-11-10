@@ -123,3 +123,15 @@ fn the_query_picks_the_start() {
     let got = from_query("start_user=root&start_dir=%2Ftmp&claude_skip=1&claude_continue=0&start_title=%EB%82%98%EB%B9%84").unwrap().unwrap();
     assert_eq!(got, Start { user: "root".into(), dir: "/tmp".into(), skip_permissions: true, resume: false, title: "나비".into(), prompt: None, root_shell_after: true, attach: None });
 }
+
+#[test]
+fn service_mode_starts_sessions_only_as_the_service_user() {
+    // Root mode: any account (the root API switches with su).
+    assert!(startable_in("nabi", false, Some("root")).is_ok());
+    // Service mode: the service user itself, and nobody else (no su without root).
+    assert!(startable_in("nabiman", true, Some("nabiman")).is_ok());
+    let refused = startable_in("nabi", true, Some("nabiman")).unwrap_err();
+    assert!(refused.contains("not available") && refused.contains("run_mode = service"), "{refused}");
+    assert!(startable_in("root", true, Some("nabiman")).is_err());
+    assert!(startable_in("nabi", true, None).is_err());
+}

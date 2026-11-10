@@ -1,5 +1,7 @@
 //! Process boundaries shared by the API and the privileged helper.
 pub mod privileged;
+/// The bounded child-process runner, shared by the API and the helper.
+pub mod bounded_command;
 
 pub mod backup_crypto;
 pub mod recovery_bundle;

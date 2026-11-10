@@ -1,5 +1,5 @@
 mod lock_safe;
-mod bounded_command;
+use nabiman_server::bounded_command;
 mod access_rules;
 mod accounts;
 mod alert_rules;
@@ -61,6 +61,8 @@ mod attack_watch;
 mod remote_servers;
 mod server_facts;
 mod runtime_identity;
+mod run_mode;
+mod system_helper;
 mod scope_access;
 mod scope_settings;
 mod secret_store;
@@ -198,6 +200,7 @@ async fn serve() -> std::io::Result<()> {
     let mec_db = owned_mec_db.handle.clone();
     storage.seed_defaults();
     let listen = install_config::listen::at_startup()?;
+    run_mode::at_startup()?;
     let static_dir = std::env::var("NABIMAN_STATIC").unwrap_or_else(|_| "./static".to_string());
 
     let share_store = terminal::share_store::open(
@@ -270,6 +273,8 @@ async fn serve() -> std::io::Result<()> {
         let index_path = format!("{}/index.html", static_dir);
 
         App::new()
+            // Innermost: after sign-in and access checks, refuse root work in service mode.
+            .wrap(actix_web::middleware::from_fn(run_mode::gate))
             .wrap(mec::safety::MecReadOnly)
             .wrap(mec::safety::MecRateLimit::new())
             .wrap(mec::safety::MecAccessAudit::new(

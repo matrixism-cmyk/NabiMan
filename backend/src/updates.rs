@@ -1,5 +1,6 @@
 use crate::models::ApiResponse;
-use actix_web::{web, HttpResponse};
+use actix_web::{web, HttpRequest, HttpResponse};
+use nabiman_server::privileged::client::Client;
 use serde::Serialize;
 
 use crate::bounded_command::{deadline, OutputOffThread};
@@ -31,7 +32,7 @@ async fn detect_pkg_manager() -> Option<&'static str> {
     None
 }
 
-async fn check_updates() -> HttpResponse {
+async fn check_updates(req: HttpRequest, client: web::Data<Client>) -> HttpResponse {
     let mgr = match detect_pkg_manager().await {
         Some(m) => m,
         None => {
@@ -43,7 +44,11 @@ async fn check_updates() -> HttpResponse {
 
     let output = match mgr {
         "apt" => {
-            let _ = std::process::Command::new("apt").args(["update"]).output_off_thread(deadline::PACKAGE_QUERY).await;
+            if crate::run_mode::is_service() {
+                crate::system_helper::refresh_packages(&req, &client).await;
+            } else {
+                let _ = std::process::Command::new("apt").args(["update"]).output_off_thread(deadline::PACKAGE_QUERY).await;
+            }
             std::process::Command::new("apt")
                 .args(["list", "--upgradable"])
                 .output_off_thread(deadline::PACKAGE_QUERY).await
@@ -114,7 +119,10 @@ fn parse_dnf_updates(output: &str) -> Vec<UpdatablePackage> {
         .collect()
 }
 
-async fn run_upgrade() -> HttpResponse {
+async fn run_upgrade(req: HttpRequest, client: web::Data<Client>) -> HttpResponse {
+    if crate::run_mode::is_service() {
+        return crate::system_helper::upgrade(req, client, None).await;
+    }
     let mgr = match detect_pkg_manager().await {
         Some(m) => m,
         None => return HttpResponse::Ok().json(ApiResponse::<String>::error("No package manager")),
@@ -154,7 +162,7 @@ struct UpgradePackageRequest {
     pub name: String,
 }
 
-async fn upgrade_package(body: web::Json<UpgradePackageRequest>) -> HttpResponse {
+async fn upgrade_package(req: HttpRequest, client: web::Data<Client>, body: web::Json<UpgradePackageRequest>) -> HttpResponse {
     let name = &body.name;
     if name.is_empty()
         || name.len() > 128
@@ -163,6 +171,9 @@ async fn upgrade_package(body: web::Json<UpgradePackageRequest>) -> HttpResponse
             .all(|c| c.is_alphanumeric() || "-_.+:".contains(c))
     {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid package name"));
+    }
+    if crate::run_mode::is_service() {
+        return crate::system_helper::upgrade(req, client, Some(name.clone())).await;
     }
     let mgr = match detect_pkg_manager().await {
         Some(m) => m,

@@ -3,6 +3,7 @@ fn main() -> std::io::Result<()> {
     let mut policy = PathBuf::from("/etc/nabiman/privileged-services.json");
     let mut socket = PathBuf::from("/run/nabiman-helper/control.sock");
     let mut ledger = PathBuf::from("/var/lib/nabiman-helper/operations.db");
+    let mut system = PathBuf::from("/etc/nabiman/privileged-system.json");
     let mut pin_api = None;
     let mut args = std::env::args().skip(1);
     while let Some(option) = args.next() {
@@ -13,6 +14,7 @@ fn main() -> std::io::Result<()> {
             "--policy" => policy = PathBuf::from(value),
             "--socket" => socket = PathBuf::from(value),
             "--ledger" => ledger = PathBuf::from(value),
+            "--system-policy" => system = PathBuf::from(value),
             "--pin-api" => pin_api = Some(value.parse::<u32>().map_err(std::io::Error::other)?),
             _ => return Err(std::io::Error::other("Unknown helper option")),
         }
@@ -21,5 +23,5 @@ fn main() -> std::io::Result<()> {
         let approved = nabiman_server::privileged::policy::Policy::load(&policy)?;
         return nabiman_server::privileged::identity::publish(&socket, pid, approved.api_uid);
     }
-    nabiman_server::privileged::server::run(&policy, &socket, &ledger)
+    nabiman_server::privileged::server::serve(&policy, &system, &socket, &ledger)
 }

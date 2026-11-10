@@ -17,7 +17,7 @@ use std::{
 
 /// Per-operation deadlines, longest first. A deadline bounds the whole
 /// command, connection included; SSH's own `ConnectTimeout` is shorter.
-pub(crate) mod deadline {
+pub mod deadline {
     use std::time::Duration;
     /// A full package upgrade (`apt upgrade -y`, `dnf upgrade -y`).
     pub const SYSTEM_UPGRADE: Duration = Duration::from_secs(60 * 60);
@@ -48,13 +48,13 @@ pub(crate) mod deadline {
 }
 
 /// How much of each stream is kept by default; the rest is read and dropped.
-pub(crate) const MAX_OUTPUT: usize = 4 * 1024 * 1024;
+pub const MAX_OUTPUT: usize = 4 * 1024 * 1024;
 /// After a deadline: time between asking the group to stop and killing it.
 const TERM_GRACE: Duration = Duration::from_secs(3);
 /// After the child exits: how long a background grandchild may hold the pipes.
 const EOF_GRACE: Duration = Duration::from_secs(2);
 
-pub(crate) struct Captured {
+pub struct Captured {
     pub status: ExitStatus,
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
@@ -63,7 +63,7 @@ pub(crate) struct Captured {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum RunError {
+pub enum RunError {
     Start,
     TimedOut(Duration),
     Io(&'static str),
@@ -85,7 +85,7 @@ impl std::fmt::Display for RunError {
 
 /// Runs `cmd` to completion or to `deadline`, whichever is first, keeping
 /// at most `max_output` bytes of each stream. Stdin is `input`, or empty.
-pub(crate) fn capture(
+pub fn capture(
     cmd: &mut Command,
     input: Option<&[u8]>,
     deadline: Duration,
@@ -107,7 +107,7 @@ pub(crate) fn capture(
 
 /// `Command::output`, bounded: a timeout is an `io::ErrorKind::TimedOut`
 /// error saying so, and output past `MAX_OUTPUT` ends in a note that it was cut.
-pub(crate) trait OutputWithin {
+pub trait OutputWithin {
     fn output_within(&mut self, deadline: Duration) -> std::io::Result<std::process::Output>;
 }
 
@@ -132,7 +132,7 @@ impl OutputWithin for Command {
 /// `output_within` for an async handler: the command runs on the blocking
 /// pool, so the HTTP worker carries on serving while it runs. The command is
 /// taken out of `self`, which is left blank.
-pub(crate) trait OutputOffThread {
+pub trait OutputOffThread {
     fn output_off_thread(&mut self, deadline: Duration) -> futures::future::BoxFuture<'static, std::io::Result<std::process::Output>>;
 }
 
@@ -147,7 +147,7 @@ impl OutputOffThread for Command {
     }
 }
 
-pub(crate) struct Output {
+pub struct Output {
     pub status: ExitStatus,
     pub out: String,
     pub err: String,
@@ -155,7 +155,7 @@ pub(crate) struct Output {
 
 /// A local tool, run with a fixed PATH and C locale; output past 1 MiB or
 /// not UTF-8 is an error rather than something half-read.
-pub(crate) fn run(
+pub fn run(
     program: &Path,
     args: &[&str],
     input: Option<&str>,

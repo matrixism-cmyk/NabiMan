@@ -58,6 +58,8 @@ struct Runtime<'a> {
     identity: &'a RuntimeIdentity,
     tools: Option<crate::external_tools::Report>,
     settings: crate::install_config::Loaded,
+    /// The run mode, and what each feature that needs root does in it.
+    privileges: crate::run_mode::Report,
 }
 
 #[derive(serde::Deserialize)]
@@ -72,6 +74,7 @@ async fn inspect(identity: web::Data<RuntimeIdentity>, ask: web::Query<Ask>) -> 
         identity: identity.get_ref(),
         tools: crate::external_tools::report(refresh),
         settings: crate::install_config::loaded(),
+        privileges: crate::run_mode::report(),
     };
     HttpResponse::Ok().insert_header(("Cache-Control", "no-store")).json(ApiResponse::ok(runtime))
 }

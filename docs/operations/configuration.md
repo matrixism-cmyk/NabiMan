@@ -55,6 +55,7 @@ TOML입니다. 키 이름이 곧 환경 변수 이름입니다.
 | `port` | `NABIMAN_PORT` | `8080` | 서버가 듣는 포트. `listen`에 포트가 없을 때 씁니다(둘 다 포트를 주면 `listen`의 포트) |
 | `secret_key_file` | `NABIMAN_SECRET_KEY_FILE` | `데이터 디렉터리/secret.key` | 저장 비밀번호 암호화 키 파일 |
 | `helper_socket` | `NABIMAN_HELPER_SOCKET` | `/run/nabiman-helper/control.sock` | 권한 도우미 소켓 |
+| `run_mode` | `NABIMAN_RUN_MODE` | `root` | `root`: API가 root로 root 작업을 직접 합니다(지금까지와 같음). `service`: API는 권한 없는 계정(`nabiman`)으로 돌고, 서비스 제어·방화벽·패키지 업데이트는 root 도우미가 하며, 그 밖에 root가 필요한 기능은 503과 이유로 답합니다(`GET /api/diagnostics/runtime`의 `privileges`). `service`인데 root로 시작하면 서버가 시작하지 않습니다. [권한 목록](../security/privilege-inventory.md) |
 | `claude_socket` | `NABIMAN_CLAUDE_SOCKET` | `/run/nabiman/claude.sock` | Claude 세션 지휘 소켓 |
 | `license_public_keys_file` | `NABIMAN_LICENSE_PUBLIC_KEYS_FILE` | `/etc/nabiman/license-public-keys.json` | 라이선스 서명 공개키 |
 
