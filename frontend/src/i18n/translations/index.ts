@@ -31,6 +31,8 @@ import usersAccess from './users-access';
 import usersGrants from './users-grants';
 import usersScope from './users-scope';
 import scope from './scope';
+import signup from './signup';
+import sftpSniff from './sftp-sniff';
 
 export type { Lang };
 export { LANG_LABELS } from '../../shared/i18n';
@@ -68,6 +70,8 @@ const translations: Translations = {
   ...usersGrants,
   ...usersScope,
   ...scope,
+  ...signup,
+  ...sftpSniff,
 };
 
 export default translations;

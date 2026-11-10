@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTheme, THEMES, THEME_ORDER, ThemeId } from './ThemeProvider';
+import { useT } from '../i18n';
 
 interface Props {
   /** 상단 네비용 컴팩트 드롭다운. 기본값은 설정 패널용 라디오 카드. */
@@ -8,6 +9,7 @@ interface Props {
 
 export default function ThemeSelector({ compact = false }: Props) {
   const { themeId, setTheme } = useTheme();
+  const { t } = useT();
 
   if (compact) {
     return (
@@ -15,12 +17,12 @@ export default function ThemeSelector({ compact = false }: Props) {
         className="lang-select"
         value={themeId}
         onChange={(e) => setTheme(e.target.value as ThemeId)}
-        title="테마 선택"
-        aria-label="테마"
+        title={t('theme.select')}
+        aria-label={t('theme.label')}
       >
         {THEME_ORDER.map((id) => (
           <option key={id} value={id}>
-            {THEMES[id].label}
+            {t(THEMES[id].label)}
           </option>
         ))}
       </select>
@@ -36,7 +38,7 @@ export default function ThemeSelector({ compact = false }: Props) {
       }}
     >
       {THEME_ORDER.map((id) => {
-        const t = THEMES[id];
+        const theme = THEMES[id];
         const active = id === themeId;
         return (
           <button
@@ -48,13 +50,13 @@ export default function ThemeSelector({ compact = false }: Props) {
               padding: '12px',
               borderRadius: '8px',
               border: active
-                ? `2px solid ${t.primary}`
+                ? `2px solid ${theme.primary}`
                 : '1px solid var(--border)',
               background: 'var(--surface)',
               cursor: 'pointer',
               color: 'var(--text)',
               boxShadow: active
-                ? `0 0 0 3px ${t.primary}33`
+                ? `0 0 0 3px ${theme.primary}33`
                 : 'none',
               transition: 'box-shadow 0.15s, border-color 0.15s',
             }}
@@ -67,19 +69,19 @@ export default function ThemeSelector({ compact = false }: Props) {
                 marginBottom: '8px',
               }}
             >
-              <strong style={{ fontSize: '14px' }}>{t.label}</strong>
+              <strong style={{ fontSize: '14px' }}>{t(theme.label)}</strong>
               {active && (
                 <span
                   style={{
-                    background: t.primary,
-                    color: t.primaryFg,
+                    background: theme.primary,
+                    color: theme.primaryFg,
                     padding: '2px 8px',
                     borderRadius: '999px',
                     fontSize: '11px',
                     fontWeight: 600,
                   }}
                 >
-                  적용 중
+                  {t('theme.active')}
                 </span>
               )}
             </div>
@@ -90,10 +92,10 @@ export default function ThemeSelector({ compact = false }: Props) {
                 marginBottom: '10px',
               }}
             >
-              {t.description}
+              {t(theme.description)}
             </div>
             <div style={{ display: 'flex', gap: '4px' }}>
-              {[t.primary, t.success, t.warning, t.danger].map((c, i) => (
+              {[theme.primary, theme.success, theme.warning, theme.danger].map((c, i) => (
                 <span
                   key={i}
                   style={{
@@ -107,8 +109,8 @@ export default function ThemeSelector({ compact = false }: Props) {
               ))}
               <span
                 style={{
-                  background: t.surface,
-                  border: `1px solid ${t.border}`,
+                  background: theme.surface,
+                  border: `1px solid ${theme.border}`,
                   width: '24px',
                   height: '18px',
                   borderRadius: '3px',
@@ -116,8 +118,8 @@ export default function ThemeSelector({ compact = false }: Props) {
               />
               <span
                 style={{
-                  background: t.bg,
-                  border: `1px solid ${t.border}`,
+                  background: theme.bg,
+                  border: `1px solid ${theme.border}`,
                   width: '24px',
                   height: '18px',
                   borderRadius: '3px',

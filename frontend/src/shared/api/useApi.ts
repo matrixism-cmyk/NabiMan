@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useVisibleInterval } from '../ui/useVisibleInterval';
+import { useT } from '../i18n';
 
 /** Every NabiMan API answers in this shape. */
 export interface ApiResponse<T> {
@@ -186,6 +187,10 @@ export function useApi<T>(endpoint: string, interval?: number) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Read through a ref, so a language change does not fetch again.
+  const { t } = useT();
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const fetchData = useCallback(async () => {
     if (!endpoint) { setData(null); setLoading(false); return; }
@@ -199,7 +204,7 @@ export function useApi<T>(endpoint: string, interval?: number) {
       if (json.success) { setData(json.data); setError(null); }
       else { setError(json.message); }
     } catch (e) {
-      if (isCurrent(session)) setError(e instanceof Error ? e.message : 'Network error');
+      if (isCurrent(session)) setError(e instanceof Error ? e.message : tRef.current('common.networkError'));
     } finally { if (isCurrent(session)) setLoading(false); }
   }, [endpoint]);
 

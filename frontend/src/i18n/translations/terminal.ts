@@ -310,6 +310,8 @@ const t: T = {
   'remote.railHide': { ko: '서버 목록 접기', en: 'Fold the server list away', ja: 'サーバー一覧をたたむ' },
   'remote.railShow': { ko: '서버 목록 펼치기', en: 'Show the server list', ja: 'サーバー一覧を表示' },
   'remote.railTab': { ko: '서버 목록', en: 'Servers', ja: 'サーバー' },
+  'terminal.restored': { ko: '이전 화면 복원됨', en: 'previous screen restored', ja: '前の画面を復元しました' },
+  'terminal.lines': { ko: '{n}줄', en: '{n} lines', ja: '{n}行' },
 };
 
 export default t;

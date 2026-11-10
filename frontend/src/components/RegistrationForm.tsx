@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import './registration-form.css';
 import { useAuthCooldown } from '../hooks/useAuthCooldown';
+import { useT } from '../i18n';
 
 export default function RegistrationForm({ onBack }: { onBack: () => void }) {
   const cooldown = useAuthCooldown();
@@ -10,10 +11,11 @@ export default function RegistrationForm({ onBack }: { onBack: () => void }) {
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
+  const { t } = useT();
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cooldown.seconds || busy) return;
-    if (password !== confirm) { setMessage('비밀번호 확인이 일치하지 않습니다.'); return; }
+    if (password !== confirm) { setMessage(t('signup.mismatch')); return; }
     setBusy(true); setMessage('');
     try {
       const res = await fetch('/api/auth/register', {
@@ -22,25 +24,25 @@ export default function RegistrationForm({ onBack }: { onBack: () => void }) {
       });
       if (cooldown.accept(res)) return;
       const json = await res.json();
-      setMessage(json.message || json.data || '가입 신청을 처리하지 못했습니다.');
+      setMessage(json.message || json.data || t('signup.failed'));
       if (json.success) { setSubmitted(true); setPassword(''); setConfirm(''); setMessage(json.data); }
-    } catch { setMessage('서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.'); }
+    } catch { setMessage(t('signup.offline')); }
     finally { setBusy(false); }
   };
   return <div className="login-screen"><form className="login-form registration-form" onSubmit={submit}>
-    <h1>회원가입 신청</h1>
-    <p>최고관리자가 가입을 승인하고 서버·tenant 소속을 지정하면 서비스를 이용할 수 있습니다.</p>
+    <h1>{t('signup.title')}</h1>
+    <p>{t('signup.lead')}</p>
     {message && <div role="status" className="message">{message}</div>}
-    {cooldown.seconds > 0 && <p role="status">요청이 많습니다. {cooldown.seconds}초 후 다시 신청하세요.</p>}
+    {cooldown.seconds > 0 && <p role="status">{t('signup.cooldown', { seconds: cooldown.seconds })}</p>}
     {!submitted && <>
-      <label>아이디<input aria-label="가입 아이디" autoComplete="username" required minLength={2} maxLength={32}
+      <label>{t('signup.id')}<input aria-label={t('signup.idLabel')} autoComplete="username" required minLength={2} maxLength={32}
         value={username} onChange={e => setUsername(e.target.value)} pattern="[A-Za-z0-9_-]+" /></label>
-      <label>비밀번호 (8자 이상)<input aria-label="가입 비밀번호" type="password" autoComplete="new-password" required minLength={8}
+      <label>{t('signup.password')}<input aria-label={t('signup.passwordLabel')} type="password" autoComplete="new-password" required minLength={8}
         value={password} onChange={e => setPassword(e.target.value)} /></label>
-      <label>비밀번호 확인<input aria-label="비밀번호 확인" type="password" autoComplete="new-password" required
+      <label>{t('signup.confirm')}<input aria-label={t('signup.confirm')} type="password" autoComplete="new-password" required
         value={confirm} onChange={e => setConfirm(e.target.value)} /></label>
-      <button className="btn btn-primary" disabled={busy || cooldown.seconds > 0}>{busy ? '신청 중…' : '가입 신청'}</button>
+      <button className="btn btn-primary" disabled={busy || cooldown.seconds > 0}>{busy ? t('signup.submitting') : t('signup.submit')}</button>
     </>}
-    <button type="button" className="btn btn-secondary" onClick={onBack}>로그인으로 돌아가기</button>
+    <button type="button" className="btn btn-secondary" onClick={onBack}>{t('signup.back')}</button>
   </form></div>;
 }

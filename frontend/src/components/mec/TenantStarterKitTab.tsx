@@ -70,7 +70,7 @@ export default function TenantStarterKitTab({ tenantId, onChanged }: Props) {
 
   return (
     <div className="panel-card">
-      <h3 style={{ marginTop: 0 }}>Starter Kit</h3>
+      <h3 style={{ marginTop: 0 }}>{t('mec.tenant.tab.starter')}</h3>
       <p style={{ color: '#6b7280', fontSize: '14px' }}>
         {t('mec.tenant.starter.description')}
       </p>

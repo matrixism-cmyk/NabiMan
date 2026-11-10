@@ -326,7 +326,7 @@ export default function SessionsView({
             <div className="session-meta">
               <span>{t('terminal.viewers')} {session.ws_count}</span>
               <span>{formatAge(session.age_secs)}</span>
-              <span>{session.scrollback.toLocaleString()}줄</span>
+              <span>{t('terminal.lines', { n: session.scrollback.toLocaleString() })}</span>
               <span>{session.owner}</span>
             </div>
 

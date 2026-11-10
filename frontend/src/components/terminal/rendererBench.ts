@@ -27,6 +27,7 @@ const COLS = 100;
 const ROWS = 30;
 
 function screen(frame: number): string {
+  // i18n-exempt: benchmark text that must include wide Hangul cells
   const words = ['nabiman', '나비맨', '터미널', 'render', '─┼─', '│', '한글', 'WebGL', 'canvas', '0123456789'];
   let out = '\x1b[H';
   for (let r = 0; r < ROWS; r++) {

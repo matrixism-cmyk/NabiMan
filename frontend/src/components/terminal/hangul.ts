@@ -1,3 +1,4 @@
+// i18n-exempt-file: Hangul letter tables for composing syllables, not UI text
 /**
  * Putting Hangul together for keyboards that leave it to the page.
  *

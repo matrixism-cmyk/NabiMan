@@ -157,7 +157,7 @@ export default function LoginScreen({ onLogin }: Props) {
           </button>
         )}
 
-        {!needs2fa && <button type="button" className="btn btn-secondary" onClick={() => { window.history.pushState(null, '', '/signup'); setRegistering(true); }}>회원가입 신청</button>}
+        {!needs2fa && <button type="button" className="btn btn-secondary" onClick={() => { window.history.pushState(null, '', '/signup'); setRegistering(true); }}>{t('signup.open')}</button>}
 
         <select value={lang} onChange={e => setLang(e.target.value as Lang)}
           className="lang-select" style={{ marginTop: '12px', alignSelf: 'center' }}>

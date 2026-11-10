@@ -5,6 +5,7 @@ import { Speaker } from './speaker';
 import PauseField from '../terminal/dictation/PauseField';
 import './claude.css';
 
+// i18n-exempt: sample sentence for hearing the Korean voice
 const SAMPLE = '안녕하세요. 이 목소리와 빠르기로 답변을 읽어 드릴게요.';
 
 /**

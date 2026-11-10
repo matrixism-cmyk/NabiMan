@@ -15,6 +15,7 @@ let fetchMock: jest.SpyInstance;
 beforeEach(() => {
   window.history.replaceState(null, '', '/');
   sessionStorage.clear(); localStorage.clear();
+  localStorage.setItem('nabiman_lang', 'ko');
   localStorage.setItem('nabiman_term_windows', JSON.stringify([savedWindow]));
   fetchMock = jest.spyOn(global, 'fetch').mockImplementation(async (input: RequestInfo | URL) => {
     const url = String(input);

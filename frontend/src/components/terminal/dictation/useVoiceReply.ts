@@ -1,6 +1,7 @@
 import { RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import { apiRequest, fetchWithRefresh } from '../../../shared/api/useApi';
 import { Speaker } from '../../claude/speaker';
+import { useT } from '../../../shared/i18n';
 import type { TerminalViewHandle } from '../terminalTypes';
 import { lastAnswer, sentences } from './voiceReply';
 
@@ -37,6 +38,7 @@ async function speak(text: string, signal: AbortSignal): Promise<Blob> {
 export function useVoiceReply(handle: RefObject<TerminalViewHandle | null>, sessionId?: string) {
   const [state, setState] = useState<ReplyState>('idle');
   const [note, setNote] = useState('');
+  const { t } = useT();
   const speaker = useRef<Speaker | null>(null);
   const timer = useRef<number | undefined>(undefined);
   const session = useRef(sessionId);
@@ -68,11 +70,11 @@ export function useVoiceReply(handle: RefObject<TerminalViewHandle | null>, sess
       if (res?.success && res.data) text = lastAnswer(res.data);
     }
     if (!text) text = lastAnswer(handle.current?.screenText() ?? '');
-    if (!text) { setState('idle'); setNote('읽어 줄 답을 찾지 못했습니다'); return; }
+    if (!text) { setState('idle'); setNote(t('dictation.noAnswer')); return; }
     setNote('');
     const say = voice();
     sentences(text).forEach((s) => say.say(s));
-  }, [handle, voice]);
+  }, [handle, voice, t]);
 
   const ask = useCallback(() => {
     stop();
@@ -88,13 +90,13 @@ export function useVoiceReply(handle: RefObject<TerminalViewHandle | null>, sess
       if (screen !== last) { last = screen; changedAt = now; moved = true; }
       const busy = BUSY.test(screen);
       if (busy) moved = true;
-      if (now - started > MAX_WAIT_MS) { stop(); setNote('답을 너무 오래 기다려 읽기를 그만두었습니다'); return; }
+      if (now - started > MAX_WAIT_MS) { stop(); setNote(t('dictation.answerTimeout')); return; }
       if (!moved || busy || now - changedAt < QUIET_MS) return;
       window.clearInterval(timer.current);
       timer.current = undefined;
       read();
     }, POLL_MS);
-  }, [handle, read, stop]);
+  }, [handle, read, stop, t]);
 
   useEffect(() => () => { window.clearInterval(timer.current); speaker.current?.stop(); }, []);
 

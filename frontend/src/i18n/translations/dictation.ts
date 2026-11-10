@@ -56,6 +56,8 @@ const t: T = {
   'dictation.voiceNeedsKey': { ko: 'API 키를 저장하면 목소리 등록 상태를 볼 수 있습니다', en: 'Save an API key to see whether a voice is enrolled', ja: 'API キーを保存すると登録状態が見られます' },
   'dictation.voiceEnrolLink': { ko: '음성 서비스 계정 화면에서 등록', en: 'Enrol on the speech service’s account page', ja: '音声サービスのアカウント画面で登録' },
   'dictation.voiceLockWithout': { ko: '목소리를 등록하기 전에는 받아쓰기를 시작할 때 "먼저 목소리를 등록해 주세요" 오류가 납니다.', en: 'Until a voice is enrolled, dictation stops at the start asking for one.', ja: '声を登録するまでは、書き取りの開始時に登録を求めるエラーになります。' },
+  'dictation.noAnswer': { ko: '읽어 줄 답을 찾지 못했습니다', en: 'No answer found to read aloud', ja: '読み上げる回答が見つかりませんでした' },
+  'dictation.answerTimeout': { ko: '답을 너무 오래 기다려 읽기를 그만두었습니다', en: 'Stopped reading: waited too long for the answer', ja: '回答を長く待ちすぎたため読み上げを中止しました' },
 };
 
 export default t;

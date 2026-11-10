@@ -26,7 +26,7 @@ function mockData(me: object, users: object[]) {
 }
 test('signup confirms password and leaves applicant waiting for approval', async () => {
   const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({ json: async () => ({ success: true, data: '최고관리자 승인 대기' }) } as Response);
-  render(<RegistrationForm onBack={jest.fn()} />);
+  inKo(<RegistrationForm onBack={jest.fn()} />);
   fireEvent.change(screen.getByLabelText('가입 아이디'), { target: { value: 'new-user' } });
   fireEvent.change(screen.getByLabelText('가입 비밀번호'), { target: { value: 'long-password-123' } });
   fireEvent.change(screen.getByLabelText('비밀번호 확인'), { target: { value: 'different' } });

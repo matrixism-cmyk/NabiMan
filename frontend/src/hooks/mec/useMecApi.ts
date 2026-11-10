@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useT } from '../../shared/i18n';
 import { MecListResponse, MecResponse } from '../../types/mec';
 import { fetchWithRefresh } from '../../shared/api/useApi';
 import { useVisibleInterval } from '../../shared/ui/useVisibleInterval';
@@ -60,6 +61,10 @@ export function useMecApi<T>(endpoint: string, interval?: number): UseMecApiResu
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Read through a ref, so a language change does not fetch again.
+  const { t } = useT();
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const fetchData = useCallback(async () => {
     if (!endpoint) {
@@ -75,7 +80,7 @@ export function useMecApi<T>(endpoint: string, interval?: number): UseMecApiResu
         setError(null);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Network error');
+      setError(e instanceof Error ? e.message : tRef.current('common.networkError'));
     } finally {
       setLoading(false);
     }
@@ -92,6 +97,10 @@ export function useMecList<T>(endpoint: string, interval?: number): UseMecApiRes
   const [data, setData] = useState<T[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Read through a ref, so a language change does not fetch again.
+  const { t } = useT();
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const fetchData = useCallback(async () => {
     if (!endpoint) {
@@ -104,7 +113,7 @@ export function useMecList<T>(endpoint: string, interval?: number): UseMecApiRes
       setError(null);
     } catch (e) {
       setData(null);
-      setError(e instanceof Error ? e.message : 'Network error');
+      setError(e instanceof Error ? e.message : tRef.current('common.networkError'));
     } finally {
       setLoading(false);
     }

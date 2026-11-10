@@ -6,6 +6,7 @@
  */
 
 /** The request, at the end of a line (or just before a spoken "엔터"). */
+// i18n-exempt: matches Korean speech, whatever the page's language
 const ASK = new RegExp(
   String.raw`\s*(?:(?:음성|목소리|소리|말)\s*(?:으로|로)\s*(?:대답|답변|답|알려|말|설명|읽어)\s*(?:을|를)?\s*(?:해|하여)?\s*`
   + String.raw`(?:줘요?|주세요|줄래요?|주라|주십시오)|(?:대답|답변|결과|답)\s*(?:을|를)?\s*(?:소리\s*내어\s*)?읽어\s*(?:줘요?|주세요|줄래요?))`
@@ -81,7 +82,7 @@ function shellOutput(lines: string[]): string {
 export function tidy(text: string, max = 1500): string {
   const clean = text
     .replace(/[│┃┆┊╎╭╮╰╯├┤┬┴┼─━═]+/g, ' ')
-    .replace(/```[\s\S]*?```/g, ' 코드 생략. ')
+    .replace(/```[\s\S]*?```/g, ' 코드 생략. ') // i18n-exempt: spoken by the Korean reading voice
     .replace(/\*\*|__|`/g, '')
     .replace(/^\s*[-*•]\s+/gm, '')
     .replace(/[ \t]+/g, ' ')
@@ -89,8 +90,8 @@ export function tidy(text: string, max = 1500): string {
     .trim();
   if (clean.length <= max) return clean;
   const cut = clean.slice(0, max);
-  const stop = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('다.'), cut.lastIndexOf('\n'));
-  return `${cut.slice(0, stop > max / 2 ? stop + 1 : max)} 이하 생략.`;
+  const stop = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('다.'), cut.lastIndexOf('\n')); // i18n-exempt: Korean sentence ending
+  return `${cut.slice(0, stop > max / 2 ? stop + 1 : max)} 이하 생략.`; // i18n-exempt: spoken by the Korean reading voice
 }
 
 /** Sentences of at most `max` characters, for the speech service one at a time. */

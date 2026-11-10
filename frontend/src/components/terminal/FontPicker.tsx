@@ -3,6 +3,7 @@ import { useT } from '../../shared/i18n';
 import { fontOf, TERMINAL_FONTS } from './terminalFonts';
 
 /** What shows a coding font's character: look-alikes, brackets, box lines, Korean, alignment. */
+// i18n-exempt: sample text showing how the font draws Hangul
 const SAMPLE = ['0O oO 1lI| {}[]() => != ->', '│ 한글 정렬 확인 │ abc │', '└──────────────┴─────┘'];
 
 /** The terminal font, with a sample in it before saving. */

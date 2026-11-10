@@ -19,6 +19,7 @@ export const TERMINAL_FONTS: TerminalFont[] = [
   { id: 'jetbrains', label: 'JetBrains Mono + D2Coding', face: 'NabiMan JetBrains Mono', family: `${DIGITS}, 'NabiMan JetBrains Mono', 'NabiMan Hangul', monospace` },
   { id: 'fira', label: 'Fira Code + D2Coding', face: 'NabiMan Fira Code', family: `${DIGITS}, 'NabiMan Fira Code', 'NabiMan Hangul', monospace` },
   { id: 'cascadia', label: 'Cascadia Mono + D2Coding', face: 'NabiMan Cascadia Mono', family: `${DIGITS}, 'NabiMan Cascadia Mono', 'NabiMan Hangul', monospace` },
+  // i18n-exempt: the font's own name
   { id: 'nanum', label: '나눔고딕코딩', face: 'NabiMan Nanum Gothic Coding', family: `${DIGITS}, 'NabiMan Nanum Gothic Coding', monospace` },
   { id: 'system', label: 'system', face: null, family: `${DIGITS}, ${SYSTEM}` },
 ];

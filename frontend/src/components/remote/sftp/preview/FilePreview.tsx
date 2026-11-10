@@ -45,7 +45,8 @@ export default function FilePreview({ url, entry, onFacts, onText, wrap, encodin
         return;
       }
       setHead(first);
-      onFacts(sniff(first) || t('preview.binaryUnknown'));
+      const kind = sniff(first);
+      onFacts(kind ? t(kind) : t('preview.binaryUnknown'));
     })().catch((e: unknown) => { if (!abort.signal.aborted) setError(e instanceof Error ? e.message : t('common.error')); });
     return () => abort.abort();
   }, [url, entry.size, onFacts, t]);

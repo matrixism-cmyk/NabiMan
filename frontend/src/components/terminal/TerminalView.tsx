@@ -68,6 +68,9 @@ const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function 
   const [historyPosition, setHistoryPosition] = useState<HistoryPosition | null>(null);
   const [status, setStatus] = useState<TerminalStatus>('connecting');
   const { t } = useT();
+  // Read once when the terminal is made, so a language change does not remake it.
+  const restoredRef = useRef('');
+  restoredRef.current = t('terminal.restored');
   const { chunksRef, record, saveBuffer, clearBuffer } = useScreenBuffer(storageKey, settingsRef);
 
   settingsRef.current = settings;
@@ -287,7 +290,7 @@ const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function 
     if (saved) {
       chunksRef.current = [saved];
       term.write(saved);
-      term.write('\r\n\x1b[90m──────── 이전 화면 복원됨 / restored ────────\x1b[0m\r\n');
+      term.write(`\r\n\x1b[90m──────── ${restoredRef.current} ────────\x1b[0m\r\n`);
     }
 
     const detachClipboard = attachClipboard(term, containerRef.current, (text) => {

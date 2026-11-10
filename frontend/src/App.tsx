@@ -167,7 +167,7 @@ function App() {
 
   if (!loggedIn) return <LoginScreen onLogin={() => setLoggedIn(true)} />;
 
-  if (!currentUser) return <div className="panel loading">권한을 확인하는 중…</div>;
+  if (!currentUser) return <div className="panel loading">{t('app.checkingAccess')}</div>;
 
   if (currentUser.mfa_blocked) return <main className="app">
     <p role="alert">{t('mfa.policyGate')}</p>

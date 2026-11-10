@@ -18,6 +18,7 @@ export interface ThemeTokens {
 
 export interface ThemePreset extends ThemeTokens {
   id: ThemeId;
+  /** Translation keys of the theme's name and one-line description. */
   label: string;
   description: string;
 }
@@ -27,8 +28,8 @@ export interface ThemePreset extends ThemeTokens {
 export const THEMES: Record<ThemeId, ThemePreset> = {
   carbon: {
     id: 'carbon',
-    label: 'Carbon (기본)',
-    description: '차콜 배경과 청록색 포인트',
+    label: 'theme.carbon',
+    description: 'theme.carbon.desc',
     bg: '#0c1117',
     surface: '#141c25',
     surfaceAlt: '#1c2733',
@@ -44,8 +45,8 @@ export const THEMES: Record<ThemeId, ThemePreset> = {
   },
   midnight: {
     id: 'midnight',
-    label: 'Midnight Blue',
-    description: '짙은 네이비 + 시안 포인트',
+    label: 'theme.midnight',
+    description: 'theme.midnight.desc',
     bg: '#0a1128',
     surface: '#121a3b',
     surfaceAlt: '#1b2554',
@@ -61,8 +62,8 @@ export const THEMES: Record<ThemeId, ThemePreset> = {
   },
   forest: {
     id: 'forest',
-    label: 'Forest',
-    description: '딥 그린 + 골드 포인트',
+    label: 'theme.forest',
+    description: 'theme.forest.desc',
     bg: '#0f1a14',
     surface: '#182922',
     surfaceAlt: '#223b32',
@@ -78,8 +79,8 @@ export const THEMES: Record<ThemeId, ThemePreset> = {
   },
   royal: {
     id: 'royal',
-    label: 'Royal Purple',
-    description: '가든 퍼플 + 핑크 액센트',
+    label: 'theme.royal',
+    description: 'theme.royal.desc',
     bg: '#1a0f2e',
     surface: '#2a1a44',
     surfaceAlt: '#3b2a5a',
@@ -95,8 +96,8 @@ export const THEMES: Record<ThemeId, ThemePreset> = {
   },
   light: {
     id: 'light',
-    label: 'Light',
-    description: '밝은 기본 테마',
+    label: 'theme.light',
+    description: 'theme.light.desc',
     bg: '#f9fafb',
     surface: '#ffffff',
     surfaceAlt: '#f3f4f6',
@@ -112,8 +113,8 @@ export const THEMES: Record<ThemeId, ThemePreset> = {
   },
   slate: {
     id: 'slate',
-    label: 'Slate',
-    description: '중간 톤 회색 + 블루',
+    label: 'theme.slate',
+    description: 'theme.slate.desc',
     bg: '#1e293b',
     surface: '#273347',
     surfaceAlt: '#334155',
