@@ -1,6 +1,16 @@
+# NabiMan API and web UI. Installed by install.sh as /etc/systemd/system/nabiman.service.
+# Layout: docs/release/README.md. Local settings: /etc/nabiman/nabiman.env
+# (NABIMAN_PORT=..., etc.) or `systemctl edit nabiman`, not edits to this file.
+#
+# TODO(Phase 4, docs/commercialization/privileged-service-control.md): run the API
+# as User=nabiman with the typed root helper (packaging/nabiman-privileged-helper.service,
+# packaging/nabiman-api-separated.service.example). That unit can take the full
+# sandbox (ProtectSystem=strict, ProtectHome, PrivateTmp, NoNewPrivileges, an empty
+# CapabilityBoundingSet). This one cannot yet, see below.
 [Unit]
 Description=NabiMan Server Management Dashboard
-After=network.target
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 Type=simple
@@ -13,6 +23,45 @@ EnvironmentFile=-/etc/nabiman/nabiman.env
 Restart=on-failure
 RestartSec=5
 LimitNOFILE=65536
+
+# Terminal sessions live in a tmux server the API starts; it stays in this unit's
+# cgroup. The default KillMode=control-group would end every terminal on each
+# restart or update; with `process` only the API stops and the restarted API
+# reattaches to the same tmux sessions. (`systemctl stop` therefore leaves the
+# sessions running; `tmux kill-server` as root ends them.)
+KillMode=process
+TimeoutStopSec=30
+
+# The data directory is created 0700 and kept private to root.
+StateDirectory=nabiman
+StateDirectoryMode=0700
+ConfigurationDirectory=nabiman
+ConfigurationDirectoryMode=0755
+
+# No core dumps of the API by default (memory holds the JWT secret and decrypted
+# credentials); the hard limit stays open, so a root shell in a NabiMan terminal
+# can still `ulimit -c unlimited` for its own debugging.
+LimitCORE=0:infinity
+
+# Deliberately NOT set while the API runs as root. Every process the API starts,
+# including the root shells of the web terminal, inherits the sandbox, and
+# managing the server is the product:
+#   ProtectSystem=      package installs and config editing write /usr and /etc
+#   ProtectHome=        user, home-directory and file management
+#   PrivateTmp=         a fresh /tmp per start would hide the tmux socket after a
+#                       restart (sessions lost) and the host's /tmp from the file panel
+#   PrivateDevices=     disks, mounts, serial bridge (/dev/tty*), loop devices
+#   NoNewPrivileges=    sudo/su inside terminal sessions would stop working
+#   ProtectKernelTunables=, ProtectKernelModules=, ProtectKernelLogs=
+#                       sysctl and firewall settings, kernel package upgrades
+#                       (/usr/lib/modules), dmesg in the log viewer
+#   ProtectControlGroups=, RestrictNamespaces=
+#                       containers (docker/podman/unshare) run from terminals
+#   RestrictSUIDSGID=   package installs set setuid bits (sudo, passwd)
+#   MemoryDenyWriteExecute=, SystemCallArchitectures=native
+#                       JIT runtimes (node, java) and 32-bit tools in terminals
+#   CapabilityBoundingSet=, ProtectClock=, ProtectHostname=
+#                       root admin work (hostname, time, network) in terminals
 
 [Install]
 WantedBy=multi-user.target

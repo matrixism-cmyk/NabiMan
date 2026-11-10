@@ -38,6 +38,7 @@ python3 "$repo_root/scripts/release-inventory.py" licenses "${license_args[@]}"
 python3 "$repo_root/scripts/release-inventory.py" generate --source "$repo_root" --binary "$binary" --static "$frontend" \
     --licenses "$stage/nabiman/licenses.json"
 cp "$repo_root/LICENSE" "$stage/nabiman/LICENSE"
+install -m 644 "$repo_root/nabiman.service" "$stage/nabiman/nabiman.service"
 cp "$binary" "$stage/nabiman/nabiman-server"
 cp "$helper" "$stage/nabiman/nabiman-privileged-helper"
 install -m 755 "$recovery" "$stage/nabiman/nabiman-recovery"

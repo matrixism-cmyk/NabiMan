@@ -30,21 +30,26 @@ ARG NABIMAN_GIT_COMMIT=
 ENV NABIMAN_GIT_COMMIT=${NABIMAN_GIT_COMMIT}
 RUN touch src/main.rs && cargo build --release --locked
 
-# Stage 3: Final image
+# Stage 3: Final image, same layout as install.sh (docs/release/README.md)
 FROM debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
+# Runtime dependencies: terminals (tmux), SSH sessions/keys, password logins,
+# port relays; python3 for the offline recovery tool.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl iproute2 procps coreutils \
+    tmux openssh-client sshpass socat python3 \
     && rm -rf /var/lib/apt/lists/*
-WORKDIR /opt/nabiman
-COPY --from=backend /app/backend/target/release/nabiman-server .
-COPY --from=frontend /app/frontend/build ./static
-RUN mkdir -p /var/lib/nabiman
+COPY --from=backend /app/backend/target/release/nabiman-server \
+     /app/backend/target/release/nabiman-privileged-helper \
+     /app/backend/target/release/nabiman-recovery /usr/local/bin/
+COPY scripts/management-recovery.py /usr/local/bin/management-recovery.py
+COPY --from=frontend /app/frontend/build /usr/local/share/nabiman/static
+RUN mkdir -p /var/lib/nabiman /etc/nabiman && chmod 700 /var/lib/nabiman
 
 ENV NABIMAN_PORT=8080
-ENV NABIMAN_STATIC=/opt/nabiman/static
+ENV NABIMAN_STATIC=/usr/local/share/nabiman/static
 ENV NABIMAN_DATA_DIR=/var/lib/nabiman
 
 EXPOSE 8080
 VOLUME ["/var/lib/nabiman"]
 HEALTHCHECK --interval=30s --timeout=5s CMD curl -f http://localhost:8080/ || exit 1
-ENTRYPOINT ["./nabiman-server"]
+ENTRYPOINT ["/usr/local/bin/nabiman-server"]

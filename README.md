@@ -114,7 +114,7 @@ NabiMan/
 
 ### 요구사항
 
-- Rust 1.88+
+- Rust 1.89+ (릴리스 빌드는 1.97.1)
 - Node.js 20.19+
 
 ### 빌드 및 실행
@@ -395,17 +395,17 @@ tar -xzf legacy-review/archive.tar.gz --no-same-owner --no-same-permissions --ke
 
 ```sh
 umask 077
-python3 /opt/nabiman/management-recovery.py capture \
+python3 /usr/local/bin/management-recovery.py capture \
   --auth /var/lib/nabiman --database /var/lib/nabiman/mec.db \
-  --runtime /opt/nabiman/nabiman-server --static /opt/nabiman/static \
+  --runtime /usr/local/bin/nabiman-server --static /usr/local/share/nabiman/static \
   --output /var/backups/nabiman-recovery
-python3 /opt/nabiman/management-recovery.py restore \
+python3 /usr/local/bin/management-recovery.py restore \
   --archive /var/backups/nabiman-recovery/실제파일명.tar.gz.age \
   --target /srv/nabiman-restored
-python3 /opt/nabiman/management-recovery.py verify --target /srv/nabiman-restored
+python3 /usr/local/bin/management-recovery.py verify --target /srv/nabiman-restored
 ```
 
-경로는 설치 환경에 맞게 지정합니다. 암호는 대화형 프롬프트 또는 이미 열린 파일 디스크립터로만 전달하고 인수·환경 변수에 넣지 않습니다. DB는 SQLite backup API로 복사하며 manifest의 파일 목록·해시·크기, DB quick_check, 회원 ID, 필수 인증 자료를 검증합니다. 원격 비밀번호가 있으면 함께 복원한 `secret.key`로 실제 해독 가능한지도 검사합니다. 검증을 모두 통과한 새 경로만 공개하며 기존 디렉터리는 덮어쓰지 않습니다. 서버 실행 파일만 0700으로 복구하고 일반 파일은 0600으로 정규화합니다.
+경로는 `install.sh`의 표준 설치 위치입니다([설치 위치](docs/release/README.md#설치-위치)). 다른 곳에 설치했다면 그에 맞게 지정합니다. 암호는 대화형 프롬프트 또는 이미 열린 파일 디스크립터로만 전달하고 인수·환경 변수에 넣지 않습니다. DB는 SQLite backup API로 복사하며 manifest의 파일 목록·해시·크기, DB quick_check, 회원 ID, 필수 인증 자료를 검증합니다. 원격 비밀번호가 있으면 함께 복원한 `secret.key`로 실제 해독 가능한지도 검사합니다. 검증을 모두 통과한 새 경로만 공개하며 기존 디렉터리는 덮어쓰지 않습니다. 서버 실행 파일만 0700으로 복구하고 일반 파일은 0600으로 정규화합니다.
 
 캡처에는 비공개 평문 작업 디렉터리가 필요합니다. 정상 종료 시 정리하지만 강제 종료 후 `.management-capture-*` 또는 복원 staging이 남을 수 있습니다. 암호화 저장소나 안전한 삭제를 보장하지 않습니다. 전체 묶음은 확장 기준 1 GiB 제한을 따릅니다.
 

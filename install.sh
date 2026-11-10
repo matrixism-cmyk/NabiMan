@@ -18,7 +18,17 @@ set -euo pipefail
 #   --archive FILE           install a package already on disk (signature: FILE.minisig)
 #   --signature FILE         signature for --archive
 #   --insecure-skip-verify   install even without a valid signature (NOT for production)
+#   --install-deps           install missing runtime dependencies with apt-get/dnf
+#   --with-optional          with --install-deps: the optional ones too
 #   -h, --help
+#
+# Layout (docs/release/README.md):
+#   /usr/local/bin/nabiman-server, nabiman-privileged-helper, nabiman-recovery,
+#     management-recovery.py           programs
+#   /usr/local/share/nabiman/static    web interface
+#   /var/lib/nabiman                   data (users, keys, databases)
+#   /etc/nabiman                       nabiman.env (local settings), release.pub
+#   /etc/systemd/system/nabiman.service
 
 REPO="${NABIMAN_REPO:-matrixism-cmyk/NabiMan}"
 INSTALL_DIR="/usr/local/bin"
@@ -37,12 +47,15 @@ BASE_URL="${NABIMAN_RELEASE_BASE:-}"
 LOCAL_ARCHIVE=""
 LOCAL_SIGNATURE=""
 SKIP_VERIFY=0
+INSTALL_DEPS=0
+WITH_OPTIONAL=0
 
 usage() {
     cat <<'USAGE'
 Usage: sudo bash install.sh [--version vX.Y.Z] [--base-url URL]
                             [--archive FILE [--signature FILE]]
                             [--insecure-skip-verify]
+                            [--install-deps [--with-optional]]
 USAGE
 }
 while [ $# -gt 0 ]; do
@@ -52,6 +65,8 @@ while [ $# -gt 0 ]; do
         --archive) LOCAL_ARCHIVE=${2:?--archive needs a file}; shift 2 ;;
         --signature) LOCAL_SIGNATURE=${2:?--signature needs a file}; shift 2 ;;
         --insecure-skip-verify) SKIP_VERIFY=1; shift ;;
+        --install-deps) INSTALL_DEPS=1; shift ;;
+        --with-optional) WITH_OPTIONAL=1; shift ;;
         -h|--help) usage; exit 0 ;;
         *) echo "Unknown option: $1 (see --help)" >&2; exit 2 ;;
     esac
@@ -65,7 +80,7 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-# Check dependencies
+# Installer needs
 for cmd in curl tar mktemp python3; do
     if ! command -v "$cmd" &>/dev/null; then
         echo "Error: $cmd is required but not installed"
@@ -73,10 +88,61 @@ for cmd in curl tar mktemp python3; do
     fi
 done
 
+# Runtime dependencies: command -> package (apt / dnf).
+#   required: terminals (tmux), SSH sessions and keys, password logins, port relays
+#   optional: RDP/VNC-over-Guacamole consoles, Office previews, video previews
+REQUIRED_DEPS="tmux:tmux:tmux ssh:openssh-client:openssh-clients ssh-keygen:openssh-client:openssh-clients sshpass:sshpass:sshpass socat:socat:socat"
+OPTIONAL_DEPS="guacd:guacd:guacd soffice:libreoffice-core:libreoffice-core ffmpeg:ffmpeg:ffmpeg-free"
+if command -v apt-get >/dev/null; then PKG=apt; elif command -v dnf >/dev/null; then PKG=dnf; else PKG=""; fi
+missing_packages() { # list -> packages for this host's package manager, missing commands only
+    local entry cmd apt dnf out=""
+    for entry in $1; do
+        IFS=: read -r cmd apt dnf <<< "$entry"
+        command -v "$cmd" >/dev/null && continue
+        case "$PKG" in apt) out+=" $apt" ;; dnf) out+=" $dnf" ;; *) out+=" $cmd" ;; esac
+    done
+    echo "$out" | tr ' ' '\n' | sort -u | tr '\n' ' ' | sed 's/^ *//; s/ *$//'
+}
+install_packages() {
+    case "$PKG" in
+        apt) DEBIAN_FRONTEND=noninteractive apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends "$@" ;;
+        dnf) dnf install -y "$@" ;;
+        *) echo "No apt-get or dnf: install $* yourself." >&2; return 1 ;;
+    esac
+}
+MISSING=$(missing_packages "$REQUIRED_DEPS")
+MISSING_OPTIONAL=$(missing_packages "$OPTIONAL_DEPS")
+if [ -n "$MISSING" ]; then
+    if [ "$INSTALL_DEPS" -eq 1 ]; then
+        echo "Installing runtime dependencies: $MISSING"
+        # shellcheck disable=SC2086
+        install_packages $MISSING
+    else
+        echo "Missing runtime dependencies. Install them, or rerun with --install-deps:" >&2
+        case "$PKG" in
+            apt) echo "  apt-get install -y $MISSING" >&2 ;;
+            dnf) echo "  dnf install -y $MISSING    (sshpass: EPEL on RHEL/Rocky/Alma)" >&2 ;;
+            *) echo "  commands: $MISSING" >&2 ;;
+        esac
+        exit 1
+    fi
+fi
+if [ -n "$MISSING_OPTIONAL" ]; then
+    if [ "$INSTALL_DEPS" -eq 1 ] && [ "$WITH_OPTIONAL" -eq 1 ]; then
+        echo "Installing optional dependencies: $MISSING_OPTIONAL"
+        # shellcheck disable=SC2086
+        install_packages $MISSING_OPTIONAL || echo "Some optional packages could not be installed; the features that need them stay off." >&2
+    else
+        echo "Optional, for RDP consoles / Office previews / video previews: $MISSING_OPTIONAL"
+        echo "  (install later, or rerun with --install-deps --with-optional)"
+    fi
+fi
+
 # Detect architecture
 ARCH=$(uname -m)
 case "$ARCH" in
     x86_64) ARCH="x86_64" ;;
+    aarch64|arm64) ARCH="aarch64" ;;
     *) echo "No release package is available for architecture: $ARCH" >&2; exit 1 ;;
 esac
 
@@ -206,8 +272,8 @@ with tarfile.open(sys.argv[1],'r:gz') as package:
 PYEXTRACT
 python3 "$STAGE/verify-release.py" "$STAGE/$ASSET" --extract-to "$STAGE/verified"
 PAYLOAD="$STAGE/verified/nabiman"
-if [ ! -x "$PAYLOAD/nabiman-server" ] || [ ! -f "$PAYLOAD/static/index.html" ]; then
-    echo "Release package is missing the server or web interface." >&2
+if [ ! -x "$PAYLOAD/nabiman-server" ] || [ ! -f "$PAYLOAD/static/index.html" ] || [ ! -f "$PAYLOAD/nabiman.service" ]; then
+    echo "Release package is missing the server, web interface or service unit." >&2
     exit 1
 fi
 
@@ -251,10 +317,13 @@ if ! mv -f "$BIN_STAGE" "$INSTALL_DIR/nabiman-server"; then
     echo "Could not install server binary." >&2
     exit 1
 fi
-for RECOVERY_TOOL in nabiman-recovery management-recovery.py; do
-    RECOVERY_STAGE=$(mktemp "$INSTALL_DIR/.recovery-tool.XXXXXX")
-    install -m 755 "$PAYLOAD/$RECOVERY_TOOL" "$RECOVERY_STAGE"
-    mv -f "$RECOVERY_STAGE" "$INSTALL_DIR/$RECOVERY_TOOL"
+# The root helper (not enabled: Phase 4 moves the API to a non-root user and
+# starts it then) and the offline recovery tools.
+for TOOL in nabiman-privileged-helper nabiman-recovery management-recovery.py; do
+    [ -f "$PAYLOAD/$TOOL" ] || continue
+    TOOL_STAGE=$(mktemp "$INSTALL_DIR/.nabiman-tool.XXXXXX")
+    install -m 755 "$PAYLOAD/$TOOL" "$TOOL_STAGE"
+    mv -f "$TOOL_STAGE" "$INSTALL_DIR/$TOOL"
 done
 if [ -n "$STATIC_BACKUP" ]; then rm -rf "$STATIC_BACKUP"; fi
 # Later updates check signatures with this key (not with one they download).
@@ -269,27 +338,15 @@ if [ -n "${BOOTSTRAP_PASSWORD:-}" ]; then
     unset BOOTSTRAP_PASSWORD
 fi
 
-# Create systemd service
-cat > "$SERVICE_FILE" << EOF
-[Unit]
-Description=NabiMan Server Management Dashboard
-After=network.target
-
-[Service]
-Type=simple
-User=root
-ExecStart=$INSTALL_DIR/nabiman-server
-Environment=NABIMAN_PORT=8080
-Environment=NABIMAN_STATIC=$STATIC_DIR
-Environment=NABIMAN_DATA_DIR=$DATA_DIR
-EnvironmentFile=-/etc/nabiman/nabiman.env
-Restart=on-failure
-RestartSec=5
-LimitNOFILE=65536
-
-[Install]
-WantedBy=multi-user.target
-EOF
+# systemd unit, from the package (its comments explain each setting).
+if [ -f "$SERVICE_FILE" ] && ! cmp -s "$PAYLOAD/nabiman.service" "$SERVICE_FILE"; then
+    cp -p "$SERVICE_FILE" "$SERVICE_FILE.bak.$(date +%Y%m%d-%H%M%S)"
+fi
+install -m 644 "$PAYLOAD/nabiman.service" "$SERVICE_FILE"
+if [ ! -e "$CONFIG_DIR/nabiman.env" ]; then
+    install -m 600 /dev/null "$CONFIG_DIR/nabiman.env"
+    printf '# Local settings for nabiman.service, e.g.\n# NABIMAN_PORT=8080\n' > "$CONFIG_DIR/nabiman.env"
+fi
 
 systemctl daemon-reload
 systemctl enable nabiman
@@ -298,5 +355,6 @@ echo ""
 echo "=== NabiMan installed ==="
 echo "Start/restart: systemctl restart nabiman"
 echo "Status:  systemctl status nabiman"
-echo "Access:  http://$(hostname -I | awk '{print $1}'):8080"
+PORT=$(sed -n 's/^NABIMAN_PORT=//p' "$CONFIG_DIR/nabiman.env" | tail -n1)
+echo "Access:  http://$(hostname -I | awk '{print $1}'):${PORT:-8080}"
 echo "Login with the configured admin password."

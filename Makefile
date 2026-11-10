@@ -31,16 +31,24 @@ docker-run:
 		-e NABIMAN_PASSWORD \
 		nabiman
 
+# Same layout as install.sh (docs/release/README.md), without the signature check
+# or the versioned directories: it installs what you just built. Do not mix it with
+# nabiman-update on one host.
 install: build
 	@echo "Installing NabiMan..."
-	sudo mkdir -p /var/lib/nabiman
+	sudo install -d -m 700 /var/lib/nabiman
 	@if [ ! -e /var/lib/nabiman/users.json ] && [ ! -e /var/lib/nabiman/password ]; then \
 		test $${#NABIMAN_PASSWORD} -ge 12 || { echo "Set a 12+ character NABIMAN_PASSWORD before make install" >&2; exit 1; }; \
 		sudo install -m 600 /dev/null /var/lib/nabiman/password; \
 		printf '%s' "$$NABIMAN_PASSWORD" | sudo tee /var/lib/nabiman/password >/dev/null; \
 	fi
-	sudo cp backend/target/release/nabiman-server /usr/local/bin/
-	sudo cp nabiman.service /etc/systemd/system/
+	sudo install -m 755 backend/target/release/nabiman-server backend/target/release/nabiman-privileged-helper \
+		backend/target/release/nabiman-recovery scripts/management-recovery.py /usr/local/bin/
+	sudo rm -rf /usr/local/share/nabiman/static.new && sudo mkdir -p /usr/local/share/nabiman
+	sudo cp -r frontend/build /usr/local/share/nabiman/static.new
+	sudo rm -rf /usr/local/share/nabiman/static && sudo mv /usr/local/share/nabiman/static.new /usr/local/share/nabiman/static
+	sudo mkdir -p /etc/nabiman
+	sudo install -m 644 nabiman.service /etc/systemd/system/nabiman.service
 	sudo systemctl daemon-reload
 	sudo systemctl enable nabiman
 	@echo "Done. Start with: sudo systemctl start nabiman"
