@@ -7,5 +7,7 @@ pub mod lock;
 pub fn prepare() -> std::io::Result<lock::DataDirLock> {
     let dir = nabiman_server::data_dir();
     let held = lock::acquire(&dir)?;
+    // Before the MEC database is opened: it may still be at its old ./data/mec.db.
+    crate::mec::db::location::adopt_legacy_default()?;
     Ok(held)
 }

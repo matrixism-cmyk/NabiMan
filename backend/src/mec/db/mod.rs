@@ -2,6 +2,7 @@ pub mod audit_store;
 pub mod docs_store;
 pub mod identity_store;
 pub mod job_store;
+pub mod location;
 pub mod membership_store;
 pub mod schema;
 pub mod tenant_store;
@@ -86,10 +87,9 @@ pub fn open_in_memory() -> rusqlite::Result<DbHandle> {
     Ok(Arc::new(Mutex::new(conn)))
 }
 
+/// `NABIMAN_MEC_DB`, else `data_dir/mec.db` (see `location`).
 pub fn default_path() -> PathBuf {
-    std::env::var("NABIMAN_MEC_DB")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("./data/mec.db"))
+    location::default_path()
 }
 
 #[cfg(test)]
