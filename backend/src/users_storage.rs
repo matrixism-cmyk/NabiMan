@@ -28,6 +28,33 @@ pub(super) fn rotate_published_admin_password(
     Ok(true)
 }
 
+/// The first administrator of a data directory that has no users yet.
+pub(crate) fn first_admin(username: &str, hash: &str) -> NabimanUser {
+    NabimanUser {
+        share_authorization_version: uuid::Uuid::new_v4().to_string(),
+        id: generate_id(),
+        username: username.into(),
+        password_hash: hash.into(),
+        role: crate::models::UserRole::Admin,
+        created_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+        last_login: None,
+        totp_enabled: false,
+        totp_secret: None,
+        mfa: Default::default(),
+        remote_permissions: Default::default(),
+        access: Default::default(),
+        status: Default::default(),
+        memberships: vec![],
+        requested_memberships: vec![],
+        scope_restricted: false,
+    }
+}
+
+/// Writes `users` as the user database at `path` (the bootstrap command's).
+pub(crate) fn publish_at(users: &[NabimanUser], path: &std::path::Path) -> Result<(), String> {
+    save_users_at(users, path).map_err(|failure| failure.to_string())
+}
+
 pub(super) fn users_file_path() -> std::path::PathBuf {
     #[cfg(test)]
     if let Some(path) = TEST_FILE.with(|slot| slot.borrow().clone()) {

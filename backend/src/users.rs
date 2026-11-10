@@ -6,7 +6,7 @@ mod storage;
 #[path = "user_admin.rs"]
 mod admin;
 use storage::*;
-pub(crate) use storage::{commit_users, generate_id};
+pub(crate) use storage::{commit_users, first_admin, generate_id, publish_at};
 
 use crate::models::{ApiResponse, CreateUserRequest, NabimanUser, UpdateUserRequest, UserRole};
 use actix_web::{web, HttpResponse};
@@ -71,24 +71,7 @@ pub fn new_user_store(pw_hash: &str) -> UserStore {
         !pw_hash.is_empty(),
         "Bootstrap password is required for initial admin creation"
     );
-    let admin = NabimanUser {
-        share_authorization_version: uuid::Uuid::new_v4().to_string(),
-        id: generate_id(),
-        username: "admin".into(),
-        password_hash: pw_hash.to_string(),
-        role: UserRole::Admin,
-        created_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-        last_login: None,
-        totp_enabled: false,
-        totp_secret: None,
-        mfa: Default::default(),
-        remote_permissions: Default::default(),
-        access: Default::default(),
-        status: Default::default(),
-        memberships: vec![],
-        requested_memberships: vec![],
-        scope_restricted: false,
-    };
+    let admin = first_admin("admin", pw_hash);
     let users = vec![admin];
     save_users(&users).expect("Failed to persist initial admin user");
     log_info!("users", "default admin user created from existing password");

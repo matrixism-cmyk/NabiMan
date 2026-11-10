@@ -14,6 +14,7 @@ mod audit_middleware;
 mod auth;
 mod auth_gate;
 mod backup;
+mod bootstrap_admin;
 mod branding;
 mod charts;
 mod cli_args;
@@ -186,6 +187,8 @@ fn main() -> std::io::Result<()> {
         log_error!("settings", e);
         std::io::Error::new(std::io::ErrorKind::InvalidInput, e)
     })?;
+    // `--bootstrap-admin`: after the settings file (it may name the data directory).
+    bootstrap_admin::run_if_asked();
     actix_web::rt::System::new().block_on(serve())
 }
 
