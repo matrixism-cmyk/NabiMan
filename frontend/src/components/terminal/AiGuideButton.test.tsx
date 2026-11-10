@@ -101,7 +101,7 @@ test('paste hands the guide over as one bracketed paste, without Enter', async (
   expect(sent.startsWith('\x1b[200~')).toBe(true);
   expect(sent.endsWith('\x1b[201~')).toBe(true);
   expect(sent).toBe(`\x1b[200~${GUIDE.trimEnd()}\x1b[201~`);
-  expect(sent).not.toMatch(/[\r\n]\x1b\[201~$/);
+  expect(sent.endsWith('\n\x1b[201~') || sent.endsWith('\r\x1b[201~')).toBe(false);
   expect(await screen.findByText(/Enter를 눌러 보내세요/)).toBeInTheDocument();
   expect(screen.queryByRole('menu')).not.toBeInTheDocument();
 });
