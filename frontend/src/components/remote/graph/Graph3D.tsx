@@ -3,6 +3,7 @@ import ForceGraph3D from '3d-force-graph';
 import * as THREE from 'three';
 import SpriteText from 'three-spritetext';
 import { Graph, GraphNode, MapEvent, signatureOf } from './graphModel';
+import { AGENTS, shortModel } from './AgentIcons';
 
 interface Props {
   graph: Graph;
@@ -102,8 +103,13 @@ function sessionObject(n: GraphNode) {
     group.add(ring);
   }
   group.add(label(`${n.lead ? '★ ' : ''}${n.name}`, n.lead ? 9 : 6.5, '#e6edf3', -(r + 8), true));
-  // The AI in it: Claude Code, by its own mark.
-  if (n.claude) group.add(label(`✳ ${n.claude}`, 4.6, '#f0a67a', -(r + 16)));
+  // The AIs in it, each by its own mark: Claude Code with its name, the others by kind.
+  let below = r + 16;
+  if (n.claude) { group.add(label(`✳ ${n.claude}${n.model ? ` · ${shortModel(n.model)}` : ''}`, 4.6, AGENTS.claude.color, -below)); below += 6.5; }
+  for (const k of (n.agents || []).filter((x) => AGENTS[x] && !(x === 'claude' && n.claude))) {
+    group.add(label(`${AGENTS[k].mark} ${AGENTS[k].name}`, 4.6, AGENTS[k].color, -below));
+    below += 6.5;
+  }
   // What it is working on, above it, while it works.
   if (n.task) group.add(label(n.task.length > 46 ? `${n.task.slice(0, 45)}…` : n.task, 4.4, '#bbf7d0', r + 9, true));
   group.userData = { pulse: n.busy, halo, core };
@@ -150,8 +156,9 @@ export default function Graph3D({ graph, selected, onSelect, onHoverEdge, autoRo
       })
       .onBackgroundClick(() => handlers.current.onSelect(null))
       .onLinkHover((l: L | null) => handlers.current.onHoverEdge(l?.note || null, pointer.current.x, pointer.current.y));
-    // Sessions stay by their machine; machines keep their distance from each other.
-    g.d3Force('charge')?.strength((n: N) => (n.kind === 'server' ? -420 : n.kind === 'device' ? -520 : -110)).distanceMax(360);
+    // Sessions stay by their machine; machines keep their distance from each other. The devices push
+    // only gently and nearby: a strong push from the whole fixed tier above pressed everything below it down.
+    g.d3Force('charge')?.strength((n: N) => (n.kind === 'server' ? -420 : n.kind === 'device' ? -200 : -110)).distanceMax(200);
     g.d3Force('link')
       ?.distance((l: L) => (l.kind === 'net' ? 60 : l.kind === 'host' ? 42 : l.kind === 'conn' ? 150 : l.kind === 'ghost' ? 150 : l.kind === 'report' ? 90 : 95))
       .strength((l: L) => (l.kind === 'net' ? 0.7 : l.kind === 'host' ? 1 : l.kind === 'conn' ? 0.5 : l.kind === 'ghost' ? 0.25 : l.kind === 'report' ? 0 : 0.15));

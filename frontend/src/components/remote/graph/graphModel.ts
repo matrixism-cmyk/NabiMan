@@ -24,6 +24,10 @@ export interface GraphNode {
   name: string;
   /** The Claude in it, if any. */
   claude: string;
+  /** The AI agents running in it, by kind. */
+  agents?: string[];
+  /** The model its Claude last answered with. */
+  model?: string;
   /** Where it runs: `local`, or the host of an SSH/telnet session. */
   group: string;
   busy: boolean;
@@ -88,6 +92,8 @@ export function buildGraph(sessions: SessionInfo[], links: SessionLink[]): Graph
       // An unnamed remote session goes by its host: the full `ssh:user@host:port` is in the panel.
       name: s.title || (group === 'local' ? s.label : group),
       claude: s.claude?.[0]?.name || '',
+      agents: s.agents || [],
+      model: s.claude?.[0]?.model,
       group,
       busy: !!s.busy,
       lead: !!s.lead,
@@ -131,7 +137,7 @@ export function depths(g: Graph): Map<string, number> {
 
 /** A signature of everything a drawing depends on, to redraw only on change. */
 export const signatureOf = (g: Graph) => [
-  ...g.nodes.map((n) => `${n.id}|${n.name}|${n.claude}|${n.group}|${n.busy}|${n.lead}|${n.alive}`),
+  ...g.nodes.map((n) => `${n.id}|${n.name}|${n.claude}|${(n.agents || []).join('+')}|${n.model || ''}|${n.group}|${n.busy}|${n.lead}|${n.alive}`),
   ...g.edges.map((e) => `${e.id}|${e.live}|${e.strength.toFixed(1)}`),
 ].join(';');
 

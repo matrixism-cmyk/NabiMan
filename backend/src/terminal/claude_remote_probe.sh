@@ -5,6 +5,8 @@
 #   R <1 if under that connection else 0> <base64 of the session record>
 #   O <session id> <transcript size>
 #   M <session id> <from> <timestamp> <msg_id> <base64 first line>   (peer messages after the given offset)
+#   V <session id> <model>   the model that last answered in that session
+#   A <kind>         an AI agent running under this connection (claude, codex, gemini, aider, opencode)
 #   U <pid> <user>   a Claude under this connection whose record is not ours to read (after `su -`, say)
 # Only addresses, times, ids and each message's first line leave the machine.
 # Offsets come in as lines "<session id> <offset>" in NABIMAN_OFFSETS.
@@ -50,6 +52,8 @@ for f in "$HOME"/.claude/sessions/*.json; do
     done
   fi
   printf 'O\t%s\t%s\n' "$sid" "$size"
+  model=$(tail -c 400000 "$t" 2>/dev/null | grep -ao '"model":"claude-[A-Za-z0-9._-]*"' | tail -n 1 | cut -d'"' -f4)
+  [ -n "$model" ] && printf 'V\t%s\t%s\n' "$sid" "$model"
 done
 # Claude Code under this connection that is someone else's (a `su -` to root,
 # say): its record cannot be read, but that it runs there can be shown.
@@ -70,3 +74,17 @@ for d in /proc/[0-9]*; do
   case "$user" in ''|*[!A-Za-z0-9._-]*) continue;; esac
   printf 'U\t%s\t%s\n' "$pid" "$user"
 done
+# Which AI agents run under this connection, whoever owns them: by program name.
+kind_of() {
+  a0=$(tr '\0' '\n' < "/proc/$1/cmdline" 2>/dev/null | head -n 3 | tr '\n' ' ')
+  case "$a0" in *bg-pty-host*|*" daemon "*|*" attach "*) return 1;; esac
+  n=${a0%% *}; n=${n##*/}; n=${n%.exe}
+  case "$n" in claude|codex|gemini|aider|opencode) echo "$n"; return 0;; esac
+  case "$a0" in */claude-code/*) echo claude;; */@openai/codex/*) echo codex;; */gemini-cli/*) echo gemini;; */bin/aider*) echo aider;; *) return 1;; esac
+}
+for d in /proc/[0-9]*; do
+  pid=${d#/proc/}
+  k=$(kind_of "$pid") || continue
+  under "$pid" || continue
+  printf 'A\t%s\n' "$k"
+done | sort -u

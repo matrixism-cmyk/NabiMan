@@ -51,6 +51,12 @@ pub(crate) struct ClaudePeer {
     /// When it last became busy or idle (seconds since 1970), if known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub since: Option<u64>,
+    /// The model that last answered in it (`claude-opus-5-5`…), from its transcript.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// Its Claude Code version.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
     /// The saved server it runs on, when that is not this machine. Its
     /// `address` is then `bridge:<Remote Control session>` (what SendMessage
     /// takes for a session on another machine), or just its name without
@@ -63,6 +69,8 @@ pub(crate) struct ClaudePeer {
 #[derive(Default, Clone, Debug)]
 pub(crate) struct Seen {
     pub claude: Vec<ClaudePeer>,
+    /// The AI agents running in it, by kind (`claude`, `codex`, `gemini`…), told by their processes.
+    pub agents: Vec<String>,
     /// The tmux sessions its Claude has handed work to lately (see `claude_links`).
     pub leads: Vec<String>,
     /// It leads others and none leads it.
@@ -205,10 +213,18 @@ fn scan() -> HashMap<String, Seen> {
         .collect();
     let refs = refs(&found.iter().map(|(r, _)| r.sock.as_str()).collect::<Vec<_>>());
     let remote = super::claude_remote::snapshot();
+    // The agents in each tile, by their processes: here, and on the servers the tiles are connected to.
+    for (tmux, kind) in local_agents(&panes) {
+        seen.entry(tmux).or_default().agents.push(kind.to_string());
+    }
+    for (tmux, kinds) in &remote.agents {
+        seen.entry(tmux.clone()).or_default().agents.extend(kinds.iter().cloned());
+    }
     link(&found, &remote, &mut seen);
     add_remote(&remote, &mut seen);
     for ((rec, tmux_name), reference) in found.into_iter().zip(refs) {
         let name = if rec.name.is_empty() { base_name(&rec.cwd) } else { rec.name.clone() };
+        let model = rec.file.parent().and_then(|p| p.parent()).and_then(|dir| super::claude_links::transcript_of(dir, &rec.cwd, &rec.session_id)).and_then(|t| last_model(&t));
         let peer = ClaudePeer {
             address: format!("{name} [{reference}]"),
             name,
@@ -216,6 +232,8 @@ fn scan() -> HashMap<String, Seen> {
             cwd: rec.cwd,
             busy: rec.busy,
             since: rec.since,
+            model,
+            version: Some(rec.version.clone()).filter(|v| !v.is_empty()),
             server: None,
         };
         let background = rec.background;
@@ -226,6 +244,12 @@ fn scan() -> HashMap<String, Seen> {
         }
         entry.claude.push(peer);
         entry.claude.sort_by(|a, b| a.address.cmp(&b.address));
+    }
+    for entry in seen.values_mut() {
+        if !entry.claude.is_empty() {
+            entry.agents.push("claude".to_string());
+        }
+        entry.agents = super::ai_agents::tidy(std::mem::take(&mut entry.agents));
     }
     seen
 }
@@ -243,6 +267,8 @@ fn add_remote(remote: &super::claude_remote::Snapshot, seen: &mut HashMap<String
             cwd: p.cwd.clone(),
             busy: p.busy,
             since: p.since,
+            model: p.model.clone(),
+            version: Some(p.version.clone()).filter(|v| !v.is_empty()),
             server: Some(server.clone()),
         };
         let entry = seen.entry(card).or_default();
@@ -401,6 +427,8 @@ struct Record {
     busy: bool,
     /// When `busy` last changed (seconds since 1970).
     since: Option<u64>,
+    /// Claude Code's version.
+    version: String,
     session_id: String,
     /// Its Remote Control session, when that is on.
     bridge: Option<String>,
@@ -436,6 +464,7 @@ fn parse_record(text: &str, uid: u32, file: &Path) -> Option<Record> {
         cwd: clip(&s("cwd"), 300),
         busy: s("status") == "busy",
         since: v.get("statusUpdatedAt").and_then(serde_json::Value::as_u64).map(|ms| ms / 1000),
+        version: clip(&s("version"), 20),
         session_id: s("sessionId"),
         bridge: Some(s("bridgeSessionId")).filter(|b| !b.is_empty()),
         background: s("kind") == "bg",
@@ -482,6 +511,72 @@ pub(crate) fn tmux_session_of_pid(pid: u32) -> Option<String> {
 
 /// Climbs from `pid` through `parent` to a pane's shell, stopping at the
 /// tmux server itself or after `MAX_HOPS`.
+/// A model name as transcripts and the pages may carry it: letters, digits, `-`, `.`, `[`, `]`.
+pub(crate) fn model_ok(m: &str) -> bool {
+    !m.is_empty() && m.len() <= 60 && m.chars().all(|c| c.is_ascii_alphanumeric() || "-._[]".contains(c))
+}
+
+/// The last `"model":"…"` in a piece of a transcript; synthetic entries are passed over.
+pub(crate) fn model_in(text: &str) -> Option<String> {
+    const KEY: &str = "\"model\":\"";
+    let mut rest = text;
+    let mut found = None;
+    while let Some(i) = rest.find(KEY) {
+        let after = &rest[i + KEY.len()..];
+        let end = after.find('"')?;
+        let m = &after[..end];
+        if model_ok(m) && !m.starts_with('<') && m != "synthetic" {
+            found = Some(m.to_string());
+        }
+        rest = &after[end..];
+    }
+    found
+}
+
+type ModelCache = Mutex<Option<HashMap<PathBuf, (u64, Option<String>)>>>;
+static MODELS: ModelCache = Mutex::new(None);
+
+/// The model that last answered in a transcript, read from its end (and again only when it has grown).
+fn last_model(transcript: &Path) -> Option<String> {
+    let len = fs::metadata(transcript).ok()?.len();
+    let mut guard = MODELS.lock().unwrap_or_else(|e| e.into_inner());
+    let cache = guard.get_or_insert_with(HashMap::new);
+    if let Some((at, model)) = cache.get(transcript) {
+        if *at == len {
+            return model.clone();
+        }
+    }
+    let mut file = fs::File::open(transcript).ok()?;
+    let from = len.saturating_sub(512 * 1024);
+    std::io::Seek::seek(&mut file, std::io::SeekFrom::Start(from)).ok()?;
+    let mut raw = Vec::new();
+    file.take(512 * 1024).read_to_end(&mut raw).ok()?;
+    // Keep what was known when the tail holds no answer (a long tool result, say).
+    let model = model_in(&String::from_utf8_lossy(&raw)).or_else(|| cache.get(transcript).and_then(|(_, m)| m.clone()));
+    if cache.len() > 200 {
+        cache.clear();
+    }
+    cache.insert(transcript.to_path_buf(), (len, model.clone()));
+    model
+}
+
+/// Every agent process under a pane of this tmux server: (tmux session, kind).
+fn local_agents(panes: &Panes) -> Vec<(String, &'static str)> {
+    let parent = |pid: u32| fs::read_to_string(format!("/proc/{pid}/stat")).ok().and_then(|s| stat_fields(&s)).map(|(_, p)| p);
+    let mut out = Vec::new();
+    for entry in fs::read_dir("/proc").into_iter().flatten().flatten() {
+        let Some(pid) = entry.file_name().to_str().and_then(|n| n.parse::<u32>().ok()) else { continue };
+        let Ok(raw) = fs::read(entry.path().join("cmdline")) else { continue };
+        let text = String::from_utf8_lossy(&raw[..raw.len().min(4096)]).to_string();
+        let argv: Vec<&str> = text.split('\0').filter(|a| !a.is_empty()).take(8).collect();
+        let Some(kind) = super::ai_agents::kind_of(&argv) else { continue };
+        if let Some(tmux) = up_to_pane(pid, panes, parent) {
+            out.push((tmux, kind));
+        }
+    }
+    out
+}
+
 fn up_to_pane(mut pid: u32, panes: &Panes, parent: impl Fn(u32) -> Option<u32>) -> Option<String> {
     for _ in 0..MAX_HOPS {
         if let Some(session) = panes.session_of.get(&pid) {
@@ -528,6 +623,18 @@ fn base_name(path: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn the_model_is_the_last_one_that_answered() {
+        let t = r#"{"message":{"model":"claude-opus-5-5"}}
+{"message":{"model":"<synthetic>"}}
+{"message":{"model":"claude-fable-5-2","content":"x"}}
+{"message":{"model":"bad model!"}}"#;
+        assert_eq!(model_in(t), Some("claude-fable-5-2".to_string()));
+        assert_eq!(model_in("no answers yet"), None);
+        assert!(model_ok("claude-opus-5-5[1m]") && !model_ok("a b") && !model_ok(""));
+    }
+
 
     #[test]
     fn a_background_record_keeps_the_id_attach_takes() {

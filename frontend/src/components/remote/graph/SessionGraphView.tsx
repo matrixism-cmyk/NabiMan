@@ -7,6 +7,7 @@ import type { SessionInfo } from '../SessionsView';
 import { buildGraph, buildWorkMap, MapEvent, MapServer, Topology, ViewMode } from './graphModel';
 import type { Layout2D } from './Graph2D';
 import TopologyEditor from './TopologyEditor';
+import AgentIcons from './AgentIcons';
 import './session-graph.css';
 
 // The graph libraries are large: fetched only when a graph is asked for.
@@ -132,6 +133,7 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
               {picked.busy && <span className="session-work-badge">{t('claudePeer.working')}</span>}
               {!picked.alive && <span className="session-work-badge is-still">{t('graph.ended')}</span>}
             </div>
+            <AgentIcons kinds={picked.agents} claude={picked.claude?.[0]} />
             <ClaudeAddress variant="card" peers={picked.claude || []} />
             {(incoming.length > 0 || outgoing.length > 0) && (
               <ul className="session-graph-rel">

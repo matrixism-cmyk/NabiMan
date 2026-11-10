@@ -35,6 +35,8 @@ struct SessionInfo {
     claude: Vec<super::claude_peers::ClaudePeer>,
     /// A Claude session in it is working on a turn.
     busy: bool,
+    /// The AI agents running in it, by kind (`claude`, `codex`, `gemini`…).
+    agents: Vec<String>,
     /// Sessions in this list its Claude has lately handed work to.
     directs: Vec<String>,
     /// Its Claude leads others here and is led by none.
@@ -209,6 +211,7 @@ async fn list_sessions(
                 },
                 claude: here.map(|h| h.claude.clone()).unwrap_or_default(),
                 busy: here.is_some_and(|h| h.busy()),
+                agents: here.map(|h| h.agents.clone()).unwrap_or_default(),
                 orchestrator: here.is_some_and(|h| h.orchestrator) && !directs.is_empty(),
                 lead: lead.as_deref() == Some(s.tmux_name.as_str()),
                 notes: here.map(|h| notes_of(h, &id_of, remote_ok)).unwrap_or_default(),

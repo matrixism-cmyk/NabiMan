@@ -209,3 +209,20 @@ it('the view switches between the tiles and the 2D and 3D graphs, and is remembe
   expect(screen.queryByTestId('graph')).toBeNull();
   localStorage.clear();
 });
+
+it('a tile shows which AI agents run in it, each by its mark',()=>{
+  localStorage.clear(); localStorage.setItem('nabiman_lang','ko');
+  const a:SessionInfo={...session,id:'pty_x',title:'x',state:'alive',agents:['claude','codex','unknown-kind']};
+  render(<I18nProvider><SessionsView sessions={[a]} onRefresh={jest.fn()} onAttach={jest.fn()} onPopOut={jest.fn()}/></I18nProvider>);
+  expect(screen.getByLabelText('Claude Code, Codex')).toBeInTheDocument();
+  expect(screen.getByTitle('Codex')).toHaveTextContent('◎ Codex');
+});
+
+it('Claude shows the model that last answered and its version',()=>{
+  localStorage.clear(); localStorage.setItem('nabiman_lang','ko');
+  const a:SessionInfo={...session,id:'pty_m',title:'m',state:'alive',agents:['claude'],claude:[{name:'n',ref:'abcdef',address:'n [abcdef]',cwd:'/w',busy:false,model:'claude-fable-5-2',version:'2.1.322'}]};
+  render(<I18nProvider><SessionsView sessions={[a]} onRefresh={jest.fn()} onAttach={jest.fn()} onPopOut={jest.fn()}/></I18nProvider>);
+  expect(screen.getByTitle('Claude Code')).toHaveTextContent('fable-5-2');
+  expect(screen.getByTitle('Claude Code')).toHaveTextContent('v2.1.322');
+  expect(screen.getByTitle('Claude Code')).not.toHaveTextContent('claude-fable');
+});

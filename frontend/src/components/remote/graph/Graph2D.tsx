@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import cytoscape, { Core, ElementDefinition } from 'cytoscape';
 import { depths, Graph, signatureOf } from './graphModel';
+import { AGENTS, shortModel } from './AgentIcons';
 
 export type Layout2D = 'concentric' | 'tree' | 'free';
 const POS_KEY = 'nabiman_graph2d_positions';
@@ -23,7 +24,7 @@ function elements(g: Graph): ElementDefinition[] {
     ...g.nodes.map((n) => ({
       data: {
         id: n.id,
-        label: `${n.lead ? '★ ' : ''}${n.name}${n.claude ? `\n${n.claude}` : ''}`,
+        label: `${n.lead ? '★ ' : ''}${n.name}${n.claude ? `\n✳ ${n.claude}` : ''}${n.model ? `\n${shortModel(n.model)}` : ''}${(n.agents || []).filter((k) => AGENTS[k] && k !== 'claude').map((k) => `\n${AGENTS[k].mark} ${AGENTS[k].name}`).join('')}`,
         color: n.color,
         group: n.group,
       },
@@ -58,7 +59,7 @@ function layoutOf(kind: Layout2D, g: Graph, saved: Record<string, { x: number; y
 
 const STYLE: cytoscape.StylesheetJson = [
   { selector: 'node', style: {
-    shape: 'round-rectangle', width: 176, height: 62, 'background-color': '#16222f', 'background-opacity': 0.96,
+    shape: 'round-rectangle', width: 176, height: 74, 'background-color': '#16222f', 'background-opacity': 0.96,
     'border-width': 2, 'border-color': 'data(color)', label: 'data(label)', color: '#e6edf3', 'font-size': 14, 'font-weight': 600,
     'text-wrap': 'wrap', 'text-max-width': '160px', 'text-overflow-wrap': 'anywhere', 'text-valign': 'center', 'text-halign': 'center', 'line-height': 1.35,
     'overlay-opacity': 0, 'transition-property': 'border-width, border-color, background-color', 'transition-duration': 300,

@@ -75,6 +75,9 @@ pub(crate) struct RemoteClaude {
     pub busy: bool,
     /// When `busy` last changed (seconds since 1970), if the record says.
     pub since: Option<u64>,
+    /// The model that last answered in it, and its Claude Code version.
+    pub model: Option<String>,
+    pub version: String,
     /// Its messaging socket (or pipe) on that machine.
     pub sock: String,
     /// Its Remote Control session, when that is on.
@@ -104,6 +107,8 @@ pub(crate) struct Snapshot {
     pub messages: Vec<RemoteMessage>,
     /// Server id → its name in NabiMan.
     pub servers: HashMap<String, String>,
+    /// Tmux session → agent kinds running under its connection.
+    pub agents: HashMap<String, Vec<String>>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -124,6 +129,8 @@ struct Server {
 #[derive(Default)]
 struct State {
     servers: HashMap<String, Server>,
+    /// Tmux session → the agent kinds seen under its connection at the last look.
+    agents: HashMap<String, Vec<String>>,
     names: HashMap<String, String>,
     os: HashMap<String, Os>,
     /// Servers looked at (answered or not) since they gained a tile.
@@ -163,7 +170,7 @@ pub(crate) fn pending() -> bool {
 /// What was last seen on the remote servers.
 pub(crate) fn snapshot() -> Snapshot {
     let s = state().lock().unwrap_or_else(|e| e.into_inner());
-    let mut out = Snapshot { servers: s.names.clone(), ..Default::default() };
+    let mut out = Snapshot { servers: s.names.clone(), agents: s.agents.clone(), ..Default::default() };
     for (server, st) in &s.servers {
         out.peers.extend(st.peers.values().cloned());
         out.messages.extend(st.got.iter().map(|(sid, from, at, said)| (server.clone(), sid.clone(), from.clone(), *at, said.clone())));
@@ -229,6 +236,7 @@ fn look_once(store: &PtyStore) {
         ok_servers.insert(server_id.clone());
         let found = parse(&out, server_id, tmux_name);
         let mut s = state().lock().unwrap_or_else(|e| e.into_inner());
+        s.agents.insert(tmux_name.clone(), found.agents.clone());
         let st = s.servers.entry(server_id.clone()).or_default();
         for (session, size) in found.sizes {
             st.offsets.insert(session, size);
@@ -386,6 +394,8 @@ fn b64_decode(text: &str) -> Option<Vec<u8>> {
 #[derive(Debug, Default)]
 struct Found {
     peers: Vec<RemoteClaude>,
+    /// Agent kinds running under this tile's connection.
+    agents: Vec<String>,
     sizes: Vec<(String, u64)>,
     messages: Vec<(String, String, u64, String, String)>,
 }
@@ -415,6 +425,8 @@ fn parse(out: &str, server_id: &str, tmux_name: &str) -> Found {
                     cwd: clip(&s("cwd"), 300),
                     busy: s("status") == "busy",
                     since: v.get("statusUpdatedAt").and_then(serde_json::Value::as_u64).map(|ms| ms / 1000),
+                    model: None,
+                    version: clip(&s("version"), 20),
                     sock: clip(&s("messagingSocketPath"), 300),
                     bridge,
                     session_id,
@@ -435,12 +447,23 @@ fn parse(out: &str, server_id: &str, tmux_name: &str) -> Found {
                     cwd: String::new(),
                     busy: false,
                     since: None,
+                    model: None,
+                    version: String::new(),
                     sock: String::new(),
                     bridge: None,
                     session_id: String::new(),
                     pid,
                     tile: Some(tmux_name.to_string()),
                 });
+            }
+            ["A", kind] => found.agents.push(kind.trim().to_string()),
+            ["V", sid, model] => {
+                let model = model.trim();
+                if super::claude_peers::model_ok(model) {
+                    for p in found.peers.iter_mut().filter(|p| p.session_id == *sid) {
+                        p.model = Some(model.to_string());
+                    }
+                }
             }
             ["O", sid, size] => {
                 if let Ok(n) = size.trim().parse() {

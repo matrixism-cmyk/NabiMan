@@ -7,6 +7,7 @@ import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import SessionGraphView from './graph/SessionGraphView';
 import { readView, saveView, VIEW_MODES, ViewMode } from './graph/graphModel';
+import AgentIcons from './graph/AgentIcons';
 import { useGrants, useMember, useSharing } from './member';
 
 export interface SessionInfo {
@@ -21,6 +22,8 @@ export interface SessionInfo {
   claude?: ClaudePeer[];
   /** A Claude session in it is working on a turn. */
   busy?: boolean;
+  /** The AI agents running in it, by kind (`claude`, `codex`, `gemini`…). */
+  agents?: string[];
   /** Sessions its Claude has lately handed work to, by id. */
   directs?: string[];
   /** Its Claude hands out work here and takes it from none. */
@@ -303,6 +306,7 @@ export default function SessionsView({
                       {t('claudePeer.led', { name: nameOf(ledBy) })}
                     </span>
                   )}
+                  <AgentIcons kinds={session.agents} claude={session.claude?.[0]} />
                   {working && <span className="session-work-badge" title={t('claudePeer.workingHint')}>{t('claudePeer.working')}</span>}
                   {output && <span className="session-work-badge is-output" title={t('claudePeer.outputHint')}>{t('claudePeer.output')}</span>}
                 </>
