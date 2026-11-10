@@ -23,9 +23,11 @@ export function addStars(scene: Three) {
 
 interface At { x?: number; y?: number; z?: number }
 
-/** Moves the camera to look at a node from a little way out, along the line from the middle. */
-export function flyTo(g: Three, n: At, ms = 900) {
-  const d = Math.hypot(n.x || 0, n.y || 0, n.z || 0) || 1;
-  const k = 1 + 120 / d;
-  g.cameraPosition({ x: (n.x || 0) * k, y: (n.y || 0) * k, z: (n.z || 0) * k + (d < 5 ? 150 : 0) }, n, ms);
+/** Moves the camera to look at a node from `distance` out (see cameraLimits), along the line from the middle. */
+export function flyTo(g: Three, n: At, ms = 900, distance = 120) {
+  const d = Math.hypot(n.x || 0, n.y || 0, n.z || 0);
+  // A node at the middle has no line from it: look at it from the front.
+  if (d < 5) { g.cameraPosition({ x: n.x || 0, y: n.y || 0, z: (n.z || 0) + distance * 1.25 }, n, ms); return; }
+  const k = 1 + distance / d;
+  g.cameraPosition({ x: (n.x || 0) * k, y: (n.y || 0) * k, z: (n.z || 0) * k }, n, ms);
 }

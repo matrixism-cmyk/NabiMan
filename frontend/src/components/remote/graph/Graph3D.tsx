@@ -6,11 +6,12 @@ import { paletteOf } from './view/graphTheme';
 import { adjacency, Adjacency, degrees, forcedLabels, pickFocus } from './view/graphFocus';
 import { chargeOf, chargeReach, centerPull, centerStrength, distanceOf, strengthOf } from './view/graphForces';
 import { SceneFx } from './view/sceneFx';
-import { richObject } from './view/richObjects';
-import { simpleObject } from './view/simpleObjects';
+import { richObject, richRadius } from './view/richObjects';
+import { simpleObject, simpleRadius } from './view/simpleObjects';
 import { arrowLength, LinkData, linkLook, linkShown, linkWidth, particleColor, particleCount, particleWidth, REPORT_COLOR, isOrder } from './view/linkStyle';
 import { addLights, addStars, flyTo } from './view/sceneSetup';
 import { reuseLinks, reuseNodes, visualKey, Placed } from './view/nodeReuse';
+import { biggestReach, flyDistance, minDistance, nodeReach } from './view/cameraLimits';
 import { watchContext } from './view/glContext';
 
 interface Props {
@@ -82,6 +83,17 @@ export default function Graph3D({ graph, selected, onSelect, onHoverEdge, settin
     const input = { hover: hover.current, selected: view.current.selected, matches: view.current.highlight };
     f.setFocus(pickFocus(adj.current, input), forcedLabels(adj.current, input));
   };
+  /** How far a node's drawing reaches from its centre, in the style drawn. */
+  const reachOf = (n: GraphNode) => {
+    const s = look.current.settings;
+    return nodeReach(n, s.style, s.style === 'rich' ? richRadius(n) : simpleRadius(n, degRef.current.get(n.id) || 0, s.nodeSize));
+  };
+  /** Flies to a node, stopping outside it however big it is drawn. */
+  const flyToNode = (g: any, n: N) => flyTo(g, n, view.current.reduced ? 0 : 900, flyDistance(reachOf(n)));
+  /** The nearest the wheel may bring the camera: outside the biggest node (see cameraLimits). */
+  const limitZoom = (nodes: GraphNode[]) => {
+    if (fg.current) fg.current.controls().minDistance = minDistance(biggestReach(nodes, reachOf));
+  };
   const rotate = () => {
     const g = fg.current;
     if (!g) return;
@@ -107,7 +119,7 @@ export default function Graph3D({ graph, selected, onSelect, onHoverEdge, settin
       .onNodeClick((n: N) => {
         // A machine opens its attack watch; a session its panel.
         handlers.current.onSelect(n.kind === 'device' ? null : n.id);
-        flyTo(g, n, view.current.reduced ? 0 : 900);
+        flyToNode(g, n);
       })
       .onNodeHover((n: N | null) => {
         hover.current = n?.id ?? null;
@@ -184,6 +196,7 @@ export default function Graph3D({ graph, selected, onSelect, onHoverEdge, settin
       .linkDirectionalArrowColor((l: L) => (l.live ? l.color : p.link))
       .linkDirectionalParticles((l: L) => particleCount(l, s))
       .linkDirectionalParticleWidth((l: L) => particleWidth(l, s));
+    limitZoom(g.graphData().nodes as N[]);
     const later = setTimeout(() => effects.touch(true), 30);
     return () => clearTimeout(later);
   }, [style, light, nodeSize, colorGroups, arrows, linkThickness]);
@@ -221,6 +234,7 @@ export default function Graph3D({ graph, selected, onSelect, onHoverEdge, settin
     adj.current = adjacency(graph.edges.map((e) => ({ id: e.id, from: e.from, to: e.to })));
     fx.current?.keepOnly(new Set(nodes.map((n) => n.id)), new Set(links.map((l) => l.id)));
     g.graphData({ nodes, links });
+    limitZoom(nodes);
     refocus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shape, signature]);
@@ -286,7 +300,7 @@ export default function Graph3D({ graph, selected, onSelect, onHoverEdge, settin
     const g = fg.current;
     if (!g || !target) return;
     const n = (g.graphData().nodes as N[]).find((x) => x.id === target.id);
-    if (n) flyTo(g, n, view.current.reduced ? 0 : 900);
+    if (n) flyToNode(g, n);
   }, [target?.seq]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
