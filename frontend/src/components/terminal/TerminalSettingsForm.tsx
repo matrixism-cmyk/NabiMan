@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useT } from '../../shared/i18n';
 import { DEFAULT_TERMINAL_SETTINGS, TerminalSettings, useTerminalSettings } from './settings';
 import FontPicker from './FontPicker';
+import RendererSettings from './RendererSettings';
+import { readRendererChoice, RendererChoice, writeRendererChoice } from './renderers';
 
 const SCROLLBACK_PRESETS = [1000, 5000, 10000, 50000, 100000];
 const TIMEOUT_PRESETS: { label: string; value: number }[] = [
@@ -23,6 +25,8 @@ export default function TerminalSettingsForm({ onDone }: { onDone?: () => void }
   const [draft, setDraft] = useState<TerminalSettings>(settings);
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
+  // 이 브라우저에만 저장되는 값 (서버 설정과 따로)
+  const [renderer, setRenderer] = useState<RendererChoice>(readRendererChoice);
 
   const set = <K extends keyof TerminalSettings>(key: K, value: TerminalSettings[K]) =>
     setDraft((d) => ({ ...d, [key]: value }));
@@ -37,6 +41,7 @@ export default function TerminalSettingsForm({ onDone }: { onDone?: () => void }
     });
     setSaving(false);
     if (error) { setMessage(error); return; }
+    writeRendererChoice(renderer);
     setMessage(t('terminal.settingsSaved'));
     onDone?.();
   };
@@ -129,11 +134,13 @@ export default function TerminalSettingsForm({ onDone }: { onDone?: () => void }
           />
         </div>
 
+        <RendererSettings value={renderer} onChange={setRenderer} fontFamily={draft.font_family} fontSize={draft.font_size} />
+
         <div className="btn-group">
           <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
             {saving ? t('common.working') : t('common.save')}
           </button>
-          <button className="btn btn-secondary" onClick={() => setDraft(DEFAULT_TERMINAL_SETTINGS)}>
+          <button className="btn btn-secondary" onClick={() => { setDraft(DEFAULT_TERMINAL_SETTINGS); setRenderer('auto'); }}>
             {t('terminal.resetDefaults')}
           </button>
           {onDone && <button className="btn btn-secondary" onClick={onDone}>{t('common.cancel')}</button>}

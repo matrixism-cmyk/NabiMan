@@ -56,6 +56,10 @@ pub(crate) fn close_tmux_session(name: &str) -> std::io::Result<()> {
 #[path = "session_probe_tests.rs"]
 mod probe_tests;
 
+#[cfg(test)]
+#[path = "tmux_conf_tests.rs"]
+mod conf_tests;
+
 /// Options and mouse bindings every NabiMan tmux session runs with.
 ///
 /// The mouse bindings differ from tmux's defaults in one way: a selection is
@@ -65,6 +69,10 @@ mod probe_tests;
 pub(super) fn tmux_conf_body(scrollback: u32) -> String {
     // window-size latest keeps a watching share viewer from shrinking the pane
     // for whoever is actually working in it.
+    //
+    // A double or triple click in a pane whose program asked for the mouse
+    // (an editor, a file manager) goes to that program, as tmux's own default
+    // bindings do; only plain shells get the copy-mode word/line selection.
     //
     // Keeping the highlight means staying in copy-mode, where keystrokes go to
     // copy-mode instead of the shell — so a click of either button leaves it
@@ -94,16 +102,22 @@ pub(super) fn tmux_conf_body(scrollback: u32) -> String {
          bind -T copy-mode-vi DoubleClick1Pane send -X select-word \\; {copy}\n\
          bind -T copy-mode    TripleClick1Pane send -X select-line \\; {copy}\n\
          bind -T copy-mode-vi TripleClick1Pane send -X select-line \\; {copy}\n\
-         bind -T root DoubleClick1Pane select-pane \\; copy-mode -H \\; send -X select-word \\; {copy}\n\
-         bind -T root TripleClick1Pane select-pane \\; copy-mode -H \\; send -X select-line \\; {copy}\n\
+         bind -T root DoubleClick1Pane if -F '#{{mouse_any_flag}}' {{ send -M }} {{ select-pane ; copy-mode -H ; send -X select-word ; {copy} }}\n\
+         bind -T root TripleClick1Pane if -F '#{{mouse_any_flag}}' {{ send -M }} {{ select-pane ; copy-mode -H ; send -X select-line ; {copy} }}\n\
+         bind -T root C-MouseDrag1Pane if -F '#{{mouse_any_flag}}' {{ send -M }} {{ new-pane -M }}\n\
          bind -T copy-mode    MouseDown1Pane send -X cancel\n\
          bind -T copy-mode-vi MouseDown1Pane send -X cancel\n\
          bind -T copy-mode    MouseDown3Pane send -X cancel\n\
-         bind -T copy-mode-vi MouseDown3Pane send -X cancel\n",
+         bind -T copy-mode-vi MouseDown3Pane send -X cancel\n\
+         {menus}",
         scrollback = scrollback,
         copy = copy,
+        menus = TMUX_MENUS,
     )
 }
+
+/// Right-click menus that stay open after a short click (tmux 3.8 defaults plus `-O`).
+const TMUX_MENUS: &str = include_str!("tmux_menus.conf");
 
 /// Seed options for a tmux server this process may be about to start.
 pub(super) fn write_tmux_conf(scrollback: u32) -> Option<String> {

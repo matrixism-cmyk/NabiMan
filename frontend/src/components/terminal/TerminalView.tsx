@@ -3,6 +3,7 @@ import { Terminal } from 'xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { apiRequest } from '../../shared/api/useApi';
 import { attachClipboard, attachTerminalIo, createTerminal } from './terminalChrome';
+import { attachRenderer, readRendererChoice } from './renderers';
 import { applyTerminalFont } from './terminalFonts';
 import TerminalStatusPill from './TerminalStatusPill';
 import { HistoryPosition } from './TerminalHistoryBar';
@@ -270,8 +271,11 @@ const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function 
     closedRef.current = false;
     attemptsRef.current = 0;
 
+    let renderer: { dispose: () => void } | null = null;
     if (containerRef.current) {
       term.open(containerRef.current);
+      // WebGL, else Canvas, else DOM (see ./renderers); needs the opened terminal
+      renderer = attachRenderer(term, readRendererChoice());
       zoomRef.current.applyInitialLayout(term, fitAddon);
       // Text drawn before the bundled fonts arrive is measured and drawn again once they have.
       appliedFamilyRef.current = settingsRef.current.font_family;
@@ -322,6 +326,7 @@ const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function 
         socket.close();
       }
       wsRef.current = null;
+      renderer?.dispose();
       term.dispose();
       termRef.current = null;
     };

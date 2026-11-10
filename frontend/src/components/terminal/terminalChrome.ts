@@ -1,6 +1,7 @@
 import { Terminal } from 'xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { ImageAddon } from 'xterm-addon-image';
 import 'xterm/css/xterm.css';
 import './terminal-symbols.css';
 import { TerminalSettings } from './settings';
@@ -8,6 +9,7 @@ import { fontOf } from './terminalFonts';
 import { applyArmed } from './stickyKeys';
 import { blobsFromClipboardItems, pathsForClipboardFiles } from './pasteFile';
 import { HangulComposer, needsHangulComposer } from './hangul';
+import { alignImagesToCells } from './imageCells';
 import { hyperlinkHandler, linkTooltip, openTerminalLink } from './terminalLinks';
 
 const THEME = {
@@ -35,6 +37,14 @@ export function createTerminal(settings: TerminalSettings): { term: Terminal; fi
   // Typed-out URLs and OSC 8 hyperlinks open the same way; see ./terminalLinks.
   term.options.linkHandler = hyperlinkHandler(term);
   term.loadAddon(new WebLinksAddon((_event, uri) => openTerminalLink(uri), linkTooltip(term)));
+  // Sixel and iTerm inline images. The addon also answers DA1 with the sixel
+  // attribute and turns on the CSI 14t/16t/18t size reports, which is how tmux
+  // (3.4+, built with sixel) learns that this terminal can show images and how
+  // big a cell is. Each terminal keeps at most 32 MB of decoded images.
+  const images = new ImageAddon({ storageLimit: 32 });
+  term.loadAddon(images);
+  // Cells are rarely a whole number of CSS pixels; see ./imageCells.
+  alignImagesToCells(term, images);
   return { term, fit };
 }
 
