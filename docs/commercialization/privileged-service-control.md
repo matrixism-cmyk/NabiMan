@@ -69,3 +69,11 @@ helper unit은 root 소유 runtime directory와 독립 state directory, NoNewPri
 실제 root helper 시험에 정책 철회·0600→0644·유실·잘못된 JSON·symlink 교체, 동일 의미의 JSON 재정렬, 원래 정책 복구와 새 ID, SQLite reader로 intent commit을 잡은 상태에서 정책 철회를 추가했다. 대상은 존재하지 않는 고유 시험 unit이며 운영 서비스는 변경하지 않는다. 이 시험의 실제 실행 결과는 [실행 기록](execution.md)에 남긴다.
 
 Cockpit은 일반 OS 세션 권한과 사용자가 올리는 관리 권한을 구분한다는 [공식 설명](https://docs.cockpit-project.org/cockpit-guide/main/guide/privileges.html)을 다시 확인했다. 나비맨의 정책 hash 재검사는 자체 실행기의 설계이며 Cockpit이 같은 protocol이나 저장 방식을 사용한다는 주장은 아니다. 시스템 전체의 최소 권한 분리·service 참조 파일 drift·실제 systemd workload 건강 검증은 여전히 별도 gate다.
+
+## 2026-11-11 — 시스템 작업과 감사 기록, `run_mode = service`
+
+서비스 제어에 더해 도우미가 고정된 시스템 작업 다섯 가지를 합니다: `firewall_status`, `firewall_add`(포트·범위·프로토콜·허용/거부, 모두 타입 값), `firewall_delete`(번호 1–10000), `package_refresh`, `package_upgrade`(전체 또는 영숫자로 시작하는 패키지 이름 하나). 승인은 서비스 정책과 별개인 root 소유 0600 `/etc/nabiman/privileged-system.json`(`firewall`, `package_upgrade`; 파일이 없으면 모두 거부)이며, 서비스 정책처럼 명령 직전에 다시 읽습니다. 프로그램은 root 소유의 고정 절대 경로만 찾고(`PATH` 안 씀) 환경을 비운 뒤 고정 argv로 `bounded_command::capture`(마감·프로세스 그룹 종료·출력 상한)로 실행합니다. 응답은 별도 `SystemReply`(출력 최대 24 KiB, 64 KiB 프레임)이고 요청은 여전히 4096바이트 상한입니다. 시스템 작업은 한 번에 하나, 별도 스레드에서 돌아 긴 업그레이드가 서비스 제어를 막지 않습니다. 기존 서비스 정책 형식·hash·원장은 바뀌지 않았습니다.
+
+모든 호출(거절 포함)은 원장 옆 `audit.jsonl`(root 0600)에 한 줄씩 남습니다: 커널 peer uid/pid, request id, actor, 타입 작업, 결정, 상태, 종료 코드. 시스템 작업은 감사 줄을 쓰지 못하면 실행하지 않습니다.
+
+API 쪽은 `run_mode = service`(`NABIMAN_RUN_MODE`)일 때만 방화벽·패키지 업데이트를 도우미로 보내고, 그 밖에 root가 필요한 기능은 503과 이유로 답합니다. `root`(기본)는 이전과 똑같습니다. 설치는 `install.sh --mode service`, 단위는 `packaging/nabiman-service-mode.service`와 `packaging/nabiman-privileged-helper.service.d/system-operations.conf`. 전체 목록: [권한 목록](../security/privilege-inventory.md).

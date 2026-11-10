@@ -18,3 +18,5 @@ mod tests;
 #[cfg(test)]
 mod identity_tests;
 
+#[cfg(test)]
+mod system_tests;
