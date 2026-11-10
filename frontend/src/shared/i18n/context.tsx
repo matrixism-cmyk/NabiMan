@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 
 export type Lang = 'ko' | 'en' | 'ja';
 /** Each key's words in every language. */
@@ -25,13 +25,22 @@ const I18nContext = createContext<I18nContextType>({
 const STORAGE_KEY = 'nabiman_lang';
 
 function getSavedLang(): Lang {
-  const saved = localStorage.getItem(STORAGE_KEY);
+  let saved: string | null = null;
+  try { saved = localStorage.getItem(STORAGE_KEY); } catch { /* storage blocked: detect from the browser */ }
   if (saved === 'ko' || saved === 'en' || saved === 'ja') return saved;
   // Auto-detect from browser
   const browserLang = navigator.language.slice(0, 2);
   if (browserLang === 'ko') return 'ko';
   if (browserLang === 'ja') return 'ja';
   return 'en';
+}
+
+/** `{name}` placeholders filled in, every occurrence of each. */
+export function interpolate(text: string, vars?: Record<string, string | number>): string {
+  if (!vars) return text;
+  let out = text;
+  for (const [k, v] of Object.entries(vars)) out = out.split(`{${k}}`).join(String(v));
+  return out;
 }
 
 /**
@@ -43,20 +52,15 @@ export function I18nProvider({ translations, children }: { translations: Transla
 
   const setLang = useCallback((newLang: Lang) => {
     setLangState(newLang);
-    localStorage.setItem(STORAGE_KEY, newLang);
-    document.documentElement.lang = newLang;
+    try { localStorage.setItem(STORAGE_KEY, newLang); } catch { /* storage blocked: the choice lasts this visit */ }
   }, []);
+  // index.html starts as ko; screen readers, fonts and hyphenation follow this.
+  useEffect(() => { document.documentElement.lang = lang; }, [lang]);
 
   const t = useCallback((key: string, vars?: Record<string, string | number>): string => {
     const entry = translations[key];
     if (!entry) return key;
-    let text = entry[lang] || entry['en'] || key;
-    if (vars) {
-      for (const [k, v] of Object.entries(vars)) {
-        text = text.replace(`{${k}}`, String(v));
-      }
-    }
-    return text;
+    return interpolate(entry[lang] || entry['en'] || key, vars);
   }, [lang, translations]);
 
   return (
