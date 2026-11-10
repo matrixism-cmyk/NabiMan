@@ -26,6 +26,29 @@ jobs:
         working-directory: backend
         run: cargo build --release --locked
 
+  release-reproducibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Base images pinned by digest
+        run: bash scripts/check-docker-pins.sh
+      - name: Cargo builds are locked
+        run: |
+          # Every cargo build/test in the Makefile and Dockerfile uses --locked.
+          if grep -nE 'cargo (build|test)' Makefile Dockerfile | grep -v -- '--locked'; then
+            echo "cargo build/test without --locked" >&2; exit 1
+          fi
+      - name: Release key and installer verifier agree
+        run: python3 scripts/check-release-key.py --allow-placeholder
+      - name: Release script syntax
+        run: |
+          for f in install.sh packaging/nabiman-update scripts/package-release.sh scripts/prune-deployments.sh scripts/check-docker-pins.sh; do
+            if [ -f "$f" ]; then bash -n "$f"; fi
+          done
+          if command -v shellcheck >/dev/null; then
+            shellcheck -S warning install.sh scripts/package-release.sh scripts/check-docker-pins.sh $(ls packaging/nabiman-update scripts/prune-deployments.sh 2>/dev/null)
+          fi
+
   backend-dependencies:
     runs-on: ubuntu-latest
     steps:

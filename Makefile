@@ -6,7 +6,7 @@ build-frontend:
 	cd frontend && npm ci --no-audit && npm run build
 
 build-backend:
-	cd backend && cargo build --release
+	cd backend && cargo build --release --locked
 
 deploy:
 	mkdir -p backend/static
@@ -14,7 +14,7 @@ deploy:
 	cp -r frontend/build/* backend/static/
 
 test:
-	cd backend && cargo test
+	cd backend && cargo test --locked
 	cd frontend && npm run lint
 	cd frontend && npm test -- --watchAll=false
 

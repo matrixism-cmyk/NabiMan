@@ -11,12 +11,39 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Native builds on both architectures: the release smoke test starts the
+    # packaged server, which a cross build could not do. ubuntu-24.04-arm is a
+    # GitHub-hosted arm64 runner (free for public repositories; a private
+    # repository needs a plan with arm64 larger runners, or switch this entry
+    # to `cross build --target aarch64-unknown-linux-gnu` on x86_64 and drop
+    # its smoke step; see docs/release/README.md).
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    env:
+      ASSET: nabiman-linux-${{ matrix.arch }}.tar.gz
     steps:
       - uses: actions/checkout@v4
 
       - name: Release signing key is set up
         run: python3 scripts/check-release-key.py
+
+      - name: Tag matches the package versions
+        run: |
+          tag=${GITHUB_REF_NAME#v}
+          cargo_version=$(sed -n 's/^version = "\(.*\)"$/\1/p' backend/Cargo.toml | head -n1)
+          npm_version=$(python3 -c 'import json;print(json.load(open("frontend/package.json"))["version"])')
+          echo "tag $tag, backend $cargo_version, frontend $npm_version"
+          test "$tag" = "$cargo_version" && test "$tag" = "$npm_version"
+
+      - name: Base images pinned by digest
+        run: bash scripts/check-docker-pins.sh
 
       - uses: actions/setup-node@v4
         with:
@@ -32,7 +59,10 @@ jobs:
           npm test -- --watch=false --runInBand
           npm run build
 
-      - uses: dtolnay/rust-toolchain@stable
+      # One fixed toolchain for release builds (the Dockerfile uses the same).
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.1
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: backend
@@ -52,14 +82,16 @@ jobs:
         run: python3 scripts/verify-http-dependencies.py
 
       - name: Package
+        env:
+          NABIMAN_VERSION: ${{ github.ref_name }}
         run: |
           bash scripts/package-release.sh \
             backend/target/release/nabiman-server frontend/build release
           cd release
-          sha256sum -c nabiman-linux-x86_64.tar.gz.sha256
-          tar -tzf nabiman-linux-x86_64.tar.gz | grep -Fx 'nabiman/static/index.html'
+          sha256sum -c "$ASSET.sha256"
+          tar -tzf "$ASSET" | grep -Fx 'nabiman/static/index.html'
           cd ..
-          python3 scripts/smoke-release.py release/nabiman-linux-x86_64.tar.gz
+          python3 scripts/smoke-release.py "release/$ASSET"
 
       - name: Validate release manifest and CycloneDX inventory
         run: |
@@ -68,11 +100,11 @@ jobs:
           python3 scripts/test-release-licenses.py
           python3 -m venv "$RUNNER_TEMP/nabiman-sbom-validation"
           "$RUNNER_TEMP/nabiman-sbom-validation/bin/pip" install 'jsonschema[format-nongpl]==4.23.0'
-          "$RUNNER_TEMP/nabiman-sbom-validation/bin/python" scripts/validate-sbom.py release/nabiman-linux-x86_64.tar.gz.cdx.json
+          "$RUNNER_TEMP/nabiman-sbom-validation/bin/python" scripts/validate-sbom.py "release/$ASSET.cdx.json"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: release-x86_64
+          name: release-${{ matrix.arch }}
           path: release/
           if-no-files-found: error
 
