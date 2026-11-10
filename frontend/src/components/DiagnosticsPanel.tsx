@@ -4,6 +4,7 @@ import { PortCheckResult } from '../types';
 import { useT } from '../i18n';
 import SupportReportPanel from './SupportReportPanel';
 import RuntimeIdentityPanel from './RuntimeIdentityPanel';
+import ExternalToolsPanel from './ExternalToolsPanel';
 
 type Tool = 'ping' | 'traceroute' | 'nslookup' | 'port-check';
 
@@ -64,6 +65,7 @@ export default function DiagnosticsPanel() {
       </div>
       {output && <pre className="log-output">{output}</pre>}
       <RuntimeIdentityPanel />
+      <ExternalToolsPanel />
       <SupportReportPanel />
     </div>
   );

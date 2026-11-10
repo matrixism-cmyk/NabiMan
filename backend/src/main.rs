@@ -26,6 +26,7 @@ mod disks;
 mod dns;
 mod dns_db;
 mod extension_points;
+mod external_tools;
 mod file_manager;
 mod firewall;
 mod install_config;
@@ -252,6 +253,8 @@ async fn serve() -> std::io::Result<()> {
     // Shared (cross-worker) throttle for recording MEC read access as audit views.
     let mec_view_throttle = mec::safety::new_view_throttle();
 
+    // Which optional programs are here, once, before requests (never on the request path).
+    external_tools::check_at_startup();
     println!("NabiMan Server starting on http://0.0.0.0:{}", port);
     println!("Static files: {}", static_dir);
 

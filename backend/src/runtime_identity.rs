@@ -50,10 +50,30 @@ impl RuntimeIdentity {
     }
 }
 
-async fn inspect(identity: web::Data<RuntimeIdentity>) -> HttpResponse {
-    HttpResponse::Ok()
-        .insert_header(("Cache-Control", "no-store"))
-        .json(ApiResponse::ok(identity.get_ref()))
+/// The identity, with the startup report of external programs (`tools`) and
+/// where the settings came from (`settings`: the file and names, never values).
+#[derive(Serialize)]
+struct Runtime<'a> {
+    #[serde(flatten)]
+    identity: &'a RuntimeIdentity,
+    tools: Option<crate::external_tools::Report>,
+    settings: crate::install_config::Loaded,
+}
+
+#[derive(serde::Deserialize)]
+struct Ask {
+    #[serde(default)]
+    refresh: Option<String>,
+}
+
+async fn inspect(identity: web::Data<RuntimeIdentity>, ask: web::Query<Ask>) -> HttpResponse {
+    let refresh = ask.refresh.as_deref().is_some_and(|v| v == "1" || v == "true");
+    let runtime = Runtime {
+        identity: identity.get_ref(),
+        tools: crate::external_tools::report(refresh),
+        settings: crate::install_config::loaded(),
+    };
+    HttpResponse::Ok().insert_header(("Cache-Control", "no-store")).json(ApiResponse::ok(runtime))
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {
@@ -85,5 +105,7 @@ mod tests {
         assert_eq!(res.headers().get("cache-control").unwrap(), "no-store");
         let body: serde_json::Value = test::read_body_json(res).await;
         assert_eq!(body["data"]["git_commit"], GIT_COMMIT);
+        // The programs' report and the settings' source come with it (no check ran in tests).
+        assert!(body["data"].get("tools").is_some() && body["data"]["settings"].get("from_file").is_some());
     }
 }

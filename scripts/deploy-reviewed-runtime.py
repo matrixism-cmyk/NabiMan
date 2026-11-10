@@ -200,7 +200,8 @@ def check(base, plan):
     assert api(base, '/api/diagnostics/runtime')[0] == 401
     assert api(base, '/api/users')[0] == 401
     api(base, '/api/auth/logout', token, {})
-    return identity['data']
+    # The process's identity only: the tools report and settings ride along but are not identity.
+    return {key: identity['data'].get(key) for key in ['package_version', 'git_commit', 'executable_sha256', 'instance_id', 'started_at']}
 def audit_ready(base):
     session = login(base)
     try:
