@@ -8,6 +8,7 @@ import { buildGraph, buildWorkMap, MapEvent, MapServer, ServerFacts, Topology, V
 import type { Layout2D } from './Graph2D';
 import TopologyEditor from './TopologyEditor';
 import AgentIcons from './AgentIcons';
+import AttackPanel from './AttackPanel';
 import './session-graph.css';
 
 // The graph libraries are large: fetched only when a graph is asked for.
@@ -87,6 +88,9 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
   const [layout, setLayout] = useState<Layout2D>(() => stored(LAYOUT_KEY, 'concentric') as Layout2D);
   const [rotate, setRotate] = useState(() => stored(ROTATE_KEY, '1') === '1');
   const picked = sessions.find((s) => s.id === selected) || null;
+  const machine = mode === 'graph3d' ? graph.nodes.find((n) => n.id === selected && n.kind === 'server') || null : null;
+  // The saved server behind a machine node (`local` for this one); none for a host that is not saved.
+  const machineId = machine ? (machine.id === 'host:local' ? 'local' : machine.id.startsWith('srv:') ? machine.id.slice(4) : null) : null;
   const groups = Array.from(new Map(graph.nodes.filter((n) => n.kind !== 'device').map((n) => [n.group, n.color])).entries());
   const clock = (at: number) => new Date(at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
   const onHoverEdge = (note: string | null, x: number, y: number) => setTip(note ? { note, x, y } : null);
@@ -138,6 +142,7 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
           </Suspense>
         ) : <p className="session-graph-wait" role="alert">{t('graph.noWebgl')}</p>}
         <p className="session-graph-hint">{t(mode === 'graph2d' ? 'graph.hint2d' : 'graph.hint3d')}</p>
+        {machine && <AttackPanel id={machineId} name={machine.name} sub={machine.sub} onClose={() => setSelected(null)} />}
         {picked && (
           <aside className="session-graph-panel" aria-label={picked.title || picked.label}>
             <div className="session-graph-panel-head">

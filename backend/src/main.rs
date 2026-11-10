@@ -42,6 +42,7 @@ mod rbac;
 mod remote;
 mod remote_host_trust;
 mod remote_probe;
+mod attack_watch;
 mod remote_servers;
 mod server_facts;
 mod runtime_identity;

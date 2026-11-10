@@ -155,7 +155,8 @@ export default function Graph3D({ graph, selected, onSelect, onHoverEdge, autoRo
       .linkDirectionalParticleSpeed(0.008)
       .linkDirectionalParticleColor((l: L) => (l.kind === 'report' ? REPORT_COLOR : l.color))
       .onNodeClick((n: N) => {
-        handlers.current.onSelect(n.kind === 'server' || n.kind === 'device' ? null : n.id);
+        // A machine opens its attack watch; a session its panel.
+        handlers.current.onSelect(n.kind === 'device' ? null : n.id);
         const d = Math.hypot(n.x || 0, n.y || 0, n.z || 0) || 1;
         const k = 1 + 120 / d;
         g.cameraPosition({ x: (n.x || 0) * k, y: (n.y || 0) * k, z: (n.z || 0) * k + (d < 5 ? 150 : 0) }, n, 900);

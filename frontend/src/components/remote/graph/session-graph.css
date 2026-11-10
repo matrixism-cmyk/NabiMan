@@ -73,3 +73,30 @@
 .agent-icon { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border: 1px solid; border-radius: 10px; font-size: 11px; font-weight: 600; white-space: nowrap; background: rgba(10, 15, 23, 0.5); }
 .agent-model { font-weight: 700; margin-left: 2px; }
 .agent-version { opacity: 0.7; font-weight: 400; }
+.attack-windows { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.attack-live { margin-left: auto; font-size: 11.5px; color: var(--text-secondary); }
+.attack-note { margin: 0; font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; }
+.attack-note.is-bad { color: #fca5a5; }
+.attack-note.is-good { color: #86efac; }
+.attack-total { display: flex; align-items: baseline; gap: 10px; }
+.attack-total b { font-size: 30px; line-height: 1; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.attack-total.is-hot b { color: #f87171; }
+.attack-total span { font-size: 12.5px; color: var(--text-secondary); }
+.attack-kinds { display: flex; gap: 6px; flex-wrap: wrap; }
+.attack-chip { font-size: 11.5px; padding: 2px 8px; border-radius: 999px; background: rgba(248, 113, 113, 0.14); color: #fecaca; border: 1px solid rgba(248, 113, 113, 0.3); }
+.attack-chip.is-banned { background: rgba(96, 165, 250, 0.14); color: #bfdbfe; border-color: rgba(96, 165, 250, 0.3); }
+.attack-spark { display: flex; align-items: flex-end; gap: 1px; height: 46px; padding: 4px 0; border-bottom: 1px solid var(--border); flex: none; }
+.attack-spark i { flex: 1; min-width: 1px; background: rgba(148, 163, 184, 0.25); border-radius: 1px 1px 0 0; }
+.attack-spark i.is-on { background: #f87171; }
+.attack-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.attack-table th { text-align: left; font-weight: 600; color: var(--text-secondary); padding: 4px 6px 4px 0; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.attack-table td { padding: 4px 6px 4px 0; border-bottom: 1px solid rgba(148, 163, 184, 0.12); vertical-align: top; }
+.attack-table tr.is-internal { opacity: 0.7; }
+.attack-num { font-variant-numeric: tabular-nums; font-weight: 700; color: #fca5a5; }
+.attack-users { color: var(--text-secondary); word-break: break-all; }
+.attack-tag { margin-left: 5px; font-size: 10.5px; padding: 0 5px; border-radius: 4px; background: rgba(148, 163, 184, 0.2); color: var(--text-secondary); white-space: nowrap; }
+.attack-tag.is-banned { background: rgba(96, 165, 250, 0.2); color: #bfdbfe; }
+.attack-sub { margin: 6px 0 0; font-size: 12.5px; color: var(--text-secondary); }
+.attack-accepted { margin: 0; padding: 0; list-style: none; font-size: 12px; display: grid; gap: 3px; }
+.attack-accepted span { color: var(--text-secondary); }
+.attack-source { margin: 0; font-size: 11px; color: var(--text-secondary); opacity: 0.8; }
