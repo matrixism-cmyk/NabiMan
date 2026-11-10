@@ -1,10 +1,11 @@
 // Finds Korean words written straight into components instead of going
 // through useT(): Hangul in string, template or JSX text outside comments.
 // Translation tables, tests and vendor code are not checked. Text that is
-// data rather than UI (sample content, patterns matching server output,
-// language names shown in their own script) can stay when the line, or the
-// line above it, carries `// i18n-exempt: <reason>`; a whole file can opt out
-// with `// i18n-exempt-file: <reason>` near its top.
+// data rather than UI (sample content, patterns matching speech or server
+// output, names shown in their own script) can stay when `// i18n-exempt:
+// <reason>` is on its line, or on the line above it or above any construct
+// holding it up to its statement (so one comment covers a whole table);
+// a whole file can opt out with `// i18n-exempt-file: <reason>` near its top.
 const fs = require('fs');
 const path = require('path');
 const ts = require('typescript');
@@ -45,23 +46,32 @@ function scan(file) {
   const lines = text.split('\n');
   const kind = file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
   const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, kind);
-  const found = new Set();
+  const lineOf = (pos) => sf.getLineAndCharacterOfPosition(pos).line;
+  const marked = (l) => EXEMPT.test(lines[l]) || (l > 0 && EXEMPT.test(lines[l - 1]));
+  /** Marked on the text's own line, or above it or any construct around it up to its statement. */
+  const exempted = (node, line) => {
+    if (marked(line)) return true;
+    for (let at = node; at && at.kind !== ts.SyntaxKind.SourceFile; at = at.parent) {
+      if (marked(lineOf(at.getStart(sf)))) return true;
+      if (ts.isStatement(at) || ts.isClassElement(at)) break;
+    }
+    return false;
+  };
+  const hits = new Set();
+  const exempt = new Set();
   const visit = (node) => {
     if (TEXT_KINDS.has(node.kind) && HANGUL.test(node.getText(sf))) {
-      const start = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line;
-      const end = sf.getLineAndCharacterOfPosition(node.getEnd()).line;
-      for (let l = start; l <= end; l++) if (HANGUL.test(lines[l])) found.add(l);
+      const start = lineOf(node.getStart(sf));
+      const end = lineOf(node.getEnd());
+      for (let l = start; l <= end; l++) {
+        if (HANGUL.test(lines[l])) (exempted(node, l) ? exempt : hits).add(l);
+      }
     }
     ts.forEachChild(node, visit);
   };
   visit(sf);
-  const hits = [];
-  let exempt = 0;
-  for (const l of [...found].sort((a, b) => a - b)) {
-    if (EXEMPT.test(lines[l]) || (l > 0 && EXEMPT.test(lines[l - 1]))) exempt++;
-    else hits.push(l + 1);
-  }
-  return { hits, exempt };
+  for (const l of exempt) hits.delete(l);
+  return { hits: [...hits].sort((a, b) => a - b).map((l) => l + 1), exempt: exempt.size };
 }
 
 const byFile = [];
@@ -78,12 +88,14 @@ for (const file of walk(src)) {
   }
 }
 
-const verbose = process.argv.includes('--list');
+// Every file:line when there are few (as after a new slip) or with --list.
+const verbose = process.argv.includes('--list') || total <= 40;
 if (total) {
   byFile.sort((a, b) => b[1].length - a[1].length);
   console.error(`Hardcoded Korean outside the translations: ${total} line(s) in ${byFile.length} file(s).`);
   for (const [file, hits] of byFile) {
-    console.error(`  ${file}: ${hits.length}` + (verbose ? `  (lines ${hits.join(', ')})` : ''));
+    console.error(`  ${file}: ${hits.length}`);
+    if (verbose) for (const line of hits) console.error(`    src/${file}:${line}`);
   }
   console.error('Move the words into src/i18n/translations and use t(), or mark data with `// i18n-exempt: <reason>`.');
   process.exit(1);
