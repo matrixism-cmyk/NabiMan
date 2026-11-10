@@ -30,7 +30,7 @@ pub(crate) fn lead_tmux() -> Option<String> {
 
 fn set_lead(tmux: Option<&str>) -> std::io::Result<()> {
     match tmux {
-        Some(t) => std::fs::write(path(), t)?,
+        Some(t) => crate::private_storage::write(&path(), t.as_bytes())?,
         None => {
             let _ = std::fs::remove_file(path());
         }

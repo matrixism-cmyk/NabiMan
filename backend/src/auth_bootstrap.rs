@@ -106,20 +106,5 @@ pub(crate) fn validate_bootstrap_password(password: &str, configured: bool) -> R
     Ok(())
 }
 pub(super) fn save_hash_to_file(hash: &str) -> Result<(), String> {
-    use std::os::unix::fs::OpenOptionsExt;
-    let path = password_file_path();
-    if let Some(p) = path.parent() {
-        let _ = std::fs::create_dir_all(p);
-    }
-    std::fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .mode(0o600)
-        .open(&path)
-        .and_then(|mut f| {
-            use std::io::Write;
-            f.write_all(hash.as_bytes())
-        })
-        .map_err(|e| e.to_string())
+    crate::private_storage::write(&password_file_path(), hash.as_bytes()).map_err(|e| e.to_string())
 }

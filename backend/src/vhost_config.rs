@@ -52,16 +52,20 @@ pub(super) struct SaveConfigRequest {
     server: Option<String>,
 }
 
+/// Replace a site file atomically (a half-written config must never be what the
+/// web server reloads), keeping the mode it had; new files are 0644 like the distribution's.
+pub(super) fn write_site(path: &str, body: &str) -> std::io::Result<()> {
+    let path = std::path::Path::new(path);
+    crate::private_storage::write_mode(path, body.as_bytes(), crate::private_storage::existing_mode(path, 0o644))
+}
+
 pub(super) async fn save_config(body: web::Json<SaveConfigRequest>) -> HttpResponse {
     if !validate_domain(&body.domain) {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid"));
     }
     let srv = body.server.as_deref().unwrap_or("apache");
     if srv == "nginx" {
-        let _ = std::fs::write(
-            format!("/etc/nginx/sites-available/{}", body.domain),
-            &body.http_config,
-        );
+        let _ = write_site(&format!("/etc/nginx/sites-available/{}", body.domain), &body.http_config);
         let test = std::process::Command::new("nginx").arg("-t").output_off_thread(deadline::SERVICE).await;
         if let Err(e) = &test {
             if e.kind() == std::io::ErrorKind::TimedOut {
@@ -81,15 +85,9 @@ pub(super) async fn save_config(body: web::Json<SaveConfigRequest>) -> HttpRespo
             .output_off_thread(deadline::SERVICE).await;
         HttpResponse::Ok().json(ApiResponse::ok("Nginx config saved".to_string()))
     } else {
-        let _ = std::fs::write(
-            format!("/etc/apache2/sites-available/{}.conf", body.domain),
-            &body.http_config,
-        );
+        let _ = write_site(&format!("/etc/apache2/sites-available/{}.conf", body.domain), &body.http_config);
         if let Some(ref ssl) = body.ssl_config {
-            let _ = std::fs::write(
-                format!("/etc/apache2/sites-available/{}-le-ssl.conf", body.domain),
-                ssl,
-            );
+            let _ = write_site(&format!("/etc/apache2/sites-available/{}-le-ssl.conf", body.domain), ssl);
         }
         let test = std::process::Command::new("apache2ctl")
             .arg("configtest")

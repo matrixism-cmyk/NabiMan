@@ -60,7 +60,11 @@ fn history_file() -> std::path::PathBuf {
     nabiman_server::data_dir().join("notification_history.json")
 }
 
+/// One read-modify-write of the history file at a time, so concurrent sends keep every event.
+static HISTORY_WRITES: Mutex<()> = Mutex::new(());
+
 fn append_history(event: &NotificationEvent) {
+    let _writing = HISTORY_WRITES.lock_safe();
     let mut history: Vec<NotificationEvent> = std::fs::read_to_string(history_file())
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
@@ -70,9 +74,9 @@ fn append_history(event: &NotificationEvent) {
     if history.len() > 500 {
         history.drain(0..history.len() - 500);
     }
-    let _ = std::fs::write(
-        history_file(),
-        serde_json::to_string(&history).unwrap_or_default(),
+    let _ = crate::private_storage::write(
+        &history_file(),
+        serde_json::to_string(&history).unwrap_or_default().as_bytes(),
     );
 }
 
@@ -230,9 +234,9 @@ fn load_templates() -> Vec<NotificationTemplate> {
 }
 
 fn save_templates(t: &[NotificationTemplate]) {
-    let _ = std::fs::write(
-        templates_file(),
-        serde_json::to_string_pretty(t).unwrap_or_default(),
+    let _ = crate::private_storage::write(
+        &templates_file(),
+        serde_json::to_string_pretty(t).unwrap_or_default().as_bytes(),
     );
 }
 
@@ -311,7 +315,7 @@ async fn get_history() -> HttpResponse {
 }
 
 async fn clear_history() -> HttpResponse {
-    let _ = std::fs::write(history_file(), "[]");
+    let _ = crate::private_storage::write(&history_file(), b"[]");
     HttpResponse::Ok().json(ApiResponse::ok("History cleared"))
 }
 

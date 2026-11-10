@@ -42,7 +42,7 @@ fn rules_file() -> std::path::PathBuf {
 
 fn save_rules(rules: &[AlertRule]) -> Result<(), String> {
     let json = serde_json::to_string_pretty(rules).map_err(|e| e.to_string())?;
-    std::fs::write(rules_file(), json).map_err(|e| e.to_string())
+    crate::private_storage::write(&rules_file(), json.as_bytes()).map_err(|e| e.to_string())
 }
 
 fn gen_id() -> String {

@@ -215,7 +215,7 @@ async fn create_apache_vhost(body: &CreateVhostRequest) -> HttpResponse {
         "redirect" => gen_apache_redirect(&body.domain, &body.target),
         _ => return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid type")),
     };
-    if let Err(e) = std::fs::write(&conf, &config) {
+    if let Err(e) = configuration::write_site(&conf, &config) {
         return HttpResponse::Ok().json(ApiResponse::<String>::error(&e.to_string()));
     }
     let _ = std::process::Command::new("a2ensite")
@@ -245,7 +245,7 @@ async fn create_nginx_vhost(body: &CreateVhostRequest) -> HttpResponse {
         "redirect" => gen_nginx_redirect(&body.domain, &body.target),
         _ => return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid type")),
     };
-    if let Err(e) = std::fs::write(&conf, &config) {
+    if let Err(e) = configuration::write_site(&conf, &config) {
         return HttpResponse::Ok().json(ApiResponse::<String>::error(&e.to_string()));
     }
     let enabled_link = format!("/etc/nginx/sites-enabled/{}", body.domain);
