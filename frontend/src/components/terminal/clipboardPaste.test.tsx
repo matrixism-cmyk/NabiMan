@@ -2,7 +2,7 @@
  * The clipboard path into a terminal: each shortcut must paste exactly once,
  * and a file on the clipboard must arrive as a path the shell can open.
  */
-import { attachClipboard } from './terminalChrome';
+import { attachClipboard, sendPaste } from './terminalChrome';
 import { blobsFromClipboardItems, pathsForClipboardFiles } from './pasteFile';
 
 jest.mock('./pasteFile', () => ({
@@ -101,5 +101,18 @@ describe('terminal clipboard', () => {
     expect(pathsForClipboardFiles).toHaveBeenCalledWith([file]);
     expect(sent).toEqual([SAVED_PATH]);
     detach();
+  });
+});
+
+describe('sendPaste', () => {
+  it('hands text to the server in one piece, and only on an open socket', () => {
+    const send = jest.fn();
+    const open = { readyState: WebSocket.OPEN, send } as unknown as WebSocket;
+    expect(sendPaste(open, '\x1b[200~hi\x1b[201~')).toBe(true);
+    expect(send).toHaveBeenCalledWith('\x01PASTE:\x1b[200~hi\x1b[201~');
+    const closed = { readyState: WebSocket.CLOSED, send } as unknown as WebSocket;
+    expect(sendPaste(closed, 'x')).toBe(false);
+    expect(sendPaste(null, 'x')).toBe(false);
+    expect(send).toHaveBeenCalledTimes(1);
   });
 });

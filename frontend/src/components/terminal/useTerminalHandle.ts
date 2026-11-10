@@ -6,6 +6,7 @@ import type { TerminalSettings } from './settings';
 import { useTerminalZoom } from './useTerminalZoom';
 import { sidKey, writeStored } from './terminalStorage';
 import { armModifiers, isBarKey, keySequence, NO_MODS, withMods } from './stickyKeys';
+import { sendPaste } from './terminalChrome';
 
 interface Controls {
   termRef: MutableRefObject<Terminal | null>;
@@ -61,6 +62,11 @@ export function useTerminalHandle(ref: Ref<TerminalViewHandle>, {
     insertText: (text: string) => {
       termRef.current?.paste(text);
       termRef.current?.focus();
+    },
+    paste: (text: string) => {
+      const sent = sendPaste(wsRef.current, text);
+      termRef.current?.focus();
+      return sent;
     },
     sendKeys: (keys: string) => {
       if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(keys);

@@ -2,7 +2,7 @@ import React, { forwardRef, useCallback, useEffect, useId, useRef, useState } fr
 import { Terminal } from 'xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { apiRequest } from '../../shared/api/useApi';
-import { attachClipboard, attachTerminalIo, createTerminal } from './terminalChrome';
+import { attachClipboard, attachTerminalIo, createTerminal, sendPaste } from './terminalChrome';
 import { attachRenderer, readRendererChoice } from './renderers';
 import { applyTerminalFont } from './terminalFonts';
 import TerminalStatusPill from './TerminalStatusPill';
@@ -38,8 +38,6 @@ const MAX_COLD_ATTEMPTS = 8;
 const ENDED_MSG = '\x02ENDED';
 /** The server telling a share viewer how big the owner's pane is. */
 const SIZE_MSG = '\x02SIZE:';
-/** Clipboard text on its way out, for the server to hand to tmux. */
-const PASTE_MSG = '\x01PASTE:';
 
 const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function TerminalView(
   { target, storageKey, settings, joinSessionId, active, share, grid, onStatus, onSessionId }, ref,
@@ -293,9 +291,7 @@ const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function 
       term.write(`\r\n\x1b[90m──────── ${restoredRef.current} ────────\x1b[0m\r\n`);
     }
 
-    const detachClipboard = attachClipboard(term, containerRef.current, (text) => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(PASTE_MSG + text);
-    });
+    const detachClipboard = attachClipboard(term, containerRef.current, (text) => { sendPaste(wsRef.current, text); });
 
     attachTerminalIo(
       term,

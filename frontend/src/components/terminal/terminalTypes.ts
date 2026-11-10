@@ -49,6 +49,9 @@ export interface TerminalViewHandle {
   sessionId: () => string;
   /** Types text at the prompt, as a paste would. */
   insertText: (text: string) => void;
+  /** Hands text over the way a clipboard paste goes: in one piece, through
+   *  the server to tmux. False when the session is not connected. */
+  paste: (text: string) => boolean;
   /** Sends keys as if they were pressed: unlike a paste, a "\r" here is Enter
    *  even in shells that take pasted line breaks as text. */
   sendKeys: (keys: string) => void;

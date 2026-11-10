@@ -64,6 +64,17 @@ export function createTerminal(settings: TerminalSettings): { term: Terminal; fi
  * clipboard write. The xterm-side selection is copied too, for panes where tmux
  * is not in the way.
  */
+/** Clipboard text on its way out, for the server to hand to tmux. */
+const PASTE_MSG = '\x01PASTE:';
+
+/** Sends text the way a clipboard paste goes: in one piece, for the server to
+ *  hand to tmux as a paste. False when the socket is not open. */
+export function sendPaste(socket: WebSocket | null, text: string): boolean {
+  if (socket?.readyState !== WebSocket.OPEN) return false;
+  socket.send(PASTE_MSG + text);
+  return true;
+}
+
 /** How long after a click, touch or key in a terminal it may set the clipboard. */
 export const OSC52_GESTURE_MS = 3000;
 /** The most an OSC 52 may carry (base64): about 1 MB of text. */
