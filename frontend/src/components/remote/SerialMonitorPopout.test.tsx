@@ -52,14 +52,21 @@ it('shows what the board said before and since, and sends, resets through the ta
     }
   };
   view('pty_1', 'esp32');
-  await waitFor(() => expect(screenText).toContain('I (12) app: 안녕'), { timeout: 5000 });
+  // The mocked screen is written straight from the message handler, outside
+  // React, so seeing the data there says nothing about what React has drawn:
+  // the holder's state may still be waiting to render, and the window title
+  // is set by an effect that runs after that render is committed (a DOM
+  // mutation can end a waitFor before it). Wait for all of it together.
+  await waitFor(() => {
+    expect(screenText).toContain('I (12) app: 안녕');
+    expect(screen.getByText('연결됨')).toBeInTheDocument();
+    expect(document.title).toBe('esp32 (COM5) · 시리얼 모니터');
+  }, { timeout: 5000 });
   expect(screenText.indexOf('ESP-ROM:esp32c3')).toBeLessThan(screenText.indexOf('여기부터 실시간'));
-  expect(screen.getByText('연결됨')).toBeInTheDocument();
   expect(screen.getByText('115200')).toBeInTheDocument();
   // What the board is, and the operator's note for it (the COM port).
   expect(screen.getByText('COM5')).toBeInTheDocument();
   expect(screen.getByText('USB 303A:1001 · Espressif USB-JTAG/Serial (ESP32-C3/S3/C6/H2)')).toBeInTheDocument();
-  expect(document.title).toBe('esp32 (COM5) · 시리얼 모니터');
 
   const input = screen.getByRole('textbox');
   fireEvent.change(input, { target: { value: 'AT' } });
@@ -92,6 +99,8 @@ it('the tab holding the port answers a monitor and carries out what it asks', as
     bootloader: jest.fn(async () => { throw new Error('port busy'); }),
   };
   const holder = monitorChannel('pty_3', 'esp32', 115200, () => bridge)!;
+  // Closed after the test even when it fails, so no channel outlives it.
+  opened.push(holder as unknown as NodeChannel);
   const monitor = holderFor('pty_3', 'esp32');
   const heard: any[] = [];
   monitor.onmessage = (e: any) => heard.push(e.data);
@@ -108,5 +117,4 @@ it('the tab holding the port answers a monitor and carries out what it asks', as
     { type: 'done', what: 'bootloader', ok: false, error: 'port busy' },
   ]));
   expect(Array.from(bridge.send.mock.calls[0][0])).toEqual([65, 10]);
-  holder.close();
 }, 20000);
