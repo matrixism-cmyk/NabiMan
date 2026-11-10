@@ -1,9 +1,10 @@
-import React, { Suspense, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { apiRequest } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/i18n';
 import ClaudeAddress from '../../terminal/ClaudeAddress';
 import type { SessionLink } from '../SessionLinks';
 import type { SessionInfo } from '../SessionsView';
-import { buildGraph, ViewMode } from './graphModel';
+import { buildGraph, buildWorkMap, MapEvent, MapServer, ViewMode } from './graphModel';
 import type { Layout2D } from './Graph2D';
 import './session-graph.css';
 
@@ -38,13 +39,35 @@ function hasWebGL() {
 /** The sessions drawn as a graph (2D or 3D), with a panel for the one picked. */
 export default function SessionGraphView({ mode, sessions, links, onAttach, onPopOut }: Props) {
   const { t } = useT();
-  const graph = useMemo(() => buildGraph(sessions, links), [sessions, links]);
+  // The work map (3D): the machines the sessions run on, and the messages between sessions as they happen.
+  const [servers, setServers] = useState<MapServer[]>([]);
+  const [events, setEvents] = useState<MapEvent[]>([]);
+  const newest = useRef(0);
+  useEffect(() => {
+    if (mode !== 'graph3d') return undefined;
+    let live = true;
+    apiRequest('/api/remote-servers').then((r: any) => { if (live && r?.success && Array.isArray(r.data)) setServers(r.data); }).catch(() => undefined);
+    const pull = () => apiRequest(`/api/terminal/claude-events?window=3600&after=${newest.current}`).then((r: any) => {
+      if (!live || !r?.success || !Array.isArray(r.data) || !r.data.length) return;
+      newest.current = r.data[r.data.length - 1].id;
+      setEvents((old) => [...old, ...r.data].slice(-300));
+    }).catch(() => undefined);
+    void pull();
+    const timer = window.setInterval(pull, 3000);
+    return () => { live = false; window.clearInterval(timer); };
+  }, [mode]);
+  const graph = useMemo(
+    () => (mode === 'graph3d' ? buildWorkMap(sessions, links, servers, events, t('graph.legend.local')) : buildGraph(sessions, links)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sessions, links, servers, events, mode],
+  );
   const [selected, setSelected] = useState<string | null>(null);
   const [tip, setTip] = useState<{ note: string; x: number; y: number } | null>(null);
   const [layout, setLayout] = useState<Layout2D>(() => stored(LAYOUT_KEY, 'concentric') as Layout2D);
   const [rotate, setRotate] = useState(() => stored(ROTATE_KEY, '1') === '1');
   const picked = sessions.find((s) => s.id === selected) || null;
   const groups = Array.from(new Map(graph.nodes.map((n) => [n.group, n.color])).entries());
+  const clock = (at: number) => new Date(at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
   const onHoverEdge = (note: string | null, x: number, y: number) => setTip(note ? { note, x, y } : null);
   const webgl = mode !== 'graph3d' || hasWebGL();
   const incoming = picked ? links.filter((l) => l.to === picked.id) : [];
@@ -72,7 +95,7 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
           {groups.map(([g, color]) => (
             <span key={g} className="session-graph-key"><i style={{ background: color }} />{g === 'local' ? t('graph.legend.local') : g}</span>
           ))}
-          <span className="session-graph-count">{t('graph.count', { sessions: graph.nodes.length, links: graph.edges.length })}</span>
+          <span className="session-graph-count">{t('graph.count', { sessions: sessions.length, links: links.length })}</span>
         </div>
       </div>
       <div className="session-graph-stage">
@@ -80,7 +103,7 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
           <Suspense fallback={<p className="session-graph-wait">{t('graph.loading')}</p>}>
             {mode === 'graph2d'
               ? <Graph2D graph={graph} layout={layout} selected={selected} onSelect={setSelected} onHoverEdge={onHoverEdge} />
-              : <Graph3D graph={graph} selected={selected} onSelect={setSelected} onHoverEdge={onHoverEdge} autoRotate={rotate} />}
+              : <Graph3D graph={graph} selected={selected} onSelect={setSelected} onHoverEdge={onHoverEdge} autoRotate={rotate} events={events} />}
           </Suspense>
         ) : <p className="session-graph-wait" role="alert">{t('graph.noWebgl')}</p>}
         <p className="session-graph-hint">{t(mode === 'graph2d' ? 'graph.hint2d' : 'graph.hint3d')}</p>
@@ -111,6 +134,19 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
           </aside>
         )}
       </div>
+      {mode === 'graph3d' && events.length > 0 && (
+        <ol className="session-graph-timeline" aria-label={t('graph.timeline')}>
+          {events.slice(-40).reverse().map((e) => (
+            <li key={e.id}>
+              <button type="button" onClick={() => setSelected(e.to || e.from)} disabled={!e.to && !e.from} title={e.text}>
+                <time>{clock(e.at)}</time>
+                <b>{e.from_name || '?'}</b><span aria-hidden="true"> → </span><b>{e.to_name || '?'}</b>
+                <span className="session-graph-timeline-text">{e.text}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
       {tip && (
         <div className="session-link-tip session-graph-tip" role="tooltip" style={{ left: tip.x + 14, top: tip.y + 16 }}>
           {tip.note.split('\n').map((line, i) => <div key={i} className={i === 0 ? 'session-link-tip-head' : 'session-link-tip-line'}>{line}</div>)}

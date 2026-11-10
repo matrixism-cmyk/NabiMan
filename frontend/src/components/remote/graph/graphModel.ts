@@ -34,6 +34,16 @@ export interface GraphNode {
   alive: boolean;
   /** One colour per group, so sessions of one server read as a set. */
   color: string;
+  /** What it is on the work map: a session (default) or the machine sessions run on. */
+  kind?: 'session' | 'server';
+  /** A second line: a server's address, a session's Claude. */
+  sub?: string;
+  /** A server's state as last checked. */
+  status?: string;
+  /** What a busy session is working on: the first line of the last request it got. */
+  task?: string;
+  /** Messages to or from it in the window: busier ones are drawn larger. */
+  heat?: number;
 }
 
 export interface GraphEdge {
@@ -46,6 +56,8 @@ export interface GraphEdge {
   /** The colour of the session handing out the work, as on the tiles. */
   color: string;
   note: string;
+  /** `order` (default): a hand-off. `host`: a server and a session on it. `conn`: NabiMan's hold on a server. */
+  kind?: 'order' | 'host' | 'conn';
 }
 
 export interface Graph { nodes: GraphNode[]; edges: GraphEdge[] }
@@ -118,3 +130,51 @@ export const signatureOf = (g: Graph) => [
   ...g.nodes.map((n) => `${n.id}|${n.name}|${n.claude}|${n.group}|${n.busy}|${n.lead}|${n.alive}`),
   ...g.edges.map((e) => `${e.id}|${e.live}|${e.strength.toFixed(1)}`),
 ].join(';');
+
+/** A saved server, as the work map needs it. */
+export interface MapServer { id: string; name: string; host: string; port?: number; status?: string }
+/** A message between two Claude sessions, from the record. */
+export interface MapEvent { id: number; at: number; from: string | null; to: string | null; from_name: string; to_name: string; text: string }
+
+/**
+ * The work map: the sessions and their hand-offs, plus the machines they run
+ * on (this one and each server a session is connected to), tied together so
+ * each machine's sessions gather round it.
+ */
+export function buildWorkMap(sessions: SessionInfo[], links: SessionLink[], servers: MapServer[], events: MapEvent[], here: string): Graph {
+  const g = buildGraph(sessions, links);
+  const heat = new Map<string, number>();
+  const task = new Map<string, string>();
+  for (const e of events) {
+    for (const id of [e.from, e.to]) if (id) heat.set(id, (heat.get(id) || 0) + 1);
+    if (e.to && e.text) task.set(e.to, e.text);
+  }
+  const hub = g.nodes.find((n) => n.lead)?.id;
+  const made = new Map<string, GraphNode>();
+  for (const n of [...g.nodes]) {
+    n.kind = 'session';
+    n.heat = heat.get(n.id) || 0;
+    if (n.busy) n.task = task.get(n.id);
+    const server = n.group === 'local' ? undefined : servers.find((x) => x.host === n.group);
+    const id = n.group === 'local' ? 'host:local' : server ? `srv:${server.id}` : `host:${n.group}`;
+    if (!made.has(id)) {
+      const node: GraphNode = {
+        id, kind: 'server', group: n.group, color: n.color, claude: '', busy: false, lead: false, orchestrator: false,
+        alive: !server || server.status !== 'offline',
+        name: n.group === 'local' ? here : server?.name || n.group,
+        sub: n.group === 'local' ? '' : `${server?.host || n.group}${server?.port && server.port !== 22 ? `:${server.port}` : ''}`,
+        status: server?.status,
+      };
+      made.set(id, node);
+      g.nodes.push(node);
+      // NabiMan (the lead's machine) holds a connection to every other machine.
+      if (id !== 'host:local') g.edges.push({ id: `conn>${id}`, from: 'host:local', to: id, live: false, strength: 0.5, color: n.color, note: '', kind: 'conn' });
+    }
+    g.edges.push({ id: `host>${n.id}`, from: id, to: n.id, live: false, strength: 0.4, color: n.color, note: '', kind: 'host' });
+  }
+  if (!made.has('host:local') && made.size) {
+    g.nodes.push({ id: 'host:local', kind: 'server', group: 'local', color: GROUP_COLORS[0], claude: '', busy: false, lead: false, orchestrator: false, alive: true, name: here, sub: '' });
+  }
+  void hub;
+  return g;
+}

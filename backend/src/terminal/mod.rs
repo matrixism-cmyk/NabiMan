@@ -4,6 +4,7 @@
 mod ssh_command;
 use ssh_command::build_ssh_command;
 
+mod claude_events;
 mod claude_lead;
 mod claude_links;
 mod claude_remote;
@@ -390,6 +391,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     session_order::configure(cfg);
     claude_start::configure(cfg);
     claude_lead::configure(cfg);
+    claude_events::configure(cfg);
     office_preview::configure(cfg);
     paste_file::config(cfg);
     session_settings::config(cfg);

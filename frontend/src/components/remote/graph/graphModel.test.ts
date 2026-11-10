@@ -30,3 +30,18 @@ it('remembers the chosen view', () => {
   localStorage.setItem('nabiman_sessions_view', 'nonsense');
   expect(readView()).toBe('tiles');
 });
+
+it('the work map adds the machines sessions run on, what each is doing and how busy it is', () => {
+  const { buildWorkMap } = require('./graphModel');
+  const sessions = [s('lead', 'local', { title: 'nabiman', lead: true }), s('a', 'ssh:jcia@spark.bebo.kr:22', { busy: true }), s('b', 'ssh:x@10.0.0.9:2222')];
+  const links = [{ from: 'lead', to: 'a', orchestrator: true, live: true, strength: 1 }];
+  const servers = [{ id: 's1', name: 'nvidia', host: 'spark.bebo.kr', port: 22, status: 'online' }];
+  const events = [{ id: 1, at: 10, from: 'lead', to: 'a', from_name: 'l', to_name: 'a', text: '그림 갱신' }, { id: 2, at: 20, from: 'a', to: 'lead', from_name: 'a', to_name: 'l', text: '완료' }];
+  const g = buildWorkMap(sessions, links as any, servers, events, '이 서버');
+  const by = Object.fromEntries(g.nodes.map((n: any) => [n.id, n]));
+  expect(by['host:local']).toEqual(expect.objectContaining({ kind: 'server', name: '이 서버' }));
+  expect(by['srv:s1']).toEqual(expect.objectContaining({ kind: 'server', name: 'nvidia', sub: 'spark.bebo.kr' }));
+  expect(by['host:10.0.0.9']).toEqual(expect.objectContaining({ kind: 'server', name: '10.0.0.9' }));
+  expect(by.a).toEqual(expect.objectContaining({ kind: 'session', task: '그림 갱신', heat: 2 }));
+  expect(g.edges.map((e: any) => `${e.kind || 'order'}:${e.id}`).sort()).toEqual(['conn:conn>host:10.0.0.9', 'conn:conn>srv:s1', 'host:host>a', 'host:host>b', 'host:host>lead', 'order:lead>a']);
+});

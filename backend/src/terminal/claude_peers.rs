@@ -329,10 +329,12 @@ fn link(found: &[(Record, String)], remote: &super::claude_remote::Snapshot, see
             *slot = (at, said.to_string());
         }
     };
+    let mut events: Vec<super::claude_events::Seen> = Vec::new();
     for (path, to) in &transcripts {
         for (from, at, said) in got.get(path).into_iter().flatten() {
             if let Some(f) = sender("local", from) {
                 note(&f, to, *at, said);
+                events.push((f.clone(), to.to_string(), *at, said.clone()));
                 messages.push((f, to.to_string(), *at));
             }
         }
@@ -340,8 +342,17 @@ fn link(found: &[(Record, String)], remote: &super::claude_remote::Snapshot, see
     for (server, receiver, from, at, said) in &remote.messages {
         let (Some(to), Some(f)) = (remote_card.get(&(server.as_str(), receiver.as_str())), sender(server, from)) else { continue };
         note(&f, to, *at, said);
+        events.push((f.clone(), to.clone(), *at, said.clone()));
         messages.push((f, to.clone(), *at));
     }
+    // The record behind the arrows: each message as an event, with its ends' names now.
+    let mut names: HashMap<String, String> = found.iter().map(|(r, t)| (t.clone(), if r.name.is_empty() { base_name(&r.cwd) } else { r.name.clone() })).collect();
+    for p in &remote.peers {
+        if let Some(t) = &p.tile {
+            names.entry(t.clone()).or_insert_with(|| p.name.clone());
+        }
+    }
+    super::claude_events::record(&events, &names);
     let links = super::claude_links::links(&messages, now, super::claude_lead::lead_tmux().as_deref());
     for (from, to) in links.leads {
         let entry = seen.entry(from.clone()).or_default();

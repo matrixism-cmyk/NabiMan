@@ -49,3 +49,11 @@
 .session-graph-tip { position: fixed; }
 .session-view-switch .btn { white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .session-graph-panel { animation: none; } }
+/* The work map's timeline: the latest messages between sessions, newest first. */
+.session-graph-timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: 168px; overflow: auto; border: 1px solid var(--border); border-radius: 10px; background: rgba(10, 15, 23, 0.6); }
+.session-graph-timeline button { all: unset; display: flex; gap: 8px; align-items: baseline; width: 100%; box-sizing: border-box; padding: 4px 12px; font-size: 12.5px; cursor: pointer; white-space: nowrap; overflow: hidden; }
+.session-graph-timeline button:hover:not(:disabled) { background: rgba(94, 234, 212, 0.08); }
+.session-graph-timeline button:disabled { cursor: default; opacity: 0.6; }
+.session-graph-timeline time { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.session-graph-timeline b { color: #e6edf3; font-weight: 600; }
+.session-graph-timeline-text { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; }

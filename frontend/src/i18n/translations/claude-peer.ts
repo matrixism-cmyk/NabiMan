@@ -78,10 +78,11 @@ const t: T = {
   'graph.loading': { ko: '그래프를 불러오는 중…', en: 'Loading the graph…', ja: 'グラフを読み込み中…' },
   'graph.noWebgl': { ko: '이 브라우저에서는 3D 그래픽(WebGL)을 쓸 수 없습니다. 2D 그래프를 이용해 주세요.', en: '3D graphics (WebGL) are not available in this browser. Use the 2D graph.', ja: 'このブラウザでは 3D (WebGL) を使えません。2D グラフをご利用ください。' },
   'graph.hint2d': { ko: '세션을 누르면 상세가 열립니다 · 끌어서 옮기기 · 휠로 확대', en: 'Click a session for details · drag to move · wheel to zoom', ja: 'セッションをクリックで詳細 · ドラッグで移動 · ホイールで拡大' },
-  'graph.hint3d': { ko: '세션을 누르면 다가갑니다 · 끌어서 돌리기 · 휠로 확대', en: 'Click a session to fly to it · drag to turn · wheel to zoom', ja: 'セッションをクリックで接近 · ドラッグで回転 · ホイールで拡大' },
+  'graph.hint3d': { ko: '▣ 서버 · ● 세션 · ✳ Claude · 세션을 누르면 다가갑니다 · 끌어서 돌리기 · 휠로 확대', en: 'Click a session to fly to it · drag to turn · wheel to zoom', ja: 'セッションをクリックで接近 · ドラッグで回転 · ホイールで拡大' },
   'graph.noPreview': { ko: '(화면 미리보기 없음)', en: '(no screen preview)', ja: '(プレビューなし)' },
   'graph.ended': { ko: '종료됨', en: 'Ended', ja: '終了' },
   'graph.close': { ko: '닫기', en: 'Close', ja: '閉じる' },
+  'graph.timeline': { ko: '최근 주고받은 메시지', en: 'Recent messages', ja: '最近のメッセージ' },
 };
 
 export default t;
