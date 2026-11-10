@@ -1,0 +1,8 @@
+/* The About dialog (AboutDialog.tsx). */
+.about-dialog { width: min(520px, calc(100vw - 32px)); }
+.about-list { display: grid; grid-template-columns: max-content 1fr; gap: 10px 16px; margin: 0 0 14px; }
+.about-list dt { color: var(--text-secondary); font-weight: 600; }
+.about-list dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+.about-hint { font-size: 12px; margin-bottom: 4px; }
+.about-status { min-height: 1.2em; font-size: 12px; color: var(--text-secondary); margin-top: 8px; }
+@media (max-width: 480px) { .about-list { grid-template-columns: 1fr; gap: 2px; } .about-list dd { margin-bottom: 8px; } }

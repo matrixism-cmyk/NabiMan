@@ -11,6 +11,7 @@ import { MemberUser } from './components/MembershipEditor';
 import PanelOutlet from './components/PanelOutlet';
 import ChangePasswordModal from './components/ChangePasswordModal';
 import HeaderMenu from './components/HeaderMenu';
+import AboutDialog from './components/about/AboutDialog';
 import IdleWarning from './components/IdleWarning';
 import { useIdleLogout } from './shared/auth/useIdleLogout';
 import { useChromeHidden } from './shared/ui/useChromeHidden';
@@ -49,6 +50,7 @@ function App() {
   const [activeCat, setActiveCat] = useState<Category>('dashboard');
   const [showChangePw, setShowChangePw] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
   const [hiddenTabs, setHiddenTabs] = useState<Set<Tab>>(new Set());
   // Focus mode: edge-to-edge, content-only view (shared with the remote shell).
   const { focusMode, enterFocus, exitFocus } = useFocusMode();
@@ -155,6 +157,7 @@ function App() {
     setLoggedIn(false);
     setShowChangePw(false);
     setShowPalette(false);
+    setShowAbout(false);
     exitFocus();
     try { await request; } catch { /* local logout completes even if offline */ }
   };
@@ -232,6 +235,7 @@ function App() {
           <button className="btn btn-secondary" title={t('app.commandPalette')} onClick={() => setShowPalette(true)}>⌘K</button>
           <button className="btn btn-secondary" title={t('app.focusMode')} onClick={enterFocus}>⛶</button>
           <button className="btn btn-secondary" onClick={() => setShowChangePw(true)}>{t('app.changePassword')}</button>
+          <button className="btn btn-secondary" onClick={() => setShowAbout(true)}>{t('app.about')}</button>
           <button className="btn btn-secondary logout-btn" onClick={handleLogout}>{t('app.logout')}</button>
         </HeaderMenu>
       </header>
@@ -283,6 +287,8 @@ function App() {
         </main>
       </div>
       {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
+      {showAbout && <AboutDialog onClose={() => setShowAbout(false)} branding={branding}
+        onOpenLicense={hiddenTabs.has('license') || scoped ? undefined : () => navigateTo('system', 'license')} />}
       {idle.secondsLeft !== null && <IdleWarning seconds={idle.secondsLeft} onStay={idle.stay} />}
       {showPalette && (
         <CommandPalette
