@@ -19,7 +19,8 @@ pub struct BackupEntry {
 mod archive;
 #[path = "backup_schedule.rs"]
 mod schedule;
-pub use schedule::{new_schedule_store, start_backup_scheduler};
+pub use schedule::{last_success, new_schedule_store, start_backup_scheduler, BackupScheduleStore};
+pub(crate) use schedule::overdue;
 #[path = "backup_state.rs"]
 mod state;
 pub use state::seed_default_schedule;

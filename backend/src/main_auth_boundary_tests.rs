@@ -77,3 +77,45 @@ async fn viewer_cannot_reach_shell_or_root_file_download() {
     let response = actix_web::test::call_service(&app, request).await;
     assert_eq!(response.status(), actix_web::http::StatusCode::OK);
 }
+
+#[actix_web::test]
+async fn probes_are_open_and_metrics_is_for_administrators() {
+    let secret: auth::JwtSecret = Arc::new("test-secret".into());
+    let sessions = jwt_sessions::new_session_store();
+    jwt_sessions::register_session(&sessions, "viewer-session", "viewer", "viewer-id", "127.0.0.1");
+    let users: users::UserStore = Arc::new(Mutex::new(vec![serde_json::from_value::<NabimanUser>(serde_json::json!({
+        "id": "viewer-id", "username": "viewer", "password_hash": "hash", "role": "viewer",
+        "created_at": "now", "status": "active"
+    }))
+    .unwrap()]));
+    let now = chrono::Utc::now().timestamp() as usize;
+    let claims = auth::Claims { sub: "viewer".into(), role: "viewer".into(), sid: "viewer-session".into(), iat: now, exp: now + 300 };
+    let token = jsonwebtoken::encode(
+        &jsonwebtoken::Header::default(),
+        &claims,
+        &jsonwebtoken::EncodingKey::from_secret(secret.as_bytes()),
+    )
+    .unwrap();
+    let ok = || async { HttpResponse::Ok().finish() };
+    let app = actix_web::test::init_service(
+        App::new()
+            .wrap(AuthCheck::new(secret, sessions, users))
+            .route("/healthz", web::get().to(ok))
+            .route("/readyz", web::get().to(ok))
+            .route("/metrics", web::get().to(ok)),
+    )
+    .await;
+    let call = |uri: &'static str, bearer: Option<String>| {
+        let mut request = actix_web::test::TestRequest::get().uri(uri);
+        if let Some(token) = bearer {
+            request = request.insert_header(("Authorization", format!("Bearer {token}")));
+        }
+        request.to_request()
+    };
+    for probe in ["/healthz", "/readyz"] {
+        assert_eq!(actix_web::test::call_service(&app, call(probe, None)).await.status(), 200, "{probe}");
+    }
+    assert_eq!(actix_web::test::call_service(&app, call("/metrics", None)).await.status(), 401);
+    assert_eq!(actix_web::test::call_service(&app, call("/metrics", Some(token))).await.status(), 403);
+    assert_eq!(actix_web::test::call_service(&app, call("/metrics", Some("not-the-scrape-token".into()))).await.status(), 401);
+}

@@ -1,9 +1,14 @@
 //! One `info` line per request (target `http`): method, the route pattern
 //! that served it (`/api/users/{id}`, never the raw path with its ids, and
 //! never the query string or body), status, duration and the signed-in
-//! account's id when there is one. Probes log at `debug`.
+//! account's id when there is one. Probes log at `debug`. The same place
+//! counts requests for `/metrics`, and holds a WebSocket's place in the
+//! open-connection gauge for as long as its (upgraded) response body lives.
 
+use super::metrics::{self, WsOpen};
+use actix_web::body::{BodySize, EitherBody, MessageBody};
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
+use actix_web::web::Bytes;
 use actix_web::Error;
 use std::future::{ready, Future, Ready};
 use std::pin::Pin;
@@ -23,14 +28,35 @@ fn probe(route: &str) -> bool {
     matches!(route, "/healthz" | "/readyz" | "/metrics")
 }
 
+/// A WebSocket response's body, counted open until it is dropped.
+pub(crate) struct Tracked<B> {
+    inner: Pin<Box<B>>,
+    _open: WsOpen,
+}
+
+impl<B: MessageBody> MessageBody for Tracked<B> {
+    type Error = B::Error;
+
+    fn size(&self) -> BodySize {
+        self.inner.size()
+    }
+
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Result<Bytes, Self::Error>>> {
+        self.inner.as_mut().poll_next(cx)
+    }
+}
+
 pub(crate) struct RequestLog;
 
 impl<S, B> Transform<S, ServiceRequest> for RequestLog
 where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
-    B: 'static,
+    B: MessageBody + 'static,
 {
-    type Response = ServiceResponse<B>;
+    type Response = ServiceResponse<EitherBody<B, Tracked<B>>>;
     type Error = Error;
     type Transform = RequestLogService<S>;
     type InitError = ();
@@ -48,9 +74,9 @@ pub(crate) struct RequestLogService<S> {
 impl<S, B> Service<ServiceRequest> for RequestLogService<S>
 where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
-    B: 'static,
+    B: MessageBody + 'static,
 {
-    type Response = ServiceResponse<B>;
+    type Response = ServiceResponse<EitherBody<B, Tracked<B>>>;
     type Error = Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
@@ -73,14 +99,22 @@ where
                 ),
                 Err(e) => (e.as_response_error().status_code().as_u16(), route_label(None, &path), None),
             };
-            let ms = started.elapsed().as_millis();
+            let took = started.elapsed();
+            metrics::record_request(&route, status, took);
+            let ms = took.as_millis();
             let user = user.unwrap_or_else(|| "-".into());
             if probe(&route) {
                 log_debug!("http", "request", method = method, route = route, status = status, ms = ms, user = user);
             } else {
                 log_info!("http", "request", method = method, route = route, status = status, ms = ms, user = user);
             }
-            result
+            result.map(|res| {
+                if res.status() == actix_web::http::StatusCode::SWITCHING_PROTOCOLS {
+                    res.map_body(|_, body| EitherBody::right(Tracked { inner: Box::pin(body), _open: WsOpen::begin() }))
+                } else {
+                    res.map_into_left_body()
+                }
+            })
         })
     }
 }

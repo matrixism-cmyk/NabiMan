@@ -9,7 +9,8 @@ fn in_scope(path: &str, scope: &str) -> bool {
 }
 
 pub(super) fn check(role: &UserRole, method: &str, path: &str) -> bool {
-    if in_scope(path, "/api/backup") || in_scope(path, "/api/audit") || in_scope(path, "/api/apikeys") {
+    // `/metrics` came after the allowlist; it was admin-only from the start.
+    if in_scope(path, "/api/backup") || in_scope(path, "/api/audit") || in_scope(path, "/api/apikeys") || path == "/metrics" {
         return *role == UserRole::Admin;
     }
     if path == "/api/diagnostics/support-report" {

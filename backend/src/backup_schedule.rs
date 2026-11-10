@@ -340,3 +340,7 @@ pub fn start_backup_scheduler(store: BackupScheduleStore) {
 #[cfg(test)]
 #[path = "backup_schedule_tests.rs"]
 mod tests;
+#[path = "backup_schedule_health.rs"]
+mod health;
+pub use health::last_success;
+pub(crate) use health::overdue;

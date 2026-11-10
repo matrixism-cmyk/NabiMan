@@ -100,6 +100,7 @@ TOML입니다. 키 이름이 곧 환경 변수 이름입니다.
 |---|---|---|---|
 | `log` | `NABIMAN_LOG` | `info` | 로그 수준. 전체와 대상별로: `warn,http=info`, `debug`, `off` |
 | `log_format` | `NABIMAN_LOG_FORMAT` | `text` | `json`이면 한 줄에 JSON 하나 |
+| `metrics_token` | `NABIMAN_METRICS_TOKEN` | 없음 | 있으면 `Authorization: Bearer <값>` 으로 `/metrics` 를 읽을 수 있음 (수집기용). 없으면 최고관리자만 |
 
 ### 외부 프로그램과 서비스
 

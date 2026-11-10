@@ -7,6 +7,8 @@ pub(super) const ROUTES: &[Route] = &[
     // Outside /api: health probes for load balancers and containers (observability).
     r("/healthz", Public, M::No),
     r("/readyz", Public, M::No),
+    // Super administrators, or a scraper with NABIMAN_METRICS_TOKEN (checked in auth).
+    r("/metrics", Admin, M::No),
     r("/api/accounts", Read, M::No),
     r("/api/accounts/options", Read, M::No),
     r("/api/accounts/password", Read, M::No),

@@ -38,6 +38,7 @@ pub(crate) const KNOWN: &[&str] = &[
     // Logs and monitoring
     "NABIMAN_LOG",
     "NABIMAN_LOG_FORMAT",
+    "NABIMAN_METRICS_TOKEN",
     // External programs and services
     "NABIMAN_SOFFICE",
     "NABIMAN_RHWP",

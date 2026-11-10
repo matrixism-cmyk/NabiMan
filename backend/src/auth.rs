@@ -284,10 +284,15 @@ pub fn check_auth(
     req.extensions_mut().remove::<VerifiedPrincipal>();
     let Ok(path) = crate::auth_gate::routed_path(req) else { return AuthDecision::BadRequest };
     let points = ExtensionPoints::of(req.app_data::<web::Data<ExtensionPoints>>());
+    let metrics = path == crate::observability::METRICS_PATH;
     if public_route(req.method().as_str(), path)
         || points.public_prefixes.iter().any(|p| path.starts_with(p))
-        || !path.starts_with("/api/")
+        || !(path.starts_with("/api/") || metrics)
     {
+        return AuthDecision::Allow;
+    }
+    // A scraper's own token (NABIMAN_METRICS_TOKEN) opens /metrics and nothing else.
+    if metrics && crate::observability::metrics::scrape_token_matches(req.headers()) {
         return AuthDecision::Allow;
     }
 

@@ -70,6 +70,7 @@ impl State {
             self.error.get_or_insert("append_interrupted");
         }
         if let Some(error) = self.error {
+            crate::observability::metrics::AUDIT_WRITE_FAILURES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             return Err(error);
         }
         self.appending = true;
@@ -142,6 +143,7 @@ impl State {
         })();
         self.appending = false;
         if let Err(error) = result {
+            crate::observability::metrics::AUDIT_WRITE_FAILURES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             self.error = Some(error);
             log_error!("audit", "local audit persistence unavailable; operation outcome is unchanged; inspect storage before restarting", reason = error);
             return Err(error);

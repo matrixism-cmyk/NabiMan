@@ -102,6 +102,9 @@ pub fn capture(
     if result.is_err() {
         stop_group(&mut child);
     }
+    if matches!(result, Err(RunError::TimedOut(_))) {
+        crate::observability::metrics::CHILD_TIMEOUTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
     result
 }
 
