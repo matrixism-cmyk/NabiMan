@@ -10,6 +10,10 @@
 //!
 //!   {"dir": "/workspace/x", "title": "x", "resume": true, "skip_permissions": true, "prompt": "…"}
 //!   → {"ok": true, "session_id": "pty_…", "title": "x", "claude": "x-12 [ab12cd]"}
+//!
+//! `{"list": true}` lists the Claude sessions; `{"op": …}` asks for one of
+//! `status`, `close`, `open` (with `server`) or `guide` — see
+//! `docs/orchestration/README.md` and `claude_control`.
 
 use crate::lock_safe::LockExt;
 use std::io::{BufRead, BufReader, Write};
@@ -20,6 +24,11 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
+use super::claude_control_ops::Ctx;
+
+#[path = "claude_socket_ops.rs"]
+mod dispatch;
+use dispatch::{answer, json};
 use super::claude_start::{self, Start};
 use super::session::{self, PtyStore, TmuxSession};
 
@@ -56,6 +65,21 @@ struct Ask {
     /// Wait for the new Claude Code's address (`name [ref]`) before answering.
     #[serde(default = "yes")]
     wait: bool,
+    /// `status`, `close`, `open` or `guide`; absent: open here (or `list`).
+    #[serde(default)]
+    op: Option<String>,
+    /// For `status` and `close`: a title, `pty_…` id, Claude address or ref.
+    #[serde(default)]
+    who: Option<String>,
+    /// For `status`: how many screen lines (20 unless asked, 200 at most).
+    #[serde(default)]
+    lines: Option<usize>,
+    /// For `close`: even while its Claude is busy, or the lead's.
+    #[serde(default)]
+    force: bool,
+    /// For `open`: the saved server (name or id) to start Claude Code on.
+    #[serde(default)]
+    server: Option<String>,
 }
 
 fn yes() -> bool {
@@ -101,7 +125,7 @@ fn refuse(why: impl Into<String>) -> Answer {
 }
 
 /// Opens the socket and serves it on a thread of its own.
-pub(crate) fn start(store: PtyStore) {
+pub(crate) fn start(ctx: Ctx) {
     let path = socket_path();
     let dir = Path::new(&path).parent().unwrap_or(Path::new("/run"));
     if std::fs::create_dir_all(dir).is_err() {
@@ -123,14 +147,14 @@ pub(crate) fn start(store: PtyStore) {
         .name("claude-socket".into())
         .spawn(move || {
             for conn in listener.incoming().flatten() {
-                let store = store.clone();
-                let _ = std::thread::Builder::new().name("claude-socket-conn".into()).spawn(move || serve(conn, &store));
+                let ctx = ctx.clone();
+                let _ = std::thread::Builder::new().name("claude-socket-conn".into()).spawn(move || serve(conn, &ctx));
             }
         })
         .ok();
 }
 
-fn serve(mut conn: UnixStream, store: &PtyStore) {
+fn serve(mut conn: UnixStream, ctx: &Ctx) {
     let _ = conn.set_read_timeout(Some(Duration::from_secs(10)));
     let answer = match peer(&conn) {
         Some((uid, pid)) => {
@@ -138,13 +162,13 @@ fn serve(mut conn: UnixStream, store: &PtyStore) {
             let read = BufReader::new(std::io::Read::take(&conn, MAX_REQUEST)).read_line(&mut line);
             match read {
                 Ok(_) => match serde_json::from_str::<Ask>(line.trim()) {
-                    Ok(ask) => open(ask, uid, pid, store),
-                    Err(e) => refuse(format!("bad request: {e}")),
+                    Ok(ask) => answer(ask, uid, pid, ctx),
+                    Err(e) => json(refuse(format!("bad request: {e}"))),
                 },
-                Err(e) => refuse(format!("read: {e}")),
+                Err(e) => json(refuse(format!("read: {e}"))),
             }
         }
-        None => refuse("cannot tell who is asking"),
+        None => json(refuse("cannot tell who is asking")),
     };
     let mut text = serde_json::to_string(&answer).unwrap_or_else(|_| "{\"ok\":false}".into());
     text.push('\n');

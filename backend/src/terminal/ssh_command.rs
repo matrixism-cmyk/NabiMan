@@ -9,12 +9,16 @@ use super::*;
 ///
 /// `mux`: the new session's id, so its connection can be shared (ControlMaster)
 /// by the probe that looks for Claude Code there (see claude_remote).
+///
+/// `remote`: a command for the server's shell instead of a plain login (an
+/// SSH tile that starts Claude Code there); it gets a terminal (`-t`).
 pub(super) fn build_ssh_command(
     query: &str,
     keepalive: bool,
     ka_interval: u64,
     member: Option<&crate::models::NabimanUser>,
     mux: Option<&str>,
+    remote: Option<&str>,
 ) -> Result<Option<(String, String, remote_access::RemoteBinding)>, String> {
     let (host, port, user, password, trust, binding, isolation, cert_opts): (_, _, _, _, _, _, _, Vec<String>) =
         if let Some(server_id) = parse_query_param(query, "server_id") {
@@ -113,7 +117,14 @@ pub(super) fn build_ssh_command(
         cmd.push_str(&opts);
         cmd.push(' ');
     }
+    if remote.is_some() {
+        cmd.push_str("-t ");
+    }
     cmd.push_str(&format!("-p {} -- {}@{}", port, user, host));
+    if let Some(remote) = remote {
+        cmd.push(' ');
+        cmd.push_str(&quote(remote));
+    }
 
     let hint = if using_saved_password {
         "저장된 비밀번호가 거부되면(exit 5) 서버 편집에서 비밀번호를 다시 저장하거나,          \"직접 입력\" 버튼으로 접속해 보세요."

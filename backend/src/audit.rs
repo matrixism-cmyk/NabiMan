@@ -62,6 +62,15 @@ fn compute_hash(prev_hash: &str, entry: &AuditEntry) -> String {
 pub fn append_entry(store: &AuditLog, entry: AuditEntry) -> Option<AuditEntry> {
     store.lock_safe().append(entry).ok()
 }
+/// A journal at `path`, and what it holds, for other modules' tests.
+#[cfg(test)]
+pub(crate) fn log_at(path: std::path::PathBuf) -> AuditLog {
+    Arc::new(Mutex::new(storage::State::load(path)))
+}
+#[cfg(test)]
+pub(crate) fn entries_of(log: &AuditLog) -> Vec<AuditEntry> {
+    log.lock_safe().entries.clone()
+}
 #[cfg(test)]
 #[path = "audit_append_tests.rs"]
 mod append_tests;

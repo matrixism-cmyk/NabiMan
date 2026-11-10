@@ -8,6 +8,10 @@ to a fresh session it can then message:
   nabiman-claude --dir /workspace/project --fresh "Review the open PR"   # new conversation, first message
   nabiman-claude --json --dir /workspace/project          # machine-readable answer
   nabiman-claude list                                     # every Claude session NabiMan knows, with addresses
+  nabiman-claude status review-3a --lines 40              # one tile: alive, busy/idle, model, cwd, its screen
+  nabiman-claude close review-3a [--force]                # close a tile (not your own; busy ones need --force)
+  nabiman-claude open --server gpu-01 --dir ~/x --fresh "Train"   # an SSH tile to a saved server, Claude Code there
+  nabiman-claude guide                                    # how AI sessions work together here (Korean)
 
 `list` covers this machine and the servers NabiMan's SSH tiles are connected
 to: `name [ref]` here, `bridge:<session>` on another machine (Remote Control),
@@ -18,20 +22,27 @@ The session appears among the tiles of the NabiMan account whose session ran
 this, and runs as the user who ran this (root may pass --user). It prints the
 new Claude Code's address, `name [ref]`, ready for SendMessage.
 No password or key: NabiMan asks the kernel who is calling.
+
+status/close name a tile by its title, its pty_… id, its Claude address
+(`name [ref]`, `bridge:…`) or the ref alone, among the tiles the dashboard
+shows the NabiMan account whose session runs this; close takes only that
+account's own tiles and is written to the audit log.
+See docs/orchestration/README.md for the JSON.
 """
 import argparse
 import json
 import os
 import socket
 import sys
+import time
 
 SOCKET = os.environ.get('NABIMAN_CLAUDE_SOCKET', '/run/nabiman/claude.sock')
 
 
-def ask_nabiman(ask):
+def ask_nabiman(ask, fail=None):
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
-            s.settimeout(60)
+            s.settimeout(90)
             s.connect(SOCKET)
             s.sendall((json.dumps(ask, ensure_ascii=False) + '\n').encode())
             data = b''
@@ -41,6 +52,8 @@ def ask_nabiman(ask):
                     break
                 data += part
     except OSError as e:
+        if fail is not None:
+            return fail
         sys.exit(f'nabiman-claude: cannot reach NabiMan at {SOCKET}: {e}')
     try:
         return json.loads(data.decode() or '{}')
@@ -64,10 +77,76 @@ def list_sessions(argv):
         print(f"{r['address']}\t{where}\t{state}\t{r.get('cwd', '')}\t{r.get('tile') or '-'}{note}")
 
 
+def finish(answer, as_json, show):
+    """Prints an answer (as JSON, or by `show`) and exits 0 only when it is ok."""
+    if as_json:
+        print(json.dumps(answer, ensure_ascii=False))
+    elif answer.get('ok'):
+        show(answer)
+    else:
+        print(f"nabiman-claude: {answer.get('error', 'refused')}", file=sys.stderr)
+    sys.exit(0 if answer.get('ok') else 1)
+
+
+def show_status(answer):
+    s = answer['status']
+    since = f" since {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(s['since']))}" if s.get('since') else ''
+    print(f"session: {s['title']} ({s['session_id']})  {s.get('server') or 'this machine'}  owner {s['owner']}"
+          f"{'  [lead]' if s.get('lead') else ''}")
+    print(f"state:   {s['state']}")
+    if s.get('claude'):
+        print(f"claude:  {s['claude']}  {'busy' if s['busy'] else 'idle'}{since}")
+        print(f"model:   {s.get('model') or '-'}  version {s.get('version') or '-'}  cwd {s.get('cwd') or '-'}")
+    else:
+        print('claude:  none seen in this tile')
+    for p in s.get('peers', [])[1:]:
+        print(f"also:    {p['address']}  {'busy' if p['busy'] else 'idle'}  {p.get('cwd', '')}")
+    if s.get('screen'):
+        print(f"--- last {s['lines']} lines ---")
+        print(s['screen'])
+
+
+def status(argv):
+    p = argparse.ArgumentParser(prog='nabiman-claude status', description='one tile: state, its Claude, its screen')
+    p.add_argument('who', help='title, pty_… id, Claude address `name [ref]` or ref')
+    p.add_argument('--lines', type=int, default=20, help='screen lines to show (default 20, at most 200)')
+    p.add_argument('--json', action='store_true')
+    a = p.parse_args(argv)
+    finish(ask_nabiman({'op': 'status', 'who': a.who, 'lines': a.lines}), a.json, show_status)
+
+
+def close(argv):
+    p = argparse.ArgumentParser(prog='nabiman-claude close', description='close a tile, as the dashboard does')
+    p.add_argument('who', help='title, pty_… id, Claude address `name [ref]` or ref')
+    p.add_argument('--force', action='store_true', help='even while its Claude is busy (or it is the lead)')
+    p.add_argument('--json', action='store_true')
+    a = p.parse_args(argv)
+    finish(ask_nabiman({'op': 'close', 'who': a.who, 'force': a.force}), a.json,
+           lambda r: print(f"closed: {r['closed']['title']} ({r['closed']['session_id']})"))
+
+
+def guide(argv):
+    """The guide as NabiMan carries it; the repository's copy when NabiMan is not reachable."""
+    answer = ask_nabiman({'op': 'guide'}, fail={})
+    text = answer.get('guide') if answer.get('ok') else None
+    if text is None:
+        here = os.path.dirname(os.path.realpath(__file__))
+        for path in (os.environ.get('NABIMAN_GUIDE', ''), os.path.join(here, '..', 'docs', 'orchestration', 'guide-ko.md')):
+            if path and os.path.isfile(path):
+                with open(path, encoding='utf-8') as f:
+                    text = f.read()
+                break
+    if text is None:
+        sys.exit('nabiman-claude: the guide is not reachable (NabiMan is not answering)')
+    print(text.rstrip('\n'))
+
+
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] == 'list':
-        list_sessions(sys.argv[2:])
+    sub = sys.argv[1] if len(sys.argv) > 1 else ''
+    if sub in ('list', 'status', 'close', 'guide'):
+        {'list': list_sessions, 'status': status, 'close': close, 'guide': guide}[sub](sys.argv[2:])
         return
+    argv = sys.argv[2:] if sub == 'open' else sys.argv[1:]
     p = argparse.ArgumentParser(prog='nabiman-claude', description=__doc__.split('\n')[1],
                                 formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__.split('\n', 2)[2])
     p.add_argument('prompt', nargs='*', help='first message for the new Claude Code')
@@ -76,12 +155,20 @@ def main():
     p.add_argument('--fresh', action='store_true', help='start a new conversation instead of -c (continue the last one)')
     p.add_argument('--ask-permissions', action='store_true', help='leave out --dangerously-skip-permissions')
     p.add_argument('--user', help='run as this user (root only)')
+    p.add_argument('--server', help='open: a saved server (name or id) to start Claude Code on over SSH;'
+                   ' --dir is then a directory there (absolute or ~/…)')
     p.add_argument('--no-wait', action='store_true', help="answer at once, without waiting for Claude Code's address")
     p.add_argument('--json', action='store_true', help='print the answer as JSON')
-    a = p.parse_args()
+    a = p.parse_args(argv)
+    if a.server and a.user:
+        p.error('--user is for this machine; on a saved server Claude Code runs as its saved user')
 
     ask = {'dir': os.path.abspath(a.dir), 'resume': not a.fresh, 'skip_permissions': not a.ask_permissions,
            'wait': not a.no_wait}
+    if a.server:
+        if '--dir' not in argv and not any(x.startswith('--dir=') for x in argv):
+            p.error('--server needs --dir (a directory on that server)')
+        ask.update({'op': 'open', 'server': a.server, 'dir': a.dir})
     if a.title:
         ask['title'] = a.title
     if a.user:
@@ -92,7 +179,8 @@ def main():
     if a.json:
         print(json.dumps(answer, ensure_ascii=False))
     elif answer.get('ok'):
-        print(f"session: {answer.get('title')} ({answer.get('session_id')})")
+        where = f" on {answer['server']}" if answer.get('server') else ''
+        print(f"session: {answer.get('title')} ({answer.get('session_id')}){where}")
         print(f"claude:  {answer['claude']}" if answer.get('claude') else
               'claude:  starting (its address shows in ListAgents shortly)')
     else:

@@ -10,6 +10,9 @@ pub(crate) mod claude_events;
 pub(crate) mod topology;
 mod claude_lead;
 mod claude_links;
+mod claude_control;
+mod claude_control_ops;
+mod claude_remote_start;
 mod claude_remote;
 mod claude_socket;
 mod claude_start;
@@ -52,6 +55,7 @@ use std::os::unix::io::FromRawFd;
 pub use registry::open as open_registry;
 pub(crate) use query_params::parse_query_param;
 use query_params::validate_ssh_input;
+pub(crate) use claude_control_ops::Ctx as ClaudeSocketCtx;
 pub(crate) use claude_socket::start as start_claude_socket;
 pub use session::{restore_sessions, start_pty_cleanup, PtyStore};
 pub use settings::{open as open_settings_registry, SettingsStore};
@@ -226,7 +230,7 @@ async fn ws_terminal(
     let built = {
         let (query, interval, sid) = (query.to_string(), user_settings.keepalive_interval_secs, sid.clone());
         let member = member.clone();
-        web::block(move || build_ssh_command(&query, keepalive, interval, member.as_ref(), Some(&sid)))
+        web::block(move || build_ssh_command(&query, keepalive, interval, member.as_ref(), Some(&sid), None))
             .await
             .unwrap_or_else(|_| Err("Preparing the session stopped unexpectedly".into()))
     };

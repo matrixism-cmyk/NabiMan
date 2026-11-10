@@ -227,7 +227,12 @@ async fn main() -> std::io::Result<()> {
     terminal::restore_sessions(&pty_store);
     terminal::start_pty_cleanup(pty_store.clone());
     // Local programs (Claude Code in a session) may open Claude sessions here.
-    terminal::start_claude_socket(pty_store.clone());
+    terminal::start_claude_socket(terminal::ClaudeSocketCtx {
+        store: pty_store.clone(),
+        users: user_store.clone(),
+        audit: audit_log.clone(),
+        forwarding: Some(audit_forwarding.clone()),
+    });
 
     let mec_services = mec::services::bootstrap::bootstrap(mec_mode).await;
     let mec_state = web::Data::new(
