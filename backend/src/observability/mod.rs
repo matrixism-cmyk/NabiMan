@@ -9,6 +9,7 @@ pub(crate) mod log;
 pub(crate) mod metrics;
 mod redact;
 pub(crate) mod request_log;
+pub(crate) mod self_check;
 
 use actix_web::web;
 

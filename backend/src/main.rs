@@ -240,6 +240,12 @@ async fn serve() -> std::io::Result<()> {
     let pty_store = terminal_registry.store.clone();
     terminal::restore_sessions(&pty_store);
     terminal::start_pty_cleanup(pty_store.clone());
+    observability::self_check::start(observability::self_check::Sources {
+        channels: channel_store.clone(),
+        audit: audit_log.clone(),
+        backups: schedule_store.clone(),
+        sessions: pty_store.clone(),
+    });
     // Local programs (Claude Code in a session) may open Claude sessions here.
     terminal::start_claude_socket(terminal::ClaudeSocketCtx {
         store: pty_store.clone(),
