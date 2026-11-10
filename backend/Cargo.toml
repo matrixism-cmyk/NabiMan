@@ -3,6 +3,8 @@ name = "nabiman-server"
 version = "0.1.0"
 edition = "2021"
 default-run = "nabiman-server"
+# Proprietary: never published (cargo-deny skips its own licence check).
+publish = false
 
 [dependencies]
 # TLS/HTTP2 terminates at the deployment proxy; the backend uses HTTP/1 + WebSocket.

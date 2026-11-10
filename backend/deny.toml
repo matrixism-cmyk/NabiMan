@@ -1,0 +1,66 @@
+# cargo-deny: known vulnerabilities, unmaintained crates, licences and
+# sources of the backend's dependencies. CI runs `cargo deny check` (see
+# .github/workflows/ci.yml). Each ignore below is a crate that is known to be
+# unmaintained, reaches us only through kube, and has a replacement plan in
+# docs/security/dependencies.md; drop the entry when the crate is gone.
+
+[graph]
+all-features = false
+
+[advisories]
+version = 2
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "deny"
+# Unmaintained crates fail the check when we depend on them directly;
+# transitive ones are listed in the dependency document instead.
+unmaintained = "workspace"
+ignore = [
+    { id = "RUSTSEC-2024-0384", reason = "instant: unmaintained, via backoff <- kube-runtime 0.95; goes with the kube upgrade" },
+    { id = "RUSTSEC-2024-0388", reason = "derivative: unmaintained, via kube-runtime 0.95; goes with the kube upgrade" },
+    { id = "RUSTSEC-2025-0012", reason = "backoff: unmaintained, via kube-runtime 0.95; goes with the kube upgrade" },
+]
+
+[licenses]
+version = 2
+confidence-threshold = 0.9
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "MPL-2.0",
+    "OpenSSL",
+    "Unlicense",
+    "0BSD",
+    "BSL-1.0",
+    "CDLA-Permissive-2.0",
+]
+
+# NabiMan itself is proprietary and never published.
+[licenses.private]
+ignore = true
+
+[[licenses.clarify]]
+crate = "jsonpath-rust"
+expression = "MIT"
+license-files = [{ path = "LICENSE", hash = 0xd9f39bfe }]
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+allow-wildcard-paths = true
+deny = [
+    # Two TLS stacks would double what has to be kept patched.
+    { crate = "openssl-sys", reason = "TLS is rustls (ring) only" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

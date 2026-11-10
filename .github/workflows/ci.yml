@@ -26,6 +26,17 @@ jobs:
         working-directory: backend
         run: cargo build --release --locked
 
+  backend-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Advisories, unmaintained crates, licences and sources (backend/deny.toml).
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: backend/Cargo.toml
+          command: check
+          arguments: --locked
+
   frontend-build:
     runs-on: ubuntu-latest
     steps:
