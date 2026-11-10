@@ -54,6 +54,7 @@ pub(super) const ROUTES: &[Route] = &[
     r("/api/backup/schedules", Admin, M::No),
     r("/api/backup/schedules/{id}", Admin, M::No),
     r("/api/backup/schedules/{id}/run", Admin, M::No),
+    r("/api/branding", Operate, M::No),
     r("/api/config/services", Read, M::No),
     r("/api/config/{service_id}", Admin, M::No),
     r("/api/config/{service_id}/diff", Admin, M::No),

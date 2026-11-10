@@ -11,6 +11,7 @@ mod audit_middleware;
 mod auth;
 mod auth_gate;
 mod backup;
+mod branding;
 mod charts;
 mod cli_args;
 mod config_manager;

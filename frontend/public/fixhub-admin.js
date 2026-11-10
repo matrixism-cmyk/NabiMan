@@ -1,9 +1,14 @@
 /* Locally controlled feedback launcher. No external script runs in NabiMan's document.
- * The optional panel is loaded only after a verified administrator clicks the button. */
+ * The optional panel is loaded only after a verified administrator clicks the button.
+ * Off unless the install configures it: the web app adds this script only when
+ * GET /api/branding names a feedback widget, with its origin and site id as
+ * data-origin and data-site on the script element. */
 (function () {
   'use strict';
-  var origin = 'https://fix.bebo.kr';
-  var site = 'fs_4oAGj2jt6Dgzp61MFo0uTq7_';
+  var me = document.currentScript;
+  var origin = me && me.getAttribute('data-origin');
+  var site = me && me.getAttribute('data-site');
+  if (!origin || !site || !/^https?:\/\/[^/?#]+$/.test(origin)) return;
   var checked = null, actor = null, button = null, panel = null, frame = null;
   // Where the launcher sits, as distances from the right and bottom edges; it can be dragged anywhere.
   var POS_KEY = 'nabiman_feedback_pos', EDGE = 8, dragged = false;

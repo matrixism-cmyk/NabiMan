@@ -5,6 +5,7 @@ use actix_web::web;
 
 pub(crate) fn configure(cfg: &mut web::ServiceConfig) {
     crate::auth::config(cfg);
+    crate::branding::config(cfg);
     crate::external_identities::config(cfg);
     crate::users::config(cfg);
     crate::scope_settings::config(cfg);

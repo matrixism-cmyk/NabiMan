@@ -52,7 +52,7 @@ const fs=require('fs');const path=require('path');const {chromium}=require('play
   check(errors.length===0,'Browser exception: '+errors.join('; ').slice(0,500));
   check(external.length===0,'Unexpected external request origins: '+[...new Set(external.map(url=>new URL(url).origin))].join(', '));
   // Mock the external origin: verify the boundary without sending a real report.
-  await page.route('https://fix.bebo.kr/**', route=>route.fulfill({contentType:'text/html',body:`<script>
+  await page.route('https://feedback.invalid/**', route=>route.fulfill({contentType:'text/html',body:`<script>
     window.replies=[]; window.parentBlocked=false;
     try { parent.sessionStorage.getItem('nabiman_token'); } catch (_) { window.parentBlocked=true; }
     addEventListener('message',e=>window.replies.push(e.data));

@@ -77,7 +77,7 @@ export default function ClaudeStartDialog({ onClose, onStart }: Props) {
         <label>
           <span>{t('claudeStart.dir')}</span>
           <input className="filter-input" list={listId} value={dir} onChange={e => setDir(e.target.value)}
-            placeholder="/workspace/project" autoComplete="off" spellCheck={false} required />
+            placeholder="/srv/project" autoComplete="off" spellCheck={false} required />
           <datalist id={listId}>
             {places.map(p => <option key={p.dir} value={p.dir} />)}
           </datalist>

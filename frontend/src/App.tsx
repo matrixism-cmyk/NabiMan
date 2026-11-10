@@ -26,6 +26,7 @@ import { apiPost, clearToken, hasSession, useApi } from './shared/api/useApi';
 import { useT } from './i18n';
 import { ThemeProvider, ThemeSelector } from './shared/theme';
 import { ErrorBoundary } from './shared/ui/ErrorBoundary';
+import { injectFeedbackWidget, useBranding } from './shared/branding/branding';
 
 /** Parse the URL hash (#category/tab) into a valid cat/tab pair, or null. */
 function parseHash(): { cat: Category; tab: Tab } | null {
@@ -158,6 +159,12 @@ function App() {
     try { await request; } catch { /* local logout completes even if offline */ }
   };
   const idle = useIdleLogout(Boolean(loggedIn && currentUser), handleLogout);
+  // The install's branding: its name, and a feedback widget for administrators when one is configured.
+  const branding = useBranding(Boolean(full));
+  useEffect(() => {
+    if (currentUser?.role === 'admin' && !scoped) injectFeedbackWidget(branding?.feedback_widget ?? null);
+    if (branding?.product_name) document.title = branding.product_name;
+  }, [branding, currentUser?.role, scoped]);
   const handleNavigate = (tab: Tab) => { setActiveCat('mec'); setActiveTab(tab); };
   const navigateTo = (cat: Category, tab: Tab) => { setActiveCat(cat); setActiveTab(tab); };
   const handleCatClick = (cat: CatDef) => {

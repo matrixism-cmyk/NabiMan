@@ -8,7 +8,7 @@ with tempfile.TemporaryDirectory(prefix='nb-support-') as temporary:
     directory=pathlib.Path(temporary);(directory/'tmux').mkdir()
     with socket.socket() as sock:sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
     password='CANARY_PRIVATE_PASSWORD_123'
-    env=dict(os.environ,NABIMAN_PORT=str(port),NABIMAN_DATA_DIR=str(directory/'auth'),NABIMAN_MEC_DB=str(directory/'mec.db'),NABIMAN_MEC_MODE='mock',NABIMAN_STATIC=str(ROOT/'frontend/build'),NABIMAN_PASSWORD=password,TMUX_TMPDIR=str(directory/'tmux'),NABIMAN_SUPPORT_CANARY='CANARY_ENVIRONMENT_SECRET')
+    env=dict(os.environ,NABIMAN_CONFIG='none',NABIMAN_FEEDBACK_ORIGIN='https://feedback.invalid',NABIMAN_FEEDBACK_SITE='smoke',NABIMAN_PORT=str(port),NABIMAN_DATA_DIR=str(directory/'auth'),NABIMAN_MEC_DB=str(directory/'mec.db'),NABIMAN_MEC_MODE='mock',NABIMAN_STATIC=str(ROOT/'frontend/build'),NABIMAN_PASSWORD=password,TMUX_TMPDIR=str(directory/'tmux'),NABIMAN_SUPPORT_CANARY='CANARY_ENVIRONMENT_SECRET')
     base=f'http://127.0.0.1:{port}'
     with (directory/'server.log').open('w') as log:
         server=subprocess.Popen([str(BINARY)],env=env,cwd=directory,stdout=log,stderr=log)

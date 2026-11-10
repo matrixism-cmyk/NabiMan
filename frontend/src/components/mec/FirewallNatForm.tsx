@@ -128,7 +128,7 @@ export default function FirewallNatForm({
               required
               value={form.public_ip}
               onChange={(e) => setForm({ ...form, public_ip: e.target.value })}
-              placeholder="121.147.13.246"
+              placeholder="203.0.113.10"
             />
           ) : (
             <select
@@ -155,7 +155,7 @@ export default function FirewallNatForm({
             required
             value={form.private_ip}
             onChange={(e) => setForm({ ...form, private_ip: e.target.value })}
-            placeholder="172.20.26.199"
+            placeholder="10.0.0.10"
           />
         </label>
         <label>

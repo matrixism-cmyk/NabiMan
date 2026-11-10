@@ -15,10 +15,10 @@ import SeverityRollup from './noc/SeverityRollup';
 import NocNodeWall from './noc/NocNodeWall';
 import NocAttentionQueue from './noc/NocAttentionQueue';
 import NocAlertMarquee from './noc/NocAlertMarquee';
+import { useBranding } from '../../shared/branding/branding';
 
 const REFRESH = 10_000;
 const STALE_MS = 40_000;
-const OWNER = 'the@aeokorea.com';
 
 interface Props {
   onNavigate?: (tab: string) => void;
@@ -42,6 +42,8 @@ function PlaceholderBand({ title, hint }: { title: string; hint: string }) {
 }
 
 export default function MecNocPanel({ onNavigate, onEnterFocus }: Props) {
+  // The on-call contact shown in the alert band: the install's (NABIMAN_NOC_CONTACT), if any.
+  const branding = useBranding(true);
   const { t } = useT();
   // Primary: one shared server-pushed stream (all walls share a single kube poll
   // set). Fallback: if the stream can't hold a connection, poll /live directly.
@@ -189,7 +191,7 @@ export default function MecNocPanel({ onNavigate, onEnterFocus }: Props) {
               ]} />
           </Section>
 
-          <div style={{ marginTop: '16px' }}><NocAlertMarquee items={items} owner={OWNER} /></div>
+          <div style={{ marginTop: '16px' }}><NocAlertMarquee items={items} owner={branding?.noc_contact ?? undefined} /></div>
         </div>
       )}
     </PanelLayout>

@@ -14,8 +14,10 @@
 //! - connections to this origin, its WebSocket (`ws:`/`wss:` on the same
 //!   host, spelled out for browsers whose `'self'` does not cover them) and
 //!   `blob:`; workers from this origin or `blob:` (pdf.js);
-//! - frames from this origin and https://fix.bebo.kr (the feedback panel the
-//!   admin launcher in public/fixhub-admin.js opens);
+//! - frames from this origin, and from the feedback panel's origin when the
+//!   install has a feedback widget (`branding`, `NABIMAN_FEEDBACK_ORIGIN`;
+//!   none on a new install), plus its launcher's origin in `script-src` when
+//!   that is not the bundled /fixhub-admin.js;
 //! - `frame-ancestors 'self'`, `object-src 'none'`, `base-uri 'self'`,
 //!   `form-action 'self'`.
 //!
@@ -32,7 +34,6 @@ use std::future::{ready, Future, Ready};
 use std::pin::Pin;
 use std::rc::Rc;
 
-const FEEDBACK_ORIGIN: &str = "https://fix.bebo.kr";
 const HSTS: &str = "max-age=31536000; includeSubDomains";
 
 /// A Host header fit to be written into the policy.
@@ -42,18 +43,21 @@ fn plain_host(host: &str) -> Option<&str> {
 }
 
 /// The Content-Security-Policy for a request to `host`, or `None` when
-/// switched off (`setting` is `NABIMAN_CSP`).
-pub(crate) fn policy(setting: Option<&str>, host: Option<&str>) -> Option<String> {
+/// switched off (`setting` is `NABIMAN_CSP`); `widget` is the feedback widget.
+pub(crate) fn policy(setting: Option<&str>, host: Option<&str>, widget: Option<&crate::branding::FeedbackWidget>) -> Option<String> {
     match setting.map(str::trim) {
         Some(off) if off.eq_ignore_ascii_case("off") => return None,
         Some(custom) if !custom.is_empty() => return Some(custom.to_string()),
         _ => {}
     }
     let sockets = host.and_then(plain_host).map(|h| format!(" ws://{h} wss://{h}")).unwrap_or_default();
+    let (frame, script) = crate::branding::csp_sources(widget);
+    let frames = frame.map(|o| format!(" {o}")).unwrap_or_default();
+    let scripts = script.map(|o| format!(" {o}")).unwrap_or_default();
     Some(format!(
-        "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; \
+        "default-src 'self'; script-src 'self'{scripts} 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; \
          img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; \
-         connect-src 'self'{sockets} blob:; worker-src 'self' blob:; frame-src 'self' {FEEDBACK_ORIGIN}; \
+         connect-src 'self'{sockets} blob:; worker-src 'self' blob:; frame-src 'self'{frames}; \
          frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
     ))
 }
@@ -104,7 +108,7 @@ where
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let host = req.headers().get("host").and_then(|h| h.to_str().ok()).map(str::to_owned);
-        let csp = policy(std::env::var("NABIMAN_CSP").ok().as_deref(), host.as_deref());
+        let csp = policy(std::env::var("NABIMAN_CSP").ok().as_deref(), host.as_deref(), crate::branding::feedback());
         // NabiMan speaks plain HTTP itself; HTTPS ends at the proxy, whose word
         // is taken only when it is trusted (actix's connection_info believes anyone).
         let https = crate::trusted_proxy::forwarded_https(
@@ -146,12 +150,12 @@ mod tests {
 
     #[test]
     fn the_policy_covers_what_the_spa_needs_and_closes_the_rest() {
-        let p = policy(None, Some("nabiman.example:8443")).unwrap();
+        let p = policy(None, Some("nabiman.example:8443"), None).unwrap();
         for part in [
             "default-src 'self'",
             "script-src 'self' 'wasm-unsafe-eval' blob:",
             "connect-src 'self' ws://nabiman.example:8443 wss://nabiman.example:8443 blob:",
-            "frame-src 'self' https://fix.bebo.kr",
+            "frame-src 'self';",
             "frame-ancestors 'self'",
             "object-src 'none'",
             "base-uri 'self'",
@@ -161,10 +165,23 @@ mod tests {
         }
         assert!(!p.contains("'unsafe-eval'") && !p.contains("script-src 'self' 'unsafe-inline'"));
         // A Host header cannot write directives into the policy.
-        let p = policy(None, Some("evil; script-src *")).unwrap();
+        let p = policy(None, Some("evil; script-src *"), None).unwrap();
         assert!(p.contains("connect-src 'self' blob:") && !p.contains("evil"));
-        assert_eq!(policy(Some("off"), None), None);
-        assert_eq!(policy(Some("default-src 'none'"), None).as_deref(), Some("default-src 'none'"));
+        assert_eq!(policy(Some("off"), None, None), None);
+        assert_eq!(policy(Some("default-src 'none'"), None, None).as_deref(), Some("default-src 'none'"));
+    }
+
+    #[test]
+    fn a_feedback_widget_adds_only_its_own_origins() {
+        use crate::branding::FeedbackWidget;
+        let bundled = FeedbackWidget { script_url: "/fixhub-admin.js".into(), origin: "https://feedback.example".into(), site: "s".into() };
+        let p = policy(None, Some("n.example"), Some(&bundled)).unwrap();
+        assert!(p.contains("frame-src 'self' https://feedback.example;"), "{p}");
+        assert!(p.contains("script-src 'self' 'wasm-unsafe-eval' blob:"), "{p}");
+        let hosted = FeedbackWidget { script_url: "https://cdn.example/w.js".into(), ..bundled };
+        let p = policy(None, Some("n.example"), Some(&hosted)).unwrap();
+        assert!(p.contains("script-src 'self' https://cdn.example 'wasm-unsafe-eval' blob:"), "{p}");
+        assert!(!p.contains("fix.bebo.kr"));
     }
 
     #[test]
