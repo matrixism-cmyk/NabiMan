@@ -116,10 +116,12 @@ package install/remove, `/api/vhost` writes, `/api/config/*` writes,
   helper's sandbox must be relaxed for system operations (see
   `packaging/nabiman-privileged-helper.service.d/system-operations.conf`).
 
-## Found on the way (not changed: root mode is kept as it was)
+## Found on the way
 
-- `updates.rs::upgrade_package` and `packages.rs` accept a package name that
-  starts with `-` (e.g. `--allow-unauthenticated`): an option reaches
-  `apt`/`dnf` in root mode. The helper refuses such names.
+- Fixed: `updates.rs::upgrade_package` and `packages.rs` accepted a package
+  name that starts with `-` (e.g. `--allow-unauthenticated`), so an option
+  reached `apt`/`dnf` in root mode. Both now use the helper's validator
+  (`system_ops::valid_package`) and put `--` before the name (and before a
+  search query).
 - `firewall.rs::add_rule` with firewalld ignores `deny` and opens the port.
   The helper refuses `deny` on firewalld.

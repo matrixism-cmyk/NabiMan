@@ -68,11 +68,12 @@ async fn list_installed() -> HttpResponse {
 
 #[post("/api/packages/search")]
 async fn search_package(body: web::Json<SearchRequest>) -> HttpResponse {
-    // Validate query: alphanumeric, hyphen, underscore, dot only
-    if !body
-        .query
-        .chars()
-        .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.')
+    // Validate query: alphanumeric, hyphen, underscore, dot only, and not an option
+    if body.query.starts_with('-')
+        || !body
+            .query
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.')
     {
         return HttpResponse::BadRequest().json(ApiResponse::<()>::error("Invalid search query"));
     }
@@ -81,10 +82,10 @@ async fn search_package(body: web::Json<SearchRequest>) -> HttpResponse {
 
     let output = match pm {
         Some("apt-get") => Command::new("apt-cache")
-            .args(["search", &body.query])
+            .args(["search", "--", &body.query])
             .output_off_thread(deadline::PACKAGE_QUERY).await,
         Some(yum_or_dnf) => Command::new(yum_or_dnf)
-            .args(["search", &body.query])
+            .args(["search", "--", &body.query])
             .output_off_thread(deadline::PACKAGE_QUERY).await,
         _ => {
             return HttpResponse::Ok().json(ApiResponse::<()>::error(
@@ -132,11 +133,11 @@ async fn install_package(body: web::Json<PackageRequest>) -> HttpResponse {
 
     let output = match pm {
         "apt-get" => Command::new("apt-get")
-            .args(["install", "-y", &body.name])
+            .args(package_args("install", &body.name))
             .env("DEBIAN_FRONTEND", "noninteractive")
             .output_off_thread(deadline::PACKAGE).await,
         yum_or_dnf => Command::new(yum_or_dnf)
-            .args(["install", "-y", &body.name])
+            .args(package_args("install", &body.name))
             .output_off_thread(deadline::PACKAGE).await,
     };
 
@@ -173,11 +174,11 @@ async fn remove_package(body: web::Json<PackageRequest>) -> HttpResponse {
 
     let output = match pm {
         "apt-get" => Command::new("apt-get")
-            .args(["remove", "-y", &body.name])
+            .args(package_args("remove", &body.name))
             .env("DEBIAN_FRONTEND", "noninteractive")
             .output_off_thread(deadline::PACKAGE).await,
         yum_or_dnf => Command::new(yum_or_dnf)
-            .args(["remove", "-y", &body.name])
+            .args(package_args("remove", &body.name))
             .output_off_thread(deadline::PACKAGE).await,
     };
 
@@ -197,12 +198,16 @@ async fn remove_package(body: web::Json<PackageRequest>) -> HttpResponse {
     }
 }
 
+/// One rule with the helper: starts with a letter or digit (never an
+/// option such as `--allow-unauthenticated`), then `[A-Za-z0-9-_.+:]`.
 fn validate_package_name(name: &str) -> bool {
-    !name.is_empty()
-        && name.len() < 128
-        && name
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.' || c == '+')
+    nabiman_server::privileged::system_ops::valid_package(name)
+}
+
+/// The argv after the program to install or remove one package (`verb`);
+/// `--` ends the options, so the name is only ever read as a name.
+fn package_args<'a>(verb: &'a str, name: &'a str) -> [&'a str; 4] {
+    [verb, "-y", "--", name]
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {
@@ -210,4 +215,28 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         .service(search_package)
         .service(install_package)
         .service(remove_package);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_package_name_is_never_an_option() {
+        for bad in ["--allow-unauthenticated", "-oAPT::Get::AllowUnauthenticated=1", "-y", "./evil.deb", "/tmp/x.rpm", "nginx curl", "nginx;id", "", "가나"] {
+            assert!(!validate_package_name(bad), "{bad}");
+        }
+        for good in ["nginx", "g++-12", "libssl3:amd64", "python3.12", "lib_foo"] {
+            assert!(validate_package_name(good), "{good}");
+        }
+        assert!(validate_package_name(&"a".repeat(128)) && !validate_package_name(&"a".repeat(129)));
+        // The same rule the helper applies.
+        assert_eq!(validate_package_name("-x"), nabiman_server::privileged::system_ops::valid_package("-x"));
+    }
+
+    #[test]
+    fn install_and_remove_end_the_options_before_the_name() {
+        assert_eq!(package_args("install", "nginx"), ["install", "-y", "--", "nginx"]);
+        assert_eq!(package_args("remove", "nginx"), ["remove", "-y", "--", "nginx"]);
+    }
 }

@@ -220,9 +220,9 @@ pub fn plan(operation: &Operation, tools: &Tools) -> Result<Plan, String> {
                 (Operation::PackageUpgrade { package: None }, "apt") => (vec![step(pm, &["upgrade", "-y"])], deadline::SYSTEM_UPGRADE),
                 (Operation::PackageUpgrade { package: None }, "dnf") => (vec![step(pm, &["upgrade", "-y"])], deadline::SYSTEM_UPGRADE),
                 (Operation::PackageUpgrade { package: None }, _) => (vec![step(pm, &["update", "-y"])], deadline::SYSTEM_UPGRADE),
-                (Operation::PackageUpgrade { package: Some(name) }, "apt") => (vec![step(pm, &["install", "--only-upgrade", "-y", name])], deadline::PACKAGE),
-                (Operation::PackageUpgrade { package: Some(name) }, "dnf") => (vec![step(pm, &["upgrade", "-y", name])], deadline::PACKAGE),
-                (Operation::PackageUpgrade { package: Some(name) }, _) => (vec![step(pm, &["update", "-y", name])], deadline::PACKAGE),
+                (Operation::PackageUpgrade { package: Some(name) }, "apt") => (vec![step(pm, &["install", "--only-upgrade", "-y", "--", name])], deadline::PACKAGE),
+                (Operation::PackageUpgrade { package: Some(name) }, "dnf") => (vec![step(pm, &["upgrade", "-y", "--", name])], deadline::PACKAGE),
+                (Operation::PackageUpgrade { package: Some(name) }, _) => (vec![step(pm, &["update", "-y", "--", name])], deadline::PACKAGE),
                 _ => unreachable!("package operations only"),
             };
             Ok(Plan { backend, steps, deadline, tail: true })

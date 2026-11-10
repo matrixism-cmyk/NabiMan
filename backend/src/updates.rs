@@ -164,12 +164,8 @@ struct UpgradePackageRequest {
 
 async fn upgrade_package(req: HttpRequest, client: web::Data<Client>, body: web::Json<UpgradePackageRequest>) -> HttpResponse {
     let name = &body.name;
-    if name.is_empty()
-        || name.len() > 128
-        || !name
-            .chars()
-            .all(|c| c.is_alphanumeric() || "-_.+:".contains(c))
-    {
+    // The helper's rule: a name, never an option (no leading '-').
+    if !nabiman_server::privileged::system_ops::valid_package(name) {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid package name"));
     }
     if crate::run_mode::is_service() {
@@ -179,19 +175,15 @@ async fn upgrade_package(req: HttpRequest, client: web::Data<Client>, body: web:
         Some(m) => m,
         None => return HttpResponse::Ok().json(ApiResponse::<String>::error("No package manager")),
     };
-    let result = match mgr {
-        "apt" => std::process::Command::new("apt")
-            .args(["install", "--only-upgrade", "-y", name])
-            .env("DEBIAN_FRONTEND", "noninteractive")
-            .output_off_thread(deadline::PACKAGE).await,
-        "dnf" => std::process::Command::new("dnf")
-            .args(["upgrade", "-y", name])
-            .output_off_thread(deadline::PACKAGE).await,
-        "yum" => std::process::Command::new("yum")
-            .args(["update", "-y", name])
-            .output_off_thread(deadline::PACKAGE).await,
-        _ => return HttpResponse::Ok().json(ApiResponse::<String>::error("Unsupported")),
+    let Some(args) = upgrade_one_args(mgr, name) else {
+        return HttpResponse::Ok().json(ApiResponse::<String>::error("Unsupported"));
     };
+    let mut command = std::process::Command::new(mgr);
+    command.args(&args);
+    if mgr == "apt" {
+        command.env("DEBIAN_FRONTEND", "noninteractive");
+    }
+    let result = command.output_off_thread(deadline::PACKAGE).await;
     match result {
         Ok(o) => {
             let combined = format!(
@@ -211,6 +203,17 @@ async fn upgrade_package(req: HttpRequest, client: web::Data<Client>, body: web:
     }
 }
 
+/// The argv after the program for upgrading one package; `--` ends the
+/// options, so the name is only ever read as a name.
+fn upgrade_one_args<'a>(mgr: &str, name: &'a str) -> Option<Vec<&'a str>> {
+    match mgr {
+        "apt" => Some(vec!["install", "--only-upgrade", "-y", "--", name]),
+        "dnf" => Some(vec!["upgrade", "-y", "--", name]),
+        "yum" => Some(vec!["update", "-y", "--", name]),
+        _ => None,
+    }
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/updates")
@@ -218,4 +221,17 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("/upgrade", web::post().to(run_upgrade))
             .route("/upgrade-package", web::post().to(upgrade_package)),
     );
+}
+
+#[cfg(test)]
+mod package_name_tests {
+    use super::upgrade_one_args;
+
+    #[test]
+    fn one_package_is_upgraded_by_name_after_the_end_of_options() {
+        assert_eq!(upgrade_one_args("apt", "nginx").unwrap(), ["install", "--only-upgrade", "-y", "--", "nginx"]);
+        assert_eq!(upgrade_one_args("dnf", "nginx").unwrap(), ["upgrade", "-y", "--", "nginx"]);
+        assert_eq!(upgrade_one_args("yum", "nginx").unwrap(), ["update", "-y", "--", "nginx"]);
+        assert!(upgrade_one_args("pacman", "nginx").is_none());
+    }
 }

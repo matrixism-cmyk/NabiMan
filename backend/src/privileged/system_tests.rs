@@ -191,7 +191,7 @@ fn each_operation_is_a_fixed_argv_for_the_backend_found() {
     assert!(system_ops::plan(&Operation::FirewallDelete { number: 3 }, &firewalld).is_err());
     let one = Operation::PackageUpgrade { package: Some("nginx".into()) };
     let plan = system_ops::plan(&one, &tools()).unwrap();
-    assert_eq!(argv(&plan), [["/usr/bin/apt-get", "install", "--only-upgrade", "-y", "nginx"]]);
+    assert_eq!(argv(&plan), [["/usr/bin/apt-get", "install", "--only-upgrade", "-y", "--", "nginx"]]);
     assert!(plan.tail && plan.deadline == crate::bounded_command::deadline::PACKAGE);
     let none = Tools { firewall: None, packages: None };
     assert!(system_ops::plan(&Operation::FirewallStatus {}, &none).is_err());
