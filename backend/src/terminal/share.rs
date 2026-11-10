@@ -6,6 +6,7 @@
 //! password, an optional read-only flag, and can be revoked at any time. The
 //! link itself is the secret — 64 hex characters from the system RNG — and the
 //! password, when set, is stored as a bcrypt hash.
+use crate::lock_safe::LockExt;
 
 #[path = "share_admission.rs"]
 mod admission;
@@ -291,7 +292,7 @@ async fn share_info(
         }
     };
     let tmux_name = {
-        let map = store.lock().unwrap();
+        let map = store.lock_safe();
         map.get(&link.session_id)
             .filter(|s| s.owned_by(&link.owner_id) && super::remote_access::allowed(s))
             .map(|s| s.tmux_name.clone())

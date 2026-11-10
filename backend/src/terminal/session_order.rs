@@ -2,6 +2,7 @@
 //! set by dragging, or one of the sorts. It is kept on the server so a
 //! phone and a desktop show the same order.
 
+use crate::lock_safe::LockExt;
 use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -85,7 +86,7 @@ async fn get_order(req: HttpRequest) -> HttpResponse {
     let Some(user) = crate::auth::verified_user_id(&req).filter(|u| !u.is_empty()) else {
         return HttpResponse::Unauthorized().json(ApiResponse::<()>::error("Not signed in"));
     };
-    let map = store().lock().unwrap_or_else(|e| e.into_inner());
+    let map = store().lock_safe();
     HttpResponse::Ok().json(ApiResponse::ok(map.get(&user).cloned().unwrap_or_default()))
 }
 
@@ -93,11 +94,11 @@ async fn put_order(req: HttpRequest, body: web::Json<Order>, sessions: web::Data
     let Some(user) = crate::auth::verified_user_id(&req).filter(|u| !u.is_empty()) else {
         return HttpResponse::Unauthorized().json(ApiResponse::<()>::error("Not signed in"));
     };
-    let known: HashSet<String> = sessions.lock().unwrap().keys().cloned().collect();
+    let known: HashSet<String> = sessions.lock_safe().keys().cloned().collect();
     let Some(order) = clean(body.into_inner(), &known) else {
         return HttpResponse::Ok().json(ApiResponse::<()>::error("Invalid order"));
     };
-    let mut map = store().lock().unwrap_or_else(|e| e.into_inner());
+    let mut map = store().lock_safe();
     let mut next = map.clone();
     next.insert(user, order.clone());
     match save(&next) {

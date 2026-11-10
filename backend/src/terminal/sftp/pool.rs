@@ -10,6 +10,7 @@
 //! so that opening a folder does not mean a fresh SSH handshake, and closed
 //! after a while of not being used.
 
+use crate::lock_safe::LockExt;
 use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -36,7 +37,7 @@ pub(crate) struct Conn {
 
 impl Conn {
     fn alive(&self) -> bool {
-        let mut child = self.child.lock().unwrap_or_else(|e| e.into_inner());
+        let mut child = self.child.lock_safe();
         matches!(child.try_wait(), Ok(None))
     }
     fn idle(&self) -> bool {
@@ -79,7 +80,7 @@ fn sweep(map: &mut HashMap<String, Arc<Conn>>) {
 pub(crate) async fn session(user_id: &str, srv: &RemoteServer) -> Result<Arc<Conn>, String> {
     let key = key(user_id, srv);
     {
-        let mut map = pool().lock().unwrap_or_else(|e| e.into_inner());
+        let mut map = pool().lock_safe();
         sweep(&mut map);
         if let Some(conn) = map.get(&key) {
             conn.touch();
@@ -88,8 +89,7 @@ pub(crate) async fn session(user_id: &str, srv: &RemoteServer) -> Result<Arc<Con
     }
     let conn = Arc::new(open(srv).await?);
     pool()
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
+        .lock_safe()
         .insert(key, conn.clone());
     Ok(conn)
 }
@@ -97,8 +97,7 @@ pub(crate) async fn session(user_id: &str, srv: &RemoteServer) -> Result<Arc<Con
 /// Drops the operator's connection to `srv`, after it broke mid-request.
 pub(crate) fn forget(user_id: &str, srv: &RemoteServer) {
     pool()
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
+        .lock_safe()
         .remove(&key(user_id, srv));
 }
 

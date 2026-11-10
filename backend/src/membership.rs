@@ -1,4 +1,5 @@
 //! Local approval and membership administration. External roles never grant these rights.
+use crate::lock_safe::LockExt;
 use crate::extension_points::ExtensionPoints;
 use crate::models::{AccountStatus, ApiResponse, Membership, NabimanUser, ScopeKind, UserRole};
 use crate::users::{commit_users, generate_id, UserStore};
@@ -118,7 +119,7 @@ async fn register(
         Ok(h) => h,
         Err(_) => return error("가입 처리 실패"),
     };
-    let mut users = store.lock().unwrap();
+    let mut users = store.lock_safe();
     if users.iter().any(|u| u.username == body.username) {
         return error("이미 사용 중인 아이디입니다");
     }
@@ -189,7 +190,7 @@ async fn review(
             return error("같은 소속을 중복 지정할 수 없습니다");
         }
     }
-    let mut users = store.lock().unwrap();
+    let mut users = store.lock_safe();
     let Some(index) = users.iter().position(|u| u.id == *id) else {
         return error("회원을 찾을 수 없습니다");
     };
@@ -246,7 +247,7 @@ async fn member(
     if let Err(r) = validate_scope(&req, m) {
         return r;
     }
-    let mut users = store.lock().unwrap();
+    let mut users = store.lock_safe();
     let Some(index) = users.iter().position(|u| u.username == body.username) else {
         return error("회원을 찾을 수 없습니다");
     };

@@ -1,4 +1,4 @@
-use crate::models::ApiResponse;
+use crate::{lock_safe::LockExt, models::ApiResponse};
 use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
 
@@ -239,13 +239,13 @@ async fn renew_certificate(body: web::Json<RenewRequest>) -> HttpResponse {
     }
     let jobs = renew_jobs();
     // Check if already running
-    if let Some(job) = jobs.lock().unwrap().get(&domain) {
+    if let Some(job) = jobs.lock_safe().get(&domain) {
         if job.status == "running" {
             return HttpResponse::Ok().json(ApiResponse::ok(job.clone()));
         }
     }
     // Start background renewal
-    jobs.lock().unwrap().insert(
+    jobs.lock_safe().insert(
         domain.clone(),
         RenewStatus {
             domain: domain.clone(),
@@ -304,7 +304,7 @@ async fn renew_certificate(body: web::Json<RenewRequest>) -> HttpResponse {
 async fn renew_status(path: web::Path<String>) -> HttpResponse {
     let domain = path.into_inner();
     let jobs = renew_jobs();
-    match jobs.lock().unwrap().get(&domain) {
+    match jobs.lock_safe().get(&domain) {
         Some(job) => HttpResponse::Ok().json(ApiResponse::ok(job.clone())),
         None => HttpResponse::Ok().json(ApiResponse::<RenewStatus>::error("No renewal job found")),
     }
@@ -326,12 +326,12 @@ async fn issue_certificate(body: web::Json<IssueRequest>) -> HttpResponse {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid domain"));
     }
     let jobs = renew_jobs();
-    if let Some(job) = jobs.lock().unwrap().get(&domain) {
+    if let Some(job) = jobs.lock_safe().get(&domain) {
         if job.status == "running" {
             return HttpResponse::Ok().json(ApiResponse::ok(job.clone()));
         }
     }
-    jobs.lock().unwrap().insert(
+    jobs.lock_safe().insert(
         domain.clone(),
         RenewStatus {
             domain: domain.clone(),

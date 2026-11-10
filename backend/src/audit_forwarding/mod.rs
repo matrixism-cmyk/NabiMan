@@ -1,4 +1,5 @@
 //! Durable HTTPS forwarding, separate from the local request journal.
+use crate::lock_safe::LockExt;
 mod api;
 mod store;
 #[cfg(test)]
@@ -112,13 +113,13 @@ impl Forwarder {
         &self,
         operation: impl FnOnce(&mut Store) -> Result<T, Error>,
     ) -> Result<T, Error> {
-        if let Some(error) = *self.0.failure.lock().unwrap() {
+        if let Some(error) = *self.0.failure.lock_safe() {
             return Err(error);
         }
-        let mut guard = self.0.store.lock().unwrap();
+        let mut guard = self.0.store.lock_safe();
         let result = operation(guard.as_mut().ok_or(Error::Storage)?);
         if matches!(result, Err(Error::Storage)) {
-            *self.0.failure.lock().unwrap() = Some(Error::Storage);
+            *self.0.failure.lock_safe() = Some(Error::Storage);
             eprintln!("Audit forwarding storage unavailable; local journal and completed operation outcomes are unchanged");
         }
         result

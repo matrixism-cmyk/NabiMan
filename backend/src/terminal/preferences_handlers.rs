@@ -1,3 +1,4 @@
+use crate::lock_safe::LockExt;
 use super::*;
 
 pub(super) async fn get_settings(
@@ -5,7 +6,7 @@ pub(super) async fn get_settings(
     preferences: web::Data<SettingsStore>,
 ) -> HttpResponse {
     let username = extract_username_header(&req);
-    match preferences.lock().unwrap().get(&username) {
+    match preferences.lock_safe().get(&username) {
         Ok(settings) => HttpResponse::Ok().json(crate::models::ApiResponse::ok(settings)),
         Err(_) => HttpResponse::ServiceUnavailable().json(crate::models::ApiResponse::<()>::error(
             "Terminal preferences unavailable; storage recovery required",
@@ -36,8 +37,7 @@ pub(super) async fn put_settings(
         settings.idle_timeout_secs = 0;
     }
     match preferences
-        .lock()
-        .unwrap()
+        .lock_safe()
         .save(&username, settings.clone())
     {
         Ok(()) => HttpResponse::Ok().json(crate::models::ApiResponse::ok(settings)),

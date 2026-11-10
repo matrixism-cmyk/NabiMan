@@ -2,6 +2,7 @@
 //! a server's own GNU `find` over its SSH shell, or folders listed one by one
 //! over the file connection (an SFTP-only account, FTP), several at a time.
 
+use crate::lock_safe::LockExt;
 use std::io::{BufRead, BufReader};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -109,7 +110,7 @@ pub(super) fn find(server: &RemoteServer, roots: &[String], job: &Job) -> bool {
         s.spawn(|| {
             while !finished.load(Ordering::Relaxed) {
                 if job.over() {
-                    let _ = child.lock().unwrap_or_else(|e| e.into_inner()).kill();
+                    let _ = child.lock_safe().kill();
                     return;
                 }
                 std::thread::sleep(Duration::from_millis(200));
@@ -136,7 +137,7 @@ pub(super) fn find(server: &RemoteServer, roots: &[String], job: &Job) -> bool {
         }
         job.tally(|c| c.merge(&here));
         finished.store(true, Ordering::Relaxed);
-        let _ = child.lock().unwrap_or_else(|e| e.into_inner()).wait();
+        let _ = child.lock_safe().wait();
         !no_find && (done || job.over())
     })
 }

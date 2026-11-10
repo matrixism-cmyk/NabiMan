@@ -1,6 +1,7 @@
 //! One-use, target-bound admission for account terminal WebSockets (and
 //! dictation's). The checks that keep a connection admitted afterwards are
 //! NabiMan's, shared with every stream: `stream_access::ConnectionGrant`.
+use crate::lock_safe::LockExt;
 use crate::{auth, models::ApiResponse};
 use actix_web::{dev::ServiceRequest, post, web, HttpRequest, HttpResponse};
 use rand::{rngs::OsRng, RngCore};
@@ -199,7 +200,7 @@ async fn issue(
     let Some(lifetime) = admission_lifetime(claims.exp, chrono::Utc::now()) else {
         return HttpResponse::Unauthorized().json(ApiResponse::<()>::error("Access token expired"));
     };
-    let ticket = match store.lock().unwrap().issue(
+    let ticket = match store.lock_safe().issue(
         claims,
         body.query.clone(),
         origin,
@@ -275,8 +276,7 @@ pub(crate) fn redeem(req: &HttpRequest, store: &TicketStore) -> Option<auth::Cla
     }
     let origin = origin(req).ok()?;
     store
-        .lock()
-        .unwrap()
+        .lock_safe()
         .consume(token?, &query, origin.as_deref(), Instant::now())
 }
 
@@ -301,7 +301,7 @@ pub(crate) fn redeem_target(req: &HttpRequest, store: &TicketStore) -> Option<au
         return None;
     }
     let origin = origin(req).ok()?;
-    store.lock().unwrap().consume(token?, query, origin.as_deref(), Instant::now())
+    store.lock_safe().consume(token?, query, origin.as_deref(), Instant::now())
 }
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(issue);

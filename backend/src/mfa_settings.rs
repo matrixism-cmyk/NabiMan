@@ -1,3 +1,4 @@
+use crate::lock_safe::LockExt;
 use super::*;
 use crate::jwt_sessions::SessionStore;
 use actix_web::get;
@@ -12,7 +13,7 @@ fn saved_error() -> HttpResponse {
         .json(ApiResponse::<()>::error("MFA state could not be saved"))
 }
 fn revoke_all(sessions: &SessionStore, id: &str) {
-    sessions.lock().unwrap().retain(|_, s| s.user_id != id);
+    sessions.lock_safe().retain(|_, s| s.user_id != id);
 }
 #[derive(Deserialize)]
 struct Password {
@@ -34,7 +35,7 @@ async fn status(
     users: web::Data<UserStore>,
     sessions: web::Data<SessionStore>,
 ) -> HttpResponse {
-    let users = users.lock().unwrap();
+    let users = users.lock_safe();
     let id = actor_id(&req);
     let Some(user) = users.iter().find(|u| u.id == id && u.active()) else {
         return HttpResponse::Unauthorized().finish();
@@ -48,8 +49,7 @@ async fn status(
     };
     let verified = crate::auth::verified_claims(&req).is_some_and(|c| {
         sessions
-            .lock()
-            .unwrap()
+            .lock_safe()
             .get(&c.sid)
             .is_some_and(|s| s.user_id == user.id && s.mfa_verified)
     });
@@ -204,8 +204,7 @@ async fn regenerate(
         Ok(()) => {
             let current = crate::auth::verified_claims(&req).map(|c| c.sid);
             sessions
-                .lock()
-                .unwrap()
+                .lock_safe()
                 .retain(|sid, s| s.user_id != id || current.as_deref() == Some(sid.as_str()));
             HttpResponse::Ok()
                 .insert_header(("Cache-Control", "no-store"))

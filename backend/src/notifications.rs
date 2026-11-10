@@ -1,3 +1,4 @@
+use crate::lock_safe::LockExt;
 use crate::models::ApiResponse;
 use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
@@ -146,7 +147,7 @@ fn send_webhook(url: &str, subject: &str, body: &str) -> bool {
 }
 
 async fn list_channels(store: web::Data<ChannelStore>) -> HttpResponse {
-    HttpResponse::Ok().json(ApiResponse::ok(store.lock().unwrap().clone()))
+    HttpResponse::Ok().json(ApiResponse::ok(store.lock_safe().clone()))
 }
 
 #[derive(Deserialize)]
@@ -167,7 +168,7 @@ async fn add_channel(
         target: body.target.clone(),
         enabled: true,
     };
-    let mut channels = store.lock().unwrap();
+    let mut channels = store.lock_safe();
     let mut updated = channels.clone();
     updated.push(ch);
     if let Err(error) = save_channels(&updated) {
@@ -179,7 +180,7 @@ async fn add_channel(
 
 async fn delete_channel(path: web::Path<String>, store: web::Data<ChannelStore>) -> HttpResponse {
     let id = path.into_inner();
-    let mut channels = store.lock().unwrap();
+    let mut channels = store.lock_safe();
     let mut updated = channels.clone();
     updated.retain(|c| c.id != id);
     if let Err(error) = save_channels(&updated) {
@@ -198,7 +199,7 @@ async fn test_channel(
     store: web::Data<ChannelStore>,
     body: web::Json<TestRequest>,
 ) -> HttpResponse {
-    let channels = store.lock().unwrap().clone();
+    let channels = store.lock_safe().clone();
     let msg = body
         .message
         .as_deref()

@@ -4,6 +4,7 @@
 //! host key is approved. Nothing else is accepted, and a refusal names the
 //! certificate's fingerprint so it can be checked out of band.
 
+use crate::lock_safe::LockExt;
 use std::sync::{Arc, Mutex};
 
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
@@ -57,7 +58,7 @@ impl ServerCertVerifier for Verifier {
             (None, None) => Err(Error::General("no certificate authorities available".into())),
         };
         if verdict.is_err() {
-            *self.refused.lock().unwrap_or_else(|e| e.into_inner()) = Some(fingerprint(end_entity.as_ref()));
+            *self.refused.lock_safe() = Some(fingerprint(end_entity.as_ref()));
         }
         verdict
     }
@@ -136,7 +137,7 @@ impl Tls {
 
     /// Why a handshake failed, in words an operator can act on.
     pub fn explain(&self, e: &std::io::Error) -> String {
-        match self.refused.lock().unwrap_or_else(|e| e.into_inner()).take() {
+        match self.refused.lock_safe().take() {
             Some(seen) => format!(
                 "The server's TLS certificate is not trusted ({e}). Its fingerprint is {seen}; \
                  verify it with the server's administrator and save it in the server settings"

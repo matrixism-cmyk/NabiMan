@@ -1,5 +1,6 @@
 //! Adding, changing and removing saved servers. A remote-only member's own
 //! servers are kept to a password and a public address (see `member_servers`).
+use crate::lock_safe::LockExt;
 use super::*;
 
 /// The signed-in account, which a server may belong to.
@@ -117,7 +118,7 @@ pub(super) async fn add_server(
         }
     }
 
-    let _guard = SERVER_WRITES.lock().unwrap_or_else(|e| e.into_inner());
+    let _guard = SERVER_WRITES.lock_safe();
     let mut servers = match load_servers() {
         Ok(servers) => servers,
         Err(error) => return storage_error(error),
@@ -140,7 +141,7 @@ pub(super) async fn update_server(
         Err(r) => return r,
     };
     let server_id = path.into_inner();
-    let _guard = SERVER_WRITES.lock().unwrap_or_else(|e| e.into_inner());
+    let _guard = SERVER_WRITES.lock_safe();
     let mut servers = match load_servers() {
         Ok(servers) => servers,
         Err(error) => return storage_error(error),
@@ -247,7 +248,7 @@ pub(super) async fn delete_server(
         Err(r) => return r,
     };
     let server_id = path.into_inner();
-    let _guard = SERVER_WRITES.lock().unwrap_or_else(|e| e.into_inner());
+    let _guard = SERVER_WRITES.lock_safe();
     let mut servers = match load_servers() {
         Ok(servers) => servers,
         Err(error) => return storage_error(error),

@@ -220,3 +220,22 @@ fn versioned_hashes_frame_fields_and_can_follow_legacy_records() {
         .starts_with("v2:"));
     assert!(inspection::inspect("audit.jsonl", &std::fs::read(path).unwrap()).valid);
 }
+
+#[test]
+fn a_lock_poisoned_by_a_reader_keeps_recording_but_an_interrupted_append_stops_the_chain() {
+    let dir = Temp::new();
+    let path = dir.path().join("audit.jsonl");
+    let store: AuditLog = Arc::new(Mutex::new(storage::State::load(path.clone())));
+    let reader = store.clone();
+    let _ = std::thread::spawn(move || {
+        let _log = reader.lock().unwrap();
+        panic!("a handler panicked while reading the log");
+    })
+    .join();
+    assert!(store.is_poisoned());
+    assert!(append_entry(&store, entry()).is_some(), "requests are still recorded");
+    store.lock_safe().interrupt_append_for_test();
+    assert!(append_entry(&store, entry()).is_none(), "no chaining onto a half-written record");
+    assert_eq!(store.lock_safe().error, Some("append_interrupted"));
+    assert!(inspection::inspect("audit.jsonl", &std::fs::read(path).unwrap()).valid);
+}

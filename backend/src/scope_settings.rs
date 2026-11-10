@@ -1,4 +1,5 @@
 //! Operational policies for service membership, separate from infrastructure credentials.
+use crate::lock_safe::LockExt;
 use crate::models::{ApiResponse, Membership, NabimanUser, ScopeKind, UserRole};
 use crate::users::UserStore;
 use actix_web::{web, HttpRequest, HttpResponse};
@@ -184,8 +185,8 @@ async fn put(
     if body.member_notice.len() > 4000 || body.member_limit.is_some_and(|n| n == 0 || n > 10000) {
         return fail("공지는 4000바이트 이하, 회원 수 제한은 1~10000명으로 입력하세요");
     }
-    let _guard = SAVE_LOCK.lock().unwrap();
-    let users = users.lock().unwrap(); // Keep membership changes and capacity changes consistent.
+    let _guard = SAVE_LOCK.lock_safe();
+    let users = users.lock_safe(); // Keep membership changes and capacity changes consistent.
     let Some(current) = users
         .iter()
         .find(|u| u.id == actor.id && u.active() && u.manages(&m.kind, &m.scope_id))
@@ -198,7 +199,7 @@ async fn put(
     let Some(sessions) = req.app_data::<web::Data<crate::jwt_sessions::SessionStore>>() else {
         return HttpResponse::Unauthorized().finish();
     };
-    let sessions = sessions.lock().unwrap();
+    let sessions = sessions.lock_safe();
     let Some(session) = sessions
         .get(&claims.sid)
         .filter(|s| s.user_id == current.id && s.username == current.username)

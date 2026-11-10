@@ -1,3 +1,4 @@
+use crate::lock_safe::LockExt;
 use super::*;
 
 #[derive(Deserialize)]
@@ -44,7 +45,7 @@ pub(super) async fn create_share(
         return refused;
     }
     let (label, via_server) = {
-        let map = store.lock().unwrap();
+        let map = store.lock_safe();
         match map.get(&session_id) {
             Some(s)
                 if s.owned_by(&owner.id)
@@ -227,7 +228,7 @@ pub(super) async fn list_shares(
         Some(r) => r,
         None => return storage_error(),
     };
-    let sessions = store.lock().unwrap();
+    let sessions = store.lock_safe();
     let mut list: Vec<ShareLink> = records
         .into_iter()
         .filter(|l| l.owner_id == owner.id || (l.owner_id.is_empty() && l.owner == owner.username))

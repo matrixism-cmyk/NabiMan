@@ -21,6 +21,7 @@
 //! answer, which reversed links and made loops. A session that leads others
 //! and is led by none is the orchestrator.
 
+use crate::lock_safe::LockExt;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Read, Seek, SeekFrom};
@@ -105,7 +106,7 @@ pub(crate) fn folder_name(cwd: &str) -> String {
 /// time through takes seconds — and each later look reads only what is new.
 pub(crate) fn received(transcripts: &[PathBuf]) -> HashMap<PathBuf, Vec<Received>> {
     let out = {
-        let mut guard = TAILS.lock().unwrap_or_else(|e| e.into_inner());
+        let mut guard = TAILS.lock_safe();
         let tails = guard.get_or_insert_with(HashMap::new);
         // Transcripts no session writes any more are forgotten.
         let wanted: HashSet<&PathBuf> = transcripts.iter().collect();
@@ -130,12 +131,12 @@ pub(crate) fn received(transcripts: &[PathBuf]) -> HashMap<PathBuf, Vec<Received
 /// Reads what was added to one transcript, without holding the lock meanwhile.
 fn read_more(path: &Path) {
     let mut tail = {
-        let guard = TAILS.lock().unwrap_or_else(|e| e.into_inner());
+        let guard = TAILS.lock_safe();
         guard.as_ref().and_then(|t| t.get(path).cloned()).unwrap_or_default()
     };
     let _ = catch_up(path, &mut tail);
     trim(&mut tail);
-    let mut guard = TAILS.lock().unwrap_or_else(|e| e.into_inner());
+    let mut guard = TAILS.lock_safe();
     guard.get_or_insert_with(HashMap::new).insert(path.to_path_buf(), tail);
 }
 

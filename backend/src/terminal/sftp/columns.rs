@@ -6,6 +6,7 @@
 //! column later needs no backend change. Share-link visitors have no account
 //! and keep their choice in the browser instead.
 
+use crate::lock_safe::LockExt;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
@@ -64,7 +65,7 @@ async fn get(req: HttpRequest) -> HttpResponse {
         Ok(id) => id,
         Err(r) => return r,
     };
-    let map = store().lock().unwrap_or_else(|e| e.into_inner());
+    let map = store().lock_safe();
     HttpResponse::Ok()
         .insert_header(("Cache-Control", "no-store"))
         .json(ApiResponse::ok(map.get(&id).cloned().unwrap_or_default()))
@@ -94,7 +95,7 @@ async fn put(req: HttpRequest, body: web::Json<Put>) -> HttpResponse {
     {
         return HttpResponse::BadRequest().json(ApiResponse::<()>::error("Column layout too large"));
     }
-    let mut map = store().lock().unwrap_or_else(|e| e.into_inner());
+    let mut map = store().lock_safe();
     {
         let scopes = map.entry(id.clone()).or_default();
         if clearing {

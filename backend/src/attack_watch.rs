@@ -4,6 +4,7 @@
 //! Read-only: one `sh` script that prints log lines; nothing on the server
 //! changes.
 
+use crate::lock_safe::LockExt;
 use std::collections::HashMap;
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -204,7 +205,7 @@ fn run(mut cmd: Command, script_on_stdin: bool, window_min: u32) -> Report {
 
 fn look(id: &str, window_min: u32) -> Result<Report, String> {
     let key = format!("{id}:{window_min}");
-    if let Some((at, r)) = CACHE.lock().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(|c| c.get(&key)) {
+    if let Some((at, r)) = CACHE.lock_safe().as_ref().and_then(|c| c.get(&key)) {
         if at.elapsed() < FRESH {
             return Ok(r.clone());
         }
@@ -222,7 +223,7 @@ fn look(id: &str, window_min: u32) -> Result<Report, String> {
         let (cmd, _pw) = crate::remote_probe::ssh_command(srv, 6, &format!("sh -s -- {window_min}"))?;
         run(cmd, true, window_min)
     };
-    let mut guard = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    let mut guard = CACHE.lock_safe();
     let cache = guard.get_or_insert_with(HashMap::new);
     cache.retain(|_, (at, _)| at.elapsed() < Duration::from_secs(600));
     cache.insert(key, (Instant::now(), report.clone()));
@@ -239,7 +240,7 @@ pub(crate) struct Query {
 /// server (`local` for this machine). Administrators only.
 pub(crate) async fn attacks(path: web::Path<String>, query: web::Query<Query>, req: HttpRequest, users: web::Data<crate::users::UserStore>) -> HttpResponse {
     let user_id = crate::auth::verified_user_id(&req).unwrap_or_default();
-    let member = users.lock().unwrap().iter().find(|u| u.id == user_id).is_none_or(crate::member_servers::is_member);
+    let member = users.lock_safe().iter().find(|u| u.id == user_id).is_none_or(crate::member_servers::is_member);
     if user_id.is_empty() || member {
         return HttpResponse::Forbidden().json(ApiResponse::<()>::error("Administrators only"));
     }

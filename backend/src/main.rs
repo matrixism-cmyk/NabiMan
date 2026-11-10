@@ -1,3 +1,4 @@
+mod lock_safe;
 mod bounded_command;
 mod access_rules;
 mod accounts;
@@ -73,6 +74,7 @@ mod updates;
 mod users;
 mod vhost;
 use actix_files as afs;
+use lock_safe::LockExt;
 use actix_web::body::EitherBody;
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::{web, App, HttpResponse, HttpServer};
@@ -189,7 +191,7 @@ async fn main() -> std::io::Result<()> {
     let helper_client = web::Data::new(nabiman_server::privileged::client::Client::from_env());
     let password_store = auth::new_password_store();
     let jwt_secret = auth::new_jwt_secret();
-    let pw_hash = password_store.lock().unwrap().clone();
+    let pw_hash = password_store.lock_safe().clone();
     let user_store = users::new_user_store(&pw_hash);
     let session_store = jwt_sessions::open_session_store();
     let login_limiter = rate_limit::RateLimiter::new();

@@ -3,6 +3,7 @@
 //! in memory for a couple of minutes against a one-use token — never stored or
 //! logged — and the browser re-issues one for each (re)connect.
 
+use crate::lock_safe::LockExt;
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -67,7 +68,7 @@ async fn issue(req: HttpRequest, body: web::Json<CredsBody>) -> HttpResponse {
     let mut bytes = [0u8; 16];
     rand::thread_rng().fill_bytes(&mut bytes);
     let token = hex::encode(bytes);
-    let mut guard = store().lock().unwrap();
+    let mut guard = store().lock_safe();
     guard.retain(|_, e| e.expires > Instant::now());
     guard.insert(
         token.clone(),

@@ -9,6 +9,7 @@
 //! A file changed in the last two seconds is never kept: two edits in one
 //! tick of a coarse file clock would carry the same times.
 
+use crate::lock_safe::LockExt;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -69,7 +70,7 @@ fn cached_at(
 ) -> Result<Vec<RemoteServer>, String> {
     let Ok(before) = stamp(path) else { return read(path) };
     {
-        let cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+        let cache = CACHE.lock_safe();
         if let Some((p, s, servers)) = cache.as_ref() {
             if p == path && *s == before {
                 return Ok(servers.clone());
@@ -79,14 +80,14 @@ fn cached_at(
     let servers = read(path)?;
     // Kept only if nothing changed while it was read, and not just now.
     if stamp(path).ok() == Some(before) && settled(&before, now) {
-        *CACHE.lock().unwrap_or_else(|e| e.into_inner()) = Some((path.to_path_buf(), before, servers.clone()));
+        *CACHE.lock_safe() = Some((path.to_path_buf(), before, servers.clone()));
     }
     Ok(servers)
 }
 
 /// After a save from here: the next read goes to the file.
 pub(super) fn forget() {
-    *CACHE.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    *CACHE.lock_safe() = None;
 }
 
 #[cfg(test)]

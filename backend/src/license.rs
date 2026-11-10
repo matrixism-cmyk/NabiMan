@@ -1,4 +1,5 @@
 //! Offline public-key verification. Issuing keys never belong on this server.
+use crate::lock_safe::LockExt;
 use crate::models::ApiResponse;
 use actix_web::{web, HttpRequest, HttpResponse};
 use chrono::{NaiveDate, Utc};
@@ -363,7 +364,7 @@ async fn activate(
     if let Err(e) = verify(key, &keys, Utc::now().date_naive()) {
         return HttpResponse::BadRequest().json(ApiResponse::<()>::error(&e));
     }
-    let _guard = WRITES.lock().unwrap();
+    let _guard = WRITES.lock_safe();
     let stored = serde_json::to_vec(&Stored {
         signed_key: key.into(),
     })

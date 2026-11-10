@@ -5,6 +5,7 @@
 //! bridge itself — socat, the relay, the reset/bootloader channel — is in
 //! `serial_bridge`.
 
+use crate::lock_safe::LockExt;
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 
@@ -36,7 +37,7 @@ static HUB: LazyLock<Mutex<HashMap<String, HashMap<String, Attached>>>> =
 
 /// Reserve `(sid, name)` in the hub, or say why not.
 fn reserve(sid: &str, device: Attached) -> Result<(), &'static str> {
-    let mut hub = HUB.lock().unwrap_or_else(|e| e.into_inner());
+    let mut hub = HUB.lock_safe();
     let total: usize = hub.values().map(HashMap::len).sum();
     let mine = hub.values().flat_map(HashMap::values).filter(|d| d.attacher_id == device.attacher_id).count();
     let here = hub.get(sid);
@@ -51,7 +52,7 @@ fn reserve(sid: &str, device: Attached) -> Result<(), &'static str> {
 }
 
 pub(super) fn release(sid: &str, name: &str) {
-    let mut hub = HUB.lock().unwrap_or_else(|e| e.into_inner());
+    let mut hub = HUB.lock_safe();
     if let Some(here) = hub.get_mut(sid) {
         here.remove(name);
         if here.is_empty() {
@@ -184,7 +185,7 @@ async fn list_session_devices(
     if !visible {
         return HttpResponse::Ok().json(crate::models::ApiResponse::<()>::error("Session not found"));
     }
-    let hub = HUB.lock().unwrap_or_else(|e| e.into_inner());
+    let hub = HUB.lock_safe();
     let mut devices: Vec<serde_json::Value> = hub
         .get(&sid)
         .map(|here| {

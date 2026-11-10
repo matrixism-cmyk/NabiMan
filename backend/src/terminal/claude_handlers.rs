@@ -1,6 +1,7 @@
 //! The Claude Code sessions in the session list: the arrows between cards,
 //! the cards of Claude sessions under no tile, and one session's header.
 
+use crate::lock_safe::LockExt;
 use actix_web::{web, HttpRequest, HttpResponse};
 use std::collections::HashMap;
 
@@ -29,8 +30,7 @@ pub(super) fn notes_of(here: &super::super::claude_peers::Seen, id_of: &HashMap<
 pub(super) fn sees_remote_claude(user_id: &str, users: &crate::users::UserStore) -> bool {
     !user_id.is_empty()
         && users
-            .lock()
-            .unwrap()
+            .lock_safe()
             .iter()
             .find(|u| u.id == user_id)
             .is_some_and(|u| !crate::member_servers::is_member(u))
@@ -75,7 +75,7 @@ pub(super) async fn remote_claude(store: web::Data<PtyStore>, req: HttpRequest, 
     }
     super::super::claude_remote::want(store.get_ref());
     let seen = super::super::claude_peers::look();
-    let map = store.lock().unwrap();
+    let map = store.lock_safe();
     let id_of: HashMap<&str, &str> = map
         .iter()
         .filter(|(_, s)| super::super::session::visible_to(s, &user_id, &users))
@@ -118,7 +118,7 @@ pub(super) async fn session_claude(
     let id = path.into_inner();
     let user_id = crate::auth::verified_user_id(&req).unwrap_or_default();
     let tmux_name = {
-        let map = store.lock().unwrap();
+        let map = store.lock_safe();
         match map.get(&id) {
             Some(s)
                 if super::super::session::visible_to(s, &user_id, &users)

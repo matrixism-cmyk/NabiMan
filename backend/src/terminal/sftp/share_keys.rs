@@ -7,6 +7,7 @@
 //! live link against that snapshot, so revoking or changing the link ends
 //! file access at once, and a key never outlives its link or one day.
 
+use crate::lock_safe::LockExt;
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -51,7 +52,7 @@ pub(crate) fn issue(link: &ShareLink) -> Option<String> {
     OsRng.try_fill_bytes(&mut bytes).ok()?;
     let key = hex::encode(bytes);
     let now = Instant::now();
-    let mut map = store().lock().unwrap_or_else(|e| e.into_inner());
+    let mut map = store().lock_safe();
     map.retain(|_, k| k.expires > now);
     let mine: Vec<(String, Instant)> = map
         .iter()
@@ -76,7 +77,7 @@ pub(crate) fn check(key: &str, token: &str) -> Option<ShareLink> {
     if key.len() != 64 {
         return None;
     }
-    let map = store().lock().unwrap_or_else(|e| e.into_inner());
+    let map = store().lock_safe();
     map.get(&digest(key))
         .filter(|k| k.expires > Instant::now() && k.link.token == token)
         .map(|k| k.link.clone())

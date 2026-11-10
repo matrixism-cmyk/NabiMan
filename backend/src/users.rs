@@ -1,3 +1,4 @@
+use crate::lock_safe::LockExt;
 #[path = "user_profile.rs"]
 mod profile;
 #[path = "users_storage.rs"]
@@ -96,8 +97,7 @@ pub fn new_user_store(pw_hash: &str) -> UserStore {
 
 pub fn find_user_by_name(store: &UserStore, username: &str) -> Option<NabimanUser> {
     store
-        .lock()
-        .unwrap()
+        .lock_safe()
         .iter()
         .find(|u| u.username == username)
         .cloned()
@@ -109,7 +109,7 @@ pub fn update_password(
     expected_hash: &str,
     new_hash: String,
 ) -> Result<(), String> {
-    let mut users = store.lock().unwrap();
+    let mut users = store.lock_safe();
     let user = users
         .iter()
         .position(|u| u.id == user_id && u.password_hash == expected_hash)
@@ -123,7 +123,7 @@ pub fn mutate_user<F, T>(store: &UserStore, user_id: &str, update: F) -> Result<
 where
     F: FnOnce(&mut NabimanUser) -> Result<T, String>,
 {
-    let mut users = store.lock().unwrap();
+    let mut users = store.lock_safe();
     let index = users
         .iter()
         .position(|u| u.id == user_id)
@@ -143,7 +143,7 @@ where
 
 /// Auto-provision or update an external (OAuth/LDAP) user
 pub fn ensure_oauth_user(store: &UserStore, username: &str, _role: &str) -> Result<(), String> {
-    let mut users = store.lock().unwrap();
+    let mut users = store.lock_safe();
     let previous = users.clone();
     if let Some(u) = users.iter_mut().find(|u| u.username == username) {
         if !u.password_hash.is_empty() {
@@ -178,7 +178,7 @@ pub fn ensure_oauth_user(store: &UserStore, username: &str, _role: &str) -> Resu
 }
 
 pub fn update_last_login(store: &UserStore, username: &str) {
-    let mut users = store.lock().unwrap();
+    let mut users = store.lock_safe();
     let previous = users.clone();
     if let Some(u) = users.iter_mut().find(|u| u.username == username) {
         u.last_login = Some(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string());
@@ -194,8 +194,7 @@ async fn list_users(req: actix_web::HttpRequest, store: web::Data<UserStore>) ->
         Err(r) => return r,
     };
     let users = store
-        .lock()
-        .unwrap()
+        .lock_safe()
         .iter()
         .filter(|u| crate::membership::visible(&actor, u))
         .cloned()
@@ -237,7 +236,7 @@ async fn create_user(
             "Password must be at least 8 characters",
         ));
     }
-    let mut users = store.lock().unwrap();
+    let mut users = store.lock_safe();
     if users.iter().any(|u| u.username == body.username) {
         return HttpResponse::Ok().json(ApiResponse::<()>::error("Username already exists"));
     }
@@ -282,7 +281,7 @@ async fn update_user(
         return r;
     }
     let user_id = path.into_inner();
-    let mut users = store.lock().unwrap();
+    let mut users = store.lock_safe();
     let previous = users.clone();
     let admin_count = users.iter().filter(|u| u.super_admin()).count();
     if let Some(role) = &body.role {
@@ -346,7 +345,7 @@ async fn delete_user(
         return r;
     }
     let user_id = path.into_inner();
-    let mut users = store.lock().unwrap();
+    let mut users = store.lock_safe();
     let admin_count = users.iter().filter(|u| u.super_admin()).count();
     let target_username = users
         .iter()

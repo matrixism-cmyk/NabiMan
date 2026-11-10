@@ -72,7 +72,7 @@ impl ConnectionGrant {
         if self.user_id.is_empty() {
             return false;
         }
-        let session = self.sessions.lock().unwrap().get(&self.sid).cloned();
+        let session = self.sessions.lock_safe().get(&self.sid).cloned();
         let Some(session) =
             session.filter(|s| s.username == self.username && s.user_id == self.user_id)
         else {

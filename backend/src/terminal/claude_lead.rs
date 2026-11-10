@@ -2,6 +2,7 @@
 //! every link between it and another session is drawn from it, whoever
 //! wrote first, since the others' reports to it are not it being led.
 
+use crate::lock_safe::LockExt;
 use std::sync::Mutex;
 
 use actix_web::{web, HttpRequest, HttpResponse};
@@ -19,7 +20,7 @@ fn path() -> std::path::PathBuf {
 
 /// The lead's tmux session name, if one is set.
 pub(crate) fn lead_tmux() -> Option<String> {
-    let mut slot = LEAD.lock().unwrap_or_else(|e| e.into_inner());
+    let mut slot = LEAD.lock_safe();
     if slot.is_none() {
         let read = std::fs::read_to_string(path()).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
         *slot = Some(read);
@@ -34,7 +35,7 @@ fn set_lead(tmux: Option<&str>) -> std::io::Result<()> {
             let _ = std::fs::remove_file(path());
         }
     }
-    *LEAD.lock().unwrap_or_else(|e| e.into_inner()) = Some(tmux.map(str::to_string));
+    *LEAD.lock_safe() = Some(tmux.map(str::to_string));
     Ok(())
 }
 
@@ -51,7 +52,7 @@ struct LeadInfo {
 
 fn lead_id(store: &PtyStore) -> Option<String> {
     let tmux = lead_tmux()?;
-    store.lock().unwrap().iter().find(|(_, s)| s.tmux_name == tmux).map(|(id, _)| id.clone())
+    store.lock_safe().iter().find(|(_, s)| s.tmux_name == tmux).map(|(id, _)| id.clone())
 }
 
 async fn get_lead(store: web::Data<PtyStore>) -> HttpResponse {
@@ -74,7 +75,7 @@ async fn put_lead(
     }
     let tmux = match &body.session_id {
         None => None,
-        Some(id) => match store.lock().unwrap().get(id) {
+        Some(id) => match store.lock_safe().get(id) {
             Some(s) => Some(s.tmux_name.clone()),
             None => return HttpResponse::Ok().json(ApiResponse::<()>::error("Session not found")),
         },

@@ -1,4 +1,5 @@
 //! Local checks detect inconsistencies, not rewriting by a privileged host operator.
+use crate::lock_safe::LockExt;
 use super::{storage, AuditEntry, AuditLog};
 use crate::models::ApiResponse;
 use actix_web::{web, HttpResponse};
@@ -77,14 +78,14 @@ fn response(value: impl Serialize) -> HttpResponse {
         .json(ApiResponse::ok(value))
 }
 pub async fn health(store: web::Data<AuditLog>) -> HttpResponse {
-    let state = store.lock().unwrap();
+    let state = store.lock_safe();
     response(
         serde_json::json!({"writable":state.error.is_none(),"error":state.error,"last_persisted_at":state.last_persisted_at,"memory_entries":state.entries.len(),"unparsed_startup_lines":state.unparsed_lines,"retention":"active plus up to five rotated 10 MB segments","durability":"local fsync; not independent storage","operation_results":"persistence failure does not roll back completed operations"}),
     )
 }
 pub async fn verify(store: web::Data<AuditLog>) -> HttpResponse {
     let result=web::block(move || {
-        let state=store.lock().unwrap();
+        let state=store.lock_safe();
         let mut segments=vec![];
         for index in (0..=5).rev() {
             let name=if index==0 {"audit.jsonl".into()} else {format!("audit.jsonl.{index}")};
@@ -114,7 +115,7 @@ pub async fn export(store: web::Data<AuditLog>, body: web::Json<Export>) -> Http
         return HttpResponse::BadRequest().json(ApiResponse::<()>::error("Unknown audit segment"));
     }
     let result=web::block(move || {
-        let state=store.lock().unwrap();
+        let state=store.lock_safe();
         let bytes=storage::read(&state.path.with_file_name(&name))?;
         let verification=inspect(&name,&bytes);
         let entries:Vec<_>=bytes.split(|b|*b==b'\n').filter_map(|line|serde_json::from_slice::<AuditEntry>(line).ok()).map(|mut e|{

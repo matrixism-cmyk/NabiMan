@@ -13,6 +13,7 @@
 //! format change could stop a restart, and a release rolled back never
 //! reads this file. A file that cannot be read starts empty.
 
+use crate::lock_safe::LockExt;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
@@ -102,7 +103,7 @@ fn save(map: &Map, file: &Path) -> Result<(), String> {
 /// holds (kept alive, closing time) comes along to show beside them.
 fn owned(req: &HttpRequest, sessions: &PtyStore, id: &str) -> Result<serde_json::Value, HttpResponse> {
     let user = crate::auth::verified_user_id(req).unwrap_or_default();
-    let map = sessions.lock().unwrap_or_else(|e| e.into_inner());
+    let map = sessions.lock_safe();
     match map.get(id) {
         Some(s) if s.owned_by(&user) => Ok(serde_json::json!({ "keepalive": s.keepalive, "timeout_secs": s.timeout_secs })),
         Some(_) => Err(HttpResponse::Forbidden().json(ApiResponse::<()>::error("Not owner"))),
@@ -116,7 +117,7 @@ async fn get(req: HttpRequest, path: web::Path<String>, sessions: web::Data<PtyS
         Ok(s) => s,
         Err(r) => return r,
     };
-    let overrides = store().lock().unwrap_or_else(|e| e.into_inner()).get(&id).cloned().unwrap_or_default();
+    let overrides = store().lock_safe().get(&id).cloned().unwrap_or_default();
     HttpResponse::Ok().insert_header(("Cache-Control", "no-store"))
         .json(ApiResponse::ok(serde_json::json!({ "overrides": overrides, "session": session })))
 }
@@ -131,8 +132,8 @@ async fn put(req: HttpRequest, path: web::Path<String>, body: web::Json<Override
     if let Err(e) = overrides.check() {
         return HttpResponse::BadRequest().json(ApiResponse::<()>::error(&e));
     }
-    let live: Vec<String> = sessions.lock().unwrap_or_else(|e| e.into_inner()).keys().cloned().collect();
-    let mut map = store().lock().unwrap_or_else(|e| e.into_inner());
+    let live: Vec<String> = sessions.lock_safe().keys().cloned().collect();
+    let mut map = store().lock_safe();
     let mut next = map.clone();
     next.insert(id, overrides.clone());
     prune(&mut next, &|sid| live.iter().any(|l| l == sid));

@@ -67,7 +67,7 @@ pub fn check_auth_token(secret: &str, token: &str, sessions: &SessionStore) -> b
 fn session_valid(claims: &Claims, sessions: &SessionStore) -> bool {
     let now = crate::jwt_sessions::app_settings::now();
     let idle = |s: &crate::jwt_sessions::SessionInfo| crate::jwt_sessions::app_settings::idle_expired(s.last_activity, now);
-    let mut map = sessions.lock().unwrap();
+    let mut map = sessions.lock_safe();
     // A sign-in idle past the limit is over: gone for good, not just refused.
     if map.get(&claims.sid).is_some_and(idle) {
         map.remove(&claims.sid);
@@ -192,7 +192,7 @@ pub async fn logout(
 ) -> HttpResponse {
     if let Some(token) = http_token(&req) {
         if let Ok(data) = decode_claims_unverified(token) {
-            sessions.lock().unwrap().remove(&data.claims.sid);
+            sessions.lock_safe().remove(&data.claims.sid);
         }
     }
     HttpResponse::Ok().json(ApiResponse::ok("Logged out"))
@@ -309,8 +309,7 @@ pub fn check_auth(
         Some(user)
             if user.active()
                 && sessions
-                    .lock()
-                    .unwrap()
+                    .lock_safe()
                     .get(&claims.sid)
                     .is_some_and(|s| !s.user_id.is_empty() && s.user_id == user.id) =>
         {
@@ -331,8 +330,7 @@ pub fn check_auth(
         return AuthDecision::Unauthorized;
     }
     let verified = sessions
-        .lock()
-        .unwrap()
+        .lock_safe()
         .get(&claims.sid)
         .is_some_and(|s| s.mfa_verified);
     if !crate::mfa_policy::permitted(&user, verified, req.method().as_str(), path) {

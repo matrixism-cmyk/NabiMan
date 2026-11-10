@@ -4,6 +4,7 @@
 //! `cd`, `claude …` — done for them, and the shells stay behind when Claude
 //! Code exits, just as they would.
 
+use crate::lock_safe::LockExt;
 use std::fs;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
@@ -271,8 +272,7 @@ async fn start_options(req: HttpRequest, users: web::Data<crate::users::UserStor
         return HttpResponse::Unauthorized().json(ApiResponse::<()>::error("Not signed in"));
     };
     let member = users
-        .lock()
-        .unwrap()
+        .lock_safe()
         .iter()
         .find(|u| u.id == id)
         .is_none_or(crate::member_servers::is_member);

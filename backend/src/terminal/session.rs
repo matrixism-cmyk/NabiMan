@@ -1,5 +1,6 @@
 //! The tmux-backed session registry: what is running, for whom, and for how
 //! long — plus the tmux commands that create and inspect those sessions.
+use crate::lock_safe::LockExt;
 
 #[path = "tmux_operations.rs"]
 mod tmux_operations;
@@ -177,7 +178,7 @@ pub(crate) fn persist(map: &HashMap<String, TmuxSession>) {
 /// Re-adopt sessions that survived a restart; drop the ones whose tmux session
 /// is gone. Called once at startup.
 pub fn restore_sessions(store: &PtyStore) {
-    let mut map = store.lock().unwrap();
+    let mut map = store.lock_safe();
     map.retain(|_, session| {
         session.ws_count = 0;
         // An unavailable tmux command is not proof that the session vanished.
@@ -201,7 +202,7 @@ pub fn restore_sessions(store: &PtyStore) {
 pub fn start_pty_cleanup(store: PtyStore) {
     std::thread::spawn(move || loop {
         std::thread::sleep(CLEANUP_INTERVAL);
-        let mut map = store.lock().unwrap();
+        let mut map = store.lock_safe();
         let now = now_unix();
         let expired: Vec<String> = map
             .iter()
@@ -242,7 +243,7 @@ pub fn start_pty_cleanup(store: PtyStore) {
 
 #[allow(dead_code)]
 pub fn kill_user_sessions(store: &PtyStore, user_id: &str) {
-    let mut map = store.lock().unwrap();
+    let mut map = store.lock_safe();
     let ids: Vec<String> = map
         .iter()
         .filter(|(_, s)| s.owned_by(user_id))

@@ -1,3 +1,4 @@
+use crate::lock_safe::LockExt;
 use super::*;
 
 #[derive(Deserialize)]
@@ -166,7 +167,7 @@ pub(super) async fn share_ws(
     let query = req.query_string();
 
     let tmux_name = {
-        let map = store.lock().unwrap();
+        let map = store.lock_safe();
         map.get(&link.session_id)
             .filter(|s| s.owned_by(&link.owner_id))
             .map(|s| s.tmux_name.clone())
@@ -211,7 +212,7 @@ pub(super) async fn share_ws(
         if let Ok(mut registry) = shares.lock() {
             registry.touch(&token);
         }
-        let mut map = store.lock().unwrap();
+        let mut map = store.lock_safe();
         if let Some(s) = map.get_mut(&link.session_id) {
             s.ws_count += 1;
             s.last_active_unix = now_unix();

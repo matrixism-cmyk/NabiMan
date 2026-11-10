@@ -1,4 +1,5 @@
 //! The terminal WebSocket: one browser pane attached to one tmux session.
+use crate::lock_safe::LockExt;
 
 #[path = "ssh_command.rs"]
 mod ssh_command;
@@ -115,14 +116,14 @@ async fn ws_terminal(
             );
         }
         let can_join = {
-            let map = store.lock().unwrap();
+            let map = store.lock_safe();
             map.get(&sid)
                 .map(|s| grant.can_access_session(s) && remote_access::allowed(s))
                 .unwrap_or(false)
         };
         if can_join {
             let tmux_name = {
-                let map = store.lock().unwrap();
+                let map = store.lock_safe();
                 map.get(&sid).map(|s| s.tmux_name.clone())
             };
             if let Some(name) = tmux_name {
@@ -139,7 +140,7 @@ async fn ws_terminal(
                     match attach_tmux(&name, parse_size(query)) {
                         Ok((fd, pid)) => {
                             {
-                                let mut map = store.lock().unwrap();
+                                let mut map = store.lock_safe();
                                 if let Some(s) = map.get_mut(&sid) {
                                     s.ws_count += 1;
                                     s.last_active_unix = now_unix();
@@ -191,7 +192,7 @@ async fn ws_terminal(
     }
 
     // --- New session ---
-    let user_settings = match preferences.lock().unwrap().get(&username) {
+    let user_settings = match preferences.lock_safe().get(&username) {
         Ok(settings) => settings,
         Err(_) => return ws::start(NoticeSocket::new("Terminal preferences unavailable; contact your administrator before opening a new session"), &req, stream),
     };
@@ -212,8 +213,7 @@ async fn ws_terminal(
     };
 
     let member = users
-        .lock()
-        .unwrap()
+        .lock_safe()
         .iter()
         .find(|u| u.id == grant.user_id && crate::member_servers::is_member(u))
         .cloned();
@@ -254,7 +254,7 @@ async fn ws_terminal(
         .collect();
     let tmux_name = format!("nb_{}_{}", safe_user, sid);
 
-    let mut map = store.lock().unwrap();
+    let mut map = store.lock_safe();
     if let Some(why) = member
         .as_ref()
         .and_then(|m| crate::member_servers::session_limit(m, map.values().filter(|s| s.owned_by(&m.id)).count()))

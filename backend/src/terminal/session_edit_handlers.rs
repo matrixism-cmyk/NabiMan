@@ -1,6 +1,7 @@
 //! Changing one session from the list: share it, its timeout and keep-alive,
 //! its name, or closing it. Only its owner may.
 
+use crate::lock_safe::LockExt;
 use actix_web::{web, HttpRequest, HttpResponse};
 use std::collections::HashMap;
 
@@ -57,7 +58,7 @@ pub(super) async fn toggle_share(
     req: HttpRequest,
 ) -> HttpResponse {
     let id = path.into_inner();
-    let mut map = store.lock().unwrap();
+    let mut map = store.lock_safe();
     if !map.contains_key(&id) {
         return HttpResponse::Ok()
             .json(crate::models::ApiResponse::<()>::error("Session not found"));
@@ -100,7 +101,7 @@ pub(super) async fn set_timeout(
             "Timeout too large (max 30 days, 0 = permanent)",
         ));
     }
-    let mut map = store.lock().unwrap();
+    let mut map = store.lock_safe();
     if !map.contains_key(&id) {
         return HttpResponse::Ok()
             .json(crate::models::ApiResponse::<()>::error("Session not found"));
@@ -144,7 +145,7 @@ pub(super) async fn set_keepalive(
 ) -> HttpResponse {
     let id = path.into_inner();
     let username = extract_username_header(&req);
-    let mut map = store.lock().unwrap();
+    let mut map = store.lock_safe();
     if !map.contains_key(&id) {
         return HttpResponse::Ok()
             .json(crate::models::ApiResponse::<()>::error("Session not found"));
@@ -156,7 +157,7 @@ pub(super) async fn set_keepalive(
     ) {
         return HttpResponse::Ok().json(crate::models::ApiResponse::<()>::error("Not owner"));
     }
-    let user_settings = match preferences.lock().unwrap().get(&username) {
+    let user_settings = match preferences.lock_safe().get(&username) {
         Ok(settings) => settings,
         Err(_) => {
             return HttpResponse::ServiceUnavailable().json(
@@ -204,7 +205,7 @@ pub(super) async fn rename_session(
         .take(MAX_TITLE_LEN)
         .collect();
 
-    let mut map = store.lock().unwrap();
+    let mut map = store.lock_safe();
     if !may_touch(
         &map,
         &id,
@@ -230,7 +231,7 @@ pub(super) async fn kill_session(
     req: HttpRequest,
 ) -> HttpResponse {
     let id = path.into_inner();
-    let mut map = store.lock().unwrap();
+    let mut map = store.lock_safe();
     if !may_touch(
         &map,
         &id,

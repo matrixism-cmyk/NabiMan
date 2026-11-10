@@ -1,3 +1,4 @@
+use crate::lock_safe::LockExt;
 use crate::models::ApiResponse;
 use actix_web::{web, HttpResponse};
 use serde::Serialize;
@@ -67,7 +68,7 @@ pub fn start_collector(store: HistoryStore) {
                 disk_write_bytes_sec: dw_sec,
             };
 
-            let mut data = store.lock().unwrap();
+            let mut data = store.lock_safe();
             data.push(point);
             // Keep last 8640 points (~24h at 10s interval)
             let len = data.len();
@@ -169,7 +170,7 @@ async fn get_history(
     store: web::Data<HistoryStore>,
     query: web::Query<HistoryQuery>,
 ) -> HttpResponse {
-    let data = store.lock().unwrap();
+    let data = store.lock_safe();
     let now = chrono::Utc::now().timestamp();
     let since = now - query.hours.unwrap_or(1) as i64 * 3600;
     let filtered: Vec<DataPoint> = data

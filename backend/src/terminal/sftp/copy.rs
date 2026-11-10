@@ -7,6 +7,7 @@
 //! A copy runs on its own after the request that starts it, so it survives
 //! the browser closing; the panel asks how it is going.
 
+use crate::lock_safe::LockExt;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -60,7 +61,7 @@ pub(super) struct Job {
 
 impl Job {
     fn update(&self, f: impl FnOnce(&mut Progress)) {
-        f(&mut self.progress.lock().unwrap_or_else(|e| e.into_inner()));
+        f(&mut self.progress.lock_safe());
     }
     pub fn cancelled(&self) -> bool {
         self.cancel.load(Ordering::Relaxed)
@@ -199,7 +200,7 @@ pub(super) async fn start(req: HttpRequest, b: web::Json<Start>) -> HttpResponse
         progress: Mutex::new(Progress { state: "copying", ..Progress::default() }),
     });
     {
-        let mut map = jobs().lock().unwrap_or_else(|e| e.into_inner());
+        let mut map = jobs().lock_safe();
         prune(&mut map);
         if map.values().filter(|j| j.owner == owner && j.running()).count() >= RUNNING_PER_ACCOUNT {
             return fail(StatusCode::TOO_MANY_REQUESTS, "Wait for a copy to finish before starting another");
@@ -216,7 +217,7 @@ pub(super) async fn list(req: HttpRequest) -> HttpResponse {
     let Some(owner) = crate::auth::verified_user_id(&req) else {
         return fail(StatusCode::UNAUTHORIZED, "Sign in again");
     };
-    let mut map = jobs().lock().unwrap_or_else(|e| e.into_inner());
+    let mut map = jobs().lock_safe();
     prune(&mut map);
     let mut mine: Vec<&Arc<Job>> = map.values().filter(|j| j.owner == owner).collect();
     mine.sort_by_key(|j| j.started_unix);
@@ -228,7 +229,7 @@ pub(super) async fn cancel(req: HttpRequest, path: web::Path<String>) -> HttpRes
     let Some(owner) = crate::auth::verified_user_id(&req) else {
         return fail(StatusCode::UNAUTHORIZED, "Sign in again");
     };
-    let job = jobs().lock().unwrap_or_else(|e| e.into_inner()).get(path.as_str()).cloned();
+    let job = jobs().lock_safe().get(path.as_str()).cloned();
     match job {
         Some(job) if job.owner == owner => {
             job.cancel.store(true, Ordering::Relaxed);

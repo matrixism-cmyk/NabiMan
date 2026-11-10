@@ -1,3 +1,4 @@
+use crate::lock_safe::LockExt;
 use super::*;
 use crate::{models::ApiResponse, users::UserStore};
 use actix_web::{web, HttpRequest, HttpResponse};
@@ -15,8 +16,7 @@ fn unavailable() -> HttpResponse {
 fn administrator(req: &HttpRequest, users: &UserStore) -> Result<NabimanUser, HttpResponse> {
     let id = crate::auth::verified_user_id(req);
     users
-        .lock()
-        .unwrap()
+        .lock_safe()
         .iter()
         .find(|u| Some(u.id.as_str()) == id.as_deref() && u.active() && u.super_admin())
         .cloned()
@@ -35,11 +35,11 @@ async fn list(
     if let Err(r) = administrator(&req, &users) {
         return r;
     }
-    let state = store.lock().unwrap();
+    let state = store.lock_safe();
     if state.failed {
         return unavailable();
     }
-    let members = users.lock().unwrap();
+    let members = users.lock_safe();
     let items: Vec<_> = state.keys.iter().map(|k| {
         let owner = members.iter().find(|u| u.id == k.owner_id);
         let status = if k.version != 1 { "legacy_disabled" }
@@ -109,7 +109,7 @@ async fn create(
         security_stamp: stamp(&actor),
         scopes: body.scopes.clone(),
     };
-    let mut state = store.lock().unwrap();
+    let mut state = store.lock_safe();
     if state.failed {
         return unavailable();
     }
@@ -138,7 +138,7 @@ async fn revoke(
     if let Err(r) = administrator(&req, &users) {
         return r;
     }
-    let mut state = store.lock().unwrap();
+    let mut state = store.lock_safe();
     if state.failed {
         return unavailable();
     }

@@ -12,6 +12,7 @@
 //! `find` in one go; an SFTP-only account and FTP walk the folders over the
 //! file connection (see `usage_walk`).
 
+use crate::lock_safe::LockExt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -97,10 +98,10 @@ impl Job {
         }
     }
     pub fn tally(&self, f: impl FnOnce(&mut Count)) {
-        f(&mut self.count.lock().unwrap_or_else(|e| e.into_inner()));
+        f(&mut self.count.lock_safe());
     }
     pub fn snapshot(&self) -> Count {
-        *self.count.lock().unwrap_or_else(|e| e.into_inner())
+        *self.count.lock_safe()
     }
     /// Whether to stop now: asked to, out of time, or past the entry limit.
     pub fn over(&self) -> bool {
@@ -114,7 +115,7 @@ impl Job {
         } else {
             return false;
         };
-        self.capped.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert(why);
+        self.capped.lock_safe().get_or_insert(why);
         self.stop.store(true, Ordering::Relaxed);
         true
     }
@@ -123,7 +124,7 @@ impl Job {
     }
     /// Stops for a reason of its own, such as a lost connection.
     pub fn give_up(&self, why: &'static str) {
-        self.capped.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert(why);
+        self.capped.lock_safe().get_or_insert(why);
         self.halt();
     }
     #[cfg(test)]
@@ -131,7 +132,7 @@ impl Job {
         Job::new(&ACCOUNT)
     }
     fn capped(&self) -> Option<&'static str> {
-        *self.capped.lock().unwrap_or_else(|e| e.into_inner())
+        *self.capped.lock_safe()
     }
 }
 

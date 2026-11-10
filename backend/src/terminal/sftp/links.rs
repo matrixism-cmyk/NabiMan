@@ -15,6 +15,7 @@
 //! stream link is good for every fetch of that one file, for a couple of
 //! hours, and only on the stream route. Each kind opens only its own route.
 
+use crate::lock_safe::LockExt;
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -92,7 +93,7 @@ fn issue_kind(owner: Owner, scope: &str, path: &str, reusable: bool) -> Result<S
         .try_fill_bytes(&mut bytes)
         .map_err(|_| "No randomness available".to_string())?;
     let ticket = hex::encode(bytes);
-    let mut map = store().lock().unwrap_or_else(|e| e.into_inner());
+    let mut map = store().lock_safe();
     let now = Instant::now();
     map.retain(|_, l| l.expires > now);
     if map.len() >= CAPACITY {
@@ -128,7 +129,7 @@ pub(crate) fn redeem(method: &str, path: &str, query: &str) -> Option<Option<Cla
     if method != "GET" {
         return Some(None);
     }
-    let mut map = store().lock().unwrap_or_else(|e| e.into_inner());
+    let mut map = store().lock_safe();
     let key = digest(ticket);
     // Each kind of link opens only its own route; a download link tried on
     // the stream route is gone. A stream link stays for the next range.
@@ -157,7 +158,7 @@ fn admit(link: &Link, scope: &str, params: &HashMap<String, String>) -> Option<C
 /// the share `token` for exactly `path`, for this route. A download link
 /// lasts a minute after its first fetch; a stream link stays for the next range.
 pub(crate) fn redeem_share(token: &str, path: &str, ticket: &str, stream: bool) -> bool {
-    let mut map = store().lock().unwrap_or_else(|e| e.into_inner());
+    let mut map = store().lock_safe();
     let key = digest(ticket);
     let fits = |l: &Link| {
         l.expires > Instant::now() && l.scope == token && l.path == path && matches!(&l.owner, Owner::Share(t) if t == token)

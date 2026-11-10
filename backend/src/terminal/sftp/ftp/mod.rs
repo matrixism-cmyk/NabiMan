@@ -4,6 +4,7 @@
 //! FTP does one thing at a time per connection, so a server's entry keeps a
 //! couple of logged-in connections: one answers listings and renames while
 //! another carries a download or an upload.
+use crate::lock_safe::LockExt;
 
 mod control;
 mod list;
@@ -63,7 +64,7 @@ impl FtpConn {
             *t = Instant::now();
         }
         loop {
-            let kept = self.idle.lock().unwrap_or_else(|e| e.into_inner()).pop();
+            let kept = self.idle.lock_safe().pop();
             let Some((mut ctl, since)) = kept else { break };
             if since.elapsed() < STALE || ctl.cmd("NOOP").await.is_ok_and(|r| r.code == 200) {
                 return Ok(ctl);
@@ -73,7 +74,7 @@ impl FtpConn {
     }
 
     pub(crate) fn give_back(&self, ctl: Control) {
-        let mut idle = self.idle.lock().unwrap_or_else(|e| e.into_inner());
+        let mut idle = self.idle.lock_safe();
         if idle.len() < SPARE {
             idle.push((ctl, Instant::now()));
         }
@@ -267,7 +268,7 @@ fn key(user_id: &str, srv: &RemoteServer) -> String {
 pub(crate) async fn session(user_id: &str, srv: &RemoteServer) -> std::result::Result<Arc<FtpConn>, String> {
     let key = key(user_id, srv);
     {
-        let mut map = pool().lock().unwrap_or_else(|e| e.into_inner());
+        let mut map = pool().lock_safe();
         map.retain(|_, c| !c.idle_too_long());
         if let Some(conn) = map.get(&key) {
             return Ok(conn.clone());
@@ -276,12 +277,12 @@ pub(crate) async fn session(user_id: &str, srv: &RemoteServer) -> std::result::R
     let conn = Arc::new(FtpConn::new(srv)?);
     let ctl = conn.take().await.map_err(|e| format!("FTP connection failed: {e}"))?;
     conn.give_back(ctl);
-    pool().lock().unwrap_or_else(|e| e.into_inner()).insert(key, conn.clone());
+    pool().lock_safe().insert(key, conn.clone());
     Ok(conn)
 }
 
 pub(crate) fn forget(user_id: &str, srv: &RemoteServer) {
-    pool().lock().unwrap_or_else(|e| e.into_inner()).remove(&key(user_id, srv));
+    pool().lock_safe().remove(&key(user_id, srv));
 }
 
 /// Logs in once and out again: the health check of an FTP server.

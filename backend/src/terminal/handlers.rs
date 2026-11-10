@@ -1,4 +1,5 @@
 //! REST endpoints around the session registry and the per-user settings.
+use crate::lock_safe::LockExt;
 
 #[path = "claude_handlers.rs"]
 mod claude;
@@ -67,7 +68,7 @@ async fn list_sessions(
     }
     // Before the lock: it asks tmux and reads /proc.
     let seen = super::claude_peers::look();
-    let map = store.lock().unwrap();
+    let map = store.lock_safe();
     let now = now_unix();
     let visible: Vec<(&String, &TmuxSession)> = map
         .iter()
@@ -140,7 +141,7 @@ async fn get_scrollback(
     let id = path.into_inner();
     let user_id = crate::auth::verified_user_id(&req).unwrap_or_default();
     let (tmux_name, lines) = {
-        let map = store.lock().unwrap();
+        let map = store.lock_safe();
         match map.get(&id) {
             Some(s)
                 if super::session::visible_to(s, &user_id, &users)

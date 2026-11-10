@@ -3,6 +3,7 @@
 //! `note`, then `done` or `error`). The answer is kept with the conversation
 //! even if the page is gone before it ends; "stop" ends it early.
 
+use crate::lock_safe::LockExt;
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
@@ -32,7 +33,7 @@ const VOICE_PROMPT: &str = "이 대화는 음성으로 이루어집니다. 사�
 /// Answers being written, by conversation, with the way to stop each.
 fn running() -> std::sync::MutexGuard<'static, HashMap<String, oneshot::Sender<()>>> {
     static MAP: OnceLock<Mutex<HashMap<String, oneshot::Sender<()>>>> = OnceLock::new();
-    MAP.get_or_init(Default::default).lock().unwrap_or_else(|e| e.into_inner())
+    MAP.get_or_init(Default::default).lock_safe()
 }
 
 fn valid_session(id: &str) -> bool {

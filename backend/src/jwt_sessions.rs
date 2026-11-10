@@ -1,3 +1,4 @@
+use crate::lock_safe::LockExt;
 use crate::auth::JwtSecret;
 use crate::models::ApiResponse;
 use crate::users::UserStore;
@@ -113,7 +114,7 @@ pub fn generate_session_id() -> String {
 
 pub fn register_session(store: &SessionStore, sid: &str, username: &str, user_id: &str, ip: &str) {
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
-    store.lock().unwrap().insert(
+    store.lock_safe().insert(
         sid.to_string(),
         SessionInfo {
             session_id: sid.to_string(),
@@ -139,7 +140,7 @@ pub fn register_authenticated_session(
     mfa_verified: bool,
     ip: &str,
 ) -> bool {
-    let users = users.lock().unwrap();
+    let users = users.lock_safe();
     let Some(current) = users
         .iter()
         .find(|u| u.id == authenticated.id && u.username == authenticated.username)
@@ -159,7 +160,7 @@ pub fn register_authenticated_session(
         return false;
     }
     register_session(store, sid, &current.username, &current.id, ip);
-    if let Some(session) = store.lock().unwrap().get_mut(sid) {
+    if let Some(session) = store.lock_safe().get_mut(sid) {
         session.mfa_verified = mfa_verified && current.totp_enabled;
     }
     true
@@ -167,8 +168,7 @@ pub fn register_authenticated_session(
 
 pub fn revoke_user_sessions(store: &SessionStore, username: &str, keep_sid: Option<&str>) {
     store
-        .lock()
-        .unwrap()
+        .lock_safe()
         .retain(|sid, session| session.username != username || keep_sid == Some(sid.as_str()));
 }
 
@@ -203,8 +203,8 @@ async fn refresh_token(
 
     // Account -> session is the same lock order used by review and login.
     // Keep both through consume+mint+commit so only one request can rotate.
-    let users = users.lock().unwrap();
-    let mut sessions = sessions.lock().unwrap();
+    let users = users.lock_safe();
+    let mut sessions = sessions.lock_safe();
     let Some(session) = sessions.get(&claims.sid) else {
         return HttpResponse::Unauthorized().json(ApiResponse::<()>::error("Session revoked"));
     };

@@ -4,6 +4,7 @@
 //! `data_dir/server-facts.sqlite3`) so the work map can show each machine's
 //! state without checking it again.
 
+use crate::lock_safe::LockExt;
 use std::os::unix::fs::PermissionsExt;
 use std::sync::Mutex;
 
@@ -28,7 +29,7 @@ fn open(path: &std::path::Path) -> rusqlite::Result<Connection> {
 }
 
 fn with_db<T>(f: impl FnOnce(&Connection) -> rusqlite::Result<T>) -> Option<T> {
-    let mut slot = DB.lock().unwrap_or_else(|e| e.into_inner());
+    let mut slot = DB.lock_safe();
     if slot.is_none() {
         *slot = open(&nabiman_server::data_dir().join("server-facts.sqlite3")).ok();
     }
@@ -87,7 +88,7 @@ fn load(db: &Connection) -> rusqlite::Result<Vec<Facts>> {
 /// `GET /api/remote-servers/facts`: what each server last reported; none for remote-only members.
 pub(crate) async fn facts(req: HttpRequest, users: web::Data<crate::users::UserStore>) -> HttpResponse {
     let user_id = crate::auth::verified_user_id(&req).unwrap_or_default();
-    let member = users.lock().unwrap().iter().find(|u| u.id == user_id).is_none_or(crate::member_servers::is_member);
+    let member = users.lock_safe().iter().find(|u| u.id == user_id).is_none_or(crate::member_servers::is_member);
     if user_id.is_empty() || member {
         return HttpResponse::Ok().json(ApiResponse::ok(Vec::<Facts>::new()));
     }

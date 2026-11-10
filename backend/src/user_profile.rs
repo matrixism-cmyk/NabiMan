@@ -1,3 +1,4 @@
+use crate::lock_safe::LockExt;
 use super::*;
 
 pub(super) async fn get_me(
@@ -9,7 +10,7 @@ pub(super) async fn get_me(
         Some(username) => username,
         None => return HttpResponse::Unauthorized().json(ApiResponse::<()>::error("Unauthorized")),
     };
-    let users = store.lock().unwrap();
+    let users = store.lock_safe();
     match users.iter().find(|u| {
         u.username == username
             && Some(u.id.as_str()) == crate::auth::verified_user_id(&req).as_deref()
@@ -17,8 +18,7 @@ pub(super) async fn get_me(
         Some(u) => {
             let verified = crate::auth::verified_claims(&req).is_some_and(|c| {
                 sessions
-                    .lock()
-                    .unwrap()
+                    .lock_safe()
                     .get(&c.sid)
                     .is_some_and(|s| s.user_id == u.id && s.mfa_verified)
             });

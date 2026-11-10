@@ -11,6 +11,7 @@
 //! password prompt, the way sshpass does for ssh. The file is read and
 //! removed at once. Exits 0 when the server closes the connection and 1 when
 //! it cannot be reached.
+use crate::lock_safe::LockExt;
 
 mod protocol;
 
@@ -138,11 +139,11 @@ pub fn run_if_asked() {
         let writer = writer.clone();
         move |bytes: &[u8]| {
             if !bytes.is_empty() {
-                let _ = writer.lock().unwrap_or_else(|e| e.into_inner()).write_all(bytes);
+                let _ = writer.lock_safe().write_all(bytes);
             }
         }
     };
-    send(&telnet.lock().unwrap_or_else(|e| e.into_inner()).hello());
+    send(&telnet.lock_safe().hello());
 
     let reader = {
         let (telnet, send) = (telnet.clone(), send.clone());
@@ -157,7 +158,7 @@ pub fn run_if_asked() {
                     Ok(0) | Err(_) => leave(0, "\r\n[Telnet 연결이 닫혔습니다]\r\n"),
                     Ok(n) => n,
                 };
-                let mut t = telnet.lock().unwrap_or_else(|e| e.into_inner());
+                let mut t = telnet.lock_safe();
                 let (screen, reply) = t.feed(&buf[..n]);
                 send(&reply);
                 let _ = out.write_all(&screen);
@@ -176,7 +177,7 @@ pub fn run_if_asked() {
     let mut buf = [0u8; 4096];
     loop {
         if RESIZED.swap(false, Ordering::Relaxed) {
-            let mut t = telnet.lock().unwrap_or_else(|e| e.into_inner());
+            let mut t = telnet.lock_safe();
             t.size = window();
             send(&t.window_size());
         }
@@ -192,7 +193,7 @@ pub fn run_if_asked() {
             Ok(0) | Err(_) => break,
             Ok(n) => n,
         };
-        let t = telnet.lock().unwrap_or_else(|e| e.into_inner());
+        let t = telnet.lock_safe();
         if !t.server_echoes() {
             // The server leaves echoing to the client.
             let shown: Vec<u8> = buf[..n].iter().flat_map(|&b| if b == b'\r' { vec![b'\r', b'\n'] } else { vec![b] }).collect();

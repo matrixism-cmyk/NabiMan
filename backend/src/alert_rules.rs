@@ -1,3 +1,4 @@
+use crate::lock_safe::LockExt;
 use crate::models::ApiResponse;
 use crate::notifications::{send_notification, ChannelStore};
 use actix_web::{web, HttpResponse};
@@ -81,8 +82,8 @@ fn check_alerts(rules: &RuleStore, channels: &ChannelStore) {
     let mem = read_memory();
     let disk = read_disk();
 
-    let mut rules = rules.lock().unwrap();
-    let channels = channels.lock().unwrap();
+    let mut rules = rules.lock_safe();
+    let channels = channels.lock_safe();
     let now = chrono::Utc::now();
 
     for rule in rules.iter_mut().filter(|r| r.enabled) {
@@ -221,14 +222,14 @@ fn parse_kb(line: &str) -> u64 {
 }
 
 async fn list_rules(store: web::Data<RuleStore>) -> HttpResponse {
-    HttpResponse::Ok().json(ApiResponse::ok(store.lock().unwrap().clone()))
+    HttpResponse::Ok().json(ApiResponse::ok(store.lock_safe().clone()))
 }
 
 async fn add_rule(body: web::Json<AlertRule>, store: web::Data<RuleStore>) -> HttpResponse {
     let mut rule = body.into_inner();
     rule.id = gen_id();
     rule.last_triggered = None;
-    let mut rules = store.lock().unwrap();
+    let mut rules = store.lock_safe();
     rules.push(rule);
     let _ = save_rules(&rules);
     HttpResponse::Ok().json(ApiResponse::ok("Rule added"))
@@ -236,7 +237,7 @@ async fn add_rule(body: web::Json<AlertRule>, store: web::Data<RuleStore>) -> Ht
 
 async fn delete_rule(path: web::Path<String>, store: web::Data<RuleStore>) -> HttpResponse {
     let id = path.into_inner();
-    let mut rules = store.lock().unwrap();
+    let mut rules = store.lock_safe();
     rules.retain(|r| r.id != id);
     let _ = save_rules(&rules);
     HttpResponse::Ok().json(ApiResponse::ok("Rule deleted"))

@@ -11,6 +11,7 @@
 //!   {"dir": "/workspace/x", "title": "x", "resume": true, "skip_permissions": true, "prompt": "…"}
 //!   → {"ok": true, "session_id": "pty_…", "title": "x", "claude": "x-12 [ab12cd]"}
 
+use crate::lock_safe::LockExt;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixListener, UnixStream};
@@ -194,8 +195,7 @@ fn list(pid: u32, store: &PtyStore) -> Answer {
         std::thread::sleep(Duration::from_millis(500));
     }
     let titles: std::collections::HashMap<String, String> = store
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
+        .lock_safe()
         .values()
         .map(|s| (s.tmux_name.clone(), if s.title.is_empty() { s.label.clone() } else { s.title.clone() }))
         .collect();
@@ -262,7 +262,7 @@ fn open(ask: Ask, uid: u32, pid: u32, store: &PtyStore) -> Answer {
     };
 
     let (sid, tmux_name) = {
-        let mut map = store.lock().unwrap_or_else(|e| e.into_inner());
+        let mut map = store.lock_safe();
         let Some(parent) = map.values().find(|s| s.tmux_name == parent_tmux).cloned() else {
             return refuse("the calling session is not one of NabiMan's");
         };

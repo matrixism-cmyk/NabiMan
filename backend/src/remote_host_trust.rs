@@ -1,4 +1,5 @@
 //! Verified host keys shared by every saved-server SSH path.
+use crate::lock_safe::LockExt;
 use crate::models::{ApiResponse, HostKeyTrust, RemoteServer};
 use actix_web::{web, HttpRequest, HttpResponse};
 use russh::keys::PublicKeyBase64;
@@ -88,8 +89,7 @@ pub async fn update(
         }
     };
     let _guard = crate::remote_servers::SERVER_WRITES
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+        .lock_safe();
     let mut servers = match crate::remote_servers::load_servers() {
         Ok(s) => s,
         Err(e) => return HttpResponse::InternalServerError().json(ApiResponse::<()>::error(&e)),

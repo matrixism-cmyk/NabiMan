@@ -1,3 +1,4 @@
+use crate::lock_safe::LockExt;
 use super::{archive, backup_dir};
 use crate::models::ApiResponse;
 use actix_web::{web, HttpResponse};
@@ -119,7 +120,7 @@ fn failed(message: &str) -> HttpResponse {
         .json(ApiResponse::<()>::error(message))
 }
 pub(super) async fn list(store: web::Data<BackupScheduleStore>) -> HttpResponse {
-    let store = store.lock().unwrap();
+    let store = store.lock_safe();
     if store.unavailable {
         return failed("Backup schedule storage unavailable; existing file preserved");
     }
@@ -150,7 +151,7 @@ pub(super) async fn create(
     {
         return HttpResponse::BadRequest().json(ApiResponse::<()>::error(&error));
     }
-    let mut store = store.lock().unwrap();
+    let mut store = store.lock_safe();
     let mut rows = store.rows.clone();
     if rows.len() >= 100 {
         return HttpResponse::Conflict().json(ApiResponse::<()>::error(
@@ -179,7 +180,7 @@ pub(super) async fn delete(
     id: web::Path<String>,
     store: web::Data<BackupScheduleStore>,
 ) -> HttpResponse {
-    let mut store = store.lock().unwrap();
+    let mut store = store.lock_safe();
     let Some(row) = store.rows.iter().find(|r| r.id == *id) else {
         return HttpResponse::NotFound().json(ApiResponse::<()>::error("Schedule not found"));
     };
@@ -199,7 +200,7 @@ pub(super) async fn delete(
 }
 // Persist intent before spawning. There is one archive worker for all schedules.
 fn claim(store: &BackupScheduleStore, id: &str, slot: Option<i64>) -> Result<Schedule, String> {
-    let mut store = store.lock().unwrap();
+    let mut store = store.lock_safe();
     if store.unavailable {
         return Err("Backup schedule storage unavailable".into());
     }
@@ -237,7 +238,7 @@ fn claim(store: &BackupScheduleStore, id: &str, slot: Option<i64>) -> Result<Sch
 }
 fn execute(store: BackupScheduleStore, row: Schedule) {
     let outcome = archive::create(&backup_dir(), &row.name, &row.paths, row.compression);
-    let mut store = store.lock().unwrap();
+    let mut store = store.lock_safe();
     let mut rows = store.rows.clone();
     if let Some(target) = rows.iter_mut().find(|r| r.id == row.id) {
         let run = target.last_result.as_mut().unwrap();
@@ -278,7 +279,7 @@ pub fn start_backup_scheduler(store: BackupScheduleStore) {
         let now = chrono::Utc::now();
         let slot = now.timestamp() / 60;
         let ids = {
-            let state = store.lock().unwrap();
+            let state = store.lock_safe();
             if state.unavailable {
                 continue;
             }

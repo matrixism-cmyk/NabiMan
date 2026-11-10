@@ -7,6 +7,7 @@
 //! listings name owners but FTP cannot change them, only permissions (SITE
 //! CHMOD).
 
+use crate::lock_safe::LockExt;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -72,7 +73,7 @@ pub(super) async fn names(t: &Target) -> Option<Arc<Names>> {
         Some(s) if s.terminal == "ssh" && s.files == "sftp" => (server_key(s), Some(s.clone())),
         Some(_) => return None,
     };
-    if let Some((at, names)) = cache().lock().unwrap_or_else(|e| e.into_inner()).get(&key) {
+    if let Some((at, names)) = cache().lock_safe().get(&key) {
         if at.elapsed() < NAMES_TTL {
             return Some(names.clone());
         }
@@ -95,7 +96,7 @@ pub(super) async fn names(t: &Target) -> Option<Arc<Names>> {
         .ok()??,
     };
     let names = Arc::new(parse_names(&text));
-    cache().lock().unwrap_or_else(|e| e.into_inner()).insert(key, (Instant::now(), names.clone()));
+    cache().lock_safe().insert(key, (Instant::now(), names.clone()));
     Some(names)
 }
 

@@ -1,3 +1,4 @@
+use crate::lock_safe::LockExt;
 use crate::models::ApiResponse;
 use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
@@ -56,8 +57,10 @@ fn compute_hash(prev_hash: &str, entry: &AuditEntry) -> String {
     hex::encode(hasher.finalize())
 }
 
+/// A lock poisoned by a reader is taken up again; one poisoned in the middle
+/// of an append is caught by the store itself, which then refuses to chain on.
 pub fn append_entry(store: &AuditLog, entry: AuditEntry) -> Option<AuditEntry> {
-    store.lock().unwrap().append(entry).ok()
+    store.lock_safe().append(entry).ok()
 }
 #[cfg(test)]
 #[path = "audit_append_tests.rs"]
@@ -72,7 +75,7 @@ struct AuditQuery {
 }
 
 async fn get_audit_log(store: web::Data<AuditLog>, query: web::Query<AuditQuery>) -> HttpResponse {
-    let log = store.lock().unwrap();
+    let log = store.lock_safe();
     let limit = query.limit.unwrap_or(200).min(500);
     let filtered: Vec<AuditEntry> = log
         .entries

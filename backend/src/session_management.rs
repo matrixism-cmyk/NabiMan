@@ -1,4 +1,5 @@
 //! Account login sessions; tenant membership never grants access to another account's sessions.
+use crate::lock_safe::LockExt;
 use crate::{
     auth,
     jwt_sessions::{SessionInfo, SessionStore},
@@ -32,8 +33,8 @@ async fn list(
     users: web::Data<UserStore>,
     sessions: web::Data<SessionStore>,
 ) -> HttpResponse {
-    let users = users.lock().unwrap();
-    let sessions = sessions.lock().unwrap();
+    let users = users.lock_safe();
+    let sessions = sessions.lock_safe();
     let Some((actor, current)) = actor(&req, &users, &sessions) else {
         return HttpResponse::Unauthorized().finish();
     };
@@ -57,8 +58,8 @@ async fn revoke(
     users: web::Data<UserStore>,
     sessions: web::Data<SessionStore>,
 ) -> HttpResponse {
-    let users = users.lock().unwrap();
-    let mut sessions = sessions.lock().unwrap();
+    let users = users.lock_safe();
+    let mut sessions = sessions.lock_safe();
     let Some((actor, _)) = actor(&req, &users, &sessions) else {
         return HttpResponse::Unauthorized().finish();
     };
@@ -77,8 +78,8 @@ fn revoke_own(
     sessions: web::Data<SessionStore>,
     keep_current: bool,
 ) -> HttpResponse {
-    let users = users.lock().unwrap();
-    let mut sessions = sessions.lock().unwrap();
+    let users = users.lock_safe();
+    let mut sessions = sessions.lock_safe();
     let Some((actor, current)) = actor(&req, &users, &sessions) else {
         return HttpResponse::Unauthorized().finish();
     };

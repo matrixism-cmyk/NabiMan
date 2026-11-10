@@ -1,4 +1,5 @@
 //! Highest administrator confirms stable IDs in a specific Rancher realm.
+use crate::lock_safe::LockExt;
 use crate::mec::handlers::util::{created, from_service_error, ok_response};
 use crate::mec::services::ServiceError;
 use crate::mec::{
@@ -19,7 +20,7 @@ fn no_store(mut response: HttpResponse) -> HttpResponse {
 }
 
 fn target(store: &UserStore, id: &str) -> Result<(), HttpResponse> {
-    let users = store.lock().unwrap();
+    let users = store.lock_safe();
     match users.iter().find(|u| u.id == id) {
         Some(u) if u.active() => Ok(()),
         Some(_) => Err(from_service_error(ServiceError::Conflict(
@@ -110,11 +111,11 @@ pub async fn link(
     }
     // Recheck current local identities after upstream I/O. Hold the user store
     // through commit so review/delete cannot race this local decision.
-    let current = users.lock().unwrap();
+    let current = users.lock_safe();
     let Some(claims) = crate::auth::verified_claims(&req) else {
         return HttpResponse::Unauthorized().finish();
     };
-    let active_sessions = sessions.lock().unwrap();
+    let active_sessions = sessions.lock_safe();
     if claims.exp as u128 <= chrono::Utc::now().timestamp().max(0) as u128
         || !active_sessions.get(&claims.sid).is_some_and(|s| {
             s.username == claims.sub

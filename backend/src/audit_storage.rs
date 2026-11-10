@@ -15,6 +15,9 @@ pub struct State {
     pub unparsed_lines: usize,
     previous: String,
     identity: Option<(u64, u64, u64)>,
+    /// Set for the length of an append. Still set at the next one means the
+    /// last panicked part-way, so the file and `previous` may disagree.
+    appending: bool,
 }
 impl State {
     pub fn load(path: PathBuf) -> Self {
@@ -26,6 +29,7 @@ impl State {
             unparsed_lines: 0,
             previous: "0".into(),
             identity: None,
+            appending: false,
         };
         let result = (|| {
             match fs::symlink_metadata(&state.path) {
@@ -60,9 +64,15 @@ impl State {
         state
     }
     pub fn append(&mut self, mut entry: AuditEntry) -> Result<AuditEntry, &'static str> {
+        if self.appending {
+            // Its lock was taken up again after a panic mid-append: chaining on
+            // would hide the gap, so persistence stops until an operator looks.
+            self.error.get_or_insert("append_interrupted");
+        }
         if let Some(error) = self.error {
             return Err(error);
         }
+        self.appending = true;
         entry.hash = Some("v2:".into());
         entry.hash = Some(compute_hash(&self.previous, &entry));
         let result = (|| {
@@ -124,6 +134,7 @@ impl State {
             }
             Ok(())
         })();
+        self.appending = false;
         if let Err(error) = result {
             self.error = Some(error);
             eprintln!("Local audit persistence unavailable ({error}); operation outcome is unchanged; inspect storage before restarting");
@@ -135,6 +146,13 @@ impl State {
             self.entries.remove(0);
         }
         Ok(entry)
+    }
+}
+#[cfg(test)]
+impl State {
+    /// As if the last append had panicked part-way.
+    pub fn interrupt_append_for_test(&mut self) {
+        self.appending = true;
     }
 }
 fn identity(path: &std::path::Path) -> Result<(u64, u64, u64), &'static str> {

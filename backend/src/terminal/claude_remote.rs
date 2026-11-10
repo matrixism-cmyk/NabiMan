@@ -10,6 +10,7 @@
 //!
 //! The probe sends back session records and, from their transcripts, only who
 //! sent each peer message, when, and its id; message text stays where it is.
+use crate::lock_safe::LockExt;
 
 #[path = "claude_remote_probe.rs"]
 mod probe;
@@ -140,7 +141,7 @@ fn state() -> &'static Mutex<State> {
 
 /// Someone is looking at the sessions: keep the remote view fresh for a while.
 pub(crate) fn want(store: &PtyStore) {
-    let mut s = state().lock().unwrap_or_else(|e| e.into_inner());
+    let mut s = state().lock_safe();
     s.wanted = Some(Instant::now());
     if s.store.is_none() {
         s.store = Some(store.clone());
@@ -153,7 +154,7 @@ pub(crate) fn want(store: &PtyStore) {
 
 /// Tiles are connected to remote servers that have not been looked at yet.
 pub(crate) fn pending() -> bool {
-    let s = state().lock().unwrap_or_else(|e| e.into_inner());
+    let s = state().lock_safe();
     let Some(store) = s.store.clone() else { return false };
     let looked = s.tried.clone();
     drop(s);
@@ -162,7 +163,7 @@ pub(crate) fn pending() -> bool {
 
 /// What was last seen on the remote servers.
 pub(crate) fn snapshot() -> Snapshot {
-    let s = state().lock().unwrap_or_else(|e| e.into_inner());
+    let s = state().lock_safe();
     let mut out = Snapshot { servers: s.names.clone(), agents: s.agents.clone(), ..Default::default() };
     for (server, st) in &s.servers {
         out.peers.extend(st.peers.values().cloned());
@@ -176,7 +177,7 @@ pub(crate) fn snapshot() -> Snapshot {
 type Tile = (String, String, String, String);
 
 fn tiles(store: &PtyStore) -> Vec<Tile> {
-    let map = store.lock().unwrap_or_else(|e| e.into_inner());
+    let map = store.lock_safe();
     map.iter()
         .filter_map(|(sid, s)| {
             let b = s.remote_binding.as_ref()?;
@@ -192,7 +193,7 @@ fn tiles(store: &PtyStore) -> Vec<Tile> {
 fn poll() {
     loop {
         let (store, wanted) = {
-            let s = state().lock().unwrap_or_else(|e| e.into_inner());
+            let s = state().lock_safe();
             (s.store.clone(), s.wanted)
         };
         let active = wanted.is_some_and(|w| w.elapsed() < IDLE_AFTER);
@@ -207,7 +208,7 @@ fn look_once(store: &PtyStore) {
     let tiles = tiles(store);
     let live: HashSet<&str> = tiles.iter().map(|t| t.2.as_str()).collect();
     {
-        let mut s = state().lock().unwrap_or_else(|e| e.into_inner());
+        let mut s = state().lock_safe();
         // Servers no tile is connected to any more are forgotten.
         s.servers.retain(|id, _| live.contains(id.as_str()));
         for id in &live {
@@ -222,13 +223,13 @@ fn look_once(store: &PtyStore) {
     let mut ok_servers: HashSet<String> = HashSet::new();
     for (sid, tmux_name, server_id, target) in &tiles {
         let offsets = {
-            let s = state().lock().unwrap_or_else(|e| e.into_inner());
+            let s = state().lock_safe();
             s.servers.get(server_id).map(|st| st.offsets.clone()).unwrap_or_default()
         };
         let Some(out) = probe(sid, target) else { continue };
         ok_servers.insert(server_id.clone());
         let found = parse(&out, server_id, tmux_name);
-        let mut s = state().lock().unwrap_or_else(|e| e.into_inner());
+        let mut s = state().lock_safe();
         s.agents.insert(tmux_name.clone(), found.agents.clone());
         let st = s.servers.entry(server_id.clone()).or_default();
         for (session, size) in found.sizes {
@@ -247,7 +248,7 @@ fn look_once(store: &PtyStore) {
         let _ = offsets;
         merge(fresh.entry(server_id.clone()).or_default(), found.peers);
     }
-    let mut s = state().lock().unwrap_or_else(|e| e.into_inner());
+    let mut s = state().lock_safe();
     s.tried = tiles.iter().map(|t| t.2.clone()).collect();
     for (server, peers) in fresh {
         if ok_servers.contains(&server) {
@@ -272,9 +273,9 @@ fn merge(seen: &mut HashMap<String, RemoteClaude>, peers: Vec<RemoteClaude>) {
 
 /// Runs the probe over the tile's shared connection; its output, or `None`.
 fn probe(session_id: &str, target: &str) -> Option<String> {
-    let os = state().lock().unwrap_or_else(|e| e.into_inner()).os.get(session_id).copied();
+    let os = state().lock_safe().os.get(session_id).copied();
     let offsets = {
-        let s = state().lock().unwrap_or_else(|e| e.into_inner());
+        let s = state().lock_safe();
         s.servers.values().flat_map(|st| st.offsets.clone()).collect::<HashMap<_, _>>()
     };
     let order: Vec<Os> = match os {
@@ -284,7 +285,7 @@ fn probe(session_id: &str, target: &str) -> Option<String> {
     for o in order {
         if let Some(out) = run(session_id, target, o, &offsets) {
             if out.lines().any(|l| l.starts_with("C\t")) {
-                state().lock().unwrap_or_else(|e| e.into_inner()).os.insert(session_id.to_string(), o);
+                state().lock_safe().os.insert(session_id.to_string(), o);
                 return Some(out);
             }
         }

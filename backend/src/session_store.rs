@@ -1,7 +1,7 @@
 //! Sign-ins, kept on disk so that a restart — every deployment is one — does
 //! not sign everyone out.
 //!
-//! The store is used as it always was (`sessions.lock().unwrap()`), but its
+//! The store is used like a mutex (`sessions.lock_safe()`), but its
 //! guard notices any change made through it and saves the whole set before
 //! the lock is let go. A sign-out or a revocation is therefore on disk the
 //! moment it takes effect, and a restart can never bring a revoked sign-in
@@ -148,6 +148,12 @@ impl SessionStore {
         }
     }
 
+    /// The sign-ins, taken up again if an earlier holder panicked: the map is
+    /// whole between statements, so one bad request cannot sign everyone out.
+    pub fn lock_safe(&self) -> SessionGuard<'_> {
+        self.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
     pub fn try_lock(&self) -> TryLockResult<SessionGuard<'_>> {
         let file = self.file.as_deref().map(PathBuf::as_path);
         let wrap = |guard| SessionGuard { guard, file, changed: false };
@@ -235,5 +241,23 @@ mod tests {
         let file = dir.path().join("login_sessions.json");
         std::fs::write(&file, b"{not json").unwrap();
         assert!(SessionStore::open(file).lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_panic_while_holding_the_sign_ins_does_not_sign_everyone_out() {
+        let dir = Dir::new();
+        let file = dir.path().join("login_sessions.json");
+        let store = SessionStore::open(file.clone());
+        let held = store.clone();
+        let _ = std::thread::spawn(move || {
+            let mut map = held.lock_safe();
+            map.insert("s1".into(), info("s1", &now()));
+            panic!("a handler panicked mid-request");
+        })
+        .join();
+        assert!(store.lock().is_err(), "the mutex is poisoned");
+        store.lock_safe().insert("s2".into(), info("s2", &now()));
+        let again = SessionStore::open(file);
+        assert_eq!(again.lock_safe().len(), 2, "both sign-ins were saved");
     }
 }

@@ -1,6 +1,7 @@
 //! The model that last answered in a Claude Code session, read from the end
 //! of its transcript.
 
+use crate::lock_safe::LockExt;
 use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
@@ -35,7 +36,7 @@ static MODELS: ModelCache = Mutex::new(None);
 /// The model that last answered in a transcript, read from its end (and again only when it has grown).
 pub(super) fn last_model(transcript: &Path) -> Option<String> {
     let len = fs::metadata(transcript).ok()?.len();
-    let mut guard = MODELS.lock().unwrap_or_else(|e| e.into_inner());
+    let mut guard = MODELS.lock_safe();
     let cache = guard.get_or_insert_with(HashMap::new);
     if let Some((at, model)) = cache.get(transcript) {
         if *at == len {

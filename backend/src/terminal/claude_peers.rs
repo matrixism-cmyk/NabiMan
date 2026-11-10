@@ -17,6 +17,7 @@
 //! start time matches), belongs to the file's owner, and runs under a pane of
 //! this server's tmux; so a file left behind, or one written to claim
 //! someone else's process, shows nothing.
+use crate::lock_safe::LockExt;
 
 #[path = "claude_peers_link.rs"]
 mod link;
@@ -146,12 +147,12 @@ static CACHE: Cache = Mutex::new(None);
 
 /// Drop what was seen, so the next look scans again (the lead changed, say).
 pub(crate) fn forget() {
-    *CACHE.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    *CACHE.lock_safe() = None;
 }
 
 /// The Claude sessions in each tmux session, by tmux name.
 pub(crate) fn look() -> Arc<HashMap<String, Seen>> {
-    let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    let mut cache = CACHE.lock_safe();
     if let Some((at, seen)) = cache.as_ref() {
         if at.elapsed() < FRESH {
             return seen.clone();
