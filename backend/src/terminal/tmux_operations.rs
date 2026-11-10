@@ -1,4 +1,5 @@
 use super::*;
+use crate::bounded_command::{deadline, OutputWithin};
 
 pub(crate) fn exact_session(name: &str) -> String {
     format!("={name}")
@@ -32,7 +33,7 @@ pub(crate) fn tmux_session_state(name: &str) -> std::io::Result<bool> {
     let output = tmux()
         .env("LC_ALL", "C")
         .args(["has-session", "-t", &exact_session(name)])
-        .output()?;
+        .output_within(deadline::TMUX)?;
     classify_tmux_probe(&output, name)
 }
 pub(crate) fn tmux_session_exists(name: &str) -> bool {
@@ -42,7 +43,7 @@ pub(crate) fn close_tmux_session(name: &str) -> std::io::Result<()> {
     let output = tmux()
         .env("LC_ALL", "C")
         .args(["kill-session", "-t", &exact_session(name)])
-        .output()?;
+        .output_within(deadline::TMUX)?;
     if output.status.success() || matches!(tmux_session_state(name), Ok(false)) {
         Ok(())
     } else {
@@ -244,7 +245,7 @@ pub(crate) fn client_size(name: &str) -> Option<(u16, u16)> {
 pub(crate) fn pane_preview(name: &str, lines: usize) -> String {
     let out = match tmux()
         .args(["capture-pane", "-p", "-J", "-t", &exact_pane(name)])
-        .output()
+        .output_within(deadline::TMUX)
     {
         Ok(o) if o.status.success() => o.stdout,
         _ => return String::new(),

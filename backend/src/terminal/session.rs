@@ -1,5 +1,6 @@
 //! The tmux-backed session registry: what is running, for whom, and for how
 //! long — plus the tmux commands that create and inspect those sessions.
+use crate::bounded_command::{deadline, OutputWithin};
 use crate::lock_safe::LockExt;
 
 #[path = "tmux_operations.rs"]
@@ -40,7 +41,7 @@ pub(crate) fn close_tmux_session(name: &str) -> std::io::Result<()> {
 }
 
 fn pane_pids(name: &str) -> Vec<u32> {
-    let Ok(out) = tmux().args(["list-panes", "-s", "-t", &exact_session(name), "-F", "#{pane_pid}"]).output() else {
+    let Ok(out) = tmux().args(["list-panes", "-s", "-t", &exact_session(name), "-F", "#{pane_pid}"]).output_within(deadline::TMUX) else {
         return Vec::new();
     };
     String::from_utf8_lossy(&out.stdout).lines().filter_map(|l| l.trim().parse().ok()).collect()
@@ -202,40 +203,40 @@ pub fn restore_sessions(store: &PtyStore) {
 pub fn start_pty_cleanup(store: PtyStore) {
     std::thread::spawn(move || loop {
         std::thread::sleep(CLEANUP_INTERVAL);
-        let mut map = store.lock_safe();
-        let now = now_unix();
-        let expired: Vec<String> = map
-            .iter()
-            .filter(|(_, s)| {
-                s.ws_count == 0
-                    && s.timeout_secs > 0
-                    && now.saturating_sub(s.last_active_unix) > s.timeout_secs
-            })
-            .map(|(id, _)| id.clone())
-            .collect();
-        // A session whose tmux process died (host rebooted, user typed exit)
-        // is dropped too, so the session list never shows ghosts.
-        let dead: Vec<String> = map
-            .iter()
-            .filter(|(_, s)| {
-                s.ws_count == 0 && matches!(tmux_session_state(&s.tmux_name), Ok(false))
-            })
-            .map(|(id, _)| id.clone())
-            .collect();
-        let mut changed = false;
-        for id in expired {
-            if let Some(s) = map.get(&id) {
-                if close_tmux_session(&s.tmux_name).is_ok() {
-                    map.remove(&id);
-                    changed = true;
+        // tmux is asked with the store unlocked: a slow or stuck tmux must not
+        // hold up every request that needs the sessions (2026-09-29 hang).
+        let idle: Vec<(String, String, bool)> = {
+            let map = store.lock_safe();
+            let now = now_unix();
+            map.iter()
+                .filter(|(_, s)| s.ws_count == 0)
+                .map(|(id, s)| {
+                    let expired = s.timeout_secs > 0 && now.saturating_sub(s.last_active_unix) > s.timeout_secs;
+                    (id.clone(), s.tmux_name.clone(), expired)
+                })
+                .collect()
+        };
+        // Expired ones are closed; a session whose tmux process died (host
+        // rebooted, user typed exit) is dropped too, so the list shows no ghosts.
+        let gone: Vec<(String, String)> = idle
+            .into_iter()
+            .filter(|(_, name, expired)| {
+                if *expired {
+                    close_tmux_session(name).is_ok()
+                } else {
+                    matches!(tmux_session_state(name), Ok(false))
                 }
-            }
+            })
+            .map(|(id, name, _)| (id, name))
+            .collect();
+        if gone.is_empty() {
+            continue;
         }
-        for id in dead {
-            map.remove(&id);
-            changed = true;
-        }
-        if changed {
+        let mut map = store.lock_safe();
+        // Only if it is still the same session and nobody attached meanwhile.
+        let before = map.len();
+        map.retain(|id, s| !gone.iter().any(|(g, name)| g == id && *name == s.tmux_name && s.ws_count == 0));
+        if map.len() != before {
             persist(&map);
         }
     });

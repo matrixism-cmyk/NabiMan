@@ -68,26 +68,25 @@ async fn list_sessions(
     }
     // Before the lock: it asks tmux and reads /proc.
     let seen = super::claude_peers::look();
-    let map = store.lock_safe();
-    let now = now_unix();
-    let visible: Vec<(&String, &TmuxSession)> = map
+    let visible: Vec<(String, TmuxSession)> = store
+        .lock_safe()
         .iter()
         .filter(|(_, s)| super::session::visible_to(s, &user_id, &users))
+        .map(|(id, s)| (id.clone(), s.clone()))
         .collect();
+    let now = now_unix();
+    // tmux is asked off the worker and with the store unlocked: a stuck tmux
+    // once held the lock and so stopped every request (2026-09-29).
+    let asks: Vec<(String, bool)> =
+        visible.iter().map(|(_, s)| (s.tmux_name.clone(), super::remote_access::allowed(s))).collect();
+    let probed = web::block(move || probe_states(asks)).await.unwrap_or_default();
     // Links are shown only between sessions this account sees.
     let id_of: HashMap<&str, &str> = visible.iter().map(|(id, s)| (s.tmux_name.as_str(), id.as_str())).collect();
     let mut list: Vec<SessionInfo> = visible
-        .into_iter()
-        .map(|(id, s)| {
-            let state = if !super::remote_access::allowed(s) {
-                "blocked"
-            } else {
-                match super::session::tmux_session_state(&s.tmux_name) {
-                    Ok(true) => "alive",
-                    Ok(false) => "ended",
-                    Err(_) => "unknown",
-                }
-            };
+        .iter()
+        .enumerate()
+        .map(|(i, (id, s))| {
+            let (state, preview) = probed.get(i).cloned().unwrap_or(("unknown", String::new()));
             let alive = state == "alive";
             let here = seen.get(&s.tmux_name).filter(|_| alive);
             let directs: Vec<String> = here.map(|h| directs_of(h, &id_of, remote_ok)).unwrap_or_default();
@@ -104,11 +103,7 @@ async fn list_sessions(
                 alive,
                 state,
                 title: s.title.clone(),
-                preview: if alive {
-                    pane_preview(&s.tmux_name, PREVIEW_LINES)
-                } else {
-                    String::new()
-                },
+                preview,
                 claude: here.map(|h| h.claude.clone()).unwrap_or_default(),
                 busy: here.is_some_and(|h| h.busy()),
                 agents: here.map(|h| h.agents.clone()).unwrap_or_default(),
@@ -123,6 +118,31 @@ async fn list_sessions(
     // cards would shuffle on every refresh.
     list.sort_by(|a, b| a.age_secs.cmp(&b.age_secs).then_with(|| a.id.cmp(&b.id)));
     HttpResponse::Ok().json(crate::models::ApiResponse::ok(list))
+}
+
+/// Each session's state and, when alive, the end of its screen. Each tmux
+/// question is bounded; once one times out tmux is stuck, and the rest are
+/// reported unknown rather than asked.
+fn probe_states(asks: Vec<(String, bool)>) -> Vec<(&'static str, String)> {
+    let mut stuck = false;
+    asks.into_iter()
+        .map(|(name, allowed)| {
+            let state = match (allowed, stuck) {
+                (false, _) => "blocked",
+                (_, true) => "unknown",
+                _ => match super::session::tmux_session_state(&name) {
+                    Ok(true) => "alive",
+                    Ok(false) => "ended",
+                    Err(e) => {
+                        stuck = e.kind() == std::io::ErrorKind::TimedOut;
+                        "unknown"
+                    }
+                },
+            };
+            let preview = if state == "alive" { pane_preview(&name, PREVIEW_LINES) } else { String::new() };
+            (state, preview)
+        })
+        .collect()
 }
 
 #[derive(serde::Deserialize)]

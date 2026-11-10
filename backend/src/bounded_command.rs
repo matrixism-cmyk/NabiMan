@@ -41,6 +41,8 @@ pub(crate) mod deadline {
     pub const SERVICE: Duration = Duration::from_secs(60);
     /// A ping, a DNS lookup, a key-login test.
     pub const PROBE: Duration = Duration::from_secs(30);
+    /// One question to the tmux server (has-session, capture-pane).
+    pub const TMUX: Duration = Duration::from_secs(5);
     /// A local query that answers at once (which, ssh-keygen -l, ps).
     pub const QUICK: Duration = Duration::from_secs(10);
 }
