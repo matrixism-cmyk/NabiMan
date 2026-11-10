@@ -6,7 +6,13 @@ import { I18nProvider } from './i18n';
 import SharePage from './components/terminal/SharePage';
 import ConsoleSharePage from './components/remote/ConsoleSharePage';
 import { ConfirmHost } from './shared/ui/ConfirmDialog';
+import { ErrorBoundary } from './shared/ui/ErrorBoundary';
+import GlobalErrorNotices from './shared/ui/GlobalErrorNotices';
+import { installGlobalErrorHandlers } from './shared/ui/globalErrors';
 import reportWebVitals from './reportWebVitals';
+
+// Errors outside React's reach (handlers, timers, promises) become a notice.
+installGlobalErrorHandlers();
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -23,14 +29,17 @@ const consoleShareToken = window.location.pathname.startsWith('/cshare/')
 root.render(
   <React.StrictMode>
     <I18nProvider>
-      {consoleShareToken ? (
-        <ConsoleSharePage token={consoleShareToken} />
-      ) : shareToken ? (
-        <SharePage token={shareToken} />
-      ) : (
-        <App />
-      )}
+      <ErrorBoundary variant="app" region="app">
+        {consoleShareToken ? (
+          <ConsoleSharePage token={consoleShareToken} />
+        ) : shareToken ? (
+          <SharePage token={shareToken} />
+        ) : (
+          <App />
+        )}
+      </ErrorBoundary>
       <ConfirmHost />
+      <GlobalErrorNotices />
     </I18nProvider>
   </React.StrictMode>
 );

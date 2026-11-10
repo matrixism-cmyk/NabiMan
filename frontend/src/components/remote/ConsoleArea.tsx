@@ -6,6 +6,7 @@ import RdpConsoleView from './RdpConsoleView';
 import VncConsoleForm from './VncConsoleForm';
 import { deleteConsole, VmConsole } from './vncApi';
 import { Selection } from './workspaceState';
+import { ErrorBoundary } from '../../shared/ui/ErrorBoundary';
 
 /** The VM-console work area: a live console (with edit/delete for admins on a
  *  registered one) or the add/edit form. Keeps that logic out of the workspace. */
@@ -32,9 +33,9 @@ export default function ConsoleArea({ selection, consoles, canManage, onSelect, 
       await deleteConsole(vm); await onChanged(); onSelect({ kind: 'overview' });
     };
     const common = { label, canEdit: canMng, onEdit: edit, onDelete: del, canGrant: canManage, onGrant: () => onAccess(vm, label), canShare: true, onShare: () => onShare(vm, label) };
-    return rec?.protocol === 'rdp'
+    return <ErrorBoundary region="console" resetKey={vm}>{rec?.protocol === 'rdp'
       ? <RdpConsoleView target={vm} {...common} />
-      : <VncConsoleView vm={vm} {...common} />;
+      : <VncConsoleView vm={vm} {...common} />}</ErrorBoundary>;
   }
   if (selection.kind === 'console-form') {
     const edit = selection.edit;

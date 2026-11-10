@@ -22,6 +22,7 @@ import TargetRail from './TargetRail';
 import AdhocConnect from './AdhocConnect';
 import ConnectCard from './ConnectCard';
 import ConsoleArea from './ConsoleArea';
+import RwView from './RwView';
 import { VmConsole } from './vncApi';
 import { useConsoleActions } from './useConsoleActions';
 import TerminalWithFiles, { filesScope } from './TerminalWithFiles';
@@ -303,7 +304,7 @@ export default function RemoteWorkspace() {
               onConnect={connect} onShowRunning={() => setServerView('sessions')} />
           )}
           {selection.kind === 'overview' && (
-            <div className="rw-view rw-view-scroll" data-zoom-key="sessions" style={zoomStyle('sessions')}>
+            <RwView region={`overview:${overviewView}`} resetKey={overviewView} className="rw-view rw-view-scroll" data-zoom-key="sessions" style={zoomStyle('sessions')}>
               {overviewView === 'summary' && <MultiServerDashboard />}
               {overviewView === 'sessions' && (
                 <SessionsView sessions={sessions} currentSessionId={currentSessionId}
@@ -327,7 +328,7 @@ export default function RemoteWorkspace() {
               {overviewView === 'recordings' && <RecordingsView />}
               {overviewView === 'serial' && <SerialView />}
               {overviewView === 'settings' && <RemoteSettingsView />}
-            </div>
+            </RwView>
           )}
           {hasSessionsView && serverView === 'sessions' && (
             <TargetSessionsView name={headTitle} sessions={targetSessions} currentSessionId={currentSessionId}
@@ -363,17 +364,17 @@ export default function RemoteWorkspace() {
           {consoleMenu.modals}
           {isServerTarget && selectedServer && serverView === 'files' && <FilesView server={selectedServer} />}
           {isServerTarget && selectedServer && serverView === 'status' && (
-            <div className="rw-view rw-view-scroll"><ServerStatusView server={selectedServer} /></div>
+            <RwView region="server:status" resetKey={selectedServer.id} className="rw-view rw-view-scroll"><ServerStatusView server={selectedServer} /></RwView>
           )}
           {isServerTarget && selectedServer && serverView === 'exec' && (
-            <div className="rw-view rw-view-scroll"><ServerExecView server={selectedServer} /></div>
+            <RwView region="server:exec" resetKey={selectedServer.id} className="rw-view rw-view-scroll"><ServerExecView server={selectedServer} /></RwView>
           )}
           {isServerTarget && selectedServer && serverView === 'settings' && (
-            <div className="rw-view rw-view-scroll">
+            <RwView region="server:settings" resetKey={selectedServer.id} className="rw-view rw-view-scroll">
               <ServerSettingsView server={selectedServer}
                 onChanged={refetchServers}
                 onDeleted={() => { refetchServers(); select({ kind: 'overview' }); }} />
-            </div>
+            </RwView>
           )}
         </div>
       </section>

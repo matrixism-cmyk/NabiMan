@@ -1,0 +1,17 @@
+/* What a crashed part of the screen shows instead (ErrorBoundary.tsx). */
+.crash { color: var(--text); line-height: 1.55; }
+.crash-app { max-width: 640px; margin: 12vh auto; padding: 28px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.crash-pane { margin: 16px; padding: 16px 18px; border: 1px solid rgba(231,76,60,0.35); background: rgba(231,76,60,0.06); border-radius: 8px; }
+.crash-title { font-size: 17px; margin: 0 0 8px; }
+.crash-pane .crash-title { font-size: 15px; }
+.crash-body { margin: 0 0 10px; font-size: 14px; color: var(--text-secondary); }
+.crash-error { margin: 0 0 14px; font-size: 12.5px; word-break: break-word; }
+.crash-copied { align-self: center; font-size: 13px; color: var(--success); }
+.crash-report { width: 100%; font-family: monospace; font-size: 12px; margin-top: 4px; }
+
+/* Errors nothing caught: a quiet stack of notices in the corner (GlobalErrorNotices.tsx). */
+.global-notices { position: fixed; right: 16px; bottom: 16px; z-index: 10000; display: flex; flex-direction: column; gap: 8px; max-width: min(420px, calc(100vw - 32px)); }
+.global-notice { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; font-size: 13px; color: var(--text); background: var(--surface); border: 1px solid rgba(231,76,60,0.45); border-left: 4px solid var(--danger); border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
+.global-notice-text { flex: 1; min-width: 0; word-break: break-word; }
+.global-notice-hint { display: block; color: var(--text-secondary); margin-top: 2px; }
+.global-notice-close { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; }

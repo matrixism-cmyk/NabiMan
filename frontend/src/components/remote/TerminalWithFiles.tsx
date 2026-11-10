@@ -4,6 +4,7 @@ import SftpPanel from './sftp/SftpPanel';
 import { draggingOwnRows } from './sftp/sftpDrop';
 import { accountSource, SftpSource } from './sftp/sftpApi';
 import type { TerminalTarget } from '../terminal/terminalTypes';
+import { ErrorBoundary } from '../../shared/ui/ErrorBoundary';
 import './sftp/sftp.css';
 
 interface Props {
@@ -60,7 +61,7 @@ export default function TerminalWithFiles({
   const scope = filesScope(target);
   const own = useMemo(() => (scope ? accountSource(scope) : null), [scope]);
   const source = given === undefined ? own : given;
-  if (!source) return <>{children}</>;
+  if (!source) return <ErrorBoundary region="terminal">{children}</ErrorBoundary>;
 
   const toggle = (next: boolean) => {
     if (controlled) { onOpenChange(next); return; }
@@ -117,7 +118,7 @@ export default function TerminalWithFiles({
           if (text) onInsert(`${text} `);
         }}
       >
-        {children}
+        <ErrorBoundary region="terminal">{children}</ErrorBoundary>
         {dropping && <div className="rw-split-drop" aria-hidden="true">{t('sftp.dropOnTerminal')}</div>}
       </div>
       {open ? (
@@ -126,7 +127,9 @@ export default function TerminalWithFiles({
             aria-label={t('sftp.resize')} aria-valuenow={width}
             onPointerDown={startResize} onKeyDown={resizeByKey} onDoubleClick={() => toggle(false)} />
           <div className="rw-split-files" style={{ width }}>
-            <SftpPanel source={source} serverName={name} onInsert={onInsert} onClose={() => toggle(false)} />
+            <ErrorBoundary region="sftp" resetKey={source.base}>
+              <SftpPanel source={source} serverName={name} onInsert={onInsert} onClose={() => toggle(false)} />
+            </ErrorBoundary>
           </div>
         </>
       ) : controlled ? null : (

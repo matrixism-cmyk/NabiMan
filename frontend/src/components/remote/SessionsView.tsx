@@ -6,6 +6,7 @@ import { arrange, moved, ORDER_MODES, OrderMode, useSessionOrder } from './sessi
 import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import SessionGraphView from './graph/SessionGraphView';
+import { ErrorBoundary } from '../../shared/ui/ErrorBoundary';
 import { readView, saveView, VIEW_MODES, ViewMode } from './graph/graphModel';
 import AgentIcons from './graph/AgentIcons';
 import { useGrants, useMember, useSharing } from './member';
@@ -249,7 +250,9 @@ export default function SessionsView({
       {message && <div role="alert" className="message">{message}</div>}
       {orderError && <div role="alert" className="message">{t('sessionOrder.saveFailed')}</div>}
       {view !== 'tiles' && (
-        <SessionGraphView mode={view} sessions={shownInOrder} links={links} onAttach={onAttach} onPopOut={onPopOut} />
+        <ErrorBoundary region={`graph:${view}`} resetKey={view}>
+          <SessionGraphView mode={view} sessions={shownInOrder} links={links} onAttach={onAttach} onPopOut={onPopOut} />
+        </ErrorBoundary>
       )}
       <div className={`session-grid ${links.length ? 'has-links' : ''}`} ref={setGrid} hidden={view !== 'tiles'}>
         <SessionLinks grid={grid} links={links} layout={shownIds.join(',')} />

@@ -25,6 +25,7 @@ import { Tab, Category, CatDef, categories } from './nav';
 import { apiPost, clearToken, useApi } from './shared/api/useApi';
 import { useT } from './i18n';
 import { ThemeProvider, ThemeSelector } from './shared/theme';
+import { ErrorBoundary } from './shared/ui/ErrorBoundary';
 
 /** Parse the URL hash (#category/tab) into a valid cat/tab pair, or null. */
 function parseHash(): { cat: Category; tab: Tab } | null {
@@ -262,6 +263,8 @@ function App() {
           </aside>
         )}
         <main className={`main-content ${currentCat.tabs.length <= 1 ? 'full-width' : ''}`}>
+          {/* A panel that throws shows why in its place; the menus stay usable. */}
+          <ErrorBoundary region={`panel:${visibleTab}`} resetKey={visibleTab}>
           {scoped && (visibleTab === 'remote' || visibleTab === 'mecTenants')
             ? <ScopeResourcesPanel key={visibleTab} kind={visibleTab === 'remote' ? 'server' : 'tenant'} />
             : <PanelOutlet
@@ -269,6 +272,7 @@ function App() {
             onNavigate={handleNavigate}
             onEnterFocus={enterFocus}
           />}
+          </ErrorBoundary>
         </main>
       </div>
       {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
