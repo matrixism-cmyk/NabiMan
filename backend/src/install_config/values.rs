@@ -23,6 +23,10 @@ pub(crate) fn number_in<T: FromStr>(get: Lookup, name: &str, default: T) -> T {
     text_in(get, name).and_then(|v| v.parse().ok()).unwrap_or(default)
 }
 
+pub(crate) fn number<T: FromStr>(name: &str, default: T) -> T {
+    number_in(&env, name, default)
+}
+
 /// A comma-separated list, each item trimmed, empty ones dropped.
 pub(crate) fn list_in(get: Lookup, name: &str) -> Vec<String> {
     text_in(get, name)

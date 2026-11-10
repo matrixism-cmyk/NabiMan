@@ -13,7 +13,8 @@ use std::sync::atomic::{AtomicI64, AtomicU64, Ordering::Relaxed};
 use std::sync::Mutex;
 use std::time::Duration;
 
-pub(crate) static CHILD_TIMEOUTS: AtomicU64 = AtomicU64::new(0);
+/// Lives with the bounded runner, which is in the library the helper shares.
+pub(crate) use nabiman_server::bounded_command::TIMEOUTS as CHILD_TIMEOUTS;
 pub(crate) static AUDIT_WRITE_FAILURES: AtomicU64 = AtomicU64::new(0);
 pub(crate) static LOGIN_FAILURES: AtomicU64 = AtomicU64::new(0);
 pub(crate) static RATE_LIMITED: AtomicU64 = AtomicU64::new(0);

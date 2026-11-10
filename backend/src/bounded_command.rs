@@ -15,6 +15,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// Children stopped at their deadline, for the server's metrics (`/metrics`).
+pub static TIMEOUTS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 /// Per-operation deadlines, longest first. A deadline bounds the whole
 /// command, connection included; SSH's own `ConnectTimeout` is shorter.
 pub mod deadline {
@@ -103,7 +106,7 @@ pub fn capture(
         stop_group(&mut child);
     }
     if matches!(result, Err(RunError::TimedOut(_))) {
-        crate::observability::metrics::CHILD_TIMEOUTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        TIMEOUTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
     result
 }
