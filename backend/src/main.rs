@@ -1,3 +1,5 @@
+#[macro_use]
+mod observability;
 mod lock_safe;
 use nabiman_server::bounded_command;
 mod access_rules;

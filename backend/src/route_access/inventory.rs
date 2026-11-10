@@ -152,7 +152,8 @@ pub(crate) fn leaves(debug: &str) -> Vec<String> {
     out
 }
 
-/// Every API route pattern of the App `main` serves, sorted, once each.
+/// Every route pattern of the App `main` serves (the API and the probes
+/// outside it; not the static files), sorted, once each.
 pub(crate) async fn api_patterns() -> Vec<String> {
     let app = test::init_service(App::new().configure(crate::app_routes::configure).route(
         "/__route_inventory",
@@ -162,7 +163,7 @@ pub(crate) async fn api_patterns() -> Vec<String> {
     let body = test::call_and_read_body(&app, test::TestRequest::get().uri("/__route_inventory").to_request()).await;
     let mut all: Vec<String> = leaves(std::str::from_utf8(&body).unwrap())
         .into_iter()
-        .filter(|p| p.starts_with("/api"))
+        .filter(|p| p != "/__route_inventory")
         .collect();
     all.sort();
     all.dedup();

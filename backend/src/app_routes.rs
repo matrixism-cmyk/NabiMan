@@ -4,6 +4,7 @@
 use actix_web::web;
 
 pub(crate) fn configure(cfg: &mut web::ServiceConfig) {
+    crate::observability::config(cfg);
     crate::auth::config(cfg);
     crate::branding::config(cfg);
     crate::external_identities::config(cfg);
