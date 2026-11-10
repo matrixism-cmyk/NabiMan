@@ -1,0 +1,20 @@
+/* The first-run checklist (FirstRunGuide.tsx): a card in the lower right corner. */
+.first-run { position: fixed; right: 16px; bottom: 16px; z-index: 900; width: min(360px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px); overflow: auto; padding: 16px; border-radius: 12px;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); box-shadow: 0 16px 48px #00000033; }
+.first-run-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.first-run-head h2 { font-size: 15px; margin: 0; color: var(--text); }
+.first-run-close { background: none; border: none; color: var(--text-secondary); font-size: 20px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+.first-run-close:hover { background: var(--surface-alt); color: var(--text); }
+.first-run-intro { font-size: 12px; color: var(--text-secondary); margin: 6px 0 10px; }
+.first-run-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.first-run-step { display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left; padding: 8px 10px;
+  border-radius: 8px; border: 1px solid transparent; background: none; color: inherit; cursor: pointer; font: inherit; }
+.first-run-step:hover { background: var(--surface-alt); border-color: var(--border); }
+.first-run-step strong { display: block; font-size: 13px; font-weight: 600; }
+.first-run-step small { display: block; font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.first-run-mark { flex: none; width: 18px; color: var(--primary); font-weight: 700; }
+.first-run-steps .is-done strong { color: var(--text-secondary); text-decoration: line-through; }
+.first-run-foot { display: flex; justify-content: flex-end; margin-top: 10px; }
+.first-run-guide { width: min(760px, calc(100vw - 32px)); }
+.first-run-guide-text { white-space: pre-wrap; max-height: 60vh; overflow: auto; font-size: 12px; }

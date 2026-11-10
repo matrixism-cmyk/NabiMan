@@ -12,6 +12,8 @@ import PanelOutlet from './components/PanelOutlet';
 import ChangePasswordModal from './components/ChangePasswordModal';
 import HeaderMenu from './components/HeaderMenu';
 import AboutDialog from './components/about/AboutDialog';
+import FirstRunGuide from './components/firstrun/FirstRunGuide';
+import { takeStep, unavailableSteps, useFirstRun } from './components/firstrun/useFirstRun';
 import IdleWarning from './components/IdleWarning';
 import { useIdleLogout } from './shared/auth/useIdleLogout';
 import { useChromeHidden } from './shared/ui/useChromeHidden';
@@ -98,6 +100,7 @@ function App() {
   const member = currentUser?.role === 'remote';
   const scoped = !!currentUser && currentUser.role !== 'admin' && !member && (currentUser.scope_restricted || currentUser.memberships.length > 0);
   const full = loggedIn && currentUser && !scoped && !member;
+  const firstRun = useFirstRun(currentUser?.username ?? null, Boolean(full && currentUser?.role === 'admin' && !isStandaloneRemote()));
   const { data: dockerAvailable } = useApi<boolean>(full ? '/api/containers/available' : '');
   const { data: dbAvailable } = useApi<boolean>(full ? '/api/database/available' : '');
   const { data: mailAvailable } = useApi<boolean>(full ? '/api/mail/available' : '');
@@ -235,6 +238,7 @@ function App() {
           <button className="btn btn-secondary" title={t('app.commandPalette')} onClick={() => setShowPalette(true)}>⌘K</button>
           <button className="btn btn-secondary" title={t('app.focusMode')} onClick={enterFocus}>⛶</button>
           <button className="btn btn-secondary" onClick={() => setShowChangePw(true)}>{t('app.changePassword')}</button>
+          {full && currentUser.role === 'admin' && <button className="btn btn-secondary" onClick={firstRun.show}>{t('app.firstRun')}</button>}
           <button className="btn btn-secondary" onClick={() => setShowAbout(true)}>{t('app.about')}</button>
           <button className="btn btn-secondary logout-btn" onClick={handleLogout}>{t('app.logout')}</button>
         </HeaderMenu>
@@ -289,6 +293,8 @@ function App() {
       {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
       {showAbout && <AboutDialog onClose={() => setShowAbout(false)} branding={branding}
         onOpenLicense={hiddenTabs.has('license') || scoped ? undefined : () => navigateTo('system', 'license')} />}
+      {firstRun.open && !focusMode && <FirstRunGuide done={firstRun.done} unavailable={unavailableSteps(hiddenTabs)} onDismiss={firstRun.dismiss}
+        onStep={(step) => { firstRun.markDone(step); takeStep(step, { changePassword: () => setShowChangePw(true), navigate: navigateTo }); }} />}
       {idle.secondsLeft !== null && <IdleWarning seconds={idle.secondsLeft} onStay={idle.stay} />}
       {showPalette && (
         <CommandPalette

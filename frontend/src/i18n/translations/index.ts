@@ -38,6 +38,7 @@ import scope from './scope';
 import signup from './signup';
 import sftpSniff from './sftp-sniff';
 import about from './about';
+import firstRun from './first-run';
 
 export type { Lang };
 export { LANG_LABELS } from '../../shared/i18n';
@@ -82,6 +83,7 @@ const translations: Translations = {
   ...signup,
   ...sftpSniff,
   ...about,
+  ...firstRun,
 };
 
 export default translations;
