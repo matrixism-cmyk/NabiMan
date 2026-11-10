@@ -129,6 +129,8 @@ jobs:
           python3 scripts/smoke-runtime-identity.py
           python3 scripts/test-deploy-preservation.py
           python3 scripts/test-release-verification.py
+          python3 scripts/test-release-signature.py
+          python3 scripts/check-release-key.py --allow-placeholder
           python3 scripts/smoke-terminal-owner.py
           python3 scripts/smoke-terminal-registry.py
       - name: Verify account and public shared admission

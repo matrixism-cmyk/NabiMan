@@ -1,17 +1,22 @@
 name: Release
 
-permissions:
-  contents: write
-
 on:
   push:
     tags: ['v*']
+
+# Building runs third-party build scripts (npm, cargo); it gets no secrets and
+# no write access. Only the `publish` job sees the signing key.
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Release signing key is set up
+        run: python3 scripts/check-release-key.py
 
       - uses: actions/setup-node@v4
         with:
@@ -59,18 +64,69 @@ jobs:
       - name: Validate release manifest and CycloneDX inventory
         run: |
           python3 scripts/test-release-verification.py
+          python3 scripts/test-release-signature.py
           python3 -m venv "$RUNNER_TEMP/nabiman-sbom-validation"
           "$RUNNER_TEMP/nabiman-sbom-validation/bin/pip" install 'jsonschema[format-nongpl]==4.23.0'
           "$RUNNER_TEMP/nabiman-sbom-validation/bin/python" scripts/validate-sbom.py release/nabiman-linux-x86_64.tar.gz.cdx.json
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-x86_64
+          path: release/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    # Protect this environment (Settings -> Environments -> release: required
+    # reviewers, tag rule v*) and keep the signing secrets there, not repo-wide.
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Install minisign
+        run: sudo apt-get update && sudo apt-get install -y minisign
+      - name: Sign release assets
+        env:
+          MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+          MINISIGN_PASSWORD: ${{ secrets.MINISIGN_PASSWORD }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          test -n "$MINISIGN_SECRET_KEY" || { echo "MINISIGN_SECRET_KEY secret is not set" >&2; exit 1; }
+          cp install.sh release/install.sh
+          key="$RUNNER_TEMP/minisign.key"
+          (umask 077; printf '%s\n' "$MINISIGN_SECRET_KEY" > "$key")
+          cd release
+          for f in *.tar.gz *.sha256 *.cdx.json *.manifest.json *.inventory.json verify-release.py install.sh; do
+            # The trusted comment is signed too: installers check file: and show version:.
+            if [ -n "$MINISIGN_PASSWORD" ]; then
+              printf '%s\n' "$MINISIGN_PASSWORD" | minisign -S -s "$key" -m "$f" -t "nabiman version:$TAG file:$f"
+            else
+              minisign -S -s "$key" -m "$f" -t "nabiman version:$TAG file:$f" </dev/null
+            fi
+          done
+          rm -f "$key"
+      - name: Verify signatures with the repository key
+        run: |
+          cd release
+          for f in *.minisig; do minisign -V -p ../docs/release/nabiman-release.pub -m "${f%.minisig}"; done
+          for a in nabiman-linux-*.tar.gz; do
+            python3 ../scripts/verify-release.py "$a" --public-key-file ../docs/release/nabiman-release.pub --require-signature
+          done
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
-            release/nabiman-linux-x86_64.tar.gz
-            release/nabiman-linux-x86_64.tar.gz.sha256
+            release/nabiman-linux-*.tar.gz
+            release/*.sha256
             release/*.cdx.json
             release/*.manifest.json
             release/*.inventory.json
+            release/*.minisig
             release/verify-release.py
-            install.sh
+            release/install.sh
