@@ -93,3 +93,13 @@ fn probe_of_old_target_cannot_change_new_targets_status() {
     assert_eq!(latest[0].status, "unknown");
     assert!(latest[0].last_checked.is_empty());
 }
+
+#[test]
+fn timestamps_keep_the_format_date_gave_them() {
+    use chrono::TimeZone;
+    let at = chrono::Utc.with_ymd_and_hms(2026, 1, 2, 3, 4, 5).unwrap();
+    assert_eq!(iso_utc(at), "2026-01-02T03:04:05Z");
+    let now = now_iso();
+    assert_eq!(now.len(), 20);
+    assert!(chrono::NaiveDateTime::parse_from_str(&now, "%Y-%m-%dT%H:%M:%SZ").is_ok(), "{now}");
+}

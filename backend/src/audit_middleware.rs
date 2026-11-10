@@ -125,20 +125,23 @@ where
             let user = crate::auth::token_audit_actor(res.request()).or_else(|| crate::auth::extract_username(res.request()))
                 .unwrap_or_else(|| "unauthenticated".into());
 
-            let persisted = append_entry(
-                &log,
-                AuditEntry {
-                    timestamp: chrono::Utc::now()
-                        .format("%Y-%m-%d %H:%M:%S UTC")
-                        .to_string(),
-                    user,
-                    method,
-                    path,
-                    status,
-                    ip,
-                    hash: None,
-                },
-            );
+            // The append syncs to disk: on the blocking pool, and awaited, so
+            // the record is persisted before the response leaves.
+            let entry = AuditEntry {
+                timestamp: chrono::Utc::now()
+                    .format("%Y-%m-%d %H:%M:%S UTC")
+                    .to_string(),
+                user,
+                method,
+                path,
+                status,
+                ip,
+                hash: None,
+            };
+            let persisted = actix_web::web::block(move || append_entry(&log, entry))
+                .await
+                .ok()
+                .flatten();
 
             if let Some(entry) = &persisted {
                 if !forwarding.enqueue(entry) {

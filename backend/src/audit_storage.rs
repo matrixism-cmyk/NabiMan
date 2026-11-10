@@ -89,7 +89,8 @@ impl State {
                 .append(true)
                 .mode(0o600)
                 .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
-            if self.identity.is_none() {
+            let creating = self.identity.is_none();
+            if creating {
                 options.create_new(true);
             }
             let mut file = options.open(&self.path).map_err(|_| "open_failed")?;
@@ -100,10 +101,15 @@ impl State {
             let mut bytes = serde_json::to_vec(&entry).map_err(|_| "encode_failed")?;
             bytes.push(b'\n');
             file.write_all(&bytes).map_err(|_| "write_failed")?;
-            file.sync_all().map_err(|_| "sync_failed")?;
-            fs::File::open(parent)
-                .and_then(|f| f.sync_all())
-                .map_err(|_| "directory_sync_failed")?;
+            // Every record is on disk before it counts: fdatasync covers the
+            // appended bytes and the new length. The directory only changes
+            // when the file is created (rotation syncs it below).
+            file.sync_data().map_err(|_| "sync_failed")?;
+            if creating {
+                fs::File::open(parent)
+                    .and_then(|f| f.sync_all())
+                    .map_err(|_| "directory_sync_failed")?;
+            }
             self.identity = Some(identity(&self.path)?);
             self.previous = entry.hash.clone().unwrap();
             if self.identity.unwrap().2 > 10_000_000 {

@@ -6,10 +6,15 @@
 //! the lock is let go. A sign-out or a revocation is therefore on disk the
 //! moment it takes effect, and a restart can never bring a revoked sign-in
 //! back. Sign-ins older than the refresh token's lifetime are dropped.
+//!
+//! The one exception is a sign-in's last activity ([`SessionGuard::touch`]),
+//! which every page reports: it is saved at most once a minute (and with
+//! any other change), so a restart may see it up to that much older.
 
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, LockResult, Mutex, MutexGuard, PoisonError, TryLockError, TryLockResult};
 
 use serde::{Deserialize, Serialize};
@@ -18,11 +23,16 @@ use super::{SessionInfo, REFRESH_TTL};
 
 type Map = HashMap<String, SessionInfo>;
 
+/// How often activity alone causes a save, in seconds.
+const ACTIVITY_SAVE_SECS: i64 = 60;
+
 #[derive(Clone)]
 pub struct SessionStore {
     map: Arc<Mutex<Map>>,
     /// Where the sign-ins are kept; none for a store that lives in memory (tests).
     file: Option<Arc<PathBuf>>,
+    /// When the sign-ins were last saved (Unix seconds).
+    saved_at: Arc<AtomicI64>,
 }
 
 /// The locked sign-ins; saved when let go, if they were changed.
@@ -30,6 +40,21 @@ pub struct SessionGuard<'a> {
     guard: MutexGuard<'a, Map>,
     file: Option<&'a Path>,
     changed: bool,
+    saved_at: &'a AtomicI64,
+}
+
+impl SessionGuard<'_> {
+    /// The sign-in `sid` was used at `now`. Kept in memory at once; saved only
+    /// if the last save is a minute old, or with the next real change.
+    pub fn touch(&mut self, sid: &str, now: i64) {
+        if let Some(session) = self.guard.get_mut(sid) {
+            session.last_activity = now;
+            if now - self.saved_at.load(Ordering::Relaxed) >= ACTIVITY_SAVE_SECS {
+                self.changed = true;
+                self.saved_at.store(now, Ordering::Relaxed);
+            }
+        }
+    }
 }
 
 impl Deref for SessionGuard<'_> {
@@ -53,6 +78,7 @@ impl Drop for SessionGuard<'_> {
             if let Err(e) = save(&self.guard, file) {
                 eprintln!("[sessions] cannot save sign-ins to {}: {e}", file.display());
             }
+            self.saved_at.fetch_max(chrono::Utc::now().timestamp(), Ordering::Relaxed);
         }
     }
 }
@@ -130,18 +156,20 @@ fn load(file: &Path) -> Map {
 impl SessionStore {
     /// Sign-ins that last only as long as the process (tests).
     pub fn in_memory() -> Self {
-        SessionStore { map: Arc::new(Mutex::new(Map::new())), file: None }
+        SessionStore { map: Arc::new(Mutex::new(Map::new())), file: None, saved_at: Arc::default() }
     }
 
     /// Sign-ins kept in `file`, with those already there taken up again.
     pub fn open(file: PathBuf) -> Self {
         let map = load(&file);
-        SessionStore { map: Arc::new(Mutex::new(map)), file: Some(Arc::new(file)) }
+        let saved_at = Arc::new(AtomicI64::new(chrono::Utc::now().timestamp()));
+        SessionStore { map: Arc::new(Mutex::new(map)), file: Some(Arc::new(file)), saved_at }
     }
 
     pub fn lock(&self) -> LockResult<SessionGuard<'_>> {
         let file = self.file.as_deref().map(PathBuf::as_path);
-        let wrap = |guard| SessionGuard { guard, file, changed: false };
+        let saved_at = &*self.saved_at;
+        let wrap = |guard| SessionGuard { guard, file, changed: false, saved_at };
         match self.map.lock() {
             Ok(guard) => Ok(wrap(guard)),
             Err(poisoned) => Err(PoisonError::new(wrap(poisoned.into_inner()))),
@@ -156,7 +184,8 @@ impl SessionStore {
 
     pub fn try_lock(&self) -> TryLockResult<SessionGuard<'_>> {
         let file = self.file.as_deref().map(PathBuf::as_path);
-        let wrap = |guard| SessionGuard { guard, file, changed: false };
+        let saved_at = &*self.saved_at;
+        let wrap = |guard| SessionGuard { guard, file, changed: false, saved_at };
         match self.map.try_lock() {
             Ok(guard) => Ok(wrap(guard)),
             Err(TryLockError::Poisoned(p)) => Err(TryLockError::Poisoned(PoisonError::new(wrap(p.into_inner())))),
@@ -259,5 +288,23 @@ mod tests {
         store.lock_safe().insert("s2".into(), info("s2", &now()));
         let again = SessionStore::open(file);
         assert_eq!(again.lock_safe().len(), 2, "both sign-ins were saved");
+    }
+
+    #[test]
+    fn activity_is_saved_at_most_once_a_minute_but_never_lost_to_a_change() {
+        let dir = Dir::new();
+        let file = dir.path().join("login_sessions.json");
+        let store = SessionStore::open(file.clone());
+        store.lock_safe().insert("s1".into(), info("s1", &now()));
+        let on_disk = || SessionStore::open(file.clone()).lock_safe()["s1"].last_activity;
+        let t = chrono::Utc::now().timestamp();
+        store.lock_safe().touch("s1", t + 5);
+        assert_ne!(on_disk(), t + 5, "a touch within the minute is not written");
+        assert_eq!(store.lock_safe()["s1"].last_activity, t + 5, "but counts at once");
+        store.lock_safe().touch("s1", t + ACTIVITY_SAVE_SECS + 1);
+        assert_eq!(on_disk(), t + ACTIVITY_SAVE_SECS + 1, "a minute on, it is");
+        store.lock_safe().touch("s1", t + ACTIVITY_SAVE_SECS + 2);
+        store.lock_safe().insert("s2".into(), info("s2", &now()));
+        assert_eq!(on_disk(), t + ACTIVITY_SAVE_SECS + 2, "a real change saves pending activity");
     }
 }

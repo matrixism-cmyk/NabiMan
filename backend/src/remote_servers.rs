@@ -20,7 +20,6 @@ use crate::secret_store;
 use crate::ssh_keys;
 use actix_web::{web, HttpResponse};
 use std::fs;
-use std::process::Command;
 
 pub(crate) static SERVER_WRITES: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
@@ -96,14 +95,14 @@ fn generate_id() -> String {
     format!("srv_{}", uuid::Uuid::new_v4().simple())
 }
 
+/// Now, in UTC, to the second: `2026-11-10T08:05:09Z`. Computed in-process
+/// (it used to start `date` for every server checked).
 pub(crate) fn now_iso() -> String {
-    let output = Command::new("date")
-        .args(["-u", "+%Y-%m-%dT%H:%M:%SZ"])
-        .output();
-    match output {
-        Ok(o) => String::from_utf8_lossy(&o.stdout).trim().to_string(),
-        Err(_) => "unknown".into(),
-    }
+    iso_utc(chrono::Utc::now())
+}
+
+fn iso_utc(at: chrono::DateTime<chrono::Utc>) -> String {
+    at.format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
 
 fn validate_host(s: &str) -> bool {

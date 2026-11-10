@@ -79,7 +79,7 @@ async fn put(req: HttpRequest, body: web::Json<AppSettings>) -> HttpResponse {
     // Turning the limit on must not sign out whoever is using NabiMan right now.
     if let Some(sessions) = req.app_data::<web::Data<crate::jwt_sessions::SessionStore>>() {
         if let Some(sid) = crate::auth::verified_claims(&req).map(|c| c.sid) {
-            if let Some(s) = sessions.lock_safe().get_mut(&sid) { s.last_activity = now(); }
+            sessions.lock_safe().touch(&sid, now());
         }
     }
     get().await
@@ -90,9 +90,7 @@ async fn activity(req: HttpRequest, sessions: web::Data<crate::jwt_sessions::Ses
     let Some(sid) = crate::auth::verified_claims(&req).map(|c| c.sid) else {
         return HttpResponse::Unauthorized().finish();
     };
-    if let Some(s) = sessions.lock_safe().get_mut(&sid) {
-        s.last_activity = now();
-    }
+    sessions.lock_safe().touch(&sid, now());
     HttpResponse::NoContent().finish()
 }
 
