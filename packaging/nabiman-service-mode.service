@@ -1,0 +1,89 @@
+# NabiMan API as an unprivileged user (run_mode = service), installed by
+# `install.sh --mode service` as /etc/systemd/system/nabiman.service, next to
+# nabiman-privileged-helper.service (root). What needs root and what this mode
+# does with it: docs/security/privilege-inventory.md. Local settings:
+# /etc/nabiman/nabiman.env or `systemctl edit nabiman`, not edits to this file.
+[Unit]
+Description=NabiMan Server Management Dashboard (unprivileged API)
+Wants=network-online.target nabiman-privileged-helper.service
+After=network-online.target nabiman-privileged-helper.service
+
+[Service]
+Type=simple
+User=nabiman
+Group=nabiman
+ExecStart=/usr/local/bin/nabiman-server
+# Root (the "+"): tell the helper which process is the API, after every start.
+ExecStartPost=+/usr/local/bin/nabiman-privileged-helper --pin-api $MAINPID
+Environment=NABIMAN_RUN_MODE=service
+# 127.0.0.1:8080 unless NABIMAN_LISTEN says otherwise; put a TLS proxy in front.
+Environment=NABIMAN_PORT=8080
+Environment=NABIMAN_STATIC=/usr/local/share/nabiman/static
+Environment=NABIMAN_DATA_DIR=/var/lib/nabiman
+Environment=NABIMAN_HELPER_SOCKET=/run/nabiman-helper/control.sock
+# tmux keeps its socket here, not in /tmp: PrivateTmp gives every start a new
+# /tmp, which would lose the terminal sessions on each restart.
+Environment=TMUX_TMPDIR=/run/nabiman
+EnvironmentFile=-/etc/nabiman/nabiman.env
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+# Terminals live in the API's tmux server; restart the API, keep the sessions.
+KillMode=process
+TimeoutStopSec=30
+LimitCORE=0:infinity
+UMask=0077
+
+# The data directory, nabiman:nabiman 0700.
+StateDirectory=nabiman
+StateDirectoryMode=0700
+# claude.sock (any local account may knock; the kernel says who) and tmux.
+RuntimeDirectory=nabiman
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+
+# Hardening, each weighed against what the API (and the shells of its
+# terminals, which inherit all of it) still does itself:
+#   NoNewPrivileges      the API never needs setuid/setgid. Costs: sudo/su in
+#                        terminals, and setgid helpers (crontab, postqueue/mailq,
+#                        postfix sendmail): use SMTP/webhook notifications.
+NoNewPrivileges=yes
+#   No capabilities: the port is above 1024 (loopback 8080), and root work
+#   goes to the helper. CAP_KILL / CAP_DAC_READ_SEARCH would undo the point.
+CapabilityBoundingSet=
+AmbientCapabilities=
+#   ProtectSystem=strict: the API writes only its data dir and /run/nabiman.
+#   /usr, /etc, /boot are read-only: package and config work is the helper's.
+ProtectSystem=strict
+ReadWritePaths=/var/lib/nabiman
+#   ProtectHome=read-only: Claude Code installed in a home stays runnable and
+#   the file manager can read what is world-readable; nothing there is written.
+ProtectHome=read-only
+PrivateTmp=yes
+#   PrivateDevices: the serial bridge uses PTYs (/dev/pts stays); disks are
+#   read from /proc and df, not block devices.
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+#   AF_NETLINK for `ip`; AF_INET/6 for the web, SSH, ping (ICMP sockets).
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+# Deliberately NOT set:
+#   MemoryDenyWriteExecute=  JIT runtimes (node, java) run from terminals
+#   SystemCallFilter=        terminals run arbitrary admin tools (strace, perf…);
+#                            add @system-service if this host has no terminal use
+#   PrivateUsers=            would hide the real uids SO_PEERCRED reports on claude.sock
+# Optional groups (create them first; a missing group stops the unit):
+#   SupplementaryGroups=systemd-journal adm   log viewer, SSH attack watch
+#   SupplementaryGroups=dialout               serial devices (NABIMAN_SERIAL_GROUP)
+
+[Install]
+WantedBy=multi-user.target

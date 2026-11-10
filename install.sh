@@ -20,6 +20,12 @@ set -euo pipefail
 #   --insecure-skip-verify   install even without a valid signature (NOT for production)
 #   --install-deps           install missing runtime dependencies with apt-get/dnf
 #   --with-optional          with --install-deps: the optional ones too
+#   --mode root|service      root (default): the API runs as root, as before.
+#                            service: the API runs as the `nabiman` system user
+#                            (run_mode = service) with nabiman-privileged-helper
+#                            (root) for service control, firewall rules and
+#                            package upgrades; other root features are reported
+#                            unavailable (docs/security/privilege-inventory.md)
 #   -h, --help
 #
 # Layout (docs/release/README.md):
@@ -30,6 +36,10 @@ set -euo pipefail
 #   /var/lib/nabiman                   data (users, keys, databases)
 #   /etc/nabiman                       nabiman.env (local settings), release.pub
 #   /etc/systemd/system/nabiman.service
+#   --mode service also: user nabiman, /var/lib/nabiman owned nabiman:nabiman 0700,
+#     /etc/systemd/system/nabiman-privileged-helper.service (+ .d/system-operations.conf),
+#     /etc/nabiman/privileged-services.json and privileged-system.json (root 0600),
+#     the helper socket /run/nabiman-helper/control.sock (nabiman 0600, root-owned dir)
 
 REPO="${NABIMAN_REPO:-matrixism-cmyk/NabiMan}"
 LIB_DIR="/usr/local/lib/nabiman"
@@ -49,6 +59,7 @@ LOCAL_SIGNATURE=""
 SKIP_VERIFY=0
 INSTALL_DEPS=0
 WITH_OPTIONAL=0
+MODE=root
 
 usage() {
     cat <<'USAGE'
@@ -56,6 +67,7 @@ Usage: sudo bash install.sh [--version vX.Y.Z] [--base-url URL]
                             [--archive FILE [--signature FILE]]
                             [--insecure-skip-verify]
                             [--install-deps [--with-optional]]
+                            [--mode root|service]
 USAGE
 }
 while [ $# -gt 0 ]; do
@@ -67,10 +79,16 @@ while [ $# -gt 0 ]; do
         --insecure-skip-verify) SKIP_VERIFY=1; shift ;;
         --install-deps) INSTALL_DEPS=1; shift ;;
         --with-optional) WITH_OPTIONAL=1; shift ;;
+        --mode) MODE=${2:?--mode needs root or service}; shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) echo "Unknown option: $1 (see --help)" >&2; exit 2 ;;
     esac
 done
+
+case "$MODE" in
+    root|service) ;;
+    *) echo "--mode is root or service, not $MODE" >&2; exit 2 ;;
+esac
 
 echo "=== NabiMan Installer ==="
 
@@ -315,16 +333,61 @@ if [ -n "${BOOTSTRAP_PASSWORD:-}" ]; then
 fi
 
 # systemd unit, from the package (its comments explain each setting).
-if [ -f "$SERVICE_FILE" ] && ! cmp -s "$LIB_DIR/current/nabiman.service" "$SERVICE_FILE"; then
+UNIT_SOURCE="$LIB_DIR/current/nabiman.service"
+if [ "$MODE" = service ]; then
+    UNIT_SOURCE="$LIB_DIR/current/packaging/nabiman-service-mode.service"
+fi
+if [ -f "$SERVICE_FILE" ] && ! cmp -s "$UNIT_SOURCE" "$SERVICE_FILE"; then
     cp -p "$SERVICE_FILE" "$SERVICE_FILE.bak.$(date +%Y%m%d-%H%M%S)"
 fi
-install -m 644 "$LIB_DIR/current/nabiman.service" "$SERVICE_FILE"
+install -m 644 "$UNIT_SOURCE" "$SERVICE_FILE"
+
+# Service mode: the API as `nabiman`, root work through the helper.
+if [ "$MODE" = service ]; then
+    if ! id -u nabiman >/dev/null 2>&1; then
+        if command -v systemd-sysusers >/dev/null; then
+            install -D -m 644 "$LIB_DIR/current/packaging/nabiman.sysusers.conf" /usr/lib/sysusers.d/nabiman.conf
+            systemd-sysusers /usr/lib/sysusers.d/nabiman.conf
+        else
+            useradd --system --user-group --home-dir "$DATA_DIR" --no-create-home --shell /usr/sbin/nologin nabiman
+        fi
+    fi
+    API_UID=$(id -u nabiman)
+    if [ "$API_UID" -eq 0 ]; then
+        echo "The nabiman account has uid 0; refusing to use it." >&2
+        exit 1
+    fi
+    # Log viewer and SSH attack watch read the journal (optional group).
+    if getent group systemd-journal >/dev/null; then usermod -a -G systemd-journal nabiman; fi
+    # The data was root's: hand it over (0700, files 0600 stay as they are).
+    chown -R nabiman:nabiman "$DATA_DIR"
+    chmod 700 "$DATA_DIR"
+    # /etc/nabiman stays root's; the helper refuses policy files others can change.
+    chown root:root "$CONFIG_DIR"
+    chmod 755 "$CONFIG_DIR"
+    if [ ! -e "$CONFIG_DIR/privileged-services.json" ]; then
+        install -m 600 /dev/null "$CONFIG_DIR/privileged-services.json"
+        printf '{\n  "api_uid": %s,\n  "services": []\n}\n' "$API_UID" > "$CONFIG_DIR/privileged-services.json"
+    fi
+    if [ ! -e "$CONFIG_DIR/privileged-system.json" ]; then
+        # The same reach root mode had for these two; set either to false to withdraw it.
+        install -m 600 /dev/null "$CONFIG_DIR/privileged-system.json"
+        printf '{\n  "api_uid": %s,\n  "firewall": true,\n  "package_upgrade": true\n}\n' "$API_UID" > "$CONFIG_DIR/privileged-system.json"
+    fi
+    install -m 644 "$LIB_DIR/current/packaging/nabiman-privileged-helper.service" /etc/systemd/system/nabiman-privileged-helper.service
+    install -d -m 755 /etc/systemd/system/nabiman-privileged-helper.service.d
+    install -m 644 "$LIB_DIR/current/packaging/nabiman-privileged-helper.service.d/system-operations.conf" \
+        /etc/systemd/system/nabiman-privileged-helper.service.d/system-operations.conf
+fi
 if [ ! -e "$CONFIG_DIR/nabiman.env" ]; then
     install -m 600 /dev/null "$CONFIG_DIR/nabiman.env"
     printf '# Local settings for nabiman.service, e.g.\n# NABIMAN_PORT=8080\n' > "$CONFIG_DIR/nabiman.env"
 fi
 
 systemctl daemon-reload
+if [ "$MODE" = service ]; then
+    systemctl enable nabiman-privileged-helper
+fi
 systemctl enable nabiman
 
 echo ""
@@ -333,6 +396,11 @@ echo "Start/restart: systemctl restart nabiman"
 echo "Update:  nabiman-update        (signed, health-checked, rolls back by itself)"
 echo "Rollback: nabiman-update --rollback"
 echo "Status:  systemctl status nabiman"
+if [ "$MODE" = service ]; then
+    echo "Mode:    service (API as nabiman). Start the helper first: systemctl start nabiman-privileged-helper"
+    echo "         Services it may control: $CONFIG_DIR/privileged-services.json (empty until you list units)."
+    echo "         Terminals now run as nabiman; sessions of a previous root install do not carry over."
+fi
 PORT=$(sed -n 's/^NABIMAN_PORT=//p' "$CONFIG_DIR/nabiman.env" | tail -n1)
 LISTEN=$(sed -n 's/^NABIMAN_LISTEN=//p' "$CONFIG_DIR/nabiman.env" | tail -n1)
 if [ -n "$LISTEN" ]; then

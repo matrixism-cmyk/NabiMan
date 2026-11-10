@@ -2,11 +2,11 @@
 # Layout: docs/release/README.md. Local settings: /etc/nabiman/nabiman.env
 # (NABIMAN_PORT=..., etc.) or `systemctl edit nabiman`, not edits to this file.
 #
-# TODO(Phase 4, docs/commercialization/privileged-service-control.md): run the API
-# as User=nabiman with the typed root helper (packaging/nabiman-privileged-helper.service,
-# packaging/nabiman-api-separated.service.example). That unit can take the full
-# sandbox (ProtectSystem=strict, ProtectHome, PrivateTmp, NoNewPrivileges, an empty
-# CapabilityBoundingSet). This one cannot yet, see below.
+# This is the root-mode unit (run_mode = root, the default). The unprivileged
+# alternative is packaging/nabiman-service-mode.service (User=nabiman, with
+# packaging/nabiman-privileged-helper.service), installed by
+# `install.sh --mode service`; it takes the full sandbox. This one cannot, see below.
+# What needs root and why: docs/security/privilege-inventory.md.
 [Unit]
 Description=NabiMan Server Management Dashboard
 Wants=network-online.target

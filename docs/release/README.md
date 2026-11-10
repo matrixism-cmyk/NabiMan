@@ -153,7 +153,7 @@ docker build --build-arg NABIMAN_GIT_COMMIT=$(git rev-parse HEAD) -t nabiman .
 - `StateDirectory=nabiman`(0700), `ConfigurationDirectory=nabiman`.
 - `LimitCORE=0:infinity`: API 메모리(JWT 비밀, 복호화한 자격 증명)가 core 파일로 남지 않게 합니다. 터미널에서 필요하면 `ulimit -c`로 올릴 수 있습니다.
 
-API를 root가 아닌 사용자로 옮기는 일은 Phase 4입니다([서비스 제어 경계](../commercialization/privileged-service-control.md), `packaging/nabiman-api-separated.service.example`). 그때 전체 샌드박스를 겁니다.
+API를 root가 아닌 사용자로 옮기는 일은 Phase 4입니다([서비스 제어 경계](../commercialization/privileged-service-control.md), `packaging/nabiman-service-mode.service`, `install.sh --mode service`). 그 단위는 전체 샌드박스를 겁니다.
 
 ## 업데이트와 되돌리기
 
