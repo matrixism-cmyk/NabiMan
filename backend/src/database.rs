@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 use crate::bounded_command::{deadline, OutputOffThread, OutputWithin};
+use crate::database_pipe::{dump_command, restore_command};
 
 #[derive(Serialize, Clone)]
 pub struct DbStatus {
@@ -163,7 +164,7 @@ struct DbBackupRequest {
 
 async fn db_backup(body: web::Json<DbBackupRequest>) -> HttpResponse {
     let db = &body.database;
-    if db.contains("..") || db.contains('/') || db.contains(';') {
+    if !crate::cli_args::database_name(db) {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid database name"));
     }
     let engine = match detect_db().await {
@@ -180,16 +181,10 @@ async fn db_backup(body: web::Json<DbBackupRequest>) -> HttpResponse {
     let filename = format!("db_{}_{}.sql.gz", db, ts);
     let dest = dir.join(&filename);
 
-    let cmd = match engine {
-        "mysql" => format!("mysqldump '{}' | gzip > '{}'", db, dest.display()),
-        "postgresql" => format!(
-            "sudo -u postgres pg_dump '{}' | gzip > '{}'",
-            db,
-            dest.display()
-        ),
-        _ => return HttpResponse::Ok().json(ApiResponse::<String>::error("Unknown engine")),
+    let Some(mut cmd) = dump_command(engine, db, &dest) else {
+        return HttpResponse::Ok().json(ApiResponse::<String>::error("Unknown engine"));
     };
-    let result = std::process::Command::new("sh").args(["-c", &cmd]).output_off_thread(deadline::DATABASE_DUMP).await;
+    let result = cmd.output_off_thread(deadline::DATABASE_DUMP).await;
     match result {
         Ok(o) if o.status.success() => HttpResponse::Ok().json(ApiResponse::ok(filename)),
         Ok(o) => {
@@ -230,7 +225,7 @@ async fn db_restore(body: web::Json<DbRestoreRequest>) -> HttpResponse {
     if fname.contains("..") || fname.contains('/') {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid filename"));
     }
-    if db.contains("..") || db.contains('/') || db.contains(';') {
+    if !crate::cli_args::database_name(db) {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid database name"));
     }
     let src = db_backup_dir().join(fname);
@@ -243,16 +238,10 @@ async fn db_restore(body: web::Json<DbRestoreRequest>) -> HttpResponse {
             return HttpResponse::Ok().json(ApiResponse::<String>::error("No database running"))
         }
     };
-    let cmd = match engine {
-        "mysql" => format!("gunzip -c '{}' | mysql '{}'", src.display(), db),
-        "postgresql" => format!(
-            "gunzip -c '{}' | sudo -u postgres psql '{}'",
-            src.display(),
-            db
-        ),
-        _ => return HttpResponse::Ok().json(ApiResponse::<String>::error("Unknown engine")),
+    let Some(mut cmd) = restore_command(engine, db, &src) else {
+        return HttpResponse::Ok().json(ApiResponse::<String>::error("Unknown engine"));
     };
-    let result = std::process::Command::new("sh").args(["-c", &cmd]).output_off_thread(deadline::DATABASE_DUMP).await;
+    let result = cmd.output_off_thread(deadline::DATABASE_DUMP).await;
     match result {
         Ok(o) if o.status.success() => {
             HttpResponse::Ok().json(ApiResponse::ok("Restore completed".to_string()))
@@ -286,7 +275,7 @@ async fn db_query(body: web::Json<DbQueryRequest>) -> HttpResponse {
             "Only SELECT/SHOW/DESCRIBE/EXPLAIN allowed",
         ));
     }
-    if db.contains("..") || db.contains('/') || db.contains(';') {
+    if !crate::cli_args::database_name(db) {
         return HttpResponse::Ok()
             .json(ApiResponse::<DbQueryResult>::error("Invalid database name"));
     }
@@ -299,11 +288,11 @@ async fn db_query(body: web::Json<DbQueryRequest>) -> HttpResponse {
     };
     let output = match engine {
         "mysql" => std::process::Command::new("mysql")
-            .args(["-BN", db, "-e", query])
+            .args(["-BN", "-e", query, "--", db])
             .output_off_thread(deadline::DATABASE).await,
         "postgresql" => std::process::Command::new("sudo")
             .args([
-                "-u", "postgres", "psql", "-d", db, "-tA", "-F", "\t", "-c", query,
+                "-u", "postgres", "--", "psql", "-tA", "-F", "\t", "-c", query, "--", db,
             ])
             .output_off_thread(deadline::DATABASE).await,
         _ => return HttpResponse::Ok().json(ApiResponse::<DbQueryResult>::error("Unknown engine")),

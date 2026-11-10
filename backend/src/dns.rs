@@ -140,21 +140,9 @@ fn health_check() -> DnsHealthCheck {
     }
 }
 
+/// Statistics from the nabidns database; see `dns_db` for how it signs in.
 fn mysql_query(sql: &str) -> String {
-    std::process::Command::new("mysql")
-        .args([
-            "-u",
-            "nabidns",
-            "-pNabi48dc79a162b27a27aec2eb28",
-            "-h",
-            "127.0.0.1",
-            "nabidns",
-            "-BNe",
-            sql,
-        ])
-        .output_within(deadline::QUICK)
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-        .unwrap_or_default()
+    crate::dns_db::query(sql)
 }
 
 fn record_stats() -> DnsRecordStats {

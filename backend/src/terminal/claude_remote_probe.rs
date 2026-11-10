@@ -48,7 +48,7 @@ pub(super) fn run(session_id: &str, target: &str, os: Os, offsets: &HashMap<Stri
     let mut child = Command::new("ssh")
         .arg("-S")
         .arg(mux_path(session_id))
-        .args(["-o", "ControlMaster=no", "-o", "BatchMode=yes", "-T", target, &remote])
+        .args(["-o", "ControlMaster=no", "-o", "BatchMode=yes", "-T", "--", target, &remote])
         .env_remove("TMUX")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

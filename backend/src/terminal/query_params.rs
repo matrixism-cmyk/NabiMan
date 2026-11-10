@@ -35,7 +35,8 @@ fn hv(b: u8) -> u8 {
     }
 }
 pub(super) fn validate_ssh_input(s: &str) -> bool {
-    !s.is_empty()
+    // Spliced into the pane's ssh line: a leading '-' would be an option.
+    crate::cli_args::not_option(s)
         && s.len() < 256
         && s.chars()
             .all(|c| c.is_alphanumeric() || ".-_@:".contains(c))

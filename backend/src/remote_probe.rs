@@ -27,6 +27,9 @@ pub(crate) fn ssh_invocation(
     extra: &[&str],
     remote_cmd: &str,
 ) -> Result<(Command, Option<ssh_auth::PwFile>), String> {
+    if !crate::cli_args::not_option(&srv.user) || !crate::cli_args::not_option(&srv.host) {
+        return Err("Invalid SSH user or host".into());
+    }
     let trust = crate::remote_host_trust::options(srv)?;
     let port = srv.port.to_string();
     let target = format!("{}@{}", srv.user, crate::member_servers::dial_host(srv, srv.port)?);
@@ -41,7 +44,7 @@ pub(crate) fn ssh_invocation(
         cmd.args(crate::ssh_cert::ssh_opts(&auth));
         cmd.args(["-o", &timeout, "-o", "BatchMode=yes", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3"]);
         cmd.args(extra);
-        cmd.args(["-p", &port, &target, remote_cmd]);
+        cmd.args(["-p", &port, "--", &target, remote_cmd]);
         return Ok((cmd, None));
     }
     let password = server_password(srv);
@@ -55,7 +58,7 @@ pub(crate) fn ssh_invocation(
         cmd.args(&trust);
         cmd.args(ssh_auth::password_auth_opts());
         cmd.args(extra);
-        cmd.args(["-p", &port, &target, remote_cmd]);
+        cmd.args(["-p", &port, "--", &target, remote_cmd]);
         return Ok((cmd, Some(pw_file)));
     }
     if srv.member_owned() {
@@ -77,7 +80,7 @@ pub(crate) fn ssh_invocation(
         "ServerAliveCountMax=3",
     ]);
     cmd.args(extra);
-    cmd.args(["-p", &port, &target, remote_cmd]);
+    cmd.args(["-p", &port, "--", &target, remote_cmd]);
     Ok((cmd, None))
 }
 

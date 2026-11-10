@@ -100,6 +100,9 @@ pub fn deploy_key_to_server(server: &RemoteServer, password: &str) -> Result<Str
     let trust = crate::remote_host_trust::options(server)?;
     let pubkey = ensure_ssh_key()?;
     let port_str = server.port.to_string();
+    if !crate::cli_args::not_option(&server.user) || !crate::cli_args::not_option(&server.host) {
+        return Err("Invalid SSH user or host".into());
+    }
     let target = format!("{}@{}", server.user, server.host);
 
     let has_sshpass = Command::new("which")
@@ -125,6 +128,7 @@ pub fn deploy_key_to_server(server: &RemoteServer, password: &str) -> Result<Str
                 &port_str,
             ])
             .args(&trust)
+            .arg("--")
             .arg(&target)
             .output_within(deadline::KEY_DEPLOY)
             .map_err(|e| format!("sshpass failed: {}", e))?;
@@ -149,6 +153,7 @@ pub fn deploy_key_to_server(server: &RemoteServer, password: &str) -> Result<Str
     let output = Command::new("sshpass")
         .args(["-f", pw_file.path(), "ssh", "-p", &port_str])
         .args(&trust)
+        .arg("--")
         .arg(&target)
         .arg(&remote_cmd)
         .output_within(deadline::KEY_DEPLOY);
@@ -193,6 +198,9 @@ pub fn test_key_auth(server: &RemoteServer) -> bool {
         Ok(t) => t,
         Err(_) => return false,
     };
+    if !crate::cli_args::not_option(&server.user) || !crate::cli_args::not_option(&server.host) {
+        return false;
+    }
     let port_str = server.port.to_string();
     let key_path = nabiman_key_path();
 
@@ -214,7 +222,7 @@ pub fn test_key_auth(server: &RemoteServer) -> bool {
             &port_str,
         ])
         .args(&trust)
-        .args([&format!("{}@{}", server.user, server.host), "echo ok"])
+        .args(["--", &format!("{}@{}", server.user, server.host), "echo ok"])
         .output_within(deadline::PROBE)
         .map(|o| o.status.success())
         .unwrap_or(false)

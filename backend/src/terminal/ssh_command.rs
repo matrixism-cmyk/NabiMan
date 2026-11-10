@@ -113,7 +113,7 @@ pub(super) fn build_ssh_command(
         cmd.push_str(&opts);
         cmd.push(' ');
     }
-    cmd.push_str(&format!("-p {} {}@{}", port, user, host));
+    cmd.push_str(&format!("-p {} -- {}@{}", port, user, host));
 
     let hint = if using_saved_password {
         "저장된 비밀번호가 거부되면(exit 5) 서버 편집에서 비밀번호를 다시 저장하거나,          \"직접 입력\" 버튼으로 접속해 보세요."

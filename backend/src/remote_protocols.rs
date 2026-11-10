@@ -73,7 +73,7 @@ pub(crate) fn check(server: &RemoteServer) -> Result<(), &'static str> {
 /// A login name. FTP hosting often logs in as `name@domain`; over SSH an `@`
 /// would be read as the start of the host, so it is refused there.
 pub(crate) fn valid_user(user: &str, ssh: bool) -> bool {
-    !user.is_empty()
+    crate::cli_args::not_option(user)
         && user.len() < 64
         && user.chars().all(|c| c.is_alphanumeric() || "_-.".contains(c) || (c == '@' && !ssh))
 }
@@ -126,6 +126,14 @@ mod tests {
         assert!(check(&ftp).is_ok());
         ftp.files = "sftp".into();
         assert!(check(&ftp).is_err());
+    }
+
+    #[test]
+    fn a_user_is_never_an_option() {
+        for ssh in [true, false] {
+            assert!(!valid_user("-oProxyCommand", ssh) && !valid_user("--", ssh) && !valid_user("", ssh));
+            assert!(valid_user("deploy-1", ssh));
+        }
     }
 
     #[test]

@@ -106,7 +106,8 @@ fn iso_utc(at: chrono::DateTime<chrono::Utc>) -> String {
 }
 
 fn validate_host(s: &str) -> bool {
-    !s.is_empty()
+    // A leading '-' would reach ssh, ssh-copy-id or telnet as an option.
+    crate::cli_args::not_option(s)
         && s.len() < 256
         && s.chars()
             .all(|c| c.is_alphanumeric() || c == '.' || c == '-' || c == ':')
