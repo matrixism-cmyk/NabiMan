@@ -141,12 +141,44 @@ def guide(argv):
     print(text.rstrip('\n'))
 
 
+# Options that take a value, so the word after them is not a subcommand.
+VALUED = ('--dir', '--title', '--user', '--server', '--lines')
+SUBCOMMANDS = ('list', 'status', 'close', 'guide', 'open')
+
+
+def subcommand(argv):
+    """The subcommand and the rest of the arguments. Options may come first
+    (`--json status x`): only the first plain word decides, so a stray option
+    never turns `status x` into the first message of a new session."""
+    i = 0
+    while i < len(argv):
+        word = argv[i]
+        if word in VALUED:
+            i += 2
+            continue
+        if word.startswith('-'):
+            i += 1
+            continue
+        if word in SUBCOMMANDS:
+            return word, argv[:i] + argv[i + 1:]
+        break
+    return '', argv
+
+
+def live_claude_in(directory):
+    """A Claude Code already running in this directory on this machine, if any."""
+    answer = ask_nabiman({'list': True}, fail={})
+    for row in answer.get('sessions') or []:
+        if isinstance(row, dict) and not row.get('server') and row.get('cwd') == directory:
+            return row.get('address') or '?'
+    return None
+
+
 def main():
-    sub = sys.argv[1] if len(sys.argv) > 1 else ''
+    sub, argv = subcommand(sys.argv[1:])
     if sub in ('list', 'status', 'close', 'guide'):
-        {'list': list_sessions, 'status': status, 'close': close, 'guide': guide}[sub](sys.argv[2:])
+        {'list': list_sessions, 'status': status, 'close': close, 'guide': guide}[sub](argv)
         return
-    argv = sys.argv[2:] if sub == 'open' else sys.argv[1:]
     p = argparse.ArgumentParser(prog='nabiman-claude', description=__doc__.split('\n')[1],
                                 formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__.split('\n', 2)[2])
     p.add_argument('prompt', nargs='*', help='first message for the new Claude Code')
@@ -175,6 +207,14 @@ def main():
         ask['user'] = a.user
     if a.prompt:
         ask['prompt'] = ' '.join(a.prompt)
+    if ask['resume'] and not a.server:
+        # `claude -c` continues the newest conversation in that directory. If a Claude
+        # is still running there, that is its conversation: a second process would
+        # carry it on in parallel, with all its context and none of its restraint.
+        running = live_claude_in(ask['dir'])
+        if running:
+            p.error(f'{running} is already running in {ask["dir"]}; -c would continue its conversation'
+                    ' in a second process. Pass --fresh for a new conversation.')
     answer = ask_nabiman(ask)
     if a.json:
         print(json.dumps(answer, ensure_ascii=False))
