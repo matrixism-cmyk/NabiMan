@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import AuditIntegrityPanel from './AuditIntegrityPanel';
 import AuditForwardingPanel from './AuditForwardingPanel';
+import AuditChange, { AuditChangeRecord } from './AuditChange';
 import { useApi } from '../shared/api/useApi';
 import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';
 
-interface AuditEntry { timestamp: string; user: string; method: string; path: string; status: number; ip: string; }
+interface AuditEntry { timestamp: string; user: string; method: string; path: string; status: number; ip: string; change?: AuditChangeRecord; }
 
 export default function AuditPanel() {
   const { t } = useT();
@@ -54,7 +55,7 @@ export default function AuditPanel() {
         <table className="data-table">
           <thead><tr>
             {S('timestamp', t('audit.time'))}{S('user', t('audit.user'))}{S('method', 'Method')}
-            {S('path', t('audit.path'))}{S('status', 'Status')}{S('ip', 'IP')}
+            {S('path', t('audit.path'))}{S('status', 'Status')}{S('ip', 'IP')}<th>{t('audit.change')}</th>
           </tr></thead>
           <tbody>
             {sorted.map((e, i) => (
@@ -65,6 +66,7 @@ export default function AuditPanel() {
                 <td><code>{e.path}</code></td>
                 <td className={e.status >= 400 ? 'text-danger' : ''}>{e.status}</td>
                 <td>{e.ip}</td>
+                <td><AuditChange change={e.change} /></td>
               </tr>
             ))}
           </tbody>

@@ -24,6 +24,7 @@ fn entry() -> AuditEntry {
         status: 200,
         ip: "127.0.0.1".into(),
         hash: None,
+        change: None,
     }
 }
 fn enabled(s: &mut Store) -> String {

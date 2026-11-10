@@ -237,6 +237,8 @@ async fn put(
     {
         return fail("현재 소속 회원 수보다 낮은 제한을 설정할 수 없습니다");
     }
+    let change = crate::audit_change::Change::between("scope_settings", &scope_key, Some(&previous.policy), Some(&body));
+    crate::audit_change::note(&req, change);
     previous.replace(body, current, reason.into());
     all.insert(scope_key, previous);
     let result = storage::save(&all);

@@ -75,7 +75,8 @@ async fn put(req: HttpRequest, body: web::Json<AppSettings>) -> HttpResponse {
     if let Err(e) = crate::private_storage::write(&path(), &json) {
         return HttpResponse::InternalServerError().json(ApiResponse::<()>::error(&format!("Cannot save the settings: {e}")));
     }
-    idle_minutes().store(body.idle_logout_minutes, Ordering::Relaxed);
+    let (old, new) = (idle_minutes().swap(body.idle_logout_minutes, Ordering::Relaxed).to_string(), body.idle_logout_minutes.to_string());
+    crate::audit_change::note(&req, crate::audit_change::Change::new("app_settings", "app", "update").field("idle_logout_minutes", Some(&old), Some(&new)));
     // Turning the limit on must not sign out whoever is using NabiMan right now.
     if let Some(sessions) = req.app_data::<web::Data<crate::jwt_sessions::SessionStore>>() {
         if let Some(sid) = crate::auth::verified_claims(&req).map(|c| c.sid) {

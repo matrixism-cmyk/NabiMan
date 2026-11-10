@@ -74,7 +74,8 @@ impl State {
             return Err(error);
         }
         self.appending = true;
-        entry.hash = Some("v2:".into());
+        // A record that says what changed is hashed with it (v3); others as before.
+        entry.hash = Some(if entry.change.is_some() { "v3:" } else { "v2:" }.into());
         entry.hash = Some(compute_hash(&self.previous, &entry));
         let result = (|| {
             let parent = self.path.parent().ok_or("invalid_path")?;

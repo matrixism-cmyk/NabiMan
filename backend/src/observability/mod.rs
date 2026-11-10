@@ -12,6 +12,16 @@ pub(crate) mod request_log;
 
 use actix_web::web;
 
+/// Whether a field of this name holds a secret (see `redact`).
+pub(crate) fn redact_key(name: &str) -> bool {
+    redact::sensitive_key(name)
+}
+
+/// `text` with the secrets in it replaced (see `redact`).
+pub(crate) fn redact_text(text: &str) -> String {
+    redact::text(text)
+}
+
 /// The one path outside `/api` that the sign-in gate judges (admin or the scrape token).
 pub(crate) const METRICS_PATH: &str = "/metrics";
 

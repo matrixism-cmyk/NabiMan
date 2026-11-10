@@ -98,6 +98,7 @@ async fn test(
         status: 200,
         ip: String::new(),
         hash: None,
+        change: None,
     };
     match service.access(|s| s.enqueue(&entry, Some((&path, &body.revision)))) {
         Ok(count) => HttpResponse::Accepted()

@@ -214,6 +214,7 @@ async fn review(
     u.scope_restricted = true;
     u.requested_memberships.clear();
     let name = u.username.clone();
+    note_user_change(&req, &previous, &users, index);
     match commit_users(&mut users, previous) {
         Ok(()) => {
             crate::jwt_sessions::revoke_user_sessions(&sessions, &name, None);
@@ -287,6 +288,7 @@ async fn member(
     }
     u.scope_restricted = true;
     let name = u.username.clone();
+    note_user_change(&req, &previous, &users, index);
     match commit_users(&mut users, previous) {
         Ok(()) => {
             crate::jwt_sessions::revoke_user_sessions(&sessions, &name, None);
@@ -294,6 +296,13 @@ async fn member(
         }
         Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<()>::error(&e)),
     }
+}
+
+/// The account at `index`, before and after, for the audit record.
+fn note_user_change(req: &HttpRequest, before: &[crate::models::NabimanUser], after: &[crate::models::NabimanUser], index: usize) {
+    let id = &after[index].id;
+    let change = crate::audit_change::Change::between("user", id, before.iter().find(|u| &u.id == id), Some(&after[index]));
+    crate::audit_change::note(req, change);
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {

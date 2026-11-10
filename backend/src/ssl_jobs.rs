@@ -33,7 +33,7 @@ fn valid(domain: &str) -> bool {
 
 /// Starts `certbot args` for `domain` unless a job for it is already running,
 /// which is answered instead. The run is bounded by `deadline::CERTIFICATE`.
-fn start(domain: String, args: Vec<String>, running: &str, started: &str) -> HttpResponse {
+fn start(req: &actix_web::HttpRequest, action: &str, domain: String, args: Vec<String>, running: &str, started: &str) -> HttpResponse {
     if !valid(&domain) {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid domain"));
     }
@@ -46,6 +46,7 @@ fn start(domain: String, args: Vec<String>, running: &str, started: &str) -> Htt
         let job = RenewStatus { domain: domain.clone(), status: "running".into(), message: running.into(), started_at: now.clone() };
         jobs.insert(domain.clone(), job);
     }
+    crate::audit_change::note(req, crate::audit_change::Change::new("certificate", &domain, action).field("job", None, Some("started")));
     let d = domain.clone();
     std::thread::spawn(move || {
         let output = std::process::Command::new("certbot").args(&args).output_within(deadline::CERTIFICATE);
@@ -66,9 +67,9 @@ fn start(domain: String, args: Vec<String>, running: &str, started: &str) -> Htt
     HttpResponse::Ok().json(ApiResponse::ok(RenewStatus { domain, status: "running".into(), message: started.into(), started_at: now }))
 }
 
-pub(super) async fn renew_certificate(body: web::Json<DomainRequest>) -> HttpResponse {
+pub(super) async fn renew_certificate(req: actix_web::HttpRequest, body: web::Json<DomainRequest>) -> HttpResponse {
     let args = ["renew", "--cert-name", &body.domain, "--force-renewal", "--non-interactive", "--no-random-sleep-on-renew"];
-    start(body.domain.clone(), args.map(String::from).to_vec(), "Renewing...", "Renewal started in background")
+    start(&req, "renew", body.domain.clone(), args.map(String::from).to_vec(), "Renewing...", "Renewal started in background")
 }
 
 pub(super) async fn renew_status(path: web::Path<String>) -> HttpResponse {
@@ -80,7 +81,7 @@ pub(super) async fn renew_status(path: web::Path<String>) -> HttpResponse {
 
 /// A new certificate needs the Let's Encrypt account address
 /// (`NABIMAN_LETSENCRYPT_EMAIL`); without one the request is refused, saying so.
-pub(super) async fn issue_certificate(body: web::Json<DomainRequest>) -> HttpResponse {
+pub(super) async fn issue_certificate(req: actix_web::HttpRequest, body: web::Json<DomainRequest>) -> HttpResponse {
     let email = match crate::install_config::settings::letsencrypt_email() {
         Ok(email) => email,
         Err(why) => return HttpResponse::Ok().json(ApiResponse::<String>::error(&why)),
@@ -88,7 +89,7 @@ pub(super) async fn issue_certificate(body: web::Json<DomainRequest>) -> HttpRes
     let args = [
         "--apache", "-d", &body.domain, "--non-interactive", "--agree-tos", "--no-eff-email", "--email", &email,
     ];
-    start(body.domain.clone(), args.map(String::from).to_vec(), "Issuing...", "Certificate issuance started")
+    start(&req, "issue", body.domain.clone(), args.map(String::from).to_vec(), "Issuing...", "Certificate issuance started")
 }
 
 #[cfg(test)]
@@ -100,7 +101,7 @@ mod tests {
         if std::env::var_os("NABIMAN_LETSENCRYPT_EMAIL").is_some() {
             return; // set where this runs: issuing would really start certbot
         }
-        let res = issue_certificate(web::Json(DomainRequest { domain: "example.com".into() })).await;
+        let res = issue_certificate(actix_web::test::TestRequest::default().to_http_request(), web::Json(DomainRequest { domain: "example.com".into() })).await;
         let body = actix_web::body::to_bytes(res.into_body()).await.unwrap();
         let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(body["success"], false);

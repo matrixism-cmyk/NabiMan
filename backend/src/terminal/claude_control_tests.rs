@@ -141,7 +141,12 @@ fn every_close_is_written_to_the_audit_journal_with_who_asked() {
     assert_eq!(entries[0].user, "admin (claude.sock: nabi pid 42 in pty_01)");
     assert_eq!((entries[0].method.as_str(), entries[0].path.as_str(), entries[0].status), ("CLOSE", "claude.sock/sessions/pty_02/close?force=1", 200));
     assert_eq!((entries[1].path.as_str(), entries[1].status), ("claude.sock/sessions/pty_03x/close", 409));
-    assert!(entries.iter().all(|e| e.hash.as_deref().is_some_and(|h| h.starts_with("v2:"))), "chained like every record");
+    // A close that went through says what it changed (v3); a refused one is a plain record.
+    assert!(entries[0].hash.as_deref().is_some_and(|h| h.starts_with("v3:")), "chained like every record");
+    assert!(entries[1].hash.as_deref().is_some_and(|h| h.starts_with("v2:")));
+    let change = entries[0].change.as_ref().unwrap();
+    assert_eq!((change.resource.as_str(), change.id.as_str(), change.action.as_str()), ("terminal_session", "pty_02", "close"));
+    assert!(entries[1].change.is_none());
     let on_disk = std::fs::read_to_string(dir.join("audit.jsonl")).unwrap();
     assert_eq!(on_disk.lines().count(), 2);
     std::fs::remove_dir_all(dir).unwrap();

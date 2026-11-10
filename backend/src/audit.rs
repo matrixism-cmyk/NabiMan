@@ -14,6 +14,10 @@ pub struct AuditEntry {
     pub ip: String,
     #[serde(default)]
     pub hash: Option<String>,
+    /// What an administrative change changed (records before it have none).
+    /// Part of the hashed record: such a record's hash is `v3:`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub change: Option<crate::audit_change::Change>,
 }
 
 #[path = "audit_inspection.rs"]
@@ -31,6 +35,23 @@ fn audit_file_path() -> std::path::PathBuf {
 fn compute_hash(prev_hash: &str, entry: &AuditEntry) -> String {
     use sha2::Digest;
     let mut hasher = sha2::Sha256::new();
+    if entry.hash.as_deref().is_some_and(|h| h.starts_with("v3:")) {
+        hasher.update(b"nabiman-audit-v3\0");
+        hasher.update(
+            serde_json::to_vec(&(
+                prev_hash,
+                &entry.timestamp,
+                &entry.user,
+                &entry.method,
+                &entry.path,
+                entry.status,
+                &entry.ip,
+                &entry.change,
+            ))
+            .expect("record tuple serialization"),
+        );
+        return format!("v3:{}", hex::encode(hasher.finalize()));
+    }
     if entry.hash.as_deref().is_some_and(|h| h.starts_with("v2:")) {
         hasher.update(b"nabiman-audit-v2\0");
         hasher.update(

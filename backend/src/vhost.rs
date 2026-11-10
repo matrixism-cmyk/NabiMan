@@ -171,6 +171,12 @@ fn detect_nginx_type(content: &str) -> (String, String) {
 
 // --- Create ---
 
+fn created(req: &actix_web::HttpRequest, body: &CreateVhostRequest) {
+    let change = crate::audit_change::Change::new("vhost", &body.domain, "create").field("type", None, Some(&body.vhost_type));
+    let change = change.field("target", None, Some(&body.target)).field("auto_ssl", None, body.auto_ssl.map(|b| b.to_string()).as_deref());
+    crate::audit_change::note(req, change);
+}
+
 #[derive(Deserialize)]
 pub struct CreateVhostRequest {
     pub domain: String,
@@ -189,7 +195,7 @@ fn validate_domain(d: &str) -> bool {
             .all(|c| c.is_alphanumeric() || c == '.' || c == '-')
 }
 
-async fn create_vhost(body: web::Json<CreateVhostRequest>) -> HttpResponse {
+async fn create_vhost(req: actix_web::HttpRequest, body: web::Json<CreateVhostRequest>) -> HttpResponse {
     if !validate_domain(&body.domain) {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid domain"));
     }
@@ -199,12 +205,12 @@ async fn create_vhost(body: web::Json<CreateVhostRequest>) -> HttpResponse {
         .unwrap_or_else(|| detect_web_server());
 
     match srv {
-        "nginx" => create_nginx_vhost(&body).await,
-        _ => create_apache_vhost(&body).await,
+        "nginx" => create_nginx_vhost(&req, &body).await,
+        _ => create_apache_vhost(&req, &body).await,
     }
 }
 
-async fn create_apache_vhost(body: &CreateVhostRequest) -> HttpResponse {
+async fn create_apache_vhost(req: &actix_web::HttpRequest, body: &CreateVhostRequest) -> HttpResponse {
     let conf = format!("/etc/apache2/sites-available/{}.conf", body.domain);
     if std::path::Path::new(&conf).exists() {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Vhost already exists"));
@@ -231,10 +237,11 @@ async fn create_apache_vhost(body: &CreateVhostRequest) -> HttpResponse {
     if body.auto_ssl.unwrap_or(false) {
         msg += &run_certbot(&body.domain, "apache").await;
     }
+    created(req, body);
     HttpResponse::Ok().json(ApiResponse::ok(msg))
 }
 
-async fn create_nginx_vhost(body: &CreateVhostRequest) -> HttpResponse {
+async fn create_nginx_vhost(req: &actix_web::HttpRequest, body: &CreateVhostRequest) -> HttpResponse {
     let conf = format!("/etc/nginx/sites-available/{}", body.domain);
     if std::path::Path::new(&conf).exists() {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Vhost already exists"));
@@ -260,6 +267,7 @@ async fn create_nginx_vhost(body: &CreateVhostRequest) -> HttpResponse {
     if body.auto_ssl.unwrap_or(false) {
         msg += &run_certbot(&body.domain, "nginx").await;
     }
+    created(req, body);
     HttpResponse::Ok().json(ApiResponse::ok(msg))
 }
 
@@ -329,7 +337,7 @@ pub struct DeleteVhostRequest {
     pub server: Option<String>,
 }
 
-async fn delete_vhost(body: web::Json<DeleteVhostRequest>) -> HttpResponse {
+async fn delete_vhost(req: actix_web::HttpRequest, body: web::Json<DeleteVhostRequest>) -> HttpResponse {
     if !validate_domain(&body.domain) {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid domain"));
     }
@@ -359,6 +367,7 @@ async fn delete_vhost(body: web::Json<DeleteVhostRequest>) -> HttpResponse {
             .args(["reload", "apache2"])
             .output_off_thread(deadline::SERVICE).await;
     }
+    crate::audit_change::note(&req, crate::audit_change::Change::new("vhost", &body.domain, "delete").field("server", Some(srv), None));
     HttpResponse::Ok().json(ApiResponse::ok(format!("{} removed", body.domain)))
 }
 

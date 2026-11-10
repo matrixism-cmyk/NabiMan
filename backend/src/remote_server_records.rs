@@ -135,6 +135,7 @@ pub(super) async fn add_server(
     if let Err(e) = save_servers(&mut servers) {
         return storage_error(e);
     }
+    crate::audit_change::note(&req, crate::audit_change::Change::between("server", &server.id, None, Some(&server)));
     HttpResponse::Ok().json(ApiResponse::ok(public(server)))
 }
 
@@ -154,6 +155,7 @@ pub(super) async fn update_server(
         Ok(servers) => servers,
         Err(error) => return storage_error(error),
     };
+    let original = servers.iter().find(|s| s.id == server_id).cloned();
     let srv = match servers
         .iter_mut()
         .find(|s| s.id == server_id && crate::member_servers::manageable(&actor, s))
@@ -243,9 +245,11 @@ pub(super) async fn update_server(
     }
 
     let updated = public(srv.clone());
+    let change = crate::audit_change::Change::between("server", &server_id, original.as_ref(), Some(&*srv));
     if let Err(e) = save_servers(&mut servers) {
         return storage_error(e);
     }
+    crate::audit_change::note(&req, change);
     HttpResponse::Ok().json(ApiResponse::ok(updated))
 }
 
@@ -265,6 +269,7 @@ pub(super) async fn delete_server(
         Err(error) => return storage_error(error),
     };
     let before = servers.len();
+    let original = servers.iter().find(|s| s.id == server_id).cloned();
     servers.retain(|s| s.id != server_id || !crate::member_servers::manageable(&actor, s));
     if servers.len() == before {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Server not found"));
@@ -272,5 +277,6 @@ pub(super) async fn delete_server(
     if let Err(e) = save_servers(&mut servers) {
         return storage_error(e);
     }
+    crate::audit_change::note(&req, crate::audit_change::Change::between("server", &server_id, original.as_ref(), None));
     HttpResponse::Ok().json(ApiResponse::ok("Server deleted".to_string()))
 }

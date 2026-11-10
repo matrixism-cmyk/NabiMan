@@ -8,6 +8,7 @@ mod alert_rules;
 mod app_routes;
 mod api_keys;
 mod audit;
+mod audit_change;
 mod audit_forwarding;
 mod audit_middleware;
 mod auth;

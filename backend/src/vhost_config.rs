@@ -59,11 +59,16 @@ pub(super) fn write_site(path: &str, body: &str) -> std::io::Result<()> {
     crate::private_storage::write_mode(path, body.as_bytes(), crate::private_storage::existing_mode(path, 0o644))
 }
 
-pub(super) async fn save_config(body: web::Json<SaveConfigRequest>) -> HttpResponse {
+pub(super) async fn save_config(req: actix_web::HttpRequest, body: web::Json<SaveConfigRequest>) -> HttpResponse {
     if !validate_domain(&body.domain) {
         return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid"));
     }
     let srv = body.server.as_deref().unwrap_or("apache");
+    // The file is replaced before the syntax test, so the change is made either way.
+    let size = |c: &str| format!("{} bytes", c.len());
+    let change = crate::audit_change::Change::new("vhost_config", &body.domain, "update").field("server", None, Some(srv));
+    let change = change.field("http_config", None, Some(&size(&body.http_config)));
+    crate::audit_change::note(&req, change.field("ssl_config", None, body.ssl_config.as_deref().map(size).as_deref()));
     if srv == "nginx" {
         let _ = write_site(&format!("/etc/nginx/sites-available/{}", body.domain), &body.http_config);
         let test = std::process::Command::new("nginx").arg("-t").output_off_thread(deadline::SERVICE).await;

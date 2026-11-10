@@ -243,6 +243,12 @@ pub(crate) fn audit_close(log: &AuditLog, forwarding: Option<&crate::audit_forwa
         status,
         ip: "local".into(),
         hash: None,
+        change: (status < 400).then(|| {
+            let id: String = id.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_').take(64).collect();
+            crate::audit_change::Change::new("terminal_session", &id, "close")
+                .field("state", Some("open"), Some("closed"))
+                .field("force", None, force.then_some("true"))
+        }),
     };
     match append_entry(log, entry) {
         Some(saved) => {

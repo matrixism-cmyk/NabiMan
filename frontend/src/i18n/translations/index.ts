@@ -39,6 +39,7 @@ import signup from './signup';
 import sftpSniff from './sftp-sniff';
 import about from './about';
 import firstRun from './first-run';
+import auditChange from './audit-change';
 
 export type { Lang };
 export { LANG_LABELS } from '../../shared/i18n';
@@ -51,6 +52,7 @@ const translations: Translations = {
   ...monitoring,
   ...management,
   ...security,
+  ...auditChange,
   ...mec,
   ...mecLive,
   ...mecDashboard,

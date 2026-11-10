@@ -87,6 +87,17 @@ fn client() -> Result<reqwest::Client, Error> {
     builder.build().map_err(|_| Error::TlsConfig)
 }
 impl Forwarder {
+    /// One that forwards nothing (its store is unavailable), for other modules' tests.
+    #[cfg(test)]
+    pub fn disabled_for_test() -> Self {
+        Self(Arc::new(Inner {
+            store: Mutex::new(None),
+            failure: Mutex::new(Some(Error::Storage)),
+            client: None,
+            legacy: false,
+            paused: true,
+        }))
+    }
     pub fn start() -> Self {
         let dir = nabiman_server::data_dir();
         let opened = Store::open(&dir.join("audit-forwarding.sqlite3"));

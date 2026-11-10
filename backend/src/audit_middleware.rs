@@ -137,6 +137,8 @@ where
                 status,
                 ip,
                 hash: None,
+                // Only a change that went through is recorded as made.
+                change: (status < 400).then(|| crate::audit_change::noted(res.request())).flatten(),
             };
             let persisted = actix_web::web::block(move || append_entry(&log, entry))
                 .await

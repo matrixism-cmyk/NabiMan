@@ -219,8 +219,7 @@ async fn create_user(
         return r;
     }
     if body.username.len() < 2 || body.username.len() > 32 {
-        return HttpResponse::Ok()
-            .json(ApiResponse::<()>::error("Username must be 2-32 characters"));
+        return HttpResponse::Ok().json(ApiResponse::<()>::error("Username must be 2-32 characters"));
     }
     if !body
         .username
@@ -262,6 +261,7 @@ async fn create_user(
         scope_restricted: body.role != UserRole::Admin,
     };
     let previous = users.clone();
+    crate::audit_change::note(&req, crate::audit_change::Change::between("user", &user.id, None, Some(&user)));
     users.push(user);
     match commit_users(&mut users, previous) {
         Ok(()) => HttpResponse::Ok().json(ApiResponse::ok("User created")),
@@ -323,6 +323,8 @@ async fn update_user(
     if let Err(e) = admin::apply(user, body.remote_permissions.as_ref(), body.access.as_ref()) {
         return HttpResponse::BadRequest().json(ApiResponse::<()>::error(&e));
     }
+    let change = crate::audit_change::Change::between("user", &user_id, previous.iter().find(|u| u.id == user_id), users.iter().find(|u| u.id == user_id));
+    crate::audit_change::note(&req, change);
     match commit_users(&mut users, previous) {
         Ok(()) => {
             if password_changed || body.role.is_some() {
@@ -346,10 +348,7 @@ async fn delete_user(
     let user_id = path.into_inner();
     let mut users = store.lock_safe();
     let admin_count = users.iter().filter(|u| u.super_admin()).count();
-    let target_username = users
-        .iter()
-        .find(|u| u.id == user_id)
-        .map(|u| u.username.clone());
+    let target_username = users.iter().find(|u| u.id == user_id).map(|u| u.username.clone());
     if let Some(u) = users.iter().find(|u| u.id == user_id) {
         if u.role == UserRole::Admin && admin_count <= 1 {
             return HttpResponse::Ok()
@@ -362,6 +361,7 @@ async fn delete_user(
     if users.len() == before {
         return HttpResponse::Ok().json(ApiResponse::<()>::error("User not found"));
     }
+    crate::audit_change::note(&req, crate::audit_change::Change::between("user", &user_id, previous.iter().find(|u| u.id == user_id), None));
     match commit_users(&mut users, previous) {
         Ok(()) => {
             if let Some(username) = target_username {

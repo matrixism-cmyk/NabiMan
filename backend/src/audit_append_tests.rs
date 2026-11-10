@@ -24,6 +24,7 @@ fn concurrent_records_have_individual_lines_one_chain_and_matching_memory_order(
                             status: 200,
                             ip: "127.0.0.1".into(),
                             hash: None,
+                            change: None,
                         })
                         .unwrap();
                 }
@@ -60,6 +61,7 @@ fn entry() -> AuditEntry {
         status: 200,
         ip: "127.0.0.1".into(),
         hash: None,
+        change: None,
     }
 }
 #[test]
@@ -238,4 +240,26 @@ fn a_lock_poisoned_by_a_reader_keeps_recording_but_an_interrupted_append_stops_t
     assert!(append_entry(&store, entry()).is_none(), "no chaining onto a half-written record");
     assert_eq!(store.lock_safe().error, Some("append_interrupted"));
     assert!(inspection::inspect("audit.jsonl", &std::fs::read(path).unwrap()).valid);
+}
+
+#[test]
+fn a_record_of_what_changed_is_chained_and_older_records_still_verify() {
+    let dir = Temp::new();
+    let path = dir.path().join("audit.jsonl");
+    let mut legacy = entry();
+    legacy.hash = Some(compute_hash("0", &legacy));
+    std::fs::write(&path, serde_json::to_string(&legacy).unwrap() + "\n").unwrap();
+    let mut state = storage::State::load(path.clone());
+    assert!(state.append(entry()).unwrap().hash.unwrap().starts_with("v2:"));
+    let mut changed = entry();
+    changed.change = Some(crate::audit_change::Change::new("user", "u1", "update").field("role", Some("viewer"), Some("operator")));
+    let saved = state.append(changed).unwrap();
+    assert!(saved.hash.as_deref().unwrap().starts_with("v3:"));
+    let bytes = std::fs::read(&path).unwrap();
+    assert!(inspection::inspect("audit.jsonl", &bytes).valid);
+    // The change is part of what is hashed: editing it breaks the chain.
+    let tampered = String::from_utf8(bytes).unwrap().replace("\"new\":\"operator\"", "\"new\":\"admin\"");
+    assert_eq!(inspection::inspect("audit.jsonl", tampered.as_bytes()).hash_mismatches, 1);
+    // And a record without one is written as before (no `change` key at all).
+    assert!(!serde_json::to_string(&entry()).unwrap().contains("change"));
 }

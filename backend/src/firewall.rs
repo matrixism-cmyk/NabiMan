@@ -294,10 +294,14 @@ async fn add_rule(req: HttpRequest, client: web::Data<Client>, body: web::Json<F
     };
 
     match result {
-        Ok(_) => HttpResponse::Ok().json(ApiResponse::ok(format!(
-            "Rule added: {} {}",
-            body.action, port_proto
-        ))),
+        Ok(_) => {
+            let change = crate::audit_change::Change::new("firewall_rule", &port_proto, "create")
+                .field("action", None, Some(&body.action))
+                .field("protocol", None, Some(&body.protocol))
+                .field("port", None, Some(&body.port));
+            crate::audit_change::note(&req, change);
+            HttpResponse::Ok().json(ApiResponse::ok(format!("Rule added: {} {}", body.action, port_proto)))
+        }
         Err(e) => HttpResponse::Ok().json(ApiResponse::<String>::error(&e)),
     }
 }
@@ -314,7 +318,10 @@ async fn delete_rule(req: HttpRequest, client: web::Data<Client>, body: web::Jso
     };
 
     match result {
-        Ok(_) => HttpResponse::Ok().json(ApiResponse::ok(format!("Rule {} deleted", body.number))),
+        Ok(_) => {
+            crate::audit_change::note(&req, crate::audit_change::Change::new("firewall_rule", &num_str, "delete"));
+            HttpResponse::Ok().json(ApiResponse::ok(format!("Rule {} deleted", body.number)))
+        }
         Err(e) => HttpResponse::Ok().json(ApiResponse::<String>::error(&e)),
     }
 }
