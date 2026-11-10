@@ -75,7 +75,7 @@ fn conflict(message: &str, data: serde_json::Value) -> HttpResponse {
 /// where it ends, and are told where that is when they do not.
 pub(super) async fn chunk(req: HttpRequest, q: web::Query<PartQuery>, mut body: web::Payload) -> HttpResponse {
     let t = tryr!(resolve(&req));
-    let limit = crate::member_servers::upload_limit(&req);
+    let limit = super::upload_limit(&req);
     if limit.is_some_and(|max| q.offset > max) {
         return super::too_big(limit);
     }
@@ -118,8 +118,8 @@ pub(super) async fn chunk(req: HttpRequest, q: web::Query<PartQuery>, mut body: 
 /// exactly as large as the file the browser sent.
 pub(super) async fn finish(req: HttpRequest, q: web::Query<PartQuery>) -> HttpResponse {
     let t = tryr!(resolve(&req));
-    if crate::member_servers::upload_limit(&req).is_some_and(|max| q.size > max) {
-        return super::too_big(crate::member_servers::upload_limit(&req));
+    if super::upload_limit(&req).is_some_and(|max| q.size > max) {
+        return super::too_big(super::upload_limit(&req));
     }
     let (part, target) = tryr!(paths(&q));
     let fs = tryr!(t.fs().await);

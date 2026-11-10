@@ -42,6 +42,13 @@ fn fail(status: StatusCode, message: &str) -> HttpResponse {
     HttpResponse::build(status).json(ApiResponse::<()>::error(message))
 }
 /// An upload past what a member may send at once.
+/// The largest single upload, in bytes: the server-wide cap for everyone,
+/// and a member's own limit when it is smaller.
+fn upload_limit(req: &actix_web::HttpRequest) -> Option<u64> {
+    let cap = crate::limits::upload_max_bytes();
+    Some(crate::member_servers::upload_limit(req).map_or(cap, |member| member.min(cap)))
+}
+
 fn too_big(limit: Option<u64>) -> HttpResponse {
     let mb = limit.unwrap_or(0) / (1024 * 1024);
     fail(StatusCode::PAYLOAD_TOO_LARGE, &format!("업로드는 한 파일에 {mb}MB까지 할 수 있습니다"))

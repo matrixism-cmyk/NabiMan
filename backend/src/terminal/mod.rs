@@ -263,9 +263,11 @@ async fn ws_terminal(
     let tmux_name = format!("nb_{}_{}", safe_user, sid);
 
     let mut map = store.lock_safe();
+    let mine = map.values().filter(|s| s.owned_by(&grant.user_id)).count();
     if let Some(why) = member
         .as_ref()
-        .and_then(|m| crate::member_servers::session_limit(m, map.values().filter(|s| s.owned_by(&m.id)).count()))
+        .and_then(|m| crate::member_servers::session_limit(m, mine))
+        .or_else(|| crate::limits::session_limit(mine))
     {
         drop(map);
         return ws::start(NoticeSocket::new(&why), &req, stream);

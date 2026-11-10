@@ -26,6 +26,7 @@ mod ip_block;
 mod jwt_sessions;
 mod ldap_auth;
 mod license;
+mod limits;
 mod logs;
 mod mail;
 mod mec;

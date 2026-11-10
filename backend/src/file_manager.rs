@@ -294,12 +294,16 @@ async fn upload_file(req: HttpRequest, body: web::Bytes) -> HttpResponse {
         Some(p) => p,
         None => return HttpResponse::Ok().json(ApiResponse::<String>::error("Invalid path")),
     };
-    if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    match std::fs::write(&path, &body) {
-        Ok(_) => HttpResponse::Ok().json(ApiResponse::ok("File uploaded".to_string())),
-        Err(e) => HttpResponse::Ok().json(ApiResponse::<String>::error(&e.to_string())),
+    let written = web::block(move || {
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        std::fs::write(&path, &body)
+    });
+    match written.await {
+        Ok(Ok(_)) => HttpResponse::Ok().json(ApiResponse::ok("File uploaded".to_string())),
+        Ok(Err(e)) => HttpResponse::Ok().json(ApiResponse::<String>::error(&e.to_string())),
+        Err(_) => HttpResponse::Ok().json(ApiResponse::<String>::error("Upload stopped unexpectedly")),
     }
 }
 
@@ -313,6 +317,16 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("/mkdir", web::post().to(mkdir))
             .route("/delete", web::post().to(delete_file))
             .route("/download", web::get().to(download_file))
-            .route("/upload", web::post().to(upload_file)),
+            // The body limit is the advertised one: actix's default (256 KiB)
+            // would refuse almost every upload before the handler saw it.
+            .service(
+                web::resource("/upload")
+                    .app_data(web::PayloadConfig::new(MAX_UPLOAD_SIZE as usize))
+                    .route(web::post().to(upload_file)),
+            ),
     );
 }
+
+#[cfg(test)]
+#[path = "file_manager_tests.rs"]
+mod tests;

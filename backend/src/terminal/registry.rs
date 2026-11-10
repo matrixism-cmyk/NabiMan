@@ -195,6 +195,11 @@ pub(super) fn prepare_insert(
     if map.contains_key(&id) || map.len() >= MAX_SESSIONS {
         return Err(io::Error::other("Terminal session capacity reached"));
     }
+    // Every way a session is opened passes here, so the per-account cap holds for all.
+    let mine = map.values().filter(|s| s.owned_by(&session.owner_id)).count();
+    if let Some(why) = crate::limits::session_limit(mine).filter(|_| !session.owner_id.is_empty()) {
+        return Err(io::Error::other(why));
+    }
     let mut candidate = map.clone();
     candidate.insert(id, session);
     validate(&candidate)?;
@@ -326,6 +331,19 @@ mod tests {
             .collect();
         assert!(prepare_insert(&full, "pty_extra".into(), entry).is_err());
         assert_eq!(full.len(), MAX_SESSIONS);
+    }
+    #[test]
+    fn one_account_cannot_take_more_than_its_share_of_sessions() {
+        let mut entry = sessions().remove("pty_one").unwrap();
+        entry.owner_id = "u1".into();
+        let cap = crate::limits::sessions_per_user();
+        let mine: HashMap<_, _> = (0..cap)
+            .map(|i| (format!("pty_{i}"), TmuxSession { tmux_name: format!("nb_{i}"), ..entry.clone() }))
+            .collect();
+        let refused = prepare_insert(&mine, "pty_more".into(), TmuxSession { tmux_name: "nb_more".into(), ..entry.clone() });
+        assert!(refused.err().unwrap().to_string().contains(&format!("{cap}개")));
+        entry.owner_id = "u2".into();
+        assert!(prepare_insert(&mine, "pty_more".into(), TmuxSession { tmux_name: "nb_more".into(), ..entry }).is_ok());
     }
     #[test]
     fn admission_reserves_space_for_later_metadata_growth() {

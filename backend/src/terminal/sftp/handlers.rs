@@ -60,7 +60,7 @@ pub(super) async fn list(req: HttpRequest, q: web::Query<PathQuery>) -> HttpResp
     let may = serde_json::json!({
         "write": t.share.is_some() || t.server.as_ref().is_none_or(|s| crate::member_servers::may_write(&req, s)),
         "copy": t.share.is_none() && crate::member_servers::may_copy(&req),
-        "upload_limit": crate::member_servers::upload_limit(&req),
+        "upload_limit": super::upload_limit(&req),
     });
     HttpResponse::Ok().json(ApiResponse::ok(serde_json::json!({
         "path": path, "parent": parent(&path), "entries": entries, "truncated": truncated, "attrs": attrs, "may": may,
@@ -169,7 +169,7 @@ pub(super) async fn upload(
         return bad("Invalid file name");
     }
     let path = join(&q.dir, &q.name);
-    let limit = crate::member_servers::upload_limit(&req);
+    let limit = super::upload_limit(&req);
     let declared = req.headers().get("content-length").and_then(|v| v.to_str().ok()?.parse::<u64>().ok());
     if limit.is_some_and(|max| declared.is_some_and(|n| n > max)) {
         return super::too_big(limit);

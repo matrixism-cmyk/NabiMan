@@ -48,6 +48,9 @@ impl Conn {
             *t = Instant::now();
         }
     }
+    fn last_used(&self) -> Instant {
+        *self.last_used.lock_safe()
+    }
 }
 
 fn pool() -> &'static Mutex<HashMap<String, Arc<Conn>>> {
@@ -76,6 +79,28 @@ fn sweep(map: &mut HashMap<String, Arc<Conn>>) {
     map.retain(|_, c| c.alive() && !c.idle());
 }
 
+/// Which keys to close so that one more fits under `cap`: the least
+/// recently used first.
+fn over_cap<K: Clone>(mut used: Vec<(K, Instant)>, cap: usize) -> Vec<K> {
+    let excess = (used.len() + 1).saturating_sub(cap.max(1));
+    used.sort_by_key(|(_, at)| *at);
+    used.into_iter().take(excess).map(|(k, _)| k).collect()
+}
+
+/// Closes idle connections every minute, not only when someone next asks.
+fn start_sweeper() {
+    static STARTED: OnceLock<()> = OnceLock::new();
+    STARTED.get_or_init(|| {
+        tokio::spawn(async {
+            let mut tick = tokio::time::interval(Duration::from_secs(60));
+            loop {
+                tick.tick().await;
+                sweep(&mut pool().lock_safe());
+            }
+        });
+    });
+}
+
 /// The operator's open connection to `srv`, or a new one.
 pub(crate) async fn session(user_id: &str, srv: &RemoteServer) -> Result<Arc<Conn>, String> {
     let key = key(user_id, srv);
@@ -88,9 +113,15 @@ pub(crate) async fn session(user_id: &str, srv: &RemoteServer) -> Result<Arc<Con
         }
     }
     let conn = Arc::new(open(srv).await?);
-    pool()
-        .lock_safe()
-        .insert(key, conn.clone());
+    start_sweeper();
+    let mut map = pool().lock_safe();
+    sweep(&mut map);
+    // Past the cap the least recently used go; anyone mid-request keeps theirs.
+    let used = map.iter().filter(|(k, _)| **k != key).map(|(k, c)| (k.clone(), c.last_used())).collect();
+    for k in over_cap(used, crate::limits::sftp_connections()) {
+        map.remove(&k);
+    }
+    map.insert(key, conn.clone());
     Ok(conn)
 }
 
@@ -176,5 +207,18 @@ pub(crate) fn failure_message(stderr: &str, timed_out: bool) -> String {
         (Some(line), _) => format!("SFTP connection failed: {line}"),
         (None, true) => "SFTP connection timed out".into(),
         (None, false) => "SFTP is not available on this server".into(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_least_recently_used_make_room() {
+        let now = std::time::Instant::now();
+        let at = |s: u64| now - std::time::Duration::from_secs(s);
+        let used = vec![("new", at(1)), ("old", at(300)), ("mid", at(60))];
+        assert_eq!(super::over_cap(used.clone(), 3), vec!["old"]);
+        assert_eq!(super::over_cap(used.clone(), 2), vec!["old", "mid"]);
+        assert!(super::over_cap(used, 10).is_empty());
     }
 }
