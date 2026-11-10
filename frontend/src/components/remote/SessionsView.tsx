@@ -5,6 +5,8 @@ import SessionLinks, { SessionLink } from './SessionLinks';
 import { arrange, moved, ORDER_MODES, OrderMode, useSessionOrder } from './sessionOrder';
 import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
+import SessionGraphView from './graph/SessionGraphView';
+import { readView, saveView, VIEW_MODES, ViewMode } from './graph/graphModel';
 import { useGrants, useMember, useSharing } from './member';
 
 export interface SessionInfo {
@@ -92,6 +94,7 @@ export default function SessionsView({
   const [draft, setDraft] = useState('');
   const [message, setMessage] = useState('');
   const recentOutput = useScreenChanges(sessions);
+  const [view, setView] = useState<ViewMode>(readView);
   // The account's own order, or a sort; dragging a tile by its handle sets the order.
   const { order, save: saveOrder, error: orderError } = useSessionOrder();
   const shownInOrder = arrange(sessions, order);
@@ -226,6 +229,12 @@ export default function SessionsView({
         <h3>{heading}</h3>
         <div className="btn-group">
           {actions}
+          <div className="btn-group session-view-switch" role="group" aria-label={t('graph.view')}>
+            {VIEW_MODES.map((m) => (
+              <button key={m} type="button" className={`btn btn-sm ${view === m ? 'btn-primary' : 'btn-secondary'}`} aria-pressed={view === m}
+                onClick={() => { setView(m); saveView(m); }}>{t(`graph.view.${m}`)}</button>
+            ))}
+          </div>
           <select className="session-sort" aria-label={t('sessionOrder.label')} title={t('sessionOrder.hint')} value={order.mode}
             onChange={(e) => saveOrder({ ...order, mode: e.target.value as OrderMode })}>
             {ORDER_MODES.map((m) => <option key={m} value={m}>{t(`sessionOrder.${m}`)}</option>)}
@@ -236,7 +245,10 @@ export default function SessionsView({
 
       {message && <div role="alert" className="message">{message}</div>}
       {orderError && <div role="alert" className="message">{t('sessionOrder.saveFailed')}</div>}
-      <div className={`session-grid ${links.length ? 'has-links' : ''}`} ref={setGrid}>
+      {view !== 'tiles' && (
+        <SessionGraphView mode={view} sessions={shownInOrder} links={links} onAttach={onAttach} onPopOut={onPopOut} />
+      )}
+      <div className={`session-grid ${links.length ? 'has-links' : ''}`} ref={setGrid} hidden={view !== 'tiles'}>
         <SessionLinks grid={grid} links={links} layout={shownIds.join(',')} />
         {shownInOrder.map(session => {
           const state = session.state === undefined ? (session.alive ? 'alive' : 'ended') :

@@ -4,6 +4,7 @@ import '@testing-library/jest-dom';
 import { I18nProvider } from '../../i18n';
 import { apiRequest } from '../../shared/api/useApi';
 jest.mock('../../shared/api/useApi',()=>({apiRequest:jest.fn(),apiPost:jest.fn()}));
+jest.mock('./graph/SessionGraphView',()=>({__esModule:true,default:(p:any)=><div data-testid="graph" data-mode={p.mode} data-sessions={p.sessions.length} data-links={p.links.length}/>}));
 import SessionsView, { SessionInfo } from './SessionsView';
 const session: SessionInfo = { id:'pty_one',label:'local',owner:'admin',ws_count:0,shared:false,age_secs:10,timeout_secs:300,scrollback:2000,keepalive:false,alive:true,title:'Fixture',preview:'' };
 function setup(value: SessionInfo) {
@@ -186,4 +187,25 @@ it('pointing at an arrow shows a box with who handed what to whom, and the other
   fireEvent.mouseLeave(container.querySelector('[data-link-hit="pty_l>pty_a"]')!);
   expect(screen.queryByRole('tooltip')).toBeNull();
   jest.restoreAllMocks();
+});
+
+it('the view switches between the tiles and the 2D and 3D graphs, and is remembered',()=>{
+  localStorage.clear(); localStorage.setItem('nabiman_lang','ko');
+  const peer=(name:string)=>[{name,ref:'abcdef',address:`${name} [abcdef]`,cwd:'/w',busy:false}];
+  const lead:SessionInfo={...session,id:'pty_l',title:'lead',state:'alive',claude:peer('lead'),orchestrator:true,directs:['pty_a']};
+  const a:SessionInfo={...session,id:'pty_a',title:'a',state:'alive',claude:peer('a')};
+  const { container, unmount } = render(<I18nProvider><SessionsView sessions={[lead,a]} onRefresh={jest.fn()} onAttach={jest.fn()} onPopOut={jest.fn()}/></I18nProvider>);
+  expect(screen.queryByTestId('graph')).toBeNull();
+  expect(container.querySelector('.session-grid')).not.toHaveAttribute('hidden');
+  fireEvent.click(screen.getByRole('button',{name:'3D 그래프'}));
+  expect(screen.getByTestId('graph')).toHaveAttribute('data-mode','graph3d');
+  expect(screen.getByTestId('graph')).toHaveAttribute('data-sessions','2');
+  expect(screen.getByTestId('graph')).toHaveAttribute('data-links','1');
+  expect(container.querySelector('.session-grid')).toHaveAttribute('hidden');
+  unmount();
+  render(<I18nProvider><SessionsView sessions={[lead,a]} onRefresh={jest.fn()} onAttach={jest.fn()} onPopOut={jest.fn()}/></I18nProvider>);
+  expect(screen.getByTestId('graph')).toHaveAttribute('data-mode','graph3d');
+  fireEvent.click(screen.getByRole('button',{name:'타일'}));
+  expect(screen.queryByTestId('graph')).toBeNull();
+  localStorage.clear();
 });

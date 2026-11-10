@@ -1,0 +1,51 @@
+/* The sessions as a graph: a stage with a bar above and a panel for the session picked. */
+.session-graph { display: flex; flex-direction: column; gap: 10px; }
+.session-graph-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.session-graph-legend { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-left: auto; font-size: 12px; color: var(--text-secondary); }
+.session-graph-key { display: inline-flex; align-items: center; gap: 5px; }
+.session-graph-key i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.session-graph-key.is-lead { color: #fbbf24; font-weight: 600; }
+.session-graph-key.is-busy { color: #4ade80; font-weight: 600; }
+.session-graph-count { padding: 2px 8px; border-radius: 10px; border: 1px solid var(--border); }
+.session-graph-stage {
+  position: relative; height: min(72vh, 780px); min-height: 420px; border-radius: 12px; overflow: hidden;
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(900px 500px at 50% 45%, rgba(94, 234, 212, 0.07), transparent 70%),
+    radial-gradient(600px 400px at 85% 10%, rgba(167, 139, 250, 0.08), transparent 70%),
+    linear-gradient(180deg, #0c1622, #0a111b);
+}
+.session-graph.is-3d .session-graph-stage {
+  background:
+    radial-gradient(700px 480px at 50% 50%, rgba(251, 191, 36, 0.08), transparent 70%),
+    radial-gradient(900px 600px at 20% 90%, rgba(96, 165, 250, 0.10), transparent 70%),
+    #05080f;
+}
+/* A faint grid under the 2D graph. */
+.session-graph:not(.is-3d) .session-graph-stage::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.35;
+  background-image: linear-gradient(rgba(148, 163, 184, 0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(148, 163, 184, 0.07) 1px, transparent 1px);
+  background-size: 36px 36px;
+}
+.session-graph-canvas { position: absolute; inset: 0; }
+.session-graph-wait { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-secondary); margin: 0; }
+.session-graph-hint { position: absolute; left: 14px; bottom: 10px; margin: 0; font-size: 11.5px; color: var(--text-secondary); opacity: 0.8; pointer-events: none; }
+.session-graph-panel {
+  position: absolute; top: 12px; right: 12px; bottom: 12px; width: min(380px, calc(100% - 24px)); display: flex; flex-direction: column; gap: 8px;
+  padding: 14px; border-radius: 12px; overflow: auto;
+  background: rgba(22, 34, 47, 0.92); backdrop-filter: blur(8px); border: 1px solid var(--border); box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+  animation: session-graph-panel-in 0.18s ease-out;
+}
+@keyframes session-graph-panel-in { from { opacity: 0; transform: translateX(12px); } }
+.session-graph-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 15px; }
+.session-graph-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.session-graph-rel { list-style: none; margin: 0; padding: 0; font-size: 12.5px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 2px; }
+.session-graph-rel .is-in { color: #fbbf24; }
+.session-graph-rel .is-out { color: #5eead4; }
+.session-graph-preview {
+  flex: 1; min-height: 120px; margin: 0; padding: 10px; border-radius: 8px; overflow: auto; white-space: pre; font-size: 11px; line-height: 1.35;
+  background: #0a0f17; border: 1px solid var(--border); color: #c9d1d9;
+}
+.session-graph-tip { position: fixed; }
+.session-view-switch .btn { white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .session-graph-panel { animation: none; } }
