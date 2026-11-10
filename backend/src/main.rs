@@ -27,6 +27,7 @@ mod dns_db;
 mod extension_points;
 mod file_manager;
 mod firewall;
+mod install_config;
 mod ip_block;
 mod jwt_sessions;
 mod ldap_auth;
@@ -170,10 +171,18 @@ where
     }
 }
 
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
+fn main() -> std::io::Result<()> {
     terminal::telnet_client::run_if_asked();
     terminal::recording::run_if_asked();
+    // The settings file joins the environment while this is the only thread.
+    install_config::apply_at_startup().map_err(|e| {
+        eprintln!("{e}");
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, e)
+    })?;
+    actix_web::rt::System::new().block_on(serve())
+}
+
+async fn serve() -> std::io::Result<()> {
     if unsafe { libc::prctl(libc::PR_SET_DUMPABLE, 0, 0, 0, 0) } != 0 {
         return Err(std::io::Error::last_os_error());
     }
@@ -186,10 +195,7 @@ async fn main() -> std::io::Result<()> {
     let owned_mec_db = mec::db::open_owned(mec::db::default_path())?;
     let mec_db = owned_mec_db.handle.clone();
     storage.seed_defaults();
-    let port: u16 = std::env::var("NABIMAN_PORT")
-        .ok()
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(8080);
+    let port: u16 = install_config::values::number("NABIMAN_PORT", 8080);
     let static_dir = std::env::var("NABIMAN_STATIC").unwrap_or_else(|_| "./static".to_string());
 
     let share_store = terminal::share_store::open(

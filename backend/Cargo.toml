@@ -59,6 +59,8 @@ async-trait = "0.1"
 futures = "0.3"
 tokio-stream = { version = "0.1", features = ["sync"] }
 docx-rs = "0.4"
+# The optional settings file (/etc/nabiman/nabiman.toml); the version already in the lock.
+toml = "=0.5.11"
 
 [dev-dependencies]
 rand10 = { package = "rand", version = "0.10", features = ["thread_rng"] }
