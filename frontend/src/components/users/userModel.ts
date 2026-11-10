@@ -1,28 +1,33 @@
 import type { MemberUser } from '../MembershipEditor';
+import type { TFn } from '../../i18n';
 
 export type Role = 'admin' | 'remote' | 'viewer' | 'operator';
 export type Status = MemberUser['status'];
 
+/** Translation keys of each level's name. */
 export const ROLE_LABEL: Record<string, string> = {
-  admin: '최고관리자',
-  remote: '원격 전용 회원',
-  viewer: '일반 회원',
-  operator: '기존 운영자',
+  admin: 'users.role.admin',
+  remote: 'users.role.remote',
+  viewer: 'users.role.viewer',
+  operator: 'users.role.operator',
 };
 
-/** One line on what each level gets, for the choice and the detail. */
+/** One line on what each level gets, for the choice and the detail (translation keys). */
 export const ROLE_HINT: Record<string, string> = {
-  admin: '서비스 전체를 관리합니다. 이용 기간·접속 제한을 둘 수 없습니다.',
-  remote: '원격 메뉴만 씁니다. 본인이 등록한 서버와 관리자가 지정한 서버로 접속합니다.',
-  viewer: '서버·tenant 소속별로 받은 권한만큼 씁니다.',
-  operator: '예전 운영자 권한입니다. 새로 지정할 수는 없습니다.',
+  admin: 'users.roleHint.admin',
+  remote: 'users.roleHint.remote',
+  viewer: 'users.roleHint.viewer',
+  operator: 'users.roleHint.operator',
 };
+
+/** A level's name, or the raw level when it is one this screen does not know. */
+export const roleName = (t: TFn, role: string) => (ROLE_LABEL[role] ? t(ROLE_LABEL[role]) : role);
 
 export const STATUS_LABEL: Record<Status, string> = {
-  active: '승인',
-  pending: '승인 대기',
-  rejected: '반려',
-  suspended: '이용 정지',
+  active: 'users.status.active',
+  pending: 'users.status.pending',
+  rejected: 'users.status.rejected',
+  suspended: 'users.status.suspended',
 };
 
 export const STATUS_TONE: Record<Status, string> = {
@@ -42,15 +47,15 @@ export function when(value?: string | number | null): string {
 }
 
 /** How long ago, roughly, for a list. */
-export function ago(value?: string | null): string {
-  if (!value) return '없음';
+export function ago(t: TFn, value?: string | null): string {
+  if (!value) return t('users.ago.never');
   const date = new Date(/^\d{4}-\d\d-\d\d \d/.test(value) ? `${value.replace(' ', 'T')}Z` : value);
   const secs = (Date.now() - date.getTime()) / 1000;
   if (Number.isNaN(secs)) return value;
-  if (secs < 60) return '방금';
-  if (secs < 3600) return `${Math.floor(secs / 60)}분 전`;
-  if (secs < 86400) return `${Math.floor(secs / 3600)}시간 전`;
-  if (secs < 86400 * 30) return `${Math.floor(secs / 86400)}일 전`;
+  if (secs < 60) return t('users.ago.now');
+  if (secs < 3600) return t('users.ago.minutes', { n: Math.floor(secs / 60) });
+  if (secs < 86400) return t('users.ago.hours', { n: Math.floor(secs / 3600) });
+  if (secs < 86400 * 30) return t('users.ago.days', { n: Math.floor(secs / 86400) });
   return date.toLocaleDateString();
 }
 
@@ -58,13 +63,13 @@ export function ago(value?: string | null): string {
 export const expired = (u: MemberUser) => Boolean(u.access?.expires_at && Date.parse(u.access.expires_at) <= Date.now());
 
 /** Short notes on the restrictions an account has, for the list. */
-export function restrictions(u: MemberUser): string[] {
+export function restrictions(t: TFn, u: MemberUser): string[] {
   const out: string[] = [];
   const a = u.access;
-  if (a?.expires_at) out.push(expired(u) ? '기간 만료' : `~${new Date(a.expires_at).toLocaleDateString()}`);
-  if (a?.allowed_networks?.length) out.push('IP 제한');
-  if (a?.allowed_hours) out.push('시간 제한');
-  if (a?.require_mfa && !u.totp_enabled) out.push('2FA 등록 필요');
+  if (a?.expires_at) out.push(expired(u) ? t('users.limit.expired') : `~${new Date(a.expires_at).toLocaleDateString()}`);
+  if (a?.allowed_networks?.length) out.push(t('users.limit.ip'));
+  if (a?.allowed_hours) out.push(t('users.limit.hours'));
+  if (a?.require_mfa && !u.totp_enabled) out.push(t('users.limit.mfaNeeded'));
   return out;
 }
 

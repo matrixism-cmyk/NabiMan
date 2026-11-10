@@ -4,6 +4,7 @@ import RegistrationForm from './RegistrationForm';
 import UserManagementPanel from './UserManagementPanel';
 import { useApi, apiPost, apiRequest } from '../shared/api/useApi';
 import { useMecList } from '../hooks/mec/useMecApi';
+import { I18nProvider } from '../i18n';
 
 jest.mock('../shared/api/useApi', () => ({ useApi: jest.fn(), apiPost: jest.fn(), apiRequest: jest.fn() }));
 jest.mock('../hooks/mec/useMecApi', () => ({ useMecList: jest.fn() }));
@@ -11,6 +12,8 @@ const scope = { kind: 'server', scope_id: 's1', role: 'admin' };
 const admin = { id: 'root', username: 'admin', role: 'admin', status: 'active', memberships: [], requested_memberships: [] };
 const pending = { id: 'new', username: 'new-user', role: 'viewer', status: 'pending', memberships: [], requested_memberships: [] };
 const refetch = jest.fn();
+beforeEach(() => localStorage.setItem('nabiman_lang', 'ko'));
+const inKo = (ui: React.ReactElement) => render(<I18nProvider>{ui}</I18nProvider>);
 function mockData(me: object, users: object[]) {
   (useApi as jest.Mock).mockImplementation((path: string) => ({
     data: path === '/api/users/me' ? me : path === '/api/users' ? users
@@ -38,7 +41,7 @@ test('signup confirms password and leaves applicant waiting for approval', async
 });
 test('super administrator approves with the selected tenant membership', async () => {
   mockData(admin, [admin, pending]);
-  render(<UserManagementPanel />);
+  inKo(<UserManagementPanel />);
   expect(screen.getByRole('heading', { name: '최고관리자 · 회원 승인 및 소속 관리' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '가입 신청 확인' }));
   expect(screen.queryByText('admin', { selector: 'strong' })).not.toBeInTheDocument();
@@ -55,7 +58,7 @@ const remote = { id: 'rm', username: 'remote-user', role: 'remote', status: 'act
 test('super administrator grants a remote-only member 세션 공유 and limits, keeping the rest as it was', async () => {
   mockData(admin, [admin, remote]);
   (apiRequest as jest.Mock).mockResolvedValue({ success: true, data: '저장했습니다' });
-  render(<UserManagementPanel />);
+  inKo(<UserManagementPanel />);
   fireEvent.click(screen.getByText('remote-user', { selector: 'strong' }));
   fireEvent.click(screen.getByRole('tab', { name: '원격 권한' }));
   fireEvent.click(screen.getByLabelText(/세션 공유/));
@@ -71,7 +74,7 @@ test('super administrator limits where and when an account may be used', async (
   mockData(admin, [admin, remote]);
   (apiRequest as jest.Mock).mockImplementation(async (path: string) => (path === '/api/users/my-address'
     ? { success: true, data: '203.0.113.5' } : { success: true, data: '저장했습니다' }));
-  render(<UserManagementPanel />);
+  inKo(<UserManagementPanel />);
   fireEvent.click(screen.getByText('remote-user', { selector: 'strong' }));
   fireEvent.click(screen.getByRole('tab', { name: '접속 제한' }));
   fireEvent.click(screen.getByLabelText(/2단계 인증 필수/));
@@ -86,7 +89,7 @@ test('scope manager sees delegation controls without signup approval or admin pr
   const manager = { ...admin, id: 'manager', username: 'manager', role: 'viewer', memberships: [scope] };
   const member = { ...pending, status: 'active', memberships: [{ ...scope, role: 'viewer' }] };
   mockData(manager, [manager, member]);
-  render(<UserManagementPanel />);
+  inKo(<UserManagementPanel />);
   expect(screen.queryByRole('button', { name: /승인하고 저장|소속 설정|반려|삭제/ })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: '소속 해제' })).toBeInTheDocument();
   expect(screen.getByLabelText('관리 소속')).toHaveTextContent('Own server');
@@ -99,7 +102,7 @@ test('delegated access editor saves disabled access, execution limit and expiry 
   const member = { ...pending, status: 'active', memberships: [{ ...scope, role: 'operator' }] };
   mockData(manager, [manager, member]);
   (apiPost as jest.Mock).mockClear();
-  render(<UserManagementPanel />);
+  inKo(<UserManagementPanel />);
   fireEvent.click(screen.getByRole('button', { name: /^접근 설정$/ }));
   fireEvent.click(screen.getByLabelText('소속 접근 허용'));
   fireEvent.click(screen.getByLabelText('명령 실행 허용'));

@@ -1,0 +1,48 @@
+type Lang = 'ko' | 'en' | 'ja';
+type T = Record<string, Record<Lang, string>>;
+
+// What a remote-only member may do: sharing, features and limits.
+const t: T = {
+  'users.grants.share_sessions': { ko: '세션 공유', en: 'Share sessions', ja: 'セッション共有' },
+  'users.grants.share_sessions.hint': { ko: '터미널 세션을 계정 없는 사람에게 링크로 공유합니다.', en: 'Shares terminal sessions by link with people who have no account.', ja: 'ターミナルセッションをアカウントのない人にリンクで共有します。' },
+  'users.grants.share_files': { ko: '파일 공유', en: 'Share files', ja: 'ファイル共有' },
+  'users.grants.share_files.hint': { ko: '서버 파일을 링크로 공유하고, 세션 링크에 파일 패널을 붙입니다.', en: 'Shares server files by link, and adds a file panel to session links.', ja: 'サーバーのファイルをリンクで共有し、セッションリンクにファイルパネルを付けます。' },
+  'users.grants.share_require_password': { ko: '링크에 비밀번호 필수', en: 'Links need a password', ja: 'リンクにパスワード必須' },
+  'users.grants.share_require_password.hint': { ko: '비밀번호 없는 링크는 만들 수 없습니다.', en: 'Links without a password cannot be made.', ja: 'パスワードのないリンクは作成できません。' },
+  'users.grants.share_view_only': { ko: '보기 전용 링크만', en: 'View-only links only', ja: '閲覧専用リンクのみ' },
+  'users.grants.share_view_only.hint': { ko: '방문자는 입력할 수 없고, 파일은 보기·내려받기만 합니다.', en: 'Visitors cannot type, and files can only be viewed or downloaded.', ja: '訪問者は入力できず、ファイルは閲覧・ダウンロードのみです。' },
+  'users.grants.dictation': { ko: '받아쓰기', en: 'Dictation', ja: '音声入力' },
+  'users.grants.dictation.hint': { ko: '마이크로 말해서 터미널에 입력합니다. 관리자의 음성 서비스 사용량이 듭니다.', en: 'Types into the terminal by speaking into the microphone. Uses the administrator\'s speech service quota.', ja: 'マイクで話してターミナルに入力します。管理者の音声サービス使用量がかかります。' },
+  'users.grants.register_servers': { ko: '서버 직접 등록', en: 'Register own servers', ja: 'サーバーを直接登録' },
+  'users.grants.register_servers.hint': { ko: '끄면 관리자가 지정한 서버만 씁니다. 이미 등록한 서버의 정보도 바꿀 수 없습니다.', en: 'When off, only administrator-assigned servers can be used, and servers already registered cannot be edited.', ja: 'オフにすると管理者が指定したサーバーのみ使えます。登録済みサーバーの情報も変更できません。' },
+  'users.grants.assigned_file_write': { ko: '지정 서버 파일 쓰기', en: 'Write files on assigned servers', ja: '指定サーバーのファイル書き込み' },
+  'users.grants.assigned_file_write.hint': { ko: '지정 서버에 올리기·지우기·이름 바꾸기·권한 바꾸기. 끄면 보기·내려받기만 합니다.', en: 'Upload, delete, rename and change permissions on assigned servers. When off, view and download only.', ja: '指定サーバーへのアップロード・削除・名前変更・権限変更。オフにすると閲覧・ダウンロードのみです。' },
+  'users.grants.copy_between_servers': { ko: '서버 간 복사', en: 'Copy between servers', ja: 'サーバー間コピー' },
+  'users.grants.copy_between_servers.hint': { ko: '한 서버의 파일을 다른 서버로 옮겨 복사합니다. 이 서버의 대역폭을 씁니다.', en: 'Copies files from one server to another, using this server\'s bandwidth.', ja: 'あるサーバーのファイルを別のサーバーへコピーします。このサーバーの帯域を使います。' },
+  'users.grants.keep_sessions': { ko: '세션 유지', en: 'Keep sessions', ja: 'セッション維持' },
+  'users.grants.keep_sessions.hint': { ko: '접속이 끊겨도 세션을 시간 제한 없이 살려 둡니다. 끄면 1시간 쓰지 않으면 닫힙니다.', en: 'Keeps sessions alive with no time limit after a disconnect. When off, they close after an hour unused.', ja: '接続が切れてもセッションを時間制限なく維持します。オフにすると1時間使わなければ閉じます。' },
+  'users.grants.share_max_days': { ko: '공유 링크 최대 기간', en: 'Longest share link', ja: '共有リンクの最大期間' },
+  'users.grants.share_max_days.hint': { ko: '정하면 영구 링크는 만들 수 없습니다.', en: 'When set, permanent links cannot be made.', ja: '設定すると無期限リンクは作成できません。' },
+  'users.grants.max_sessions': { ko: '동시 세션', en: 'Concurrent sessions', ja: '同時セッション' },
+  'users.grants.max_sessions.hint': { ko: '한꺼번에 열어 둘 수 있는 터미널 세션 수.', en: 'How many terminal sessions can be open at once.', ja: '同時に開いておけるターミナルセッション数。' },
+  'users.grants.max_idle_minutes': { ko: '최대 유휴 시간', en: 'Longest idle time', ja: '最大アイドル時間' },
+  'users.grants.max_idle_minutes.hint': { ko: '이만큼 쓰지 않은 세션은 닫힙니다. 정하면 세션 유지는 꺼집니다.', en: 'Sessions unused this long are closed. When set, keeping sessions is turned off.', ja: 'この時間使われなかったセッションは閉じます。設定するとセッション維持はオフになります。' },
+  'users.grants.max_servers': { ko: '직접 등록 서버', en: 'Own servers', ja: '直接登録サーバー' },
+  'users.grants.max_servers.hint': { ko: '직접 등록할 수 있는 서버 수.', en: 'How many servers they can register.', ja: '直接登録できるサーバー数。' },
+  'users.grants.max_upload_mb': { ko: '업로드 한 파일', en: 'Single upload', ja: 'アップロード1ファイル' },
+  'users.grants.max_upload_mb.hint': { ko: '한 번에 올릴 수 있는 파일 크기.', en: 'The largest file that can be uploaded at once.', ja: '一度にアップロードできるファイルサイズ。' },
+  'users.grants.unit.days': { ko: '일', en: 'days', ja: '日' },
+  'users.grants.unit.count': { ko: '개', en: 'sessions', ja: '個' },
+  'users.grants.unit.minutes': { ko: '분', en: 'min', ja: '分' },
+  'users.grants.unit.servers': { ko: '대', en: 'servers', ja: '台' },
+  'users.grants.sharing': { ko: '공유', en: 'Sharing', ja: '共有' },
+  'users.grants.sharingNote': { ko: '켜지 않으면 공유 링크를 만들 수 없습니다. 권한을 끄면 이미 나간 링크도 바로 막힙니다.', en: 'Without these no share links can be made. Turning a permission off blocks links already handed out at once.', ja: 'オンにしないと共有リンクは作成できません。権限をオフにすると発行済みのリンクもすぐに無効になります。' },
+  'users.grants.features': { ko: '기능', en: 'Features', ja: '機能' },
+  'users.grants.limits': { ko: '한도', en: 'Limits', ja: '上限' },
+  'users.grants.limitsZero': { ko: '(0 = 제한 없음)', en: '(0 = no limit)', ja: '(0 = 制限なし)' },
+  'users.grants.save': { ko: '원격 권한 저장', en: 'Save remote permissions', ja: 'リモート権限を保存' },
+  'users.grants.defaults': { ko: '기본값으로', en: 'Reset to defaults', ja: '既定値に戻す' },
+  'users.grants.note': { ko: '저장하면 바로 적용됩니다. 회원 화면의 버튼은 회원이 새로 고칠 때 바뀝니다.', en: 'Saved changes apply at once. The buttons on the member\'s screen change when they reload.', ja: '保存するとすぐに適用されます。メンバー画面のボタンはメンバーが再読み込みしたときに変わります。' },
+};
+
+export default t;

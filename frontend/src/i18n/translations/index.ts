@@ -25,6 +25,11 @@ import remoteProtocols from './remote-protocols';
 import remoteBase from './remote-base';
 import claude from './claude';
 import claudePeer from './claude-peer';
+import users from './users';
+import usersDetail from './users-detail';
+import usersAccess from './users-access';
+import usersGrants from './users-grants';
+import usersScope from './users-scope';
 
 export type { Lang };
 export { LANG_LABELS } from '../../shared/i18n';
@@ -56,6 +61,11 @@ const translations: Translations = {
   ...claude,
   ...claudePeer,
   ...remoteProtocols,
+  ...users,
+  ...usersDetail,
+  ...usersAccess,
+  ...usersGrants,
+  ...usersScope,
 };
 
 export default translations;

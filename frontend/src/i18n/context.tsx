@@ -10,3 +10,4 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
 export { useT, LANG_LABELS };
 export type { Lang };
+export type { TFn } from '../shared/i18n';

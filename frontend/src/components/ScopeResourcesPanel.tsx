@@ -48,7 +48,7 @@ export default function ScopeResourcesPanel({ kind }: { kind: 'server' | 'tenant
     {(serverError || tenantError) && <div role="alert" className="message">{serverError || tenantError}</div>}
     <table className="data-table"><thead><tr><th>이름</th><th>{kind === 'server' ? '호스트' : 'namespace'}</th><th>내 권한</th><th>관리</th></tr></thead>
       <tbody>{rows.map(r => <tr key={r.id}>
-        <td>{r.name}</td><td>{r.detail}</td><td>{role(r.id) ? membershipRole[role(r.id)!] : '조회자'}</td>
+        <td>{r.name}</td><td>{r.detail}</td><td>{t(membershipRole[role(r.id) || 'viewer'])}</td>
         <td><div className="btn-group">
           {kind === 'tenant' && role(r.id) === 'admin' && <button className="btn btn-sm btn-primary" onClick={() => setGrantTenantId(r.id)}>{t('mec.delegation.open')}</button>}
           {kind === 'server' && role(r.id) === 'admin' && <button className="btn btn-sm btn-secondary" onClick={() => setTrustId(r.id)}>{t('remote.trust.title')}</button>}

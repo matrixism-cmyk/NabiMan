@@ -5,7 +5,7 @@ export type Lang = 'ko' | 'en' | 'ja';
 export type Translations = Record<string, Record<Lang, string>>;
 
 export const LANG_LABELS: Record<Lang, string> = {
-  ko: '한국어',
+  ko: '한국어', // i18n-exempt: each language is named in its own script
   en: 'English',
   ja: '日本語',
 };
@@ -13,8 +13,11 @@ export const LANG_LABELS: Record<Lang, string> = {
 interface I18nContextType {
   lang: Lang;
   setLang: (lang: Lang) => void;
-  t: (key: string, vars?: Record<string, string | number>) => string;
+  t: TFn;
 }
+
+/** The translate function, for helpers outside components that take it as an argument. */
+export type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
 const I18nContext = createContext<I18nContextType>({
   lang: 'ko',

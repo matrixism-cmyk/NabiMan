@@ -1,0 +1,58 @@
+type Lang = 'ko' | 'en' | 'ja';
+type T = Record<string, Record<Lang, string>>;
+
+// One member's details: header, actions, tabs, account and memberships.
+const t: T = {
+  'users.detail.saved': { ko: '저장했습니다', en: 'Saved', ja: '保存しました' },
+  'users.detail.failed': { ko: '처리하지 못했습니다', en: 'Could not be done', ja: '処理できませんでした' },
+  'users.detail.signOutConfirm': { ko: '{name} 의 모든 로그인을 끝낼까요? 열려 있는 터미널도 끊깁니다.', en: 'End every sign-in of {name}? Open terminals are disconnected too.', ja: '{name} のすべてのログインを終了しますか? 開いているターミナルも切断されます。' },
+  'users.detail.signOut': { ko: '강제 로그아웃', en: 'Force sign-out', ja: '強制ログアウト' },
+  'users.detail.deleteConfirm': { ko: '{name} 회원을 삭제할까요? 되돌릴 수 없습니다.', en: 'Delete member {name}? This cannot be undone.', ja: 'メンバー {name} を削除しますか? 元に戻せません。' },
+  'users.detail.tabOverview': { ko: '개요', en: 'Overview', ja: '概要' },
+  'users.detail.tabAccount': { ko: '계정', en: 'Account', ja: 'アカウント' },
+  'users.detail.tabAssigned': { ko: '지정 서버', en: 'Assigned servers', ja: '指定サーバー' },
+  'users.detail.tabScopes': { ko: '서버·소속', en: 'Servers & memberships', ja: 'サーバー・所属' },
+  'users.detail.tabRemote': { ko: '원격 권한', en: 'Remote permissions', ja: 'リモート権限' },
+  'users.detail.tabAccess': { ko: '접속 제한', en: 'Access limits', ja: '接続制限' },
+  'users.detail.label': { ko: '{name} 상세', en: '{name} details', ja: '{name} の詳細' },
+  'users.detail.close': { ko: '상세 닫기', en: 'Close details', ja: '詳細を閉じる' },
+  'users.detail.expired': { ko: '이용 기간 만료', en: 'Usage period over', ja: '利用期間満了' },
+  'users.detail.mfaOn': { ko: '2단계 인증 사용', en: '2-step verification on', ja: '2段階認証を使用' },
+  'users.detail.mfaOff': { ko: '2단계 인증 없음', en: 'No 2-step verification', ja: '2段階認証なし' },
+  'users.detail.sub': { ko: '{hint} 가입 {created} · 최근 로그인 {login}', en: '{hint} Joined {created} · last sign-in {login}', ja: '{hint} 加入 {created} · 最終ログイン {login}' },
+  'users.detail.approveRequested': { ko: '신청대로 승인', en: 'Approve as requested', ja: '申請どおり承認' },
+  'users.detail.reject': { ko: '반려', en: 'Reject', ja: '却下' },
+  'users.detail.suspend': { ko: '이용 정지', en: 'Suspend', ja: '利用停止' },
+  'users.detail.unsuspend': { ko: '정지 해제', en: 'Lift suspension', ja: '停止を解除' },
+  'users.detail.reapprove': { ko: '다시 승인', en: 'Approve again', ja: '再承認' },
+  'users.detail.tabs': { ko: '회원 상세', en: 'Member details', ja: 'メンバー詳細' },
+
+  'users.account.grantAdmin': { ko: '{name} 에게 서비스 전체 최고관리자 권한을 줄까요?', en: 'Give {name} super administrator rights over the whole service?', ja: '{name} にサービス全体の最高管理者権限を与えますか?' },
+  'users.account.revokeAdmin': { ko: '{name} 의 최고관리자 권한을 거둘까요?', en: 'Take super administrator rights away from {name}?', ja: '{name} の最高管理者権限を取り消しますか?' },
+  'users.account.shortPassword': { ko: '비밀번호는 8자 이상으로 정하세요', en: 'Use at least 8 characters for the password', ja: 'パスワードは 8 文字以上にしてください' },
+  'users.account.level': { ko: '등급', en: 'Level', ja: '等級' },
+  'users.account.levelGroup': { ko: '{name} 서비스 권한', en: '{name} service level', ja: '{name} のサービス権限' },
+  'users.account.selfLevel': { ko: '자기 자신의 등급은 바꿀 수 없습니다.', en: 'You cannot change your own level.', ja: '自分自身の等級は変更できません。' },
+  'users.account.saveLevel': { ko: '등급 저장', en: 'Save level', ja: '等級を保存' },
+  'users.account.levelNote': { ko: '등급을 바꾸면 그 회원의 로그인이 모두 끝나고, 다시 로그인하면 새 등급으로 열립니다.', en: 'Changing the level ends all of the member\'s sign-ins; they get the new level when they sign in again.', ja: '等級を変えるとそのメンバーのログインはすべて終了し、再ログインすると新しい等級で開きます。' },
+  'users.account.resetPassword': { ko: '비밀번호 재설정', en: 'Reset password', ja: 'パスワード再設定' },
+  'users.account.newPassword': { ko: '새 비밀번호', en: 'New password', ja: '新しいパスワード' },
+  'users.account.changePassword': { ko: '비밀번호 바꾸기', en: 'Change password', ja: 'パスワードを変更' },
+  'users.account.passwordNote': { ko: '바꾸면 그 회원의 로그인이 모두 끝납니다. 새 비밀번호는 따로 안전하게 전해 주세요.', en: 'Changing it ends all of the member\'s sign-ins. Pass the new password on separately and safely.', ja: '変更するとそのメンバーのログインはすべて終了します。新しいパスワードは別途安全に伝えてください。' },
+  'users.account.external': { ko: '외부 계정', en: 'External account', ja: '外部アカウント' },
+  'users.account.externalHint': { ko: 'MEC(Rancher) 프로젝트 권한을 이 회원의 Rancher 계정과 연결합니다.', en: 'Links MEC (Rancher) project permissions to this member\'s Rancher account.', ja: 'MEC(Rancher) プロジェクト権限をこのメンバーの Rancher アカウントと連携します。' },
+  'users.account.linkRancher': { ko: 'Rancher 계정 연결', en: 'Link Rancher account', ja: 'Rancher アカウントを連携' },
+
+  'users.scopes.assignedTitle': { ko: '관리자 지정 서버', en: 'Administrator-assigned servers', ja: '管理者指定サーバー' },
+  'users.scopes.title': { ko: '서버·tenant 소속', en: 'Server & tenant memberships', ja: 'サーバー・tenant 所属' },
+  'users.scopes.assignedHint': { ko: '여기서 지정한 서버가 회원의 원격 목록에 "관리자 지정"으로 나옵니다. 터미널·파일·상태 확인만 할 수 있고, 접속은 서버에 설정된 방식(SSH 키·저장된 비밀번호)으로 이루어집니다.', en: 'Servers assigned here appear in the member\'s Remote list as "Assigned by administrator". They can use the terminal, files and status only, and connect the way the server is set up (SSH key or stored password).', ja: 'ここで指定したサーバーはメンバーのリモート一覧に「管理者指定」として表示されます。ターミナル・ファイル・状態確認のみ可能で、接続はサーバーに設定された方式 (SSH キー・保存済みパスワード) で行われます。' },
+  'users.scopes.hint': { ko: '소속마다 조회자·운영자·소속 관리자 중 하나를 정합니다. 사용 허용과 만료일로 접근을 잠시 막거나 기한을 둘 수 있습니다.', en: 'Each membership gets one of viewer, operator or scope administrator. Use the access switch and expiry to pause access or give it a deadline.', ja: '所属ごとに閲覧者・オペレーター・所属管理者のいずれかを設定します。使用許可と有効期限でアクセスを一時的に止めたり期限を設けたりできます。' },
+  'users.scopes.prefilled': { ko: '가입하며 신청한 소속이 미리 채워져 있습니다.', en: 'The memberships requested at sign-up are filled in.', ja: '加入時に申請した所属があらかじめ入力されています。' },
+  'users.scopes.approveSave': { ko: '승인하고 저장', en: 'Approve and save', ja: '承認して保存' },
+  'users.scopes.saveAssigned': { ko: '지정 서버 저장', en: 'Save assigned servers', ja: '指定サーバーを保存' },
+  'users.scopes.save': { ko: '소속 저장', en: 'Save memberships', ja: '所属を保存' },
+  'users.scopes.saveNote': { ko: '저장하면 그 회원의 로그인이 모두 끝나고, 다시 로그인하면 바뀐 소속으로 열립니다.', en: 'Saving ends all of the member\'s sign-ins; they get the new memberships when they sign in again.', ja: '保存するとそのメンバーのログインはすべて終了し、再ログインすると変更後の所属で開きます。' },
+  'users.scopes.tenantAccess': { ko: 'tenant 실제 접근', en: 'Actual tenant access', ja: 'tenant の実際のアクセス' },
+};
+
+export default t;

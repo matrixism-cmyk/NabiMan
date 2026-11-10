@@ -3,6 +3,7 @@ import { useApi } from '../shared/api/useApi';
 import type { MemberUser } from './MembershipEditor';
 import UserAdmin from './users/UserAdmin';
 import ScopeMembersPanel from './users/ScopeMembersPanel';
+import { useT } from '../i18n';
 
 /**
  * 회원 관리: the super administrator manages every account; a scope manager
@@ -10,7 +11,8 @@ import ScopeMembersPanel from './users/ScopeMembersPanel';
  */
 export default function UserManagementPanel({ initialScope = '' }: { initialScope?: string }) {
   const { data: me } = useApi<MemberUser>('/api/users/me');
-  if (!me) return <div className="panel loading">회원 목록을 불러오는 중…</div>;
+  const { t } = useT();
+  if (!me) return <div className="panel loading">{t('users.loading')}</div>;
   return me.role === 'admin'
     ? <UserAdmin me={me} initialScope={initialScope} />
     : <ScopeMembersPanel me={me} initialScope={initialScope} />;

@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { apiPost, apiRequest } from '../../shared/api/useApi';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
+import { useT } from '../../i18n';
 import type { MemberUser, ScopeOption } from '../MembershipEditor';
 import UserOverview from './UserOverview';
 import UserAccount from './UserAccount';
 import UserScopes from './UserScopes';
 import RemoteGrantsForm from './RemoteGrantsForm';
 import AccessRulesForm from './AccessRulesForm';
-import { expired, ROLE_HINT, ROLE_LABEL, STATUS_LABEL, STATUS_TONE, when } from './userModel';
+import { expired, ROLE_HINT, roleName, STATUS_LABEL, STATUS_TONE, when } from './userModel';
 
 type Tab = 'overview' | 'account' | 'scopes' | 'remote' | 'access';
 
@@ -25,6 +26,7 @@ interface Props {
 export default function UserDetail({ user, me, options, onChanged, onMessage, onClose, onDeleted }: Props) {
   const [tab, setTab] = useState<Tab>(user.status === 'pending' ? 'scopes' : 'overview');
   const [busy, setBusy] = useState(false);
+  const { t } = useT();
   const self = user.id === me.id;
   const admin = user.role === 'admin';
   const remote = user.role === 'remote';
@@ -34,11 +36,11 @@ export default function UserDetail({ user, me, options, onChanged, onMessage, on
     setBusy(true);
     try {
       const res = await run();
-      onMessage(typeof res.data === 'string' && res.data ? res.data : res.message || (res.success ? '저장했습니다' : '처리하지 못했습니다'));
+      onMessage(typeof res.data === 'string' && res.data ? res.data : res.message || (res.success ? t('users.detail.saved') : t('users.detail.failed')));
       if (res.success) onChanged();
       return res.success;
     } catch {
-      onMessage('요청을 처리할 수 없습니다. 다시 시도하세요.');
+      onMessage(t('users.requestFailed'));
       return false;
     } finally {
       setBusy(false);
@@ -50,60 +52,60 @@ export default function UserDetail({ user, me, options, onChanged, onMessage, on
     act(() => apiRequest<string>(`/api/users/${user.id}`, { method: 'PUT', body: JSON.stringify(body) }));
 
   const signOut = async () => {
-    if (await confirmDialog({ message: `${user.username} 의 모든 로그인을 끝낼까요? 열려 있는 터미널도 끊깁니다.`, danger: true, confirmLabel: '강제 로그아웃' })) {
+    if (await confirmDialog({ message: t('users.detail.signOutConfirm', { name: user.username }), danger: true, confirmLabel: t('users.detail.signOut') })) {
       act(() => apiPost<string>(`/api/users/${user.id}/sign-out`, {}));
     }
   };
   const remove = async () => {
-    if (await confirmDialog({ message: `${user.username} 회원을 삭제할까요? 되돌릴 수 없습니다.`, danger: true, confirmLabel: '삭제' })) {
+    if (await confirmDialog({ message: t('users.detail.deleteConfirm', { name: user.username }), danger: true, confirmLabel: t('common.delete') })) {
       if (await act(() => apiRequest<string>(`/api/users/${user.id}`, { method: 'DELETE' }))) onDeleted();
     }
   };
 
   const tabs: [Tab, string][] = [
-    ['overview', '개요'],
-    ['account', '계정'],
-    ['scopes', remote ? '지정 서버' : '서버·소속'],
-    ...(remote ? [['remote', '원격 권한'] as [Tab, string]] : []),
-    ...(!admin ? [['access', '접속 제한'] as [Tab, string]] : []),
+    ['overview', t('users.detail.tabOverview')],
+    ['account', t('users.detail.tabAccount')],
+    ['scopes', remote ? t('users.detail.tabAssigned') : t('users.detail.tabScopes')],
+    ...(remote ? [['remote', t('users.detail.tabRemote')] as [Tab, string]] : []),
+    ...(!admin ? [['access', t('users.detail.tabAccess')] as [Tab, string]] : []),
   ];
 
   return (
-    <aside className="users-detail" aria-label={`${user.username} 상세`}>
+    <aside className="users-detail" aria-label={t('users.detail.label', { name: user.username })}>
       <header className="users-detail-head">
         <div className="users-detail-title">
-          <h3>{user.username}{self && <span className="users-me">나</span>}</h3>
-          <button type="button" className="users-close" onClick={onClose} aria-label="상세 닫기">×</button>
+          <h3>{user.username}{self && <span className="users-me">{t('users.me')}</span>}</h3>
+          <button type="button" className="users-close" onClick={onClose} aria-label={t('users.detail.close')}>×</button>
         </div>
         <div className="users-detail-badges">
-          <span className={`users-role role-${user.role}`}>{ROLE_LABEL[user.role] || user.role}</span>
-          <span className={`users-state ${STATUS_TONE[user.status]}`}>{STATUS_LABEL[user.status]}</span>
-          {expired(user) && <span className="users-state is-bad">이용 기간 만료</span>}
-          <span className={user.totp_enabled ? 'users-chip is-ok' : 'users-chip'}>{user.totp_enabled ? '2단계 인증 사용' : '2단계 인증 없음'}</span>
+          <span className={`users-role role-${user.role}`}>{roleName(t, user.role)}</span>
+          <span className={`users-state ${STATUS_TONE[user.status]}`}>{t(STATUS_LABEL[user.status])}</span>
+          {expired(user) && <span className="users-state is-bad">{t('users.detail.expired')}</span>}
+          <span className={user.totp_enabled ? 'users-chip is-ok' : 'users-chip'}>{user.totp_enabled ? t('users.detail.mfaOn') : t('users.detail.mfaOff')}</span>
         </div>
         <p className="text-secondary users-detail-sub">
-          {ROLE_HINT[user.role] || ''} 가입 {when(user.created_at)} · 최근 로그인 {when(user.last_login)}
+          {t('users.detail.sub', { hint: ROLE_HINT[user.role] ? t(ROLE_HINT[user.role]) : '', created: when(user.created_at), login: when(user.last_login) })}
         </p>
         <div className="btn-group users-actions">
           {user.status === 'pending' && <>
             <button type="button" className="btn btn-primary btn-sm" disabled={busy}
-              onClick={() => review('active', user.requested_memberships)}>신청대로 승인</button>
-            <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => review('rejected', [])}>반려</button>
+              onClick={() => review('active', user.requested_memberships)}>{t('users.detail.approveRequested')}</button>
+            <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => review('rejected', [])}>{t('users.detail.reject')}</button>
           </>}
           {user.status === 'active' && !self && (
-            <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => review('suspended')}>이용 정지</button>
+            <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => review('suspended')}>{t('users.detail.suspend')}</button>
           )}
           {(user.status === 'suspended' || user.status === 'rejected') && (
             <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => review('active')}>
-              {user.status === 'suspended' ? '정지 해제' : '다시 승인'}
+              {user.status === 'suspended' ? t('users.detail.unsuspend') : t('users.detail.reapprove')}
             </button>
           )}
-          {!self && <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={signOut}>강제 로그아웃</button>}
-          {!self && <button type="button" className="btn btn-danger btn-sm" disabled={busy} onClick={remove}>삭제</button>}
+          {!self && <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={signOut}>{t('users.detail.signOut')}</button>}
+          {!self && <button type="button" className="btn btn-danger btn-sm" disabled={busy} onClick={remove}>{t('common.delete')}</button>}
         </div>
       </header>
 
-      <nav className="users-tabs" role="tablist" aria-label="회원 상세">
+      <nav className="users-tabs" role="tablist" aria-label={t('users.detail.tabs')}>
         {tabs.map(([key, text]) => (
           <button key={key} type="button" role="tab" aria-selected={tab === key}
             className={tab === key ? 'is-on' : ''} onClick={() => setTab(key)}>{text}</button>
