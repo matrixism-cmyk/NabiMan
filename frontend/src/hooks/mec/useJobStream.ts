@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { fetchWithRefresh } from '../../shared/api/useApi';
 
 export interface JobSnapshotStep {
   name: string;
@@ -45,16 +46,12 @@ export function useJobStream({ jobId, onEvent }: Options) {
     setEvents([]);
     setError(null);
     setIsOpen(false);
-    const token = sessionStorage.getItem('nabiman_token');
     const url = `/api/mec/v1/jobs/${encodeURIComponent(jobId)}/stream`;
     const controller = new AbortController();
 
     (async () => {
       try {
-        const res = await fetch(url, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          signal: controller.signal,
-        });
+        const res = await fetchWithRefresh(url, { signal: controller.signal });
         if (!res.ok || !res.body) {
           throw new Error(`HTTP ${res.status}`);
         }

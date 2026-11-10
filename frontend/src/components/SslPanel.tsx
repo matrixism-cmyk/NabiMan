@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useApi, apiPost } from '../shared/api/useApi';
+import { useApi, apiPost, apiRequest } from '../shared/api/useApi';
 import { SslCertificate } from '../types';
 import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';
@@ -12,31 +12,50 @@ export default function SslPanel() {
   const { data, loading, error, refetch } = useApi<SslCertificate[]>('/api/ssl/certificates');
   const [renewMsg, setRenewMsg] = useState('');
   const [renewing, setRenewing] = useState('');
+  const [renewError, setRenewError] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => { return () => { if (pollRef.current) clearInterval(pollRef.current); }; }, []);
 
-  const handleRenew = async (domain: string) => {
-    if (!(await confirmDialog(t('ssl.confirmRenew').replace('{domain}', domain)))) return;
-    setRenewing(domain);
-    setRenewMsg(`${domain}: ${t('ssl.renewStarted')}`);
-    await apiPost<RenewStatus>('/api/ssl/renew', { domain });
-    // Poll for completion
+  // Asks every 3 s how the certbot run for `domain` went, until it is over.
+  // A failed ask is said on screen and the polling stops: it would only fail again.
+  const pollStatus = (domain: string, doneKey: string) => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    const stop = () => { if (pollRef.current) clearInterval(pollRef.current); pollRef.current = null; setRenewing(''); };
     pollRef.current = setInterval(async () => {
-      const res = await fetch(`/api/ssl/renew/${domain}`, {
-        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('nabiman_token')}` },
-      });
-      const json = await res.json();
-      if (json.success && json.data) {
-        const s = json.data as RenewStatus;
-        if (s.status !== 'running') {
-          if (pollRef.current) clearInterval(pollRef.current);
-          setRenewing('');
-          setRenewMsg(`${domain}: ${s.status === 'success' ? t('ssl.renewed') : s.message}`);
+      try {
+        const json = await apiRequest<RenewStatus>(`/api/ssl/renew/${encodeURIComponent(domain)}`);
+        if (!json.success) { stop(); setRenewError(`${domain}: ${json.message || t('ssl.statusFailed')}`); return; }
+        if (json.data && json.data.status !== 'running') {
+          stop();
+          setRenewMsg(`${domain}: ${json.data.status === 'success' ? t(doneKey) : json.data.message}`);
           refetch();
         }
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') return;
+        stop();
+        setRenewError(`${domain}: ${t('ssl.statusFailed')} (${e instanceof Error ? e.message : String(e)})`);
       }
     }, 3000);
+  };
+
+  const start = async (domain: string, path: string, startedKey: string, doneKey: string) => {
+    setRenewing(domain);
+    setRenewError('');
+    setRenewMsg(`${domain}: ${t(startedKey)}`);
+    try {
+      const res = await apiPost<RenewStatus>(path, { domain });
+      if (!res.success) { setRenewing(''); setRenewMsg(''); setRenewError(`${domain}: ${res.message}`); return; }
+    } catch (e) {
+      setRenewing(''); setRenewMsg(''); setRenewError(`${domain}: ${e instanceof Error ? e.message : String(e)}`);
+      return;
+    }
+    pollStatus(domain, doneKey);
+  };
+
+  const handleRenew = async (domain: string) => {
+    if (!(await confirmDialog(t('ssl.confirmRenew').replace('{domain}', domain)))) return;
+    await start(domain, '/api/ssl/renew', 'ssl.renewStarted', 'ssl.renewed');
   };
 
   const { sorted, toggle, indicator } = useSortable(data || [], 'days_left', 'asc');
@@ -50,21 +69,7 @@ export default function SslPanel() {
 
   const handleIssue = async (domain: string) => {
     if (!(await confirmDialog(t('ssl.confirmIssue').replace('{domain}', domain)))) return;
-    setRenewing(domain);
-    setRenewMsg(`${domain}: ${t('ssl.issueStarted')}`);
-    await apiPost<any>('/api/ssl/issue', { domain });
-    pollRef.current = setInterval(async () => {
-      const res = await fetch(`/api/ssl/renew/${domain}`, {
-        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('nabiman_token')}` },
-      });
-      const json = await res.json();
-      if (json.success && json.data && json.data.status !== 'running') {
-        if (pollRef.current) clearInterval(pollRef.current);
-        setRenewing('');
-        setRenewMsg(`${domain}: ${json.data.status === 'success' ? t('ssl.issued') : json.data.message}`);
-        refetch();
-      }
-    }, 3000);
+    await start(domain, '/api/ssl/issue', 'ssl.issueStarted', 'ssl.issued');
   };
 
   const statusBadge = (cert: SslCertificate) => {
@@ -82,6 +87,7 @@ export default function SslPanel() {
         <button className="btn btn-secondary btn-sm" onClick={refetch}>{t('ssl.refresh')}</button>
       </div>
       {renewMsg && <div className="message" onClick={() => setRenewMsg('')}>{renewMsg}</div>}
+      {renewError && <div role="alert" className="message" onClick={() => setRenewError('')}>{renewError}</div>}
       {data.length === 0 ? (
         <p className="text-secondary">{t('ssl.noCerts')}</p>
       ) : (

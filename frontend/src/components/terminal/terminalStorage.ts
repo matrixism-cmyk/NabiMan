@@ -5,6 +5,7 @@
  * scrollback, so a reload shows what was on screen even before the socket is
  * back. The data never leaves the browser it was written in.
  */
+import { sessionSubject } from '../../shared/api/useApi';
 
 /** Raw output kept per window in localStorage so a reload still shows history.
  *  512 KB comfortably holds the 5,000-line default without crowding the
@@ -169,16 +170,7 @@ export function startFresh(storageKey: string) {
 const OWNER_KEY = 'nabiman_term_owner';
 
 /** The account signed in in this tab, by its token's subject; null when none. */
-function signedIn(): string | null {
-  try {
-    const token = sessionStorage.getItem('nabiman_token');
-    const part = token?.split('.')[1];
-    if (!part) return null;
-    const json = atob(part.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(part.length / 4) * 4, '='));
-    const sub = JSON.parse(json).sub;
-    return typeof sub === 'string' && sub ? sub : null;
-  } catch { return null; }
-}
+function signedIn(): string | null { return sessionSubject(); }
 
 /**
  * Every pane's stored screen, of whoever used this browser. Only the screens:

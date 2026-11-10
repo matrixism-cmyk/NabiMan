@@ -7,7 +7,6 @@ import { useT } from '../../shared/i18n';
 import { Cast, loadCast } from './recordingsApi';
 
 const SPEEDS = [0.5, 1, 2, 4, 8];
-const token = () => sessionStorage.getItem('nabiman_token');
 
 function mmss(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -90,7 +89,7 @@ export default function RecordingPlayer({ sid, label, onClose }: { sid: string; 
     term0.loadAddon(fit0);
     if (host.current) { term0.open(host.current); try { fit0.fit(); } catch { /* not sized yet */ } }
     term.current = term0; fit.current = fit0;
-    loadCast(sid, token()).then((c) => {
+    loadCast(sid).then((c) => {
       if (!live) return;
       cast.current = c;
       try { term0.resize(c.cols, c.rows); } catch { /* ignore */ }

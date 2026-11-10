@@ -53,11 +53,43 @@ function isCurrent(session: SessionSnapshot) {
 function assertCurrent(session: SessionSnapshot) {
   if (!isCurrent(session)) throw new DOMException('Login session changed; request discarded', 'AbortError');
 }
-function authHeaders(): Record<string, string> {
+/** A body the browser types itself (multipart boundary, a file's bytes). */
+function typesItself(body: RequestInit['body']): boolean {
+  return (typeof FormData !== 'undefined' && body instanceof FormData)
+    || (typeof Blob !== 'undefined' && body instanceof Blob)
+    || (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams);
+}
+function authHeaders(body?: RequestInit['body']): Record<string, string> {
   const token = getToken();
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = typesItself(body) ? {} : { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   return headers;
+}
+function headerRecord(headers: HeadersInit | undefined): Record<string, string> {
+  if (!headers) return {};
+  if (typeof Headers !== 'undefined' && headers instanceof Headers) return Object.fromEntries(headers.entries());
+  if (Array.isArray(headers)) return Object.fromEntries(headers);
+  return headers as Record<string, string>;
+}
+/** Whether this tab holds a login at all. */
+export function hasSession(): boolean { return Boolean(getToken()); }
+/** The signed-in account's id (the token's subject), or null. Not a credential. */
+export function sessionSubject(): string | null {
+  try {
+    const part = getToken()?.split('.')[1];
+    if (!part) return null;
+    const json = atob(part.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(part.length / 4) * 4, '='));
+    const sub = JSON.parse(json).sub;
+    return typeof sub === 'string' && sub ? sub : null;
+  } catch { return null; }
+}
+/**
+ * For the one request fetch cannot make (an XMLHttpRequest, for its upload
+ * progress): the header to sign it with, taken fresh for every send.
+ */
+export function authorizationHeader(): string {
+  const token = getToken();
+  return token ? `Bearer ${token}` : '';
 }
 let refreshJob: { session: SessionSnapshot; promise: Promise<boolean> } | null = null;
 async function tryRefresh(session: SessionSnapshot): Promise<boolean> {
@@ -96,29 +128,49 @@ async function tryRefresh(session: SessionSnapshot): Promise<boolean> {
   try { return await promise; }
   finally { if (refreshJob === job) refreshJob = null; }
 }
+/** What a request remembers of the login it was sent under. */
+export type SessionMark = SessionSnapshot;
+export const markSession = (): SessionMark => snapshotSession();
+/**
+ * After a 401 to a request sent under `session`: true when it may be sent
+ * again, because the access token was (or has just been) renewed. When the
+ * login cannot be renewed the tab signs out and asks for a new login.
+ */
+export async function recoverFromUnauthorized(session: SessionMark): Promise<boolean> {
+  assertCurrent(session);
+  if (!session.refresh) return false;
+  // Another request may already have renewed this same session.
+  const refreshed = refreshRevision !== session.revision || getToken() !== session.access || await tryRefresh(session);
+  assertCurrent(session);
+  if (refreshed) return true;
+  clearToken();
+  sessionStorage.setItem('nabiman_reauth_required', '1');
+  window.location.reload();
+  return false;
+}
+/**
+ * fetch for every signed-in request: the bearer token, one renewal and retry
+ * on a 401, and the MFA-policy signal. Bodies the browser types itself
+ * (FormData, Blob, URLSearchParams) keep their own Content-Type; an abort
+ * signal, a blob or a streamed body pass through unchanged.
+ */
 export async function fetchWithRefresh(url: string, options: RequestInit = {}): Promise<Response> {
   const session = snapshotSession();
   const send = () => {
     assertCurrent(session);
-    return fetch(url, { ...options, headers: { ...authHeaders(), ...(options.headers as Record<string, string> || {}) } });
+    return fetch(url, { ...options, headers: { ...authHeaders(options.body), ...headerRecord(options.headers) } });
   };
   const res = await send();
   assertCurrent(session);
   if (res.status === 401 && session.refresh) {
     if (options.signal?.aborted) throw new DOMException('Request aborted', 'AbortError');
-    // Another request may already have renewed this same session.
-    const refreshed = refreshRevision !== session.revision || getToken() !== session.access || await tryRefresh(session);
-    assertCurrent(session);
-    if (refreshed) {
+    if (await recoverFromUnauthorized(session)) {
       if (options.signal?.aborted) throw new DOMException('Request aborted', 'AbortError');
       const retried = await send();
       assertCurrent(session);
       notifyMfaPolicy(retried);
       return retried;
     }
-    clearToken();
-    sessionStorage.setItem('nabiman_reauth_required', '1');
-    window.location.reload();
   }
   notifyMfaPolicy(res);
   return res;

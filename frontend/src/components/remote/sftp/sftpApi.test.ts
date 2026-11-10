@@ -1,7 +1,9 @@
 import { accountSource, PART_SIZE, uploadFile } from './sftpApi';
 import { apiRequest } from '../../../shared/api/useApi';
 
-jest.mock('../../../shared/api/useApi', () => ({ apiRequest: jest.fn() }));
+jest.mock('../../../shared/api/useApi', () => ({
+  apiRequest: jest.fn(), authorizationHeader: () => 'Bearer t', markSession: () => ({}), recoverFromUnauthorized: () => Promise.resolve(false),
+}));
 const request = apiRequest as jest.Mock;
 
 /** Answers each upload request with the next scripted reply. */

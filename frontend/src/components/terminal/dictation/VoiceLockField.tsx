@@ -14,6 +14,15 @@ interface Voiceprint {
   enrol_at: string;
 }
 
+/** The enrolment page comes from the service; only a web address may become a link. */
+export function safeHref(href: string | undefined): string | null {
+  if (!href) return null;
+  try {
+    const url = new URL(href, window.location.href);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null;
+  } catch { return null; }
+}
+
 /**
  * "내 목소리만": the service takes only the voice enrolled with its account —
  * the API key's owner, for every dictation here — and shows whether one is
@@ -52,8 +61,8 @@ export default function VoiceLockField({ value, onChange, keySet }: { value: boo
       <small className="text-secondary">{t('dictation.voiceLockSettingHint')}</small>
       <small className={`voice-status ${ready ? 'is-ready' : 'is-missing'}`} role="status">
         {status}
-        {print && !ready && (
-          <> · <a href={print.enrol_at} target="_blank" rel="noreferrer">{t('dictation.voiceEnrolLink')}</a></>
+        {print && !ready && safeHref(print.enrol_at) && (
+          <> · <a href={safeHref(print.enrol_at) || undefined} target="_blank" rel="noreferrer">{t('dictation.voiceEnrolLink')}</a></>
         )}
       </small>
       {value && print && !ready && <small className="text-warning">{t('dictation.voiceLockWithout')}</small>}

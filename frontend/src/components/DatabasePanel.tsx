@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useApi, apiPost } from '../shared/api/useApi';
+import { useApi, apiPost, apiRequest } from '../shared/api/useApi';
 import { useT } from '../i18n';
 import { confirmDialog } from '../shared/ui/ConfirmDialog';
 
@@ -30,11 +30,7 @@ export default function DatabasePanel() {
 
   const fetchBackups = async () => {
     try {
-      const token = sessionStorage.getItem('nabiman_token') || '';
-      const res = await fetch('/api/database/backups', {
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
-      const json = await res.json();
+      const json = await apiRequest<DbBackupEntry[]>('/api/database/backups');
       if (json.success && json.data) setBackups(json.data);
     } catch { /* ignore */ }
   };

@@ -24,6 +24,7 @@ jest.mock('./TerminalView', () => {
 // A plain function, not jest.fn(): CRA resets mock implementations between
 // tests, which would make the settings provider await `undefined`.
 jest.mock('../../shared/api/useApi', () => ({
+  sessionSubject: () => null,
   apiRequest: (path: string) => Promise.resolve({
     success: true, message: '',
     data: path === '/api/terminal/sessions' ? [{ id: 'pty_named', title: '빌드 서버' }] : null,

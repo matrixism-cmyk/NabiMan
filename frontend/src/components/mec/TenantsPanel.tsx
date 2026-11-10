@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useT } from '../../i18n';
+import { fetchWithRefresh } from '../../shared/api/useApi';
 import { useMecList, mecGet, mecDelete } from '../../hooks/mec/useMecApi';
 import { Tenant } from '../../types/mec';
 import TenantWizard from './wizard/TenantWizard';
@@ -119,11 +120,8 @@ export default function TenantsPanel() {
   };
 
   const downloadGuide = (id: string, format: 'txt' | 'docx') => {
-    const token = sessionStorage.getItem('nabiman_token');
     const url = `/api/mec/v1/tenants/${encodeURIComponent(id)}/guide.${format}`;
-    fetch(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
+    fetchWithRefresh(url)
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const blob = await r.blob();

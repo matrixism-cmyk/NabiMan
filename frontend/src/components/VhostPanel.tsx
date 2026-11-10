@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useApi, apiPost } from '../shared/api/useApi';
+import { useApi, apiPost, apiRequest, ApiResponse } from '../shared/api/useApi';
 import { useT } from '../i18n';
 import { confirmDialog } from '../shared/ui/ConfirmDialog';
 
@@ -42,10 +42,9 @@ export default function VhostPanel() {
   };
 
   const handleEdit = async (d: string) => {
-    const res = await fetch(`/api/vhost/config/${d}`, {
-      headers: { 'Authorization': `Bearer ${sessionStorage.getItem('nabiman_token')}` },
-    });
-    const json = await res.json();
+    let json: ApiResponse<VhostConfig>;
+    try { json = await apiRequest<VhostConfig>(`/api/vhost/config/${encodeURIComponent(d)}`); }
+    catch (e) { setMsg(e instanceof Error ? e.message : String(e)); return; }
     if (json.success && json.data) {
       setEditing(json.data);
       setEditHttp(json.data.http_config);

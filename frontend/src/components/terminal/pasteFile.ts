@@ -7,6 +7,8 @@
  * Instead the bytes are uploaded and the terminal receives the path the server
  * saved them at, which the program on the other end can open.
  */
+import { fetchWithRefresh } from '../../shared/api/useApi';
+
 const API_BASE = process.env.REACT_APP_API_URL || '';
 
 /** Clipboard types the server keeps; anything else is left to text pasting. */
@@ -20,13 +22,9 @@ export function isUploadable(type: string): boolean {
 export async function uploadPastedFile(file: File | Blob): Promise<string | null> {
   if (!isUploadable(file.type)) return null;
   try {
-    const res = await fetch(`${API_BASE}/api/terminal/paste-file`, {
+    const res = await fetchWithRefresh(`${API_BASE}/api/terminal/paste-file`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/octet-stream',
-        'X-Paste-Type': file.type,
-        Authorization: `Bearer ${sessionStorage.getItem('nabiman_token') || ''}`,
-      },
+      headers: { 'Content-Type': 'application/octet-stream', 'X-Paste-Type': file.type },
       body: file,
     });
     const json = await res.json();

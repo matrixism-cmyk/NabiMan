@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { apiPost, fetchWithRefresh } from '../shared/api/useApi';
+import { apiPost, apiRequest, fetchWithRefresh } from '../shared/api/useApi';
 import { useT } from '../i18n';
 import { useSortable } from '../hooks/useSortable';
 import { confirmDialog } from '../shared/ui/ConfirmDialog';
@@ -31,12 +31,13 @@ export default function FileManagerPanel() {
   const browse = async (dir: string) => {
     setLoading(true);
     setEditing(null);
-    const res = await fetch(`/api/files/browse?path=${encodeURIComponent(dir)}`, {
-      headers: { 'Authorization': `Bearer ${sessionStorage.getItem('nabiman_token') || ''}`, 'Content-Type': 'application/json' },
-    });
-    const json = await res.json();
-    if (json.success) { setFiles(json.data); setPathInput(dir); }
-    else { setMsg(json.message); }
+    try {
+      const json = await apiRequest<FileEntry[]>(`/api/files/browse?path=${encodeURIComponent(dir)}`);
+      if (json.success) { setFiles(json.data || []); setPathInput(dir); }
+      else { setMsg(json.message); }
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    }
     setLoading(false);
   };
 
@@ -65,18 +66,12 @@ export default function FileManagerPanel() {
     setUploading(true);
     try {
       const text = await file.text();
-      const token = sessionStorage.getItem('nabiman_token') || '';
       const filePath = currentDir + file.name;
-      const res = await fetch('/api/files/upload', {
+      const json = await apiRequest<string>('/api/files/upload', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'text/plain',
-          'X-File-Path': filePath,
-        },
+        headers: { 'Content-Type': 'text/plain', 'X-File-Path': filePath },
         body: text,
       });
-      const json = await res.json();
       setMsg(json.success ? t('files.uploaded') : json.message);
       if (json.success) browse(pathInput);
     } catch (err) {

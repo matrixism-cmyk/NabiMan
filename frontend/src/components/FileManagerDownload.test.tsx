@@ -1,15 +1,16 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { apiPost, fetchWithRefresh } from '../shared/api/useApi';
+import { apiPost, apiRequest, fetchWithRefresh } from '../shared/api/useApi';
 import { I18nProvider } from '../i18n';
 import FileManagerPanel from './FileManagerPanel';
-jest.mock('../shared/api/useApi', () => ({ apiPost: jest.fn(), fetchWithRefresh: jest.fn() }));
+jest.mock('../shared/api/useApi', () => ({ apiPost: jest.fn(), apiRequest: jest.fn(), fetchWithRefresh: jest.fn() }));
 beforeEach(() => {
   jest.clearAllMocks();
   localStorage.setItem('nabiman_lang', 'ko');
   sessionStorage.setItem('nabiman_token', 'never-download-in-url');
   (apiPost as jest.Mock).mockResolvedValue({ success: true });
-  global.fetch = jest.fn().mockResolvedValue({ json: async () => ({ success: true, data: [{ name: 'report.txt', path: '/report.txt', is_dir: false, size: 10, modified: 'now', permissions: '600' }] }) });
+  // The listing, too, goes through the shared helper now, not a fetch of its own.
+  (apiRequest as jest.Mock).mockResolvedValue({ success: true, data: [{ name: 'report.txt', path: '/report.txt', is_dir: false, size: 10, modified: 'now', permissions: '600' }] });
 });
 it('downloads through the refresh-aware header client without putting the JWT in a URL', async () => {
   const blob = new Blob(['test']);

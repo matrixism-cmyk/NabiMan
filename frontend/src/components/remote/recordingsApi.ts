@@ -1,4 +1,4 @@
-import { apiRequest } from '../../shared/api/useApi';
+import { apiRequest, fetchWithRefresh } from '../../shared/api/useApi';
 
 const API = process.env.REACT_APP_API_URL || '';
 
@@ -37,10 +37,8 @@ function fromBase64(s: string): Uint8Array {
 }
 
 /** Fetches and parses a recording (header line + `[ms, base64]` lines). */
-export async function loadCast(sid: string, token: string | null): Promise<Cast> {
-  const res = await fetch(`${API}/api/terminal/recordings/${encodeURIComponent(sid)}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
+export async function loadCast(sid: string): Promise<Cast> {
+  const res = await fetchWithRefresh(`${API}/api/terminal/recordings/${encodeURIComponent(sid)}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const text = await res.text();
   const lines = text.split('\n').filter((l) => l.trim());

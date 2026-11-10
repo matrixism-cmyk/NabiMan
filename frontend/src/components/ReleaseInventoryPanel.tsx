@@ -5,6 +5,7 @@ export default function ReleaseInventoryPanel({ runtimeSha }: { runtimeSha?: str
   const { t } = useT(); const [inventory, setInventory] = useState<Inventory | null>(null); const [failed, setFailed] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
+    // A static file beside the page, readable without signing in: plain fetch.
     fetch('/release-inventory.json', { cache: 'no-store', signal: controller.signal }).then(async response => {
       if (!response.ok) throw new Error('Unavailable');
       const value = await response.json() as Inventory;

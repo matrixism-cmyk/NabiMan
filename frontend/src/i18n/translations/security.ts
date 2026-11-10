@@ -139,6 +139,7 @@ const t: T = {
   'ssl.expired': { ko: '만료됨', en: 'Expired', ja: '期限切れ' },
   'ssl.renew': { ko: '갱신', en: 'Renew', ja: '更新' },
   'ssl.renewed': { ko: '갱신 완료', en: 'Renewed', ja: '更新完了' },
+  'ssl.statusFailed': { ko: '인증서 작업 상태를 확인하지 못했습니다. 잠시 후 목록을 새로고침해 결과를 확인해 주세요.', en: 'Could not check how the certificate job went. Refresh the list in a moment to see the result.', ja: '証明書の処理状況を確認できませんでした。しばらくしてから一覧を更新して結果を確認してください。' },
   'ssl.confirmRenew': { ko: '{domain} 인증서를 갱신하시겠습니까?', en: 'Renew certificate for {domain}?', ja: '{domain}の証明書を更新しますか？' },
   'ssl.refresh': { ko: '새로고침', en: 'Refresh', ja: '更新' },
   'ssl.noCerts': { ko: '등록된 인증서가 없습니다.', en: 'No certificates found.', ja: '証明書がありません。' },

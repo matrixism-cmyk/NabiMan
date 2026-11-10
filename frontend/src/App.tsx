@@ -22,7 +22,7 @@ import { DEFAULT_GRANTS } from './components/remote/member';
 import CommandPalette from './components/CommandPalette';
 import LanguageSelector from './shared/ui/LanguageSelector';
 import { Tab, Category, CatDef, categories } from './nav';
-import { apiPost, clearToken, useApi } from './shared/api/useApi';
+import { apiPost, clearToken, hasSession, useApi } from './shared/api/useApi';
 import { useT } from './i18n';
 import { ThemeProvider, ThemeSelector } from './shared/theme';
 import { ErrorBoundary } from './shared/ui/ErrorBoundary';
@@ -43,7 +43,7 @@ function parseHash(): { cat: Category; tab: Tab } | null {
 
 function App() {
   const { t } = useT();
-  const [loggedIn, setLoggedIn] = useState(!!sessionStorage.getItem('nabiman_token'));
+  const [loggedIn, setLoggedIn] = useState(hasSession);
   const [activeTab, setActiveTab] = useState<Tab>('server');
   const [activeCat, setActiveCat] = useState<Category>('dashboard');
   const [showChangePw, setShowChangePw] = useState(false);

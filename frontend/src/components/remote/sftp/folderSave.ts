@@ -80,6 +80,7 @@ export async function saveInto(
 ): Promise<void> {
   const url = await downloadLink(src, file.path);
   if (!url) throw new Error('link');
+  // A short-lived signed link carries its own permission: no token to renew.
   const res = await fetch(url, { signal });
   if (!res.ok || !res.body) throw new Error(String(res.status));
   const parts = file.rel.split('/');

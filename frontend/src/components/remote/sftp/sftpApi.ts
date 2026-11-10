@@ -5,7 +5,7 @@
  * XMLHttpRequest instead of fetch because only it reports upload progress,
  * and a progress bar is most of what makes a large upload bearable.
  */
-import { apiRequest } from '../../../shared/api/useApi';
+import { apiRequest, authorizationHeader, markSession, recoverFromUnauthorized } from '../../../shared/api/useApi';
 
 export interface SftpEntry {
   name: string;
@@ -68,7 +68,6 @@ export function modeString(mode: number): string {
 }
 
 export const API_BASE = process.env.REACT_APP_API_URL || '';
-const token = () => sessionStorage.getItem('nabiman_token') || '';
 
 /**
  * Where a panel's files come from, and how it signs its requests: a signed-in
@@ -111,7 +110,7 @@ async function request<T>(src: SftpSource, path: string, init: RequestInit = {})
 }
 
 const authHeader = (src: SftpSource): [string, string] =>
-  (src.shareKey ? ['X-Share-Files', src.shareKey] : ['Authorization', `Bearer ${token()}`]);
+  (src.shareKey ? ['X-Share-Files', src.shareKey] : ['Authorization', authorizationHeader()]);
 
 export const joinPath = (dir: string, name: string) => (dir.endsWith('/') ? `${dir}${name}` : `${dir}/${name}`);
 export const baseName = (path: string) => path.replace(/\/+$/, '').split('/').pop() || path;
@@ -189,7 +188,31 @@ export interface Transfer {
   abort: () => void;
 }
 
+/**
+ * One transfer. An account's 401 (an access token that expired mid-session)
+ * renews the login through the shared helper and sends the request once more,
+ * as every fetch-based request does; a visitor's key cannot be renewed.
+ */
 function send(
+  src: SftpSource, method: 'GET' | 'POST', url: string, body: Blob | null,
+  onProgress: (loaded: number, total: number) => void,
+): Transfer {
+  const session = markSession();
+  let current = sendOnce(src, method, url, body, onProgress);
+  let aborted = false;
+  const promise = current.promise.then(async (result) => {
+    if (result.status !== 401 || src.shareKey || aborted) return result;
+    try {
+      if (!(await recoverFromUnauthorized(session))) return result;
+    } catch { return result; /* the login changed meanwhile: this answer is the last word */ }
+    if (aborted) return { ok: false, aborted: true };
+    current = sendOnce(src, method, url, body, onProgress);
+    return current.promise;
+  });
+  return { promise, abort: () => { aborted = true; current.abort(); } };
+}
+
+function sendOnce(
   src: SftpSource, method: 'GET' | 'POST', url: string, body: Blob | null,
   onProgress: (loaded: number, total: number) => void,
 ): Transfer {
