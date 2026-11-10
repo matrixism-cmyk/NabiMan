@@ -47,3 +47,25 @@ it('explains expired verification state without presenting a perpetual license',
   expect(screen.getByRole('alert')).toHaveTextContent('라이선스가 만료되었습니다.');
   expect(screen.queryByText('무기한')).not.toBeInTheDocument();
 });
+it('shows a plan with its usage, features and grace notice in the chosen language', () => {
+  const planned = {
+    ...status, validation_state: 'grace', grace_ends_at: '2026-11-14', grace_days_remaining: 3,
+    limits: { plan: 'team', deployment: 'installed', max_users: 5, max_servers: 10, features: ['recording'] },
+    usage: { users: 5, servers: 2 }, notices: ['grace', 'users_at_limit'],
+  };
+  (useApi as jest.Mock).mockImplementation((url: string) => ({ data: url.endsWith('/features') ? status.features : planned, loading: false, error: null, refetch }));
+  render(<I18nProvider><LicensePanel /></I18nProvider>);
+  expect(screen.getByText('라이선스가 만료되어 유예 기간입니다.')).toBeInTheDocument();
+  expect(screen.getByText(/유예 기간이 2026-11-14까지/)).toBeInTheDocument();
+  expect(screen.getByText(/라이선스 한도\(5명\)에 도달/)).toBeInTheDocument();
+  expect(screen.getByText('5 / 5')).toBeInTheDocument();
+  expect(screen.getByText('2 / 10')).toBeInTheDocument();
+  expect(screen.getByText('설치형')).toBeInTheDocument();
+  expect(screen.getByText('세션 녹화').previousSibling).toHaveTextContent('허용');
+  expect(screen.getByText('MEC 관리').previousSibling).toHaveTextContent('미허용');
+});
+it('shows no plan section for a licence without a plan', () => {
+  render(<I18nProvider><LicensePanel /></I18nProvider>);
+  expect(screen.queryByText('요금제')).not.toBeInTheDocument();
+  expect(screen.queryByRole('list')).not.toBeInTheDocument();
+});

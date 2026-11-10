@@ -15,6 +15,7 @@ import AboutDialog from './components/about/AboutDialog';
 import FirstRunGuide from './components/firstrun/FirstRunGuide';
 import { takeStep, unavailableSteps, useFirstRun } from './components/firstrun/useFirstRun';
 import IdleWarning from './components/IdleWarning';
+import LicenseBanner from './components/LicenseBanner';
 import { useIdleLogout } from './shared/auth/useIdleLogout';
 import { useChromeHidden } from './shared/ui/useChromeHidden';
 import { useFocusMode } from './shared/ui/useFocusMode';
@@ -243,6 +244,8 @@ function App() {
           <button className="btn btn-secondary logout-btn" onClick={handleLogout}>{t('app.logout')}</button>
         </HeaderMenu>
       </header>
+      <LicenseBanner enabled={currentUser.role === 'admin' && !scoped && !hiddenTabs.has('license')}
+        onOpen={() => navigateTo('system', 'license')} />
       <nav className="cat-nav">
         {visibleCategories.map((cat) => (
           <button

@@ -40,6 +40,7 @@ import sftpSniff from './sftp-sniff';
 import about from './about';
 import firstRun from './first-run';
 import auditChange from './audit-change';
+import license from './license';
 
 export type { Lang };
 export { LANG_LABELS } from '../../shared/i18n';
@@ -47,6 +48,7 @@ export { LANG_LABELS } from '../../shared/i18n';
 const translations: Translations = {
   ...sharedStrings,
   ...common,
+  ...license,
   ...cron,
   ...processes,
   ...monitoring,

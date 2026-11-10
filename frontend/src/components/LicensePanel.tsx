@@ -2,19 +2,7 @@ import React, { useState } from 'react';
 import { useApi, apiPost } from '../shared/api/useApi';
 import { useT } from '../i18n';
 import DismissibleMessage from '../shared/ui/DismissibleMessage';
-
-interface LicenseStatus {
-  active: boolean;
-  tier: string;
-  holder: string;
-  expires_at: string | null;
-  days_remaining: number | null;
-  is_trial: boolean;
-  trial_days_remaining: number | null;
-  features: string[];
-  max_servers: number | null;
-  validation_state: string;
-}
+import { LicenseNotices, LicensePlanSection, LicenseStatus } from './LicensePlan';
 
 export default function LicensePanel() {
   const { t } = useT();
@@ -75,6 +63,7 @@ export default function LicensePanel() {
       {msg && <DismissibleMessage onDismiss={() => setMsg('')}>{msg}</DismissibleMessage>}
 
       {data.validation_state && <p role={data.active ? 'status' : 'alert'}>{t(`license.state.${data.validation_state}`)}</p>}
+      <LicenseNotices status={data} />
 
       {/* Status Card */}
       <div className="info-grid">
@@ -116,6 +105,8 @@ export default function LicensePanel() {
           </div>
         )}
       </div>
+
+      <LicensePlanSection status={data} />
 
       {/* Trial Info */}
       {data.is_trial && data.trial_days_remaining != null && (
