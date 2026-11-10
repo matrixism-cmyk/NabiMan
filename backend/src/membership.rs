@@ -115,7 +115,7 @@ async fn register(
             return r;
         }
     }
-    let hash = match bcrypt::hash(&body.password, 10) {
+    let hash = match crate::password_check::hash(&body.password, 10).await {
         Ok(h) => h,
         Err(_) => return error("가입 처리 실패"),
     };

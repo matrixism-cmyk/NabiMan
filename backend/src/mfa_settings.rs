@@ -67,11 +67,14 @@ pub(super) async fn setup_2fa(
     user_store: web::Data<UserStore>,
 ) -> HttpResponse {
     let id = actor_id(&req);
+    // Checked off the workers and outside the users lock; the hash is then
+    // confirmed unchanged under the lock.
+    let verified = crate::password_check::verified_hash(&user_store, &id, &body.password).await;
     let secret = generate_secret();
     let (codes, hashes) = recovery_codes();
     let expires = chrono::Utc::now().timestamp() + 600;
     let result = crate::users::mutate_user(&user_store, &id, |user| {
-        if !user.active() || !bcrypt::verify(&body.password, &user.password_hash).unwrap_or(false) {
+        if !user.active() || verified.as_deref() != Some(user.password_hash.as_str()) {
             return Err("Invalid password".into());
         }
         if user.totp_enabled {
@@ -141,10 +144,11 @@ async fn disable_2fa(
     sessions: web::Data<SessionStore>,
 ) -> HttpResponse {
     let id = actor_id(&req);
+    let verified = crate::password_check::verified_hash(&users, &id, &body.password).await;
     let result = crate::users::mutate_user(&users, &id, |user| {
         if !user.active()
             || !user.totp_enabled
-            || !bcrypt::verify(&body.password, &user.password_hash).unwrap_or(false)
+            || verified.as_deref() != Some(user.password_hash.as_str())
             || !consume_factor(
                 user,
                 &body.code,
@@ -183,11 +187,12 @@ async fn regenerate(
     sessions: web::Data<SessionStore>,
 ) -> HttpResponse {
     let id = actor_id(&req);
+    let verified = crate::password_check::verified_hash(&users, &id, &body.password).await;
     let (codes, hashes) = recovery_codes();
     let result = crate::users::mutate_user(&users, &id, |user| {
         if !user.active()
             || !user.totp_enabled
-            || !bcrypt::verify(&body.password, &user.password_hash).unwrap_or(false)
+            || verified.as_deref() != Some(user.password_hash.as_str())
             || !consume_factor(
                 user,
                 &body.code,

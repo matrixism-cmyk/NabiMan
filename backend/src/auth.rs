@@ -93,7 +93,7 @@ pub async fn login(
                 .json(ApiResponse::<()>::error("Invalid credentials"))
         }
     };
-    match bcrypt::verify(&body.password, &user.password_hash) {
+    match crate::password_check::verify(&body.password, &user.password_hash).await {
         Ok(true) => {
             if !user.active() {
                 let why = if user.status == crate::models::AccountStatus::Active && user.access.expired() {

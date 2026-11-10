@@ -108,7 +108,7 @@ async fn verify_login(
     };
     if !snapshot.active()
         || !snapshot.totp_enabled
-        || !bcrypt::verify(&body.password, &snapshot.password_hash).unwrap_or(false)
+        || !crate::password_check::verify(&body.password, &snapshot.password_hash).await.unwrap_or(false)
     {
         return invalid();
     }

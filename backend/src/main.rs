@@ -38,6 +38,7 @@ mod notifications;
 mod oauth;
 mod openapi;
 mod packages;
+mod password_check;
 mod private_storage;
 mod processes;
 mod rate_limit;

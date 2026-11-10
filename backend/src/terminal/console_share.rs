@@ -184,6 +184,13 @@ async fn revoke_share(req: HttpRequest, path: web::Path<(String, String)>) -> Ht
     }
 }
 
+/// [`password_ok`], with bcrypt on the blocking pool.
+async fn password_ok_off_thread(share: &Share, req: &HttpRequest) -> bool {
+    let Some(hash) = &share.password_hash else { return true };
+    let pw = super::parse_query_param(req.query_string(), "pw").unwrap_or_default();
+    !pw.is_empty() && crate::password_check::verify(&pw, hash).await.unwrap_or(false)
+}
+
 /// Whether the request carries the link's password, when it has one.
 pub(super) fn password_ok(share: &Share, req: &HttpRequest) -> bool {
     let Some(hash) = &share.password_hash else { return true };
@@ -224,7 +231,7 @@ async fn share_ws(
     let Some(share) = resolve(&token) else {
         return Ok(HttpResponse::NotFound().finish());
     };
-    if !password_ok(&share, &req) {
+    if !password_ok_off_thread(&share, &req).await {
         return Ok(HttpResponse::Forbidden().finish());
     }
     super::vnc_console::open_shared_console(&req, stream, &share.console, share.mode != "control", token.into_inner())
