@@ -43,6 +43,7 @@ pub(crate) fn configure(cfg: &mut web::ServiceConfig) {
     crate::dns::config(cfg);
     crate::vhost::config(cfg);
     crate::license::config(cfg);
+    crate::usage::config(cfg);
     crate::notifications::config(cfg);
     crate::alert_rules::config(cfg);
     crate::ip_block::config(cfg);

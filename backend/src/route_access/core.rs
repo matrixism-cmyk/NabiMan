@@ -265,6 +265,8 @@ pub(super) const ROUTES: &[Route] = &[
     r("/api/updates/check", Operate, M::No),
     r("/api/updates/upgrade", Operate, M::No),
     r("/api/updates/upgrade-package", Operate, M::No),
+    // Super administrators, or a collector with NABIMAN_USAGE_TOKEN (checked in auth).
+    r("/api/usage", Admin, M::No),
     r("/api/users", Read, M::No),
     r("/api/users/me", Read, M::Only(&["GET"])),
     r("/api/users/memberships", Read, M::No),

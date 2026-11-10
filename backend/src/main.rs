@@ -91,6 +91,7 @@ mod trusted_proxy;
 mod totp;
 mod traffic;
 mod updates;
+mod usage;
 mod users;
 mod vhost;
 use actix_files as afs;
@@ -243,6 +244,7 @@ async fn serve() -> std::io::Result<()> {
     let pty_store = terminal_registry.store.clone();
     terminal::restore_sessions(&pty_store);
     terminal::start_pty_cleanup(pty_store.clone());
+    usage::start_sampler(pty_store.clone(), user_store.clone());
     observability::self_check::start(observability::self_check::Sources {
         channels: channel_store.clone(),
         audit: audit_log.clone(),

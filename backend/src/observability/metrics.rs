@@ -139,8 +139,14 @@ pub(crate) fn scrape_token_matches(headers: &actix_web::http::header::HeaderMap)
 }
 
 pub(crate) fn scrape_token_in(headers: &actix_web::http::header::HeaderMap, get: crate::install_config::values::Lookup) -> bool {
+    bearer_setting_in(headers, get, "NABIMAN_METRICS_TOKEN")
+}
+
+/// Whether the one `Authorization: Bearer` header carries the value of `setting`
+/// (none set: never). Also the usage collector's (`NABIMAN_USAGE_TOKEN`).
+pub(crate) fn bearer_setting_in(headers: &actix_web::http::header::HeaderMap, get: crate::install_config::values::Lookup, setting: &str) -> bool {
     use sha2::{Digest, Sha256};
-    let Some(expected) = crate::install_config::values::text_in(get, "NABIMAN_METRICS_TOKEN") else { return false };
+    let Some(expected) = crate::install_config::values::text_in(get, setting) else { return false };
     let mut given = headers.get_all("Authorization");
     let (Some(one), None) = (given.next(), given.next()) else { return false };
     let Some(token) = one.to_str().ok().and_then(|v| v.strip_prefix("Bearer ")) else { return false };

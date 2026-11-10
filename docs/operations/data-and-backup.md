@@ -30,6 +30,7 @@
 | `topology.sqlite3` | 작업 지도의 네트워크 구성(장비·연결·서버 위치) | SQLite | 포함 |
 | `claude-events.sqlite3` | Claude 세션끼리 주고받은 메시지 기록(14일) | SQLite(WAL) | 포함 |
 | `server-facts.sqlite3` | 서버를 마지막으로 점검했을 때 확인한 사양·상태 | SQLite | 포함 |
+| `usage.sqlite3` | 사용량 원장: 1분마다 센 세션·계정·서버 수의 날짜별 합(800일). `/api/usage`가 읽음 | SQLite | 포함 |
 | `mec.db` | MEC 테넌트·작업·감사·문서 | SQLite | 포함 |
 | `ssh/` | 나비맨 SSH 키(`nabiman_ed25519`). `ssh/pw/`는 sshpass에 넘기는 임시 파일입니다 | 파일 | 포함(`ssh/pw/` 제외) |
 | `ssh-ca/` | SSH 인증서 로그인용 나비맨 CA 키 | 파일 | 포함 |

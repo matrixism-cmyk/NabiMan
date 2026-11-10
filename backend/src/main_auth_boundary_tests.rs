@@ -79,7 +79,7 @@ async fn viewer_cannot_reach_shell_or_root_file_download() {
 }
 
 #[actix_web::test]
-async fn probes_are_open_and_metrics_is_for_administrators() {
+async fn probes_are_open_and_metrics_and_usage_are_for_administrators() {
     let secret: auth::JwtSecret = Arc::new("test-secret".into());
     let sessions = jwt_sessions::new_session_store();
     jwt_sessions::register_session(&sessions, "viewer-session", "viewer", "viewer-id", "127.0.0.1");
@@ -102,7 +102,8 @@ async fn probes_are_open_and_metrics_is_for_administrators() {
             .wrap(AuthCheck::new(secret, sessions, users))
             .route("/healthz", web::get().to(ok))
             .route("/readyz", web::get().to(ok))
-            .route("/metrics", web::get().to(ok)),
+            .route("/metrics", web::get().to(ok))
+            .route("/api/usage", web::get().to(ok)),
     )
     .await;
     let call = |uri: &'static str, bearer: Option<String>| {
@@ -116,6 +117,10 @@ async fn probes_are_open_and_metrics_is_for_administrators() {
         assert_eq!(actix_web::test::call_service(&app, call(probe, None)).await.status(), 200, "{probe}");
     }
     assert_eq!(actix_web::test::call_service(&app, call("/metrics", None)).await.status(), 401);
-    assert_eq!(actix_web::test::call_service(&app, call("/metrics", Some(token))).await.status(), 403);
+    assert_eq!(actix_web::test::call_service(&app, call("/metrics", Some(token.clone()))).await.status(), 403);
     assert_eq!(actix_web::test::call_service(&app, call("/metrics", Some("not-the-scrape-token".into()))).await.status(), 401);
+    // Usage, the same way: administrators, or the collector's own token.
+    assert_eq!(actix_web::test::call_service(&app, call("/api/usage", None)).await.status(), 401);
+    assert_eq!(actix_web::test::call_service(&app, call("/api/usage", Some(token))).await.status(), 403);
+    assert_eq!(actix_web::test::call_service(&app, call("/api/usage", Some("not-the-usage-token".into()))).await.status(), 401);
 }

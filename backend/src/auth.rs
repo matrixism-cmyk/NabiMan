@@ -295,6 +295,10 @@ pub fn check_auth(
     if metrics && crate::observability::metrics::scrape_token_matches(req.headers()) {
         return AuthDecision::Allow;
     }
+    // And the usage collector's (NABIMAN_USAGE_TOKEN) opens /api/usage and nothing else.
+    if path == crate::usage::PATH && crate::usage::token_matches(req.headers()) {
+        return AuthDecision::Allow;
+    }
 
     if let Some(decision) = api_tokens::check(req, users, path) { return decision; }
     // A URL the browser opens itself carries no Authorization header; a
