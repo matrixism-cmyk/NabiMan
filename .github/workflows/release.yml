@@ -33,6 +33,10 @@ jobs:
           workspaces: backend
       - name: Build backend
         working-directory: backend
+        env:
+          # The tag's commit, recorded in the binary (build.rs) even if the
+          # checkout's git metadata is shallow or missing.
+          NABIMAN_GIT_COMMIT: ${{ github.sha }}
         run: |
           mkdir -p static
           cp -r ../frontend/build/* static/

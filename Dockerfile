@@ -11,9 +11,15 @@ FROM rust:1.88-bookworm AS backend
 WORKDIR /app/backend
 COPY backend/Cargo.toml backend/Cargo.lock ./
 RUN mkdir src && echo 'fn main(){}' > src/main.rs && cargo build --release && rm -rf src
+COPY backend/build.rs ./build.rs
 COPY backend/src ./src
 # The orchestration guide is built into the binary (include_str!).
 COPY docs/orchestration/guide-ko.md /app/docs/orchestration/guide-ko.md
+# The image has no .git, so build.rs takes the commit from here:
+#   docker build --build-arg NABIMAN_GIT_COMMIT=$(git rev-parse HEAD) .
+# Left empty, the server reports git_commit "unknown".
+ARG NABIMAN_GIT_COMMIT=
+ENV NABIMAN_GIT_COMMIT=${NABIMAN_GIT_COMMIT}
 RUN touch src/main.rs && cargo build --release
 
 # Stage 3: Final image

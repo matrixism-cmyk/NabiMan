@@ -2,7 +2,11 @@ version: '3.8'
 
 services:
   nabiman:
-    build: .
+    build:
+      context: .
+      args:
+        # export NABIMAN_GIT_COMMIT=$(git rev-parse HEAD) before `docker compose build`
+        NABIMAN_GIT_COMMIT: ${NABIMAN_GIT_COMMIT:-}
     container_name: nabiman
     ports:
       - "8080:8080"
