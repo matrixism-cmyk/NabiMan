@@ -96,10 +96,11 @@ jobs:
       - name: Validate release manifest and CycloneDX inventory
         run: |
           python3 scripts/test-release-verification.py
-          python3 scripts/test-release-signature.py
-          python3 scripts/test-release-licenses.py
           python3 -m venv "$RUNNER_TEMP/nabiman-sbom-validation"
-          "$RUNNER_TEMP/nabiman-sbom-validation/bin/pip" install 'jsonschema[format-nongpl]==4.23.0'
+          "$RUNNER_TEMP/nabiman-sbom-validation/bin/pip" install 'jsonschema[format-nongpl]==4.23.0' 'cryptography==43.0.3'
+          "$RUNNER_TEMP/nabiman-sbom-validation/bin/python" scripts/test-release-signature.py
+          "$RUNNER_TEMP/nabiman-sbom-validation/bin/python" scripts/test-release-licenses.py
+          "$RUNNER_TEMP/nabiman-sbom-validation/bin/python" scripts/test-nabiman-update.py
           "$RUNNER_TEMP/nabiman-sbom-validation/bin/python" scripts/validate-sbom.py "release/$ASSET.cdx.json"
 
       - uses: actions/upload-artifact@v4
@@ -110,7 +111,7 @@ jobs:
 
   publish:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Protect this environment (Settings -> Environments -> release: required
     # reviewers, tag rule v*) and keep the signing secrets there, not repo-wide.
     environment: release

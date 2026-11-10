@@ -40,8 +40,15 @@ jobs:
           fi
       - name: Release key and installer verifier agree
         run: python3 scripts/check-release-key.py --allow-placeholder
-      - name: Update, health check and rollback (throwaway prefix)
-        run: python3 scripts/test-nabiman-update.py
+      # The tests sign fixtures with a throwaway key: they need `cryptography`
+      # (verification itself is standard library and is tested without it too).
+      - name: Signature, licence and update tests
+        run: |
+          python3 -m venv "$RUNNER_TEMP/release-tests"
+          "$RUNNER_TEMP/release-tests/bin/pip" install --quiet 'cryptography==43.0.3'
+          "$RUNNER_TEMP/release-tests/bin/python" scripts/test-release-signature.py
+          "$RUNNER_TEMP/release-tests/bin/python" scripts/test-release-licenses.py
+          "$RUNNER_TEMP/release-tests/bin/python" scripts/test-nabiman-update.py
       - name: Release script syntax
         run: |
           for f in install.sh packaging/nabiman-update scripts/package-release.sh scripts/prune-deployments.sh scripts/check-docker-pins.sh; do

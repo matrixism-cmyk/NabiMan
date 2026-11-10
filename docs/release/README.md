@@ -1,5 +1,111 @@
 # 릴리스·설치·업데이트
 
+이 문서는 나비맨을 고객 서버에 내보내는 전 과정을 다룹니다: 릴리스 만들기(태그 → CI → 서명된 패키지), 설치(명령 하나), 검증, 업데이트, 되돌리기.
+
+- 패키지: `nabiman-linux-x86_64.tar.gz`, `nabiman-linux-aarch64.tar.gz`(Linux, glibc). 각각 `.minisig`(서명), `.sha256`, `.cdx.json`(SBOM), `.manifest.json`, `.inventory.json`, `.licenses.json`이 함께 붙습니다.
+- 서명: [minisign](https://jedisct1.github.io/minisign/) (Ed25519). 공개 키는 저장소의 [`nabiman-release.pub`](nabiman-release.pub)와 `install.sh` 안에 같은 값으로 들어 있습니다.
+- 무중단 배포 검토: [zero-downtime.md](zero-downtime.md).
+
+## 고객 서버에 설치
+
+```sh
+curl -fsSLO https://github.com/matrixism-cmyk/NabiMan/releases/latest/download/install.sh
+sudo bash install.sh --install-deps
+```
+
+`install.sh`는 반드시 **릴리스에 붙은 것**을 씁니다. 그 안에 서명 공개 키가 들어 있습니다(저장소 브랜치의 `install.sh`는 키가 들어가기 전이면 설치를 거부합니다). `curl … | sudo bash`도 동작하지만, 받은 뒤 아래처럼 `install.sh` 자체의 서명을 확인하고 실행하기를 권합니다.
+
+설치 스크립트가 하는 일:
+
+1. 실행에 필요한 패키지(tmux, ssh, ssh-keygen, sshpass, socat)를 확인합니다. 없으면 배포판에 맞는 설치 명령을 보여 주고 멈춥니다. `--install-deps`면 apt/dnf로 설치합니다(`--with-optional`: guacd, LibreOffice, ffmpeg까지).
+2. 패키지와 `.minisig`를 받아 **스크립트에 들어 있는 키와 검증 코드로** 서명을 확인합니다. 서명이 없거나, 다른 키이거나, 다른 파일(예: 다른 아키텍처)에 대한 서명이면 설치하지 않습니다. 받은 파일의 코드는 서명이 확인된 뒤에만 실행합니다.
+3. manifest로 모든 파일의 해시·크기·권한을 확인하고 새 디렉터리에 풉니다.
+4. 처음 설치라면 관리자 초기 비밀번호(12자 이상)를 묻습니다(`NABIMAN_PASSWORD`로 줄 수도 있음).
+5. 아래 [설치 위치](#설치-위치)에 놓고, systemd unit을 설치·enable합니다. 시작은 `sudo systemctl start nabiman`.
+
+선택 사항:
+
+| 옵션 | 뜻 |
+|---|---|
+| `--version v1.2.0` | 최신 대신 특정 릴리스 |
+| `--base-url https://mirror.example/nabiman/v1.2.0` | 사내 미러에서 받기(서명은 그대로 확인) |
+| `--archive FILE [--signature FILE]` | 인터넷이 없는 서버: 미리 옮겨 둔 패키지로 설치(기본 서명 파일은 `FILE.minisig`) |
+| `--insecure-skip-verify` | 서명 확인 생략. 다른 방법으로 검증한 경우에만, 운영 서버에는 쓰지 않습니다 |
+| `NABIMAN_REPO=owner/repo` | 다른 GitHub 저장소의 릴리스 |
+
+## 받은 파일 직접 검증하기
+
+minisign이 있으면:
+
+```sh
+minisign -Vm nabiman-linux-x86_64.tar.gz -p nabiman-release.pub
+minisign -Vm install.sh -p nabiman-release.pub
+```
+
+minisign 없이(Python 3 표준 라이브러리만):
+
+```sh
+python3 verify-release.py nabiman-linux-x86_64.tar.gz \
+  --public-key-file nabiman-release.pub --require-signature \
+  --extract-to ./nabiman-verified
+```
+
+`nabiman-release.pub`은 저장소(`docs/release/`)나 이미 설치된 서버의 `/etc/nabiman/release.pub`처럼 **릴리스와 다른 곳**에서 가져옵니다. 같은 릴리스에서 받은 키로 확인하면 의미가 없습니다. 출력의 `publisher_authenticated: true`와 `signed_version`을 확인합니다. 서명의 trusted comment에는 `version:<태그> file:<파일 이름>`이 들어 있고, 검증기는 파일 이름이 맞는지까지 봅니다.
+
+`verify-release.py`는 `cryptography` 패키지가 있으면 그것으로, 없으면 스크립트 안의 RFC 8032 구현으로 Ed25519를 확인합니다.
+
+## 릴리스 만들기
+
+1. `backend/Cargo.toml`과 `frontend/package.json`의 `version`을 새 버전으로 올립니다(같은 값).
+2. `CHANGELOG.md`의 `Unreleased`를 그 버전 제목으로 옮깁니다.
+3. 커밋하고 태그를 올립니다:
+   ```sh
+   git tag -a v1.2.0 -m "NabiMan 1.2.0"
+   git push origin v1.2.0
+   ```
+4. `.github/workflows/release.yml`이 돕니다.
+   - **build** (x86_64: `ubuntu-24.04`, aarch64: `ubuntu-24.04-arm`, 둘 다 네이티브): 서명 키 설정 확인, 태그와 패키지 버전 일치 확인, Docker 이미지 digest 고정 확인, 프런트 audit·타입·린트·테스트·빌드, Rust 1.97.1로 `cargo test/build --locked`(빌드 커밋은 태그의 커밋), 라이선스 검사, 패키징, 패키지 서버를 띄우는 smoke test, SBOM 스키마 검증. 이 job에는 비밀이 없고 쓰기 권한도 없습니다.
+   - **publish** (`release` environment): 두 아키텍처의 산출물을 모아 minisign으로 하나씩 서명하고, 저장소의 공개 키로 모두 다시 확인한 다음 GitHub 릴리스에 붙입니다(`install.sh`와 그 서명 포함).
+5. 릴리스 페이지에서 `.minisig`가 모든 파일에 붙었는지 보고, 위의 검증을 한 번 해 봅니다.
+
+태그가 패키지 버전과 다르거나, 서명 키가 아직 placeholder이거나, 출하되는 의존성의 라이선스가 정책 밖이면 릴리스는 실패합니다.
+
+### aarch64 빌드
+
+GitHub 호스팅 arm64 러너(`ubuntu-24.04-arm`)로 네이티브 빌드해서, x86_64와 똑같이 패키지 서버 smoke test까지 돌립니다. 이 러너는 공개 저장소에서는 무료이고, **비공개 저장소에서는 arm64 larger runner가 되는 요금제**가 필요합니다. 쓸 수 없으면 matrix의 aarch64 항목을 x86_64 러너 + [`cross`](https://github.com/cross-rs/cross)(`cross build --release --locked --target aarch64-unknown-linux-gnu`)로 바꾸고 그 항목의 smoke test를 뺍니다(교차 빌드한 실행 파일은 x86_64 러너에서 실행할 수 없습니다).
+
+### 서명 키 만들기와 GitHub 설정 (처음 한 번)
+
+개인 키는 저장소에 절대 넣지 않습니다. 오프라인 컴퓨터에서 만들고 사본을 안전한 곳(금고, 비밀번호 관리자)에 둡니다.
+
+```sh
+minisign -G -p nabiman-release.pub -s nabiman-release.key   # 암호를 묻습니다
+# CI에서 암호 없이 쓰려면: minisign -G -W -p … -s …
+```
+
+1. `nabiman-release.pub`의 두 줄로 `docs/release/nabiman-release.pub`을 바꾸고, 둘째 줄(키)을 `install.sh`의 `NABIMAN_RELEASE_PUBKEY='…'`에 넣습니다. `python3 scripts/check-release-key.py`가 통과해야 합니다.
+2. GitHub → Settings → Environments → **release**를 만들고 Deployment branches and tags를 `v*` 태그로 제한, Required reviewers를 지정합니다.
+3. 그 environment의 secret으로 `MINISIGN_SECRET_KEY`(= `nabiman-release.key` 파일 내용 전체)와, 암호를 걸었다면 `MINISIGN_PASSWORD`를 넣습니다.
+4. Settings → Rules에서 `v*` 태그를 보호합니다(만들기·지우기를 관리자만).
+
+키를 바꾸면(분실·유출) 새 키로 위 1~3을 다시 하고, 이미 설치된 서버의 `/etc/nabiman/release.pub`도 새 키로 바꿔야 `nabiman-update`가 새 릴리스를 받아들입니다. 유출이면 예전 키로 서명된 릴리스를 내리고 고객에게 알립니다.
+
+### 라이선스
+
+패키징 때 `scripts/release-inventory.py licenses`가 Cargo(`cargo metadata --locked`)와 npm(`package-lock.json`, `node_modules`) 의존성의 SPDX 라이선스를 모아 `packaging/licenses.json` 정책과 비교합니다. 패키지에는 `LICENSE`, `NOTICE`(의존성의 NOTICE 포함), `THIRD_PARTY_LICENSES.md`(목록과 라이선스 원문), `licenses.json`이 들어갑니다. GPL/LGPL 같은 항목은 패키지·버전별로 `reviewed`에 검토 사유를 적어야 통과하고, 모르는 라이선스는 실패합니다. 로컬에서 보려면:
+
+```sh
+python3 scripts/release-inventory.py licenses --source . --out /tmp/nabiman-licenses --report-only
+```
+
+### 컨테이너 이미지
+
+```sh
+docker build --build-arg NABIMAN_GIT_COMMIT=$(git rev-parse HEAD) -t nabiman .
+```
+
+기반 이미지는 digest로 고정되어 있습니다(`Dockerfile` 첫머리에 갱신 방법). CI는 digest 없는 `FROM`을 실패로 봅니다(`scripts/check-docker-pins.sh`). 이미지 안의 경로도 아래 설치 위치와 같습니다.
+
 ## 설치 위치
 
 릴리스마다 `/usr/local/lib/nabiman/<버전>/`에 따로 풀어 두고, 아래의 고정 경로는 `current`를 가리키는 링크입니다. systemd unit과 문서의 경로는 버전이 바뀌어도 그대로입니다.

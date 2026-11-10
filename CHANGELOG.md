@@ -6,7 +6,8 @@
 - 버전은 `MAJOR.MINOR.PATCH`입니다. 호환되지 않는 API·설정·저장 형식 변경은 MAJOR,
   호환되는 기능 추가는 MINOR, 버그 수정만 있으면 PATCH를 올립니다.
 - 배포는 `vX.Y.Z` 태그로 합니다. 태그를 올리면 `.github/workflows/release.yml`이
-  테스트·빌드 후 `nabiman-linux-x86_64.tar.gz`(체크섬·SBOM 포함)를 만들어 릴리스에 붙입니다.
+  테스트·빌드 후 `nabiman-linux-x86_64.tar.gz`·`nabiman-linux-aarch64.tar.gz`(체크섬·SBOM·라이선스 목록 포함)를
+  만들고 minisign으로 서명해 릴리스에 붙입니다. 절차는 [docs/release/README.md](docs/release/README.md).
 - 태그 전에 `backend/Cargo.toml`과 `frontend/package.json`의 `version`을 같은 값으로 올리고,
   아래 `Unreleased` 항목을 그 버전 제목으로 옮깁니다.
 - 실행 중인 서버의 버전과 빌드 커밋은 **진단 → 실행 중인 서버 버전**
@@ -36,5 +37,25 @@
 - **화면**: 한국어·영어·일본어, 테마, 집중 모드.
 - 실행 중인 서버가 자신이 빌드된 git 커밋을 알려 줍니다(`git_commit`).
 
+- **릴리스·설치·업데이트** ([docs/release/README.md](docs/release/README.md)):
+  - 릴리스 산출물 전체를 minisign으로 서명합니다. `install.sh`는 공개 키와 검증 코드를 품고 있어
+    서명이 없거나 맞지 않는 패키지를 설치하지 않습니다(`--insecure-skip-verify`로만 생략).
+    `verify-release.py`도 서명을 확인합니다(`--public-key-file`, `--require-signature`).
+  - aarch64(arm64) 패키지를 함께 만듭니다.
+  - `nabiman-update`: 서명된 릴리스를 버전별 디렉터리(`/usr/local/lib/nabiman/<버전>`)에 나란히 설치하고,
+    재시작 후 상태를 확인해 실패하면 자동으로 이전 버전으로 되돌립니다. `--rollback`, `--list`, 최근 3개 보관.
+  - 패키지에 `LICENSE`, `NOTICE`, `THIRD_PARTY_LICENSES.md`가 들어가고, 허용 목록 밖 라이선스의 의존성이
+    있으면 릴리스가 실패합니다.
+  - `install.sh`가 tmux·ssh·sshpass·socat 등 필요한 패키지를 확인하고 배포판별 설치 명령을 알려 줍니다
+    (`--install-deps`로 설치). root helper도 설치합니다. `--version`, `--base-url`, `--archive`(오프라인 설치).
+  - 개발 서버 정리용 `scripts/prune-deployments.sh`(기본은 목록만).
+
 ### 변경
+- 설치 위치를 하나로 맞췄습니다: `/usr/local/bin`, `/usr/local/share/nabiman/static`, `/var/lib/nabiman`,
+  `/etc/nabiman`. 문서의 `/opt/nabiman` 예시와 컨테이너 이미지도 같은 위치를 씁니다.
+- systemd unit에 `KillMode=process`를 넣어 재시작·업데이트 때 터미널(tmux) 세션이 끊기지 않습니다.
+  root로 도는 동안 서버 관리를 막는 샌드박스 옵션은 이유와 함께 빼 두었습니다(Phase 4에서 비root 전환).
+- 빌드 커밋을 `NABIMAN_GIT_COMMIT` 빌드 환경 변수로 줄 수 있습니다(Docker `--build-arg`, 릴리스 CI).
+  git 없이 빌드한 뒤 `unknown`이 남아 있던 문제를 고쳤습니다.
+- Makefile·Dockerfile도 `--locked`로 빌드하고, Docker 기반 이미지를 digest로 고정했습니다(Rust 1.97.1).
 - 400줄 제한을 넘던 소스 파일을 기능 단위 모듈로 나눴습니다(동작 변화 없음).

@@ -150,9 +150,16 @@ cd ../backend && cargo build --release && \
 ./target/release/nabiman-server
 ```
 
-### 릴리스 패키지
+### 릴리스 패키지로 설치 (운영 서버)
 
-태그 릴리스는 Linux x86_64용 `nabiman-linux-x86_64.tar.gz`와 SHA-256 검사 파일을 게시합니다. 묶음에는 서버 실행 파일과 웹 화면의 `static` 파일이 함께 들어갑니다. 릴리스가 게시된 후 해당 릴리스의 `install.sh`를 실행하면 검사 파일로 무결성을 확인한 뒤 둘 다 설치합니다. 현재 설치 스크립트의 사전 빌드 패키지는 x86_64만 지원합니다.
+```bash
+curl -fsSLO https://github.com/matrixism-cmyk/NabiMan/releases/latest/download/install.sh
+sudo bash install.sh --install-deps
+```
+
+태그 릴리스는 Linux x86_64·aarch64용 `nabiman-linux-<arch>.tar.gz`와 minisign 서명(`.minisig`), 체크섬, SBOM, 라이선스 목록을 게시합니다. 릴리스에 붙은 `install.sh`는 서명 공개 키를 품고 있어 패키지의 서명을 먼저 확인한 뒤 설치하며, 서명이 없거나 맞지 않으면 설치하지 않습니다. 업데이트는 `sudo nabiman-update`(상태 확인에 실패하면 자동으로 되돌림), 되돌리기는 `sudo nabiman-update --rollback`입니다.
+
+설치 위치, 필요한 패키지, 검증, 업데이트, 릴리스 만드는 법은 [docs/release/README.md](docs/release/README.md)에 있습니다.
 
 ## 환경변수
 
@@ -452,16 +459,16 @@ HTTPS 인증서와 호스트명을 검증하고 redirect를 따라가지 않습�
 `package-release.sh`는 `release-bom.cdx.json`과 `release-inventory.json`을 프런트 빌드 디렉터리에 생성하고, 패키지 내부의 모든 일반 파일(자기 자신인 manifest 제외)을 `release-manifest.json`의 해시·크기·권한과 대조합니다. Python 3.11 이상 또는 Python 3.10 + tomli가 명세 생성에 필요합니다. 패키지와 별도로 SBOM·manifest·inventory JSON 및 `verify-release.py`를 생성합니다. 릴리스 CI는 공식 CycloneDX 스키마의 고정 해시를 확인한 뒤 스키마/format 검증도 수행합니다.
 
 ```sh
-# 검증 스크립트는 신뢰하는 소스에서 확보합니다. 아카이브 안의 코드를 먼저 실행하지 않습니다.
-python3 scripts/verify-release.py nabiman-linux-x86_64.tar.gz
-python3 scripts/verify-release.py nabiman-linux-x86_64.tar.gz --extract-to ./verified-release
+# 검증 스크립트와 공개 키는 신뢰하는 소스(이 저장소)에서 확보합니다. 아카이브 안의 코드를 먼저 실행하지 않습니다.
+python3 scripts/verify-release.py nabiman-linux-x86_64.tar.gz \
+  --public-key-file docs/release/nabiman-release.pub --require-signature
+python3 scripts/verify-release.py nabiman-linux-x86_64.tar.gz \
+  --public-key-file docs/release/nabiman-release.pub --require-signature --extract-to ./verified-release
 ```
 
 검증은 누락·추가·중복·변조 파일, 경로 이탈, 링크·특수·sparse 파일, 특권 mode, 20,000개 항목/확장 2 GiB 초과를 거부합니다. 추출 대상은 새 디렉터리여야 하며 Linux의 atomic no-replace rename을 사용합니다. 추출 중에도 파일 해시를 재검사합니다. 기존 디렉터리를 덮어쓰지 않습니다.
 
-새 installer는 다운로드 체크섬 확인에 더해 릴리스와 함께 배포되는 검증기로 검사한 뒤 설치합니다. 새 manifest와 verifier가 없는 구형 릴리스에는 적용되지 않으며 무검증 추출로 되돌아가지 않습니다. 이 installer를 게시하려면 같은 릴리스에 새 형식의 패키지와 `verify-release.py` 자산도 게시해야 합니다. 이 작업에서 GitHub 태그/공개 릴리스를 발행한 것은 아닙니다.
-
-동일 출처의 체크섬·검증기·manifest는 **배포자의 암호학적 신원을 증명하지 않습니다**. 이들은 파일 일관성 검사이며 서명, 독립 attestation, source-to-binary 연결 또는 재현 빌드 증거가 아닙니다. 서명된 릴리스·신뢰 루트·CVE 승인·라이선스 검토는 별도 출시 요건으로 유지합니다.
+installer와 `nabiman-update`는 manifest 검사 전에 패키지의 **minisign 서명**을 확인합니다. 키는 installer 안(그리고 설치 후 `/etc/nabiman/release.pub`)에 있고, 같은 릴리스에서 받은 키나 검증기는 믿지 않습니다. 서명 없이 검사하면 결과의 `publisher_authenticated`가 `false`입니다. 체크섬·manifest만으로는 배포자를 증명하지 못합니다. 서명은 배포자를 증명하지만 source-to-binary 연결이나 재현 빌드 증거는 아닙니다. 서명 키 관리와 검증 방법은 [docs/release/README.md](docs/release/README.md)에 있습니다.
 
 
 ### 의존성 보안 갱신과 남은 항목 (2026-10-06)
