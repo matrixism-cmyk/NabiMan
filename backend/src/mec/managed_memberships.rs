@@ -224,10 +224,11 @@ fn revoked_source(users: &UserStore, grant: &ManagedBinding) -> bool {
 pub fn start(state: web::Data<MecState>, users: UserStore) {
     actix_web::rt::spawn(async move {
         let mut cursor = 0usize;
+        let mut repeats = crate::observability::damp::Repeats::new(std::time::Duration::from_secs(600));
         loop {
-            if let Err(_) = sweep_page(&state, &users, cursor).await {
-                log_warn!("mec.membership", "managed membership scan could not complete; no unverified outcome is reported as revoked");
-            }
+            let outcome = sweep_page(&state, &users, cursor).await.map(|_| ()).map_err(|e| e.to_string());
+            // No unverified outcome is reported as revoked when a scan stops part-way.
+            repeats.report("mec.membership", "managed membership scan", outcome);
             cursor = cursor.wrapping_add(100);
             tokio::time::sleep(std::time::Duration::from_secs(30)).await;
         }

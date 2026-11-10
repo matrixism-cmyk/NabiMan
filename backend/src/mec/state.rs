@@ -25,6 +25,9 @@ pub struct MecState {
     /// fanned out to every SSE subscriber (see handlers::dashboard_sse). `None`
     /// until the first successful poll.
     pub live_tx: watch::Sender<Option<LiveSnapshot>>,
+    /// The dashboard poller's failures, damped in the log and shown in the
+    /// health summary (`dashboard_poll`).
+    pub dashboard_poll: Arc<std::sync::Mutex<crate::observability::damp::Repeats>>,
 }
 
 impl MecState {
@@ -48,6 +51,9 @@ impl MecState {
             docs_store,
             channels: None,
             live_tx,
+            dashboard_poll: Arc::new(std::sync::Mutex::new(crate::observability::damp::Repeats::new(
+                std::time::Duration::from_secs(600),
+            ))),
         }
     }
 

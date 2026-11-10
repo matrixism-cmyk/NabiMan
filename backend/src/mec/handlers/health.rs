@@ -1,4 +1,5 @@
 use super::util::ok_response;
+use crate::lock_safe::LockExt;
 use crate::mec::MecState;
 use actix_web::{web, HttpResponse};
 use serde::Serialize;
@@ -10,6 +11,8 @@ pub struct HealthSummary {
     pub axgate: HealthEntry,
     pub harbor: HealthEntry,
     pub mode: String,
+    /// The shared dashboard poller: whether it is failing, and the last error.
+    pub dashboard_poll: crate::observability::damp::Status,
 }
 
 #[derive(Serialize)]
@@ -62,6 +65,7 @@ pub async fn summary(state: web::Data<MecState>) -> HttpResponse {
             })
             .unwrap_or_else(|e| error_entry(&e.to_string())),
         mode: std::env::var("NABIMAN_MEC_MODE").unwrap_or_else(|_| "auto".into()),
+        dashboard_poll: state.dashboard_poll.lock_safe().status(),
     };
 
     ok_response(summary)

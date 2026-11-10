@@ -7,6 +7,7 @@
 
 use super::dashboard::build_live;
 use crate::mec::services::ServiceBundle;
+use crate::lock_safe::LockExt;
 use crate::mec::MecState;
 use actix_web::{web, HttpRequest, HttpResponse};
 use futures::stream::{self, Stream, StreamExt};
@@ -26,20 +27,25 @@ const HEARTBEAT: Duration = Duration::from_secs(15);
 pub fn start_poller(state: &web::Data<MecState>) {
     let services: Arc<ServiceBundle> = state.services.clone();
     let tx: watch::Sender<Option<crate::models::mec::LiveSnapshot>> = state.live_tx.clone();
+    let poll = state.dashboard_poll.clone();
     tokio::spawn(async move {
         let mut ticker = tokio::time::interval(POLL_INTERVAL);
         loop {
             ticker.tick().await;
-            match build_live(&services).await {
+            let outcome = match build_live(&services).await {
                 // Send even if there are no receivers yet — subscribers get the
                 // latest value immediately on connect.
                 Ok(snap) => {
                     let _ = tx.send(Some(snap));
+                    Ok(())
                 }
                 // A transient upstream failure (kube 401, metrics-server down)
                 // keeps the last good snapshot; the client shows it as stale.
-                Err(e) => log_warn!("mec", "dashboard poll failed", error = e),
-            }
+                // A lasting one (RBAC) is logged once, then every few minutes;
+                // the health summary shows the last error.
+                Err(e) => Err(e.to_string()),
+            };
+            poll.lock_safe().report("mec", "dashboard poll", outcome);
         }
     });
 }

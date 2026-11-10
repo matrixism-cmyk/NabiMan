@@ -3,6 +3,7 @@
 
 #[macro_use]
 mod macros;
+pub(crate) mod damp;
 pub(crate) mod health;
 pub(crate) mod log;
 mod redact;
