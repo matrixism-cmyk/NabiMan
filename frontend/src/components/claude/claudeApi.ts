@@ -25,7 +25,8 @@ export interface VoiceStatus {
   run_as: string | null;
   problem: string | null;
   voice_ready: boolean;
-  speakers: { id: string; name: string; desc: string }[];
+  /** The voices, by id; what each sounds like is translated here (claude.speaker.<id>). */
+  speakers: { id: string; name: string }[];
 }
 
 export interface ChatMessage { role: 'user' | 'assistant'; text: string; at: number; error?: string }

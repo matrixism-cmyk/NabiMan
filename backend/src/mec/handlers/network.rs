@@ -3,42 +3,34 @@ use crate::mec::MecState;
 use crate::models::mec::LbIpPool;
 use actix_web::{web, HttpResponse};
 
+/// The MetalLB address pools this install has (`NABIMAN_MEC_LB_POOLS`), with how
+/// many of each pool's addresses LoadBalancer services hold. None set: an empty list.
 pub async fn lb_pools(state: web::Data<MecState>) -> HttpResponse {
-    // MetalLB IPAddressPool CRD 조회는 Phase 2 kube-rs 통합에서 구현.
-    // 현재는 서비스 현황으로부터 추정치를 제공한다.
+    // Reading MetalLB's IPAddressPool CRDs is for the kube-rs integration; until
+    // then the pools are configured and their use counted from the services.
+    let configured = crate::install_config::settings::mec_lb_pools();
+    if configured.is_empty() {
+        return list_response(Vec::<LbIpPool>::new());
+    }
     let services = match state.services.kube.list_lb_services(None).await {
         Ok(s) => s,
         Err(e) => return from_service_error(e),
     };
-    let used: std::collections::BTreeSet<String> =
-        services.iter().map(|s| s.external_ip.clone()).collect();
-    let pools = vec![
-        LbIpPool {
-            name: "tenant".into(),
-            address_ranges: vec!["172.20.26.151-172.20.26.200".into()],
-            total_ips: 50,
-            used_ips: used
-                .iter()
-                .filter(|ip| prefix_matches(ip, "172.20.26.1") || prefix_matches(ip, "172.20.26.2"))
-                .count() as u32,
-            auto_assign: true,
-        },
-        LbIpPool {
-            name: "reserved".into(),
-            address_ranges: vec!["172.20.26.231-172.20.26.238".into()],
-            total_ips: 8,
-            used_ips: used
-                .iter()
-                .filter(|ip| prefix_matches(ip, "172.20.26.23"))
-                .count() as u32,
-            auto_assign: false,
-        },
-    ];
-    list_response(pools)
+    let used: std::collections::BTreeSet<String> = services.iter().map(|s| s.external_ip.clone()).collect();
+    list_response(pools(&configured, &used))
 }
 
-fn prefix_matches(ip: &str, prefix: &str) -> bool {
-    ip.starts_with(prefix)
+fn pools(configured: &[crate::install_config::settings::LbPool], used: &std::collections::BTreeSet<String>) -> Vec<LbIpPool> {
+    configured
+        .iter()
+        .map(|p| LbIpPool {
+            name: p.name.clone(),
+            address_ranges: p.ranges.iter().map(|(a, b)| if a == b { a.to_string() } else { format!("{a}-{b}") }).collect(),
+            total_ips: p.size(),
+            used_ips: used.iter().filter(|ip| p.contains(ip)).count() as u32,
+            auto_assign: p.auto_assign,
+        })
+        .collect()
 }
 
 pub async fn services(state: web::Data<MecState>) -> HttpResponse {
@@ -191,5 +183,18 @@ pub async fn delete_ingress(
             audit.failure(e.to_string());
             from_service_error(e)
         }
+    }
+}
+
+#[cfg(test)]
+mod pool_tests {
+    #[test]
+    fn pools_count_the_addresses_services_hold() {
+        let get = |n: &str| (n == "NABIMAN_MEC_LB_POOLS").then(|| "tenant=10.1.0.10-10.1.0.19 auto,one=10.1.0.30".to_string());
+        let configured = crate::install_config::settings::mec_lb_pools_in(&get);
+        let used = ["10.1.0.10", "10.1.0.19", "10.1.0.20", "10.1.0.30", ""].iter().map(|s| s.to_string()).collect();
+        let p = super::pools(&configured, &used);
+        assert_eq!((p[0].address_ranges.clone(), p[0].total_ips, p[0].used_ips, p[0].auto_assign), (vec!["10.1.0.10-10.1.0.19".to_string()], 10, 2, true));
+        assert_eq!((p[1].address_ranges.clone(), p[1].total_ips, p[1].used_ips, p[1].auto_assign), (vec!["10.1.0.30".to_string()], 1, 1, false));
     }
 }

@@ -4,7 +4,8 @@ import { useT } from '../i18n';
 
 interface DnsStatus {
   service: { running: boolean; pid: string; memory: string; uptime: string };
-  health: { ok: boolean; response: string; response_ms: number };
+  /** configured false: no name to check is set, so no check ran. */
+  health: { ok: boolean; configured?: boolean; response: string; response_ms: number };
   records: { total: number; active: number; domains: number };
   users: { total: number; active: number; pending: number; disabled: number };
   metrics: { queries_total: string; cache_hits: string; cache_misses: string; cache_hit_ratio: string; responses_nxdomain: string; rate_limited: string; acl_denied: string } | null;
@@ -50,9 +51,11 @@ export default function DnsPanel() {
         </div>
         <div className="info-item">
           <span className="info-label">{t('dns.healthCheck')}</span>
-          <span className={`status-badge ${health.ok ? 'up' : 'down'}`}>
-            {health.ok ? t('dns.healthy') : t('dns.unhealthy')}
-          </span>
+          {health.configured === false
+            ? <span className="status-badge">{t('dns.notConfigured')}</span>
+            : <span className={`status-badge ${health.ok ? 'up' : 'down'}`}>
+              {health.ok ? t('dns.healthy') : t('dns.unhealthy')}
+            </span>}
         </div>
         <div className="info-item">
           <span className="info-label">{t('dns.responseTime')}</span>

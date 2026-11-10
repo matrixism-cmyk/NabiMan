@@ -9,7 +9,8 @@ import VoiceLockField from './VoiceLockField';
 interface Setup {
   available: boolean;
   language: string;
-  url?: string;
+  /** null: no speech service is set up yet (admins only see this field). */
+  url?: string | null;
   address?: string;
   key_set?: boolean;
   key_hint?: string | null;
@@ -87,7 +88,8 @@ export default function DictationSettings() {
       {message && <p role="status" className="message">{message}</p>}
       <div className="form-group">
         <label htmlFor="dictation-url">{t('dictation.url')}</label>
-        <input id="dictation-url" className="filter-input" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://v.bebo.kr" />
+        <input id="dictation-url" className="filter-input" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://speech.example.com" />
+        {!setup.url && <small className="text-secondary" role="note">{t('dictation.notConfigured')}</small>}
       </div>
       <div className="form-group">
         <label htmlFor="dictation-address">{t('dictation.address')}</label>

@@ -26,6 +26,8 @@ pub struct DnsServiceInfo {
 #[derive(Serialize)]
 pub struct DnsHealthCheck {
     pub ok: bool,
+    /// Whether a name to check is set (`NABIMAN_DNS_CHECK_DOMAIN`).
+    pub configured: bool,
     pub response: String,
     pub response_ms: u64,
 }
@@ -115,28 +117,32 @@ fn format_bytes(b: u64) -> String {
     format!("{:.1} GB", b as f64 / 1073741824.0)
 }
 
+/// Asks the local DNS server for `NABIMAN_DNS_CHECK_DOMAIN` and, when
+/// `NABIMAN_DNS_CHECK_EXPECT` is set, whether the answer holds that address.
+/// Nothing set: no check (`configured: false`).
 fn health_check() -> DnsHealthCheck {
+    let Some((domain, expect)) = crate::install_config::settings::dns_check() else {
+        return DnsHealthCheck { ok: false, configured: false, response: String::new(), response_ms: 0 };
+    };
     let start = Instant::now();
     let output = std::process::Command::new("dig")
-        .args(["@127.0.0.1", "xos.kr", "A", "+short", "+time=3"])
+        .args(["@127.0.0.1", &domain, "A", "+short", "+time=3"])
         .output_within(deadline::PROBE);
     let elapsed = start.elapsed().as_millis() as u64;
-
     match output {
         Ok(o) => {
             let resp = String::from_utf8_lossy(&o.stdout).trim().to_string();
-            let ok = resp.contains("115.68.193.237");
-            DnsHealthCheck {
-                ok,
-                response: resp,
-                response_ms: elapsed,
-            }
+            DnsHealthCheck { ok: answered(&resp, expect.as_deref()), configured: true, response: resp, response_ms: elapsed }
         }
-        Err(e) => DnsHealthCheck {
-            ok: false,
-            response: e.to_string(),
-            response_ms: elapsed,
-        },
+        Err(e) => DnsHealthCheck { ok: false, configured: true, response: e.to_string(), response_ms: elapsed },
+    }
+}
+
+/// Whether dig's `+short` answer is good: holds `expect`, or, with none, any address.
+fn answered(resp: &str, expect: Option<&str>) -> bool {
+    match expect {
+        Some(want) => resp.lines().any(|l| l.trim() == want),
+        None => resp.lines().any(|l| l.trim().parse::<std::net::IpAddr>().is_ok()),
     }
 }
 
@@ -285,4 +291,19 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("/available", web::get().to(dns_available))
             .route("/status", web::get().to(dns_status)),
     );
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_check_wants_the_expected_address_or_any() {
+        assert!(super::answered("192.0.2.1\n", Some("192.0.2.1")));
+        assert!(!super::answered("192.0.2.2\n", Some("192.0.2.1")));
+        assert!(super::answered("cname.example.\n192.0.2.9", None));
+        assert!(!super::answered("", None) && !super::answered(";; connection timed out", None));
+        if std::env::var_os("NABIMAN_DNS_CHECK_DOMAIN").is_none() {
+            let h = super::health_check();
+            assert!(!h.configured && !h.ok, "no name set: no check");
+        }
+    }
 }

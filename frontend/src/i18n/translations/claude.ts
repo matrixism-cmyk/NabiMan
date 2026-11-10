@@ -27,7 +27,7 @@ const t: T = {
   'claude.draft': { ko: '보낼 말', en: 'Message', ja: '送る内容' },
   'claude.draftPlaceholder': { ko: '말하거나 입력하세요 (Enter로 보내기)', en: 'Speak or type (Enter sends)', ja: '話すか入力してください（Enter で送信）' },
   'claude.replay': { ko: '다시 듣기', en: 'Read again', ja: 'もう一度聞く' },
-  'claude.noVoice': { ko: '음성 서비스(v.bebo.kr) API 키가 없습니다. 원격 → 터미널 설정의 받아쓰기에서 먼저 설정하세요.', en: 'No speech service (v.bebo.kr) API key: set it under dictation in the terminal settings first.', ja: '音声サービス (v.bebo.kr) の API キーがありません。ターミナル設定の音声入力で先に設定してください。' },
+  'claude.noVoice': { ko: '음성 서비스가 설정되지 않았습니다(주소나 API 키 없음). 원격 → 터미널 설정의 받아쓰기에서 먼저 설정하세요.', en: 'No speech service is set up (no address or API key): set it under dictation in Remote → terminal settings first.', ja: '音声サービスが設定されていません（アドレスまたは API キーなし）。リモート → ターミナル設定の音声入力で先に設定してください。' },
   'claude.settings': { ko: 'Claude 음성 대화 설정', en: 'Claude voice chat settings', ja: 'Claude 音声会話の設定' },
   'claude.voiceSection': { ko: '읽어 주는 목소리', en: 'Voice', ja: '読み上げの声' },
   'claude.voice': { ko: '목소리', en: 'Voice', ja: '声' },

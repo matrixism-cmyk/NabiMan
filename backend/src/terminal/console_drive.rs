@@ -3,7 +3,7 @@
 //! VM copies onto that drive both land here — listed and downloaded server-side
 //! (reliable, unlike reading the redirected filesystem back over RDPDR).
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use actix_web::http::header::{ContentDisposition, DispositionParam, DispositionType};
 use actix_web::{web, HttpRequest, HttpResponse};
@@ -13,9 +13,8 @@ use crate::models::ApiResponse;
 /// The host directory redirected into the VM at `host` as its "NabiMan" drive.
 /// Keyed by host so each VM has its own; must match the path rdp_tunnel sends.
 pub fn drive_dir(host: &str) -> PathBuf {
-    let root = std::env::var("NABIMAN_DATA_DIR").unwrap_or_else(|_| "/workspace/var/lib/nabiman".into());
     let safe: String = host.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
-    Path::new(&root).join("guac-drive").join(safe)
+    nabiman_server::data_dir().join("guac-drive").join(safe)
 }
 
 fn host_of(target: &str) -> Option<String> {

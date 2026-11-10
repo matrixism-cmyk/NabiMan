@@ -24,6 +24,7 @@ import sftp from './sftp';
 import remoteProtocols from './remote-protocols';
 import remoteBase from './remote-base';
 import claude from './claude';
+import claudeVoices from './claude-voices';
 import claudePeer from './claude-peer';
 import aiGuide from './ai-guide';
 import graph from './graph';
@@ -64,6 +65,7 @@ const translations: Translations = {
   ...remoteBase,
   ...sftp,
   ...claude,
+  ...claudeVoices,
   ...claudePeer,
   ...aiGuide,
   ...graph,

@@ -16,17 +16,18 @@ use serde::{Deserialize, Serialize};
 use super::dictation;
 use crate::models::ApiResponse;
 
-/// The voices the speech service has (id, name, what it sounds like).
-pub(crate) const SPEAKERS: [(&str, &str, &str); 9] = [
-    ("sohee", "Sohee", "따뜻하고 감정이 풍부한 한국어 여성"),
-    ("vivian", "Vivian", "밝고 또렷한 젊은 여성 (중국어)"),
-    ("serena", "Serena", "부드럽고 차분한 젊은 여성 (중국어)"),
-    ("ono_anna", "Ono Anna", "경쾌한 젊은 여성 (일본어)"),
-    ("aiden", "Aiden", "밝은 미국 남성 (영어)"),
-    ("ryan", "Ryan", "리듬감 있는 남성 (영어)"),
-    ("uncle_fu", "Uncle Fu", "낮고 묵직한 중년 남성 (중국어)"),
-    ("dylan", "Dylan", "베이징 젊은 남성 (중국어)"),
-    ("eric", "Eric", "청두 남성, 살짝 허스키 (중국어)"),
+/// The voices the speech service has (id, name). What each sounds like is
+/// worded by the screen, in the reader's language (`claude.speaker.<id>`).
+pub(crate) const SPEAKERS: [(&str, &str); 9] = [
+    ("sohee", "Sohee"),
+    ("vivian", "Vivian"),
+    ("serena", "Serena"),
+    ("ono_anna", "Ono Anna"),
+    ("aiden", "Aiden"),
+    ("ryan", "Ryan"),
+    ("uncle_fu", "Uncle Fu"),
+    ("dylan", "Dylan"),
+    ("eric", "Eric"),
 ];
 const LANGUAGES: [&str; 5] = ["korean", "english", "japanese", "chinese", "auto"];
 /// What Claude may use: nothing, or tools that only read (files and the web).
@@ -127,7 +128,7 @@ async fn get_settings() -> HttpResponse {
         "run_as": found.as_ref().map(|l| l.user.clone()).ok(),
         "problem": found.err(),
         "voice_ready": dictation::ready(),
-        "speakers": SPEAKERS.iter().map(|(id, name, desc)| serde_json::json!({ "id": id, "name": name, "desc": desc })).collect::<Vec<_>>(),
+        "speakers": SPEAKERS.iter().map(|(id, name)| serde_json::json!({ "id": id, "name": name })).collect::<Vec<_>>(),
     });
     HttpResponse::Ok().insert_header(("Cache-Control", "no-store"))
         .json(ApiResponse::ok(serde_json::json!({ "settings": s, "status": status })))

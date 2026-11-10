@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useT } from '../../shared/i18n';
 import { getSettings, putSettings, speak, testClaude, VoiceSettings, VoiceStatus } from './claudeApi';
 import { Speaker } from './speaker';
+import { speakerLabel } from './speakerLabel';
 import PauseField from '../terminal/dictation/PauseField';
 import './claude.css';
 
@@ -68,7 +69,7 @@ export default function ClaudeSettingsPanel() {
         <label className="cv-field">
           <span>{t('claude.voice')}</span>
           <select className="select-input" value={s.speaker} onChange={(e) => set('speaker', e.target.value)}>
-            {status.speakers.map((v) => <option key={v.id} value={v.id}>{v.name} — {v.desc}</option>)}
+            {status.speakers.map((v) => <option key={v.id} value={v.id}>{speakerLabel(v, t)}</option>)}
           </select>
         </label>
         <label className="cv-field">

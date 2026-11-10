@@ -15,9 +15,14 @@ use crate::terminal::sftp::ftp::tls::Tls;
 
 const CONNECT: Duration = Duration::from_secs(10);
 
+/// The service's base URL, or why there is none.
+fn base(s: &Settings) -> Result<String, String> {
+    s.url().ok_or_else(|| "No speech service is set up: enter its address in the dictation settings (or set NABIMAN_DICTATION_URL)".into())
+}
+
 /// Scheme, host and port of the service's URL.
 fn target(s: &Settings) -> Result<(bool, String, u16), String> {
-    let url = reqwest::Url::parse(s.url()).map_err(|_| "The dictation service address is not valid")?;
+    let url = reqwest::Url::parse(&base(s)?).map_err(|_| "The dictation service address is not valid")?;
     let tls = url.scheme() == "https";
     let host = url.host_str().ok_or("The dictation service address has no host")?.to_string();
     let port = url.port_or_known_default().unwrap_or(if tls { 443 } else { 80 });
@@ -39,7 +44,7 @@ async fn http(s: &Settings, timeout: Duration) -> Result<reqwest::Client, String
 /// `GET /api/health` with the key: whether the service is up and takes it.
 pub(super) async fn health(s: &Settings, key: &str) -> Result<serde_json::Value, String> {
     let client = http(s, Duration::from_secs(15)).await?;
-    let res = client.get(format!("{}/api/health", s.url())).bearer_auth(key).send().await
+    let res = client.get(format!("{}/api/health", base(s)?)).bearer_auth(key).send().await
         .map_err(|e| format!("Cannot reach the dictation service: {e}"))?;
     match res.status().as_u16() {
         200 => res.json().await.map_err(|e| format!("Unexpected answer: {e}")),
@@ -51,7 +56,7 @@ pub(super) async fn health(s: &Settings, key: &str) -> Result<serde_json::Value,
 /// `GET /api/voiceprint`: whether the key's account has a voice enrolled.
 pub(super) async fn voiceprint(s: &Settings, key: &str) -> Result<serde_json::Value, String> {
     let client = http(s, Duration::from_secs(15)).await?;
-    let res = client.get(format!("{}/api/voiceprint", s.url())).bearer_auth(key).send().await
+    let res = client.get(format!("{}/api/voiceprint", base(s)?)).bearer_auth(key).send().await
         .map_err(|e| format!("Cannot reach the dictation service: {e}"))?;
     match res.status().as_u16() {
         200 => res.json().await.map_err(|e| format!("Unexpected answer: {e}")),
@@ -64,7 +69,7 @@ pub(super) async fn voiceprint(s: &Settings, key: &str) -> Result<serde_json::Va
 /// `POST /api/tts`: `text` read aloud, as a WAV file. Nothing is kept by the service.
 pub(super) async fn speak(s: &Settings, key: &str, body: &serde_json::Value) -> Result<Vec<u8>, String> {
     let client = http(s, Duration::from_secs(120)).await?;
-    let res = client.post(format!("{}/api/tts", s.url())).bearer_auth(key).json(body).send().await
+    let res = client.post(format!("{}/api/tts", base(s)?)).bearer_auth(key).json(body).send().await
         .map_err(|e| format!("Cannot reach the speech service: {e}"))?;
     match res.status().as_u16() {
         200 => res.bytes().await.map(|b| b.to_vec()).map_err(|e| format!("The speech was cut off: {e}")),

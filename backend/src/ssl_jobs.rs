@@ -78,9 +78,33 @@ pub(super) async fn renew_status(path: web::Path<String>) -> HttpResponse {
     }
 }
 
+/// A new certificate needs the Let's Encrypt account address
+/// (`NABIMAN_LETSENCRYPT_EMAIL`); without one the request is refused, saying so.
 pub(super) async fn issue_certificate(body: web::Json<DomainRequest>) -> HttpResponse {
+    let email = match crate::install_config::settings::letsencrypt_email() {
+        Ok(email) => email,
+        Err(why) => return HttpResponse::Ok().json(ApiResponse::<String>::error(&why)),
+    };
     let args = [
-        "--apache", "-d", &body.domain, "--non-interactive", "--agree-tos", "--no-eff-email", "--email", "webmaster@xos.kr",
+        "--apache", "-d", &body.domain, "--non-interactive", "--agree-tos", "--no-eff-email", "--email", &email,
     ];
     start(body.domain.clone(), args.map(String::from).to_vec(), "Issuing...", "Certificate issuance started")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[actix_web::test]
+    async fn a_new_certificate_needs_the_lets_encrypt_address() {
+        if std::env::var_os("NABIMAN_LETSENCRYPT_EMAIL").is_some() {
+            return; // set where this runs: issuing would really start certbot
+        }
+        let res = issue_certificate(web::Json(DomainRequest { domain: "example.com".into() })).await;
+        let body = actix_web::body::to_bytes(res.into_body()).await.unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["success"], false);
+        assert!(body["message"].as_str().unwrap().contains("NABIMAN_LETSENCRYPT_EMAIL"), "{body}");
+        assert!(renew_jobs().lock_safe().get("example.com").is_none(), "nothing was started");
+    }
 }

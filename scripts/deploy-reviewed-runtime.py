@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reviewed, backed-up rollout for this supervisor-managed NabiMan installation.
+"""Reviewed, backed-up rollout for a supervisor-managed NabiMan installation.
 
 Run prepare, inspect the private plan, rehearse, then activate. Never prints credentials.
 The systemd-only helper is packaged but not enabled on this supervisor host.
@@ -9,13 +9,34 @@ import socket, sqlite3, subprocess, time, uuid
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 
-ROOT = pathlib.Path('/workspace/nabiman')
-AUTH = pathlib.Path('/workspace/var/lib/nabiman')
-DB = ROOT / 'data/mec.db'
-SOURCE = ROOT / 'src'
-SUPERVISOR = '/workspace/etc/supervisor/supervisord.conf'
-CHROME = '/workspace/nabi/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome'
-PUBLIC = 'https://man.bebo.kr'
+# Where this installation is: from the command line or NABIMAN_DEPLOY_* (see
+# configure()); there are no defaults, so the script never assumes a machine.
+ROOT = AUTH = DB = SOURCE = None
+SUPERVISOR = PUBLIC = LOCAL = None
+SETTINGS = [
+    # (option, environment, required for, help)
+    ('root', 'NABIMAN_DEPLOY_ROOT', 'all', 'installation directory (bin/, static/, secrets/, deployments/)'),
+    ('data-dir', 'NABIMAN_DEPLOY_DATA_DIR', 'all', "the running server's NABIMAN_DATA_DIR"),
+    ('mec-db', 'NABIMAN_DEPLOY_MEC_DB', None, 'MEC database (default: ROOT/data/mec.db)'),
+    ('source', 'NABIMAN_DEPLOY_SOURCE', None, 'built source tree (default: ROOT/src)'),
+    ('supervisor-conf', 'NABIMAN_DEPLOY_SUPERVISOR_CONF', 'activate rollback', 'supervisord.conf that runs the nabiman program'),
+    ('local-url', 'NABIMAN_DEPLOY_LOCAL_URL', 'activate', 'the server on this machine, e.g. http://127.0.0.1:8080'),
+    ('public-url', 'NABIMAN_DEPLOY_PUBLIC_URL', 'activate', 'the address people use, e.g. https://nabiman.example.com'),
+]
+
+def configure(args):
+    global ROOT, AUTH, DB, SOURCE, SUPERVISOR, PUBLIC, LOCAL
+    value = lambda option, env: getattr(args, option.replace('-', '_')) or os.environ.get(env)
+    missing = [f'--{option} (or {env})' for option, env, needed, _ in SETTINGS
+               if needed and (needed == 'all' or args.action in needed.split()) and not value(option, env)]
+    if missing: raise SystemExit('Missing for ' + args.action + ': ' + ', '.join(missing))
+    ROOT = pathlib.Path(value('root', 'NABIMAN_DEPLOY_ROOT'))
+    AUTH = pathlib.Path(value('data-dir', 'NABIMAN_DEPLOY_DATA_DIR'))
+    DB = pathlib.Path(value('mec-db', 'NABIMAN_DEPLOY_MEC_DB') or ROOT / 'data/mec.db')
+    SOURCE = pathlib.Path(value('source', 'NABIMAN_DEPLOY_SOURCE') or ROOT / 'src')
+    SUPERVISOR = value('supervisor-conf', 'NABIMAN_DEPLOY_SUPERVISOR_CONF')
+    LOCAL = (value('local-url', 'NABIMAN_DEPLOY_LOCAL_URL') or '').rstrip('/')
+    PUBLIC = (value('public-url', 'NABIMAN_DEPLOY_PUBLIC_URL') or '').rstrip('/')
 
 def read(path): return json.loads(path.read_text())
 def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -274,7 +295,7 @@ def activate(deployment, plan, approved_hash):
         os.rename(ROOT / 'static', deployment / 'static.previous')
         os.symlink(deployment / 'candidate/static', ROOT / 'static')
         supervisor('start')
-        identity = check('http://127.0.0.1:18080', plan)
+        identity = check(LOCAL, plan)
         assert check(PUBLIC, plan) == identity, 'Public proxy reaches a different running instance'
         audit_ready(PUBLIC)
         assert set(read(deployment / 'cutover.before/tmux.json')).issubset(tmux_names()), 'An existing tmux session disappeared'
@@ -295,7 +316,10 @@ if __name__ == '__main__':
     parser.add_argument('action', choices=['prepare', 'rehearse', 'activate', 'rollback'])
     parser.add_argument('--deployment', type=pathlib.Path, required=True)
     parser.add_argument('--approved-plan-sha256')
+    for option, env, needed, text in SETTINGS:
+        parser.add_argument('--' + option, help=f'{text} [{env}]' + (f'; required for {needed}' if needed else ''))
     args = parser.parse_args()
+    configure(args)
     assert os.geteuid() == 0, 'Use the existing authorized deployment operator'
     os.umask(0o077)
     assert args.deployment.parent == ROOT / 'deployments'

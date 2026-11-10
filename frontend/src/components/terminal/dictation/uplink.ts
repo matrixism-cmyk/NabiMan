@@ -3,7 +3,7 @@
  * where the browser can make it (WebCodecs), one eighth of plain 16 kHz PCM
  * (256 kbps) and no worse to recognise — or as PCM where it cannot.
  *
- * Opus goes in VSP/1 bundles (v.bebo.kr's /docs 4.3): five 20 ms packets,
+ * Opus goes in VSP/1 bundles (the speech service's /docs, 4.3): five 20 ms packets,
  * 100 ms, per message, each bundle carrying when its first packet starts.
  * Muted (Claude reading an answer aloud), packets are dropped and a 7-byte
  * "silent until here" bundle goes every 200 ms instead, so the service's
@@ -22,7 +22,7 @@ const BUNDLE = 5;
 const KEEP_EVERY = 10;
 const FLAG_SILENCE = 1;
 export const OPUS_BITRATE = 32000;
-/** The rates stepped through on a slow line (v.bebo.kr's /docs: 12k still recognises well). */
+/** The rates stepped through on a slow line (the speech service's /docs: 12k still recognises well). */
 export const OPUS_LADDER = [12000, 16000, 24000, 32000];
 /** Sound still on the way, in ms, that counts as a slow line, or as one that keeps up. */
 const SLOW_MS = 800;

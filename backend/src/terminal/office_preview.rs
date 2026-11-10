@@ -30,13 +30,6 @@ const MAX_BYTES: usize = 50 << 20;
 const TIME_LIMIT: Duration = Duration::from_secs(90);
 /// The cache stays under this; the least recently used go first.
 const CACHE_BYTES: u64 = 512 << 20;
-/// Where LibreOffice is, unless `NABIMAN_SOFFICE` says otherwise.
-const SOFFICE: &str = "/workspace/opt/libreoffice-26.2.7/opt/libreoffice26.2/program/soffice.bin";
-/// Where rhwp is, unless `NABIMAN_RHWP` says otherwise.
-const RHWP: &str = "/workspace/opt/rhwp-0.8.7/bin/rhwp";
-/// Korean fonts both converters use (Noto Sans/Serif KR), and the fontconfig
-/// file that adds them to the system's.
-const FONTS: &str = "/workspace/opt/fonts-noto-kr";
 /// LibreOffice asks to be started again after making a new profile.
 const RESTART: i32 = 81;
 const NOBODY: u32 = 65534;
@@ -76,12 +69,20 @@ fn extension(name: &str) -> String {
     Path::new(name).extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase()
 }
 
+/// LibreOffice and rhwp: their settings, else where they are usually installed
+/// (see `install_config::settings`). An empty path when there is none.
 fn soffice() -> PathBuf {
-    std::env::var_os("NABIMAN_SOFFICE").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(SOFFICE))
+    crate::install_config::settings::soffice().unwrap_or_default()
 }
 
 fn rhwp() -> PathBuf {
-    std::env::var_os("NABIMAN_RHWP").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(RHWP))
+    crate::install_config::settings::rhwp().unwrap_or_default()
+}
+
+/// Korean fonts both converters use (e.g. Noto Sans/Serif KR), and the
+/// fontconfig file in it that adds them to the system's: `NABIMAN_PREVIEW_FONTS`.
+fn fonts() -> Option<PathBuf> {
+    crate::install_config::settings::preview_fonts()
 }
 
 fn cache_dir() -> PathBuf {
@@ -135,8 +136,8 @@ fn convert(bytes: &[u8], ext: &str, kind: Kind) -> Result<Vec<u8>, String> {
 fn convert_in(cache: &Path, bytes: &[u8], ext: &str, kind: Kind) -> Result<Vec<u8>, String> {
     let program = soffice();
     let hangul = rhwp();
-    if !program.exists() && !(kind == Kind::Hangul && hangul.exists()) {
-        return Err("문서 변환기가 이 서버에 설치되어 있지 않습니다".into());
+    if !program.is_file() && !(kind == Kind::Hangul && hangul.is_file()) {
+        return Err("문서 변환기(LibreOffice)가 이 서버에 없습니다. 설치하거나 NABIMAN_SOFFICE로 위치를 지정하세요".into());
     }
     let key = hex::encode(Sha256::digest([bytes, ext.as_bytes(), kind.tag()].concat()));
     let cached = cache.join(format!("{key}.pdf"));
@@ -156,11 +157,11 @@ fn convert_in(cache: &Path, bytes: &[u8], ext: &str, kind: Kind) -> Result<Vec<u
     let output = work.path.join("document.pdf");
     let started = Instant::now();
     // Hangul documents: rhwp first, which lays them out the way Hangul does.
-    if kind == Kind::Hangul && hangul.exists() {
-        let fonts = Path::new(FONTS);
+    if kind == Kind::Hangul && hangul.is_file() {
+        let fonts = fonts().filter(|f| f.is_dir());
         let mut args: Vec<String> = vec!["export-pdf".into(), input.display().to_string(), "-o".into(), output.display().to_string()];
-        if fonts.is_dir() {
-            args.extend(["--font-path".into(), FONTS.into(), "--fallback-serif".into(), "Noto Serif KR".into(), "--fallback-sans".into(), "Noto Sans KR".into(), "--fallback-mono".into(), "Noto Sans KR".into()]);
+        if let Some(fonts) = fonts {
+            args.extend(["--font-path".into(), fonts.display().to_string(), "--fallback-serif".into(), "Noto Serif KR".into(), "--fallback-sans".into(), "Noto Sans KR".into(), "--fallback-mono".into(), "Noto Sans KR".into()]);
         }
         args.extend(["--font-path".into(), "/usr/share/fonts".into()]);
         let args: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -266,8 +267,7 @@ fn run(program: &Path, home: &Path, args: &[&str], limit: Duration) -> Result<Op
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
-    let fonts = Path::new(FONTS).join("fonts.conf");
-    if fonts.is_file() {
+    if let Some(fonts) = fonts().map(|f| f.join("fonts.conf")).filter(|f| f.is_file()) {
         // The Korean fonts, for LibreOffice too (rhwp is given them directly).
         cmd.env("FONTCONFIG_FILE", fonts);
     }

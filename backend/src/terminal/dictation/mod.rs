@@ -1,5 +1,7 @@
 //! Dictation into a terminal: the browser's microphone, transcribed live by
-//! the speech service (v.bebo.kr's Qwen3-ASR), typed at the prompt.
+//! a speech service (one with the Qwen3-ASR live API), typed at the prompt.
+//! No service is set up on a new install: dictation stays off until a
+//! super administrator enters one (or `NABIMAN_DICTATION_URL` names it).
 //!
 //! The browser cannot send the service's API key on a WebSocket, and should
 //! not hold it anyway, so NabiMan relays: the browser streams 16 kHz PCM to
@@ -17,12 +19,11 @@ use serde::{Deserialize, Serialize};
 use crate::models::ApiResponse;
 
 pub(crate) const LANGUAGES: [&str; 5] = ["korean", "english", "japanese", "chinese", "auto"];
-const DEFAULT_URL: &str = "https://v.bebo.kr";
 
 /// Where the speech service is and how to sign in to it.
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub(crate) struct Settings {
-    /// The service's base URL; empty means v.bebo.kr.
+    /// The service's base URL; empty means `NABIMAN_DICTATION_URL`, else none.
     #[serde(default)]
     pub url: String,
     /// `host:port` to connect to instead of what the URL's name resolves to,
@@ -59,8 +60,12 @@ pub(crate) fn valid_pause(ms: u64) -> bool {
 }
 
 impl Settings {
-    pub fn url(&self) -> &str {
-        if self.url.is_empty() { DEFAULT_URL } else { &self.url }
+    /// The service, or none set up: the saved address, else the install's default.
+    pub fn url(&self) -> Option<String> {
+        self.url_or(crate::install_config::settings::dictation_url())
+    }
+    fn url_or(&self, install_default: Option<String>) -> Option<String> {
+        if self.url.is_empty() { install_default.and_then(|u| valid_url(&u)) } else { Some(self.url.clone()) }
     }
     pub fn endpoint_ms(&self) -> u32 {
         self.endpoint_ms.unwrap_or(1500)
@@ -71,7 +76,13 @@ impl Settings {
     pub fn language(&self) -> &str {
         if self.language.is_empty() { "korean" } else { &self.language }
     }
+    /// The key to use: only with a service to use it with.
     pub fn key(&self) -> Option<String> {
+        self.url()?;
+        self.stored_key()
+    }
+    /// The saved key, whether or not a service is set up.
+    pub fn stored_key(&self) -> Option<String> {
         (!self.key_enc.is_empty())
             .then(|| crate::secret_store::open(crate::secret_store::Binding::dictation_key(), &self.key_enc).ok())
             .flatten()
@@ -138,8 +149,10 @@ async fn get_settings(req: HttpRequest) -> HttpResponse {
         "endpoint_ms": s.endpoint_ms(), "auto_enter": s.auto_enter(), "voice_lock": s.voice_lock, "voice_reply": s.voice_reply,
     });
     if admin {
+        // No service: the screen says dictation is not set up yet.
         out["url"] = s.url().into();
         out["address"] = s.address.clone().into();
+        let key = s.stored_key();
         out["key_set"] = key.is_some().into();
         out["key_hint"] = key.map(|k| format!("…{}", &k[k.len().saturating_sub(4)..])).into();
     }
@@ -168,7 +181,8 @@ async fn put_settings(req: HttpRequest, body: web::Json<Change>) -> HttpResponse
     if let Some(url) = &body.url {
         match valid_url(url) {
             Some(u) => s.url = u,
-            None => return bad("The address should be like https://v.bebo.kr"),
+            None if url.trim().is_empty() => s.url.clear(),
+            None => return bad("The address should be like https://speech.example.com"),
         }
     }
     if let Some(address) = &body.address {
@@ -223,7 +237,7 @@ async fn put_settings(req: HttpRequest, body: web::Json<Change>) -> HttpResponse
 /// the key kept here; nothing is saved there.
 pub(crate) async fn speak(text: &str, speaker: &str, language: &str, instruct: &str) -> Result<Vec<u8>, String> {
     let s = load();
-    let key = s.key().ok_or("Dictation is not set up: no API key for the speech service")?;
+    let key = s.key().ok_or_else(|| format!("Dictation is not set up: {}", not_set_up(&s)))?;
     let body = serde_json::json!({ "text": text, "speaker": speaker, "language": language, "instruct": instruct, "save": false });
     voice::speak(&s, &key, &body).await
 }
@@ -233,6 +247,11 @@ pub(crate) fn ready() -> bool {
     load().key().is_some()
 }
 
+/// What is missing before dictation can be used.
+fn not_set_up(s: &Settings) -> &'static str {
+    if s.url().is_none() { "No speech service is set up: enter its address first" } else { "No API key is set" }
+}
+
 /// Signs in to the service and asks whether it is ready.
 async fn test(req: HttpRequest) -> HttpResponse {
     if let Err(r) = super_admin(&req) {
@@ -240,7 +259,7 @@ async fn test(req: HttpRequest) -> HttpResponse {
     }
     let s = load();
     let Some(key) = s.key() else {
-        return HttpResponse::Ok().json(ApiResponse::<()>::error("No API key is set"));
+        return HttpResponse::Ok().json(ApiResponse::<()>::error(not_set_up(&s)));
     };
     match voice::health(&s, &key).await {
         Ok(health) => HttpResponse::Ok().json(ApiResponse::ok(health)),
@@ -254,9 +273,9 @@ async fn test(req: HttpRequest) -> HttpResponse {
 async fn voiceprint() -> HttpResponse {
     let s = load();
     let Some(key) = s.key() else {
-        return HttpResponse::Ok().json(ApiResponse::<()>::error("No API key is set"));
+        return HttpResponse::Ok().json(ApiResponse::<()>::error(not_set_up(&s)));
     };
-    let enrol_at = format!("{}/account#voice", s.url());
+    let enrol_at = format!("{}/account#voice", s.url().unwrap_or_default());
     match voice::voiceprint(&s, &key).await {
         Ok(v) => {
             let flag = |k: &str| v.get(k).and_then(|x| x.as_bool()).unwrap_or(false);
@@ -290,7 +309,7 @@ mod tests {
 
     #[test]
     fn enter_at_a_pause_is_on_unless_turned_off() {
-        let unset: Settings = serde_json::from_str(r#"{"url":"https://v.bebo.kr"}"#).unwrap();
+        let unset: Settings = serde_json::from_str(r#"{"url":"https://speech.example.com"}"#).unwrap();
         assert!(unset.auto_enter());
         let off: Settings = serde_json::from_str(r#"{"auto_enter":false}"#).unwrap();
         assert!(!off.auto_enter());
@@ -298,9 +317,9 @@ mod tests {
 
     #[test]
     fn addresses_and_keys_are_checked() {
-        assert_eq!(valid_url("https://v.bebo.kr/").as_deref(), Some("https://v.bebo.kr"));
+        assert_eq!(valid_url("https://speech.example.com/").as_deref(), Some("https://speech.example.com"));
         assert_eq!(valid_url("http://127.0.0.1:19999").as_deref(), Some("http://127.0.0.1:19999"));
-        for bad in ["ftp://x", "https://v.bebo.kr/api", "https://u:p@v.bebo.kr", "v.bebo.kr", "https://x/?a=1"] {
+        for bad in ["ftp://x", "https://speech.example.com/api", "https://u:p@speech.example.com", "speech.example.com", "https://x/?a=1"] {
             assert_eq!(valid_url(bad), None, "{bad}");
         }
         assert!(valid_address("") && valid_address("127.0.0.1:443") && valid_address("[::1]:443"));
@@ -310,9 +329,14 @@ mod tests {
     }
 
     #[test]
-    fn defaults_point_at_v_bebo_kr_in_korean() {
+    fn dictation_is_off_until_a_service_is_set() {
         let s = Settings::default();
-        assert_eq!((s.url(), s.language()), ("https://v.bebo.kr", "korean"));
-        assert!(s.key().is_none());
+        assert_eq!((s.url_or(None), s.language()), (None, "korean"));
+        assert!(s.key().is_none() && s.stored_key().is_none());
+        // The install's default applies only when nothing was saved, and only a valid one.
+        assert_eq!(s.url_or(Some("https://speech.example.com/".into())).as_deref(), Some("https://speech.example.com"));
+        assert_eq!(s.url_or(Some("not a url".into())), None);
+        let saved = Settings { url: "https://saved.example".into(), ..Settings::default() };
+        assert_eq!(saved.url_or(Some("https://speech.example.com".into())).as_deref(), Some("https://saved.example"));
     }
 }

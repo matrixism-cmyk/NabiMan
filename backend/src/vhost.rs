@@ -263,19 +263,16 @@ async fn create_nginx_vhost(body: &CreateVhostRequest) -> HttpResponse {
     HttpResponse::Ok().json(ApiResponse::ok(msg))
 }
 
+/// Issues a certificate for the new site; without a Let's Encrypt address
+/// (`NABIMAN_LETSENCRYPT_EMAIL`) the site is made and the certificate skipped, saying why.
 async fn run_certbot(domain: &str, plugin: &str) -> String {
+    let email = match crate::install_config::settings::letsencrypt_email() {
+        Ok(email) => email,
+        Err(why) => return format!(" (SSL skipped: {why})"),
+    };
     let flag = format!("--{}", plugin);
     match std::process::Command::new("certbot")
-        .args([
-            &flag,
-            "-d",
-            domain,
-            "--non-interactive",
-            "--agree-tos",
-            "--no-eff-email",
-            "--email",
-            "webmaster@xos.kr",
-        ])
+        .args([&flag, "-d", domain, "--non-interactive", "--agree-tos", "--no-eff-email", "--email", &email])
         .output_off_thread(deadline::CERTIFICATE).await
     {
         Ok(o) if o.status.success() => " + SSL issued".into(),

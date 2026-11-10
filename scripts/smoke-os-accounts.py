@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """Real release + shadow/PAM tools inside a private chroot; no host OS account mutation."""
 import ctypes,hashlib,http.client,json,os,pathlib,re,shutil,socket,stat,subprocess,tempfile,time
+def chromium():
+ """NABIMAN_CHROMIUM, else the newest Chromium Playwright downloaded for this user."""
+ if os.environ.get('NABIMAN_CHROMIUM'): return os.environ['NABIMAN_CHROMIUM']
+ found=sorted(pathlib.Path.home().glob('.cache/ms-playwright/chromium-*/chrome-linux64/chrome'))
+ if not found: raise SystemExit('No Chromium: set NABIMAN_CHROMIUM or run npx playwright install chromium')
+ return str(found[-1])
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 BINARY=pathlib.Path(os.environ.get('NABIMAN_SMOKE_BINARY',ROOT/'backend/target/release/nabiman-server')).resolve()
 assert os.geteuid()==0,'This isolated chroot fixture requires the authorized local test operator'
@@ -86,11 +92,11 @@ with tempfile.TemporaryDirectory(prefix='nb-os-account-root-') as temporary:
    assert call('/api/accounts',{'username':name,'expected_uid':row['uid'],'remove_home':True,'confirm_home':'/wrong'},token,'DELETE')[0]==409
    assert call('/api/accounts',{'username':name,'expected_uid':row['uid'],'remove_home':True,'confirm_home':row['home']},token,'DELETE')[0]==200
    assert not (root/'home'/name).exists()
-   browser_run=subprocess.run(['node',str(ROOT/'frontend/scripts/smoke-os-accounts.js')],input=json.dumps({'base':base,'root':str(root),'token':token,'chromiumPath':os.environ.get('NABIMAN_CHROMIUM','/workspace/nabi/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome')}),text=True,capture_output=True,timeout=70,cwd=ROOT/'frontend')
+   browser_run=subprocess.run(['node',str(ROOT/'frontend/scripts/smoke-os-accounts.js')],input=json.dumps({'base':base,'root':str(root),'token':token,'chromiumPath':chromium()}),text=True,capture_output=True,timeout=70,cwd=ROOT/'frontend')
    assert browser_run.returncode==0,'OS account browser fixture failed; credential-bearing browser logs are not printed'
    browser=json.loads(browser_run.stdout)
    from cron_fixture import verify
-   cron=verify(root,call,token,base,ROOT,os.environ.get('NABIMAN_CHROMIUM','/workspace/nabi/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome'))
+   cron=verify(root,call,token,base,ROOT,chromium())
    # Unreadable/malformed inventory must be 503, not a successful empty list.
    original=(root/'etc/passwd').read_bytes();(root/'etc/passwd').write_text('malformed')
    try:assert call('/api/accounts',token=token)[0]==503

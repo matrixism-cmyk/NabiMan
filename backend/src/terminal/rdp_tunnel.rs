@@ -1,4 +1,4 @@
-//! RDP consoles in the browser via guacd (127.0.0.1:4822): NabiMan does the
+//! RDP consoles in the browser via guacd (`NABIMAN_GUACD_ADDR`, 127.0.0.1:4822): NabiMan does the
 //! Guacamole handshake, injects the RDP login server-side (password never
 //! reaches the browser), then relays the protocol to guacamole-common-js —
 //! clipboard, files and Korean input all native.
@@ -12,7 +12,6 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 
-const GUACD: &str = "127.0.0.1:4822";
 const LONGEST: Duration = Duration::from_secs(12 * 60 * 60);
 const CHECK_EVERY: Duration = Duration::from_secs(30);
 
@@ -211,7 +210,7 @@ async fn pump(
     mut rx: mpsc::UnboundedReceiver<Vec<u8>>,
     addr: actix::Addr<RdpConsole>,
 ) {
-    let tcp = match TcpStream::connect(GUACD).await {
+    let tcp = match TcpStream::connect(crate::install_config::settings::guacd_addr()).await {
         Ok(t) => t,
         Err(_) => {
             // guacd unreachable: UPSTREAM_UNAVAILABLE so the browser retries.

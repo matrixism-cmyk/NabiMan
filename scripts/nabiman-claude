@@ -4,9 +4,9 @@
 Meant for Claude Code itself, running inside a NabiMan session, to hand work
 to a fresh session it can then message:
 
-  nabiman-claude --dir /workspace/project                 # claude --dangerously-skip-permissions -c
-  nabiman-claude --dir /workspace/project --fresh "Review the open PR"   # new conversation, first message
-  nabiman-claude --json --dir /workspace/project          # machine-readable answer
+  nabiman-claude --dir /srv/project                      # claude --dangerously-skip-permissions -c
+  nabiman-claude --dir /srv/project --fresh "Review the open PR"   # new conversation, first message
+  nabiman-claude --json --dir /srv/project               # machine-readable answer
   nabiman-claude list                                     # every Claude session NabiMan knows, with addresses
   nabiman-claude status review-3a --lines 40              # one tile: alive, busy/idle, model, cwd, its screen
   nabiman-claude close review-3a [--force]                # close a tile (not your own; busy ones need --force)

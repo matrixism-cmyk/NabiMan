@@ -10,7 +10,7 @@ use tokio::process::Command;
 use super::Settings;
 
 /// Where Claude Code is usually installed, besides `$PATH`.
-const PLACES: [&str; 4] = ["/workspace/.npm-global/bin/claude", "/usr/local/bin/claude", "/usr/bin/claude", "/opt/claude/bin/claude"];
+const PLACES: [&str; 3] = ["/usr/local/bin/claude", "/usr/bin/claude", "/opt/claude/bin/claude"];
 /// Per-user installs, under each account's home.
 const HOME_PLACES: [&str; 3] = [".local/bin/claude", ".npm-global/bin/claude", ".claude/local/claude"];
 
@@ -32,14 +32,14 @@ fn accounts() -> Vec<Account> {
     }).collect()
 }
 
-fn runnable(path: &Path) -> bool {
-    std::fs::metadata(path).is_ok_and(|m| m.is_file() && m.mode() & 0o111 != 0)
-}
+use crate::install_config::values::runnable;
 
-/// The `claude` program: the one set, or the first found.
+/// The `claude` program: the one set here, else the install's (`NABIMAN_CLAUDE`),
+/// else the first found on `$PATH` and in the usual places.
 fn find(set: &str) -> Result<PathBuf, String> {
+    let set = if set.is_empty() { crate::install_config::settings::claude().map(|p| p.display().to_string()).unwrap_or_default() } else { set.to_string() };
     if !set.is_empty() {
-        let p = PathBuf::from(set);
+        let p = PathBuf::from(&set);
         return if runnable(&p) { Ok(p) } else { Err(format!("{set} is not a program that can be run")) };
     }
     let from_path = std::env::var("PATH").unwrap_or_default().split(':').map(|d| Path::new(d).join("claude")).collect::<Vec<_>>();
@@ -47,7 +47,7 @@ fn find(set: &str) -> Result<PathBuf, String> {
         .flat_map(|a| HOME_PLACES.iter().map(move |p| Path::new(&a.home).join(p))).collect::<Vec<_>>();
     from_path.into_iter().chain(PLACES.iter().map(PathBuf::from)).chain(homes)
         .find(|p| runnable(p))
-        .ok_or_else(|| "Claude Code (claude) was not found on this server; set where it is".into())
+        .ok_or_else(|| "Claude Code (claude) was not found on this server; set where it is (or NABIMAN_CLAUDE)".into())
 }
 
 /// How to start Claude: which program, as whom, from where.

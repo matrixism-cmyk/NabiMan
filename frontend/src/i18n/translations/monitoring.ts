@@ -139,6 +139,7 @@ const t: T = {
   'dns.healthCheck': { ko: '헬스체크', en: 'Health Check', ja: 'ヘルスチェック' },
   'dns.healthy': { ko: '정상', en: 'Healthy', ja: '正常' },
   'dns.unhealthy': { ko: '이상', en: 'Unhealthy', ja: '異常' },
+  'dns.notConfigured': { ko: '점검 안 함 (NABIMAN_DNS_CHECK_DOMAIN 미설정)', en: 'Not checked (NABIMAN_DNS_CHECK_DOMAIN not set)', ja: '確認なし（NABIMAN_DNS_CHECK_DOMAIN 未設定）' },
   'dns.responseTime': { ko: '응답 시간', en: 'Response Time', ja: '応答時間' },
   'dns.statistics': { ko: '레코드 / 사용자 통계', en: 'Record / User Statistics', ja: 'レコード/ユーザー統計' },
   'dns.totalRecords': { ko: '전체 레코드', en: 'Total Records', ja: '全レコード' },
