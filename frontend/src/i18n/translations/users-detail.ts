@@ -29,7 +29,7 @@ const t: T = {
 
   'users.account.grantAdmin': { ko: '{name} 에게 서비스 전체 최고관리자 권한을 줄까요?', en: 'Give {name} super administrator rights over the whole service?', ja: '{name} にサービス全体の最高管理者権限を与えますか?' },
   'users.account.revokeAdmin': { ko: '{name} 의 최고관리자 권한을 거둘까요?', en: 'Take super administrator rights away from {name}?', ja: '{name} の最高管理者権限を取り消しますか?' },
-  'users.account.shortPassword': { ko: '비밀번호는 8자 이상으로 정하세요', en: 'Use at least 8 characters for the password', ja: 'パスワードは 8 文字以上にしてください' },
+  'users.account.shortPassword': { ko: '비밀번호는 12자 이상, 72바이트 이하로 정하세요', en: 'Use 12 or more characters (at most 72 bytes) for the password', ja: 'パスワードは12文字以上、72バイト以下にしてください' },
   'users.account.level': { ko: '등급', en: 'Level', ja: '等級' },
   'users.account.levelGroup': { ko: '{name} 서비스 권한', en: '{name} service level', ja: '{name} のサービス権限' },
   'users.account.selfLevel': { ko: '자기 자신의 등급은 바꿀 수 없습니다.', en: 'You cannot change your own level.', ja: '自分自身の等級は変更できません。' },

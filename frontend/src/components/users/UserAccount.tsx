@@ -4,6 +4,7 @@ import type { MemberUser } from '../MembershipEditor';
 import ExternalIdentityEditor from '../ExternalIdentityEditor';
 import { useT } from '../../i18n';
 import { ROLE_HINT, ROLE_LABEL } from './userModel';
+import { passwordOk } from '../../shared/passwordRule';
 
 interface Props {
   user: MemberUser;
@@ -29,7 +30,7 @@ export default function UserAccount({ user, self, busy, update }: Props) {
     update({ role });
   };
   const savePassword = async () => {
-    if (password.length < 8) { setProblem(t('users.account.shortPassword')); return; }
+    if (!passwordOk(password)) { setProblem(t('users.account.shortPassword')); return; }
     if (password !== confirm) { setProblem(t('users.passwordMismatch')); return; }
     setProblem('');
     if (await update({ password })) { setPassword(''); setConfirm(''); }

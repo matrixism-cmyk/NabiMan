@@ -69,10 +69,10 @@ const t: T = {
 
   'users.new.title': { ko: '회원 추가', en: 'Add member', ja: 'メンバー追加' },
   'users.new.badId': { ko: '아이디는 영문·숫자·밑줄·하이픈 2~32자로 입력하세요', en: 'Use 2–32 letters, digits, underscores or hyphens for the ID', ja: 'ID は英数字・アンダースコア・ハイフンの 2〜32 文字で入力してください' },
-  'users.new.shortPassword': { ko: '비밀번호는 8자 이상으로 입력하세요', en: 'Use at least 8 characters for the password', ja: 'パスワードは 8 文字以上で入力してください' },
+  'users.new.shortPassword': { ko: '비밀번호는 12자 이상, 72바이트 이하로 정하세요', en: 'Use 12 or more characters (at most 72 bytes) for the password', ja: 'パスワードは12文字以上、72バイト以下にしてください' },
   'users.new.failed': { ko: '회원을 만들 수 없습니다', en: 'The member could not be created', ja: 'メンバーを作成できません' },
   'users.new.id': { ko: '아이디', en: 'ID', ja: 'ID' },
-  'users.new.password': { ko: '비밀번호 (8자 이상)', en: 'Password (8+ characters)', ja: 'パスワード (8文字以上)' },
+  'users.new.password': { ko: '비밀번호 (12자 이상)', en: 'Password (12+ characters)', ja: 'パスワード (12文字以上)' },
   'users.new.level': { ko: '등급', en: 'Level', ja: '等級' },
   'users.new.note': { ko: '만든 회원은 바로 승인된 상태입니다. 원격 권한·지정 서버·접속 제한은 만든 뒤 상세에서 정합니다.', en: 'New members start approved. Set remote permissions, assigned servers and access limits in their details afterwards.', ja: '作成したメンバーはすぐに承認済みになります。リモート権限・指定サーバー・接続制限は作成後に詳細で設定します。' },
   'users.new.creating': { ko: '만드는 중…', en: 'Creating…', ja: '作成中…' },

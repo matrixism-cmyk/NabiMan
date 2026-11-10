@@ -3,6 +3,7 @@ import Modal from '../../shared/ui/Modal';
 import { apiPost } from '../../shared/api/useApi';
 import { useT } from '../../i18n';
 import { ROLE_HINT, ROLE_LABEL } from './userModel';
+import { passwordOk } from '../../shared/passwordRule';
 
 /** Making an account directly, approved from the start. */
 export default function NewUserForm({ onClose, onCreated }: { onClose: () => void; onCreated: (username: string) => void }) {
@@ -17,7 +18,7 @@ export default function NewUserForm({ onClose, onCreated }: { onClose: () => voi
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!/^[A-Za-z0-9_-]{2,32}$/.test(username)) { setMessage(t('users.new.badId')); return; }
-    if (password.length < 8) { setMessage(t('users.new.shortPassword')); return; }
+    if (!passwordOk(password)) { setMessage(t('users.new.shortPassword')); return; }
     if (password !== confirm) { setMessage(t('users.passwordMismatch')); return; }
     setBusy(true);
     try {

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import './registration-form.css';
 import { useAuthCooldown } from '../hooks/useAuthCooldown';
 import { useT } from '../i18n';
+import { PASSWORD_MIN } from '../shared/passwordRule';
 
 export default function RegistrationForm({ onBack }: { onBack: () => void }) {
   const cooldown = useAuthCooldown();
@@ -37,7 +38,7 @@ export default function RegistrationForm({ onBack }: { onBack: () => void }) {
     {!submitted && <>
       <label>{t('signup.id')}<input aria-label={t('signup.idLabel')} autoComplete="username" required minLength={2} maxLength={32}
         value={username} onChange={e => setUsername(e.target.value)} pattern="[A-Za-z0-9_-]+" /></label>
-      <label>{t('signup.password')}<input aria-label={t('signup.passwordLabel')} type="password" autoComplete="new-password" required minLength={8}
+      <label>{t('signup.password')}<input aria-label={t('signup.passwordLabel')} type="password" autoComplete="new-password" required minLength={PASSWORD_MIN}
         value={password} onChange={e => setPassword(e.target.value)} /></label>
       <label>{t('signup.confirm')}<input aria-label={t('signup.confirm')} type="password" autoComplete="new-password" required
         value={confirm} onChange={e => setConfirm(e.target.value)} /></label>

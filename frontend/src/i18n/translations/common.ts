@@ -47,7 +47,7 @@ const t: T = {
   'app.newPassword': { ko: '새 비밀번호', en: 'New Password', ja: '新しいパスワード' },
   'app.confirmPassword': { ko: '새 비밀번호 확인', en: 'Confirm New Password', ja: '新しいパスワード確認' },
   'app.passwordMismatch': { ko: '새 비밀번호가 일치하지 않습니다', en: 'New passwords do not match', ja: '新しいパスワードが一致しません' },
-  'app.passwordTooShort': { ko: '비밀번호는 4자 이상이어야 합니다', en: 'Password must be at least 4 characters', ja: 'パスワードは4文字以上必要です' },
+  'app.passwordTooShort': { ko: '비밀번호는 12자 이상, 72바이트 이하로 정하세요', en: 'Use 12 or more characters (at most 72 bytes) for the password', ja: 'パスワードは12文字以上、72バイト以下にしてください' },
   'app.passwordChanged': { ko: '비밀번호가 변경되었습니다', en: 'Password changed successfully', ja: 'パスワードを変更しました' },
   'app.failed': { ko: '실패', en: 'Failed', ja: '失敗' },
 

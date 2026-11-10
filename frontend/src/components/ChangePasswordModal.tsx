@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { apiPost } from '../shared/api/useApi';
 import { useT } from '../i18n';
+import { passwordOk } from '../shared/passwordRule';
 
 export default function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const { t } = useT();
@@ -14,7 +15,7 @@ export default function ChangePasswordModal({ onClose }: { onClose: () => void }
     e.preventDefault();
     setMsg('');
     if (newPw !== confirmPw) { setMsg(t('app.passwordMismatch')); return; }
-    if (newPw.length < 8) { setMsg(t('app.passwordTooShort')); return; }
+    if (!passwordOk(newPw)) { setMsg(t('app.passwordTooShort')); return; }
     const res = await apiPost<string>('/api/auth/change-password', { current_password: currentPw, new_password: newPw });
     if (res.success) { setSuccess(true); setMsg(t('app.passwordChanged')); }
     else { setMsg(res.message || t('app.failed')); }

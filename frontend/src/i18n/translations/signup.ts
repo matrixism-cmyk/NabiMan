@@ -12,7 +12,7 @@ const t: T = {
   'signup.cooldown': { ko: '요청이 많습니다. {seconds}초 후 다시 신청하세요.', en: 'Too many requests. Try again in {seconds} seconds.', ja: 'リクエストが多すぎます。{seconds}秒後に再申請してください。' },
   'signup.id': { ko: '아이디', en: 'ID', ja: 'ID' },
   'signup.idLabel': { ko: '가입 아이디', en: 'Sign-up ID', ja: '登録 ID' },
-  'signup.password': { ko: '비밀번호 (8자 이상)', en: 'Password (8+ characters)', ja: 'パスワード (8文字以上)' },
+  'signup.password': { ko: '비밀번호 (12자 이상)', en: 'Password (12+ characters)', ja: 'パスワード (12文字以上)' },
   'signup.passwordLabel': { ko: '가입 비밀번호', en: 'Sign-up password', ja: '登録パスワード' },
   'signup.confirm': { ko: '비밀번호 확인', en: 'Confirm password', ja: 'パスワード確認' },
   'signup.submitting': { ko: '신청 중…', en: 'Sending…', ja: '申請中…' },
