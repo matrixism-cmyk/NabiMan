@@ -38,6 +38,8 @@ export interface GraphNode {
   kind?: 'session' | 'server' | 'device';
   /** A network device's kind: firewall, router, switch, node, vip, gateway, dongle, internet, storage, other. */
   device?: string;
+  /** A device's tier in the network, counted from the internet (0) inwards; drawn top to bottom. */
+  layer?: number;
   /** A second line: a server's address, a session's Claude. */
   sub?: string;
   /** A server's state as last checked. */
@@ -191,6 +193,22 @@ export function buildWorkMap(sessions: SessionInfo[], links: SessionLink[], serv
     for (const d of topology.devices) {
       g.nodes.push({ id: `dev:${d.key}`, kind: 'device', device: d.kind, name: d.name, sub: d.address, group: 'network', color: '#94a3b8', claude: '', busy: false, lead: false, orchestrator: false, alive: true, task: d.note });
     }
+    // Tiers: how many links a device is from the internet (or, with none entered, from the firewall).
+    const tier = new Map<string, number>();
+    const roots = topology.devices.filter((d) => d.kind === 'internet');
+    let front = (roots.length ? roots : topology.devices.filter((d) => d.kind === 'firewall')).map((d) => d.key);
+    front.forEach((k) => tier.set(k, 0));
+    for (let depth = 1; front.length && depth < 12; depth += 1) {
+      const next: string[] = [];
+      for (const l of topology.links) {
+        for (const [a, b] of [[l.from, l.to], [l.to, l.from]]) {
+          if (front.includes(a) && !tier.has(b)) { tier.set(b, depth); next.push(b); }
+        }
+      }
+      front = next;
+    }
+    const deepest = Math.max(0, ...Array.from(tier.values()));
+    for (const n of g.nodes) if (n.kind === 'device') n.layer = tier.get(n.id.slice(4)) ?? deepest + 1;
     for (const l of topology.links) g.edges.push({ id: `net>${l.from}>${l.to}`, from: `dev:${l.from}`, to: `dev:${l.to}`, live: false, strength: 0.5, color: '#64748b', note: l.label, kind: 'net' });
     for (const [id, node] of Array.from(made)) {
       const host = id === 'host:local' ? 'localhost' : servers.find((x) => `srv:${x.id}` === id)?.host || node.group;

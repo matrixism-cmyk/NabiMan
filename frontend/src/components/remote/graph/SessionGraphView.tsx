@@ -6,6 +6,7 @@ import type { SessionLink } from '../SessionLinks';
 import type { SessionInfo } from '../SessionsView';
 import { buildGraph, buildWorkMap, MapEvent, MapServer, Topology, ViewMode } from './graphModel';
 import type { Layout2D } from './Graph2D';
+import TopologyEditor from './TopologyEditor';
 import './session-graph.css';
 
 // The graph libraries are large: fetched only when a graph is asked for.
@@ -45,6 +46,7 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
   const [events, setEvents] = useState<MapEvent[]>([]);
   const newest = useRef(0);
   const [topology, setTopology] = useState<Topology | null>(null);
+  const [editing, setEditing] = useState(false);
   const [network, setNetwork] = useState(() => stored(NETWORK_KEY, '1') === '1');
   useEffect(() => {
     if (mode !== 'graph3d') return undefined;
@@ -96,6 +98,9 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
         {mode === 'graph3d' && !!topology?.devices.length && (
           <button type="button" className={`btn btn-sm ${network ? 'btn-primary' : 'btn-secondary'}`} aria-pressed={network}
             onClick={() => { setNetwork(!network); store(NETWORK_KEY, network ? '0' : '1'); }}>⛨ {t('graph.network', { count: topology.devices.length })}</button>
+        )}
+        {mode === 'graph3d' && (
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditing(true)} title={t('topology.note')}>✎ {t('topology.edit')}</button>
         )}
         <div className="session-graph-legend">
           <span className="session-graph-key is-lead">★ {t('graph.legend.lead')}</span>
@@ -154,6 +159,10 @@ export default function SessionGraphView({ mode, sessions, links, onAttach, onPo
             </li>
           ))}
         </ol>
+      )}
+      {editing && (
+        <TopologyEditor topology={topology || { devices: [], links: [], hosts: [] }} serverHosts={['localhost', ...servers.map((x) => x.host)]}
+          onSaved={setTopology} onClose={() => setEditing(false)} />
       )}
       {tip && (
         <div className="session-link-tip session-graph-tip" role="tooltip" style={{ left: tip.x + 14, top: tip.y + 16 }}>

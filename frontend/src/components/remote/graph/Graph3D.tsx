@@ -23,6 +23,9 @@ type L = {
 
 const radius = (n: GraphNode) => (n.kind === 'device' ? (n.device === 'internet' ? 14 : n.device === 'firewall' ? 9 : 6) : n.kind === 'server' ? 11 : n.lead ? 15 : (n.claude ? 9 : 6.5) + Math.min(n.heat || 0, 12) * 0.25);
 const REPORT_COLOR = '#7dd3fc';
+/** Where the network's lowest tier stands above the lead, and the step between tiers. */
+const BASE_Y = 70;
+const TIER_GAP = 58;
 
 /** A colour dimmed towards the background, as an arrow fades once its work is done. */
 function dim(hex: string, strength: number) {
@@ -148,12 +151,12 @@ export default function Graph3D({ graph, selected, onSelect, onHoverEdge, autoRo
       .onBackgroundClick(() => handlers.current.onSelect(null))
       .onLinkHover((l: L | null) => handlers.current.onHoverEdge(l?.note || null, pointer.current.x, pointer.current.y));
     // Sessions stay by their machine; machines keep their distance from each other.
-    g.d3Force('charge')?.strength((n: N) => (n.kind === 'server' ? -420 : n.kind === 'device' ? -260 : -110)).distanceMax(320);
+    g.d3Force('charge')?.strength((n: N) => (n.kind === 'server' ? -420 : n.kind === 'device' ? -520 : -110)).distanceMax(360);
     g.d3Force('link')
       ?.distance((l: L) => (l.kind === 'net' ? 60 : l.kind === 'host' ? 42 : l.kind === 'conn' ? 150 : l.kind === 'ghost' ? 150 : l.kind === 'report' ? 90 : 95))
       .strength((l: L) => (l.kind === 'net' ? 0.7 : l.kind === 'host' ? 1 : l.kind === 'conn' ? 0.5 : l.kind === 'ghost' ? 0.25 : l.kind === 'report' ? 0 : 0.15));
     // Start close: the layout settles within a few hundred units of the centre.
-    g.cameraPosition({ x: 0, y: 80, z: 420 });
+    g.cameraPosition({ x: 0, y: 150, z: 560 });
     g.cooldownTicks(160);
     const scene = g.scene();
     scene.add(new THREE.AmbientLight('#8fb4ff', 1.1));
@@ -205,10 +208,13 @@ export default function Graph3D({ graph, selected, onSelect, onHoverEdge, autoRo
     if (!g) return;
     // Keep where the nodes already are, so a refresh does not throw them about.
     const before = new Map<string, N>((g.graphData().nodes as N[]).map((n) => [n.id, n]));
+    const deepest = Math.max(0, ...graph.nodes.map((n) => n.layer ?? 0));
     const nodes: N[] = graph.nodes.map((n) => {
       const old = before.get(n.id);
       const next: N = { ...n, x: old?.x, y: old?.y, z: old?.z };
       if (n.lead) { next.fx = 0; next.fy = 0; next.fz = 0; }
+      // The network stands in tiers above the sessions: the internet on top, each hop inwards a step down.
+      if (n.kind === 'device') next.fy = BASE_Y + (deepest - (n.layer ?? deepest)) * TIER_GAP;
       return next;
     });
     const links: L[] = graph.edges.map((e) => ({ id: e.id, source: e.from, target: e.to, live: e.live, strength: e.strength, color: e.color, note: e.note, kind: e.kind || 'order' }));
