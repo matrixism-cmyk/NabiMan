@@ -3,6 +3,7 @@ pub mod privileged;
 
 pub mod backup_crypto;
 pub mod recovery_bundle;
+pub mod state_snapshot;
 
 /// Where NabiMan keeps its data: `$NABIMAN_DATA_DIR`, else /var/lib/nabiman.
 /// The one place this is decided. Read on every call, so a test (or a

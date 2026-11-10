@@ -20,6 +20,9 @@ mod archive;
 #[path = "backup_schedule.rs"]
 mod schedule;
 pub use schedule::{new_schedule_store, start_backup_scheduler};
+#[path = "backup_state.rs"]
+mod state;
+pub use state::seed_default_schedule;
 
 fn backup_dir() -> std::path::PathBuf {
     nabiman_server::data_dir().join("backups")

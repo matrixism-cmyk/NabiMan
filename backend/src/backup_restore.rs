@@ -8,8 +8,8 @@ use std::{
     io::{self, Read},
     path::{Component, Path, PathBuf},
 };
-pub(super) const MAX_BYTES: u64 = 1024 * 1024 * 1024;
-pub(super) struct Stage(pub PathBuf);
+pub(crate) const MAX_BYTES: u64 = 1024 * 1024 * 1024;
+pub(crate) struct Stage(pub PathBuf);
 impl Stage {
     pub fn new(parent: &Path) -> Result<Self, String> {
         let p = parent.join(format!(".private-backup-{}", uuid::Uuid::new_v4()));
@@ -25,21 +25,21 @@ impl Drop for Stage {
         let _ = fs::remove_dir_all(&self.0);
     }
 }
-pub(super) fn private_file(path: &Path) -> io::Result<fs::File> {
+pub(crate) fn private_file(path: &Path) -> io::Result<fs::File> {
     fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .mode(0o600)
         .open(path)
 }
-pub(super) fn directory(path: &Path) -> io::Result<()> {
+pub(crate) fn directory(path: &Path) -> io::Result<()> {
     fs::DirBuilder::new()
         .recursive(true)
         .mode(0o700)
         .create(path)
 }
 /// No archive metadata is applied: restored files 0600, directories 0700, API UID owns them.
-pub(super) fn extract(input: impl Read, target: &Path) -> Result<(), String> {
+pub(crate) fn extract(input: impl Read, target: &Path) -> Result<(), String> {
     let decoded = flate2::read::GzDecoder::new(input).take(MAX_BYTES + 1);
     let mut archive = tar::Archive::new(decoded);
     let mut total = 0u64;
@@ -113,7 +113,7 @@ fn sync_tree(path: &Path) -> Result<(), String> {
         .and_then(|f| f.sync_all())
         .map_err(|_| "Cannot persist restored directory".into())
 }
-pub(super) fn target(path: &str) -> Result<PathBuf, String> {
+pub(crate) fn target(path: &str) -> Result<PathBuf, String> {
     let target = Path::new(path);
     if !target.is_absolute()
         || target
@@ -133,7 +133,7 @@ pub(super) fn target(path: &str) -> Result<PathBuf, String> {
     }
     Ok(target)
 }
-pub(super) fn publish(staged: &Path, target: &Path) -> Result<(), String> {
+pub(crate) fn publish(staged: &Path, target: &Path) -> Result<(), String> {
     let from = std::ffi::CString::new(staged.as_os_str().as_bytes())
         .map_err(|_| "Invalid restore path")?;
     let to = std::ffi::CString::new(target.as_os_str().as_bytes())

@@ -169,13 +169,14 @@ async fn main() -> std::io::Result<()> {
         return Err(std::io::Error::last_os_error());
     }
     // One server per data directory: taken before any store opens it, held until exit.
-    let _data_dir_lock = data_dir::prepare().inspect_err(|e| eprintln!("{e}"))?;
+    let storage = data_dir::prepare().inspect_err(|e| eprintln!("{e}"))?;
     let runtime_identity = web::Data::new(runtime_identity::RuntimeIdentity::capture()?);
     let mec_mode = mec::services::bootstrap::ServiceMode::from_env()
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
     // Validate durable storage before starting background collectors or auth writes.
     let owned_mec_db = mec::db::open_owned(mec::db::default_path())?;
     let mec_db = owned_mec_db.handle.clone();
+    storage.seed_defaults();
     let port: u16 = std::env::var("NABIMAN_PORT")
         .ok()
         .and_then(|p| p.parse().ok())

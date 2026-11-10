@@ -36,6 +36,20 @@ pub struct Schedule {
     pub last_result: Option<RunResult>,
     #[serde(default)]
     pub last_slot: Option<i64>,
+    /// `paths`: archive the listed paths (plain tar). `state`: a consistent
+    /// snapshot of the data directory that restores a working install (see backup_state).
+    #[serde(default = "paths_kind")]
+    pub kind: String,
+    /// For `state`: how many of this schedule's snapshots to keep (older ones are
+    /// removed after a successful run). Unset: backup_state::DEFAULT_KEEP.
+    #[serde(default)]
+    pub keep: Option<u32>,
+    /// For `state`: also put secret.key in the snapshot (off: keep the key separately).
+    #[serde(default)]
+    pub include_secret_key: bool,
+}
+fn paths_kind() -> String {
+    "paths".into()
 }
 pub struct Store {
     path: PathBuf,
@@ -43,7 +57,7 @@ pub struct Store {
     unavailable: bool,
 }
 pub type BackupScheduleStore = Arc<Mutex<Store>>;
-fn save(path: &std::path::Path, rows: &[Schedule]) -> Result<(), String> {
+pub(super) fn save(path: &std::path::Path, rows: &[Schedule]) -> Result<(), String> {
     let temporary = path.with_extension(format!("{}.tmp", uuid::Uuid::new_v4()));
     let result = (|| -> Result<(), Box<dyn std::error::Error>> {
         let mut file = std::fs::OpenOptions::new()
@@ -138,17 +152,29 @@ pub(super) struct Create {
     compression: bool,
     #[serde(default = "yes")]
     enabled: bool,
+    #[serde(default = "paths_kind")]
+    kind: String,
+    #[serde(default)]
+    keep: Option<u32>,
+    #[serde(default)]
+    include_secret_key: bool,
 }
 fn yes() -> bool {
     true
+}
+pub(super) fn check_cron(expr: &str) -> Result<(), String> {
+    Cron::parse(expr).map(|_| ())
 }
 pub(super) async fn create(
     body: web::Json<Create>,
     store: web::Data<BackupScheduleStore>,
 ) -> HttpResponse {
-    if let Err(error) = archive::validate(&body.name, &body.paths)
-        .and_then(|_| Cron::parse(&body.cron_expr).map(|_| ()))
-    {
+    let paths_ok = match body.kind.as_str() {
+        "paths" => archive::validate(&body.name, &body.paths),
+        "state" => super::state::validate(&body.name, body.keep),
+        _ => Err("Schedule kind must be paths or state".into()),
+    };
+    if let Err(error) = paths_ok.and_then(|_| Cron::parse(&body.cron_expr).map(|_| ())) {
         return HttpResponse::BadRequest().json(ApiResponse::<()>::error(&error));
     }
     let mut store = store.lock_safe();
@@ -169,6 +195,9 @@ pub(super) async fn create(
         next_run: None,
         last_result: None,
         last_slot: None,
+        kind: body.kind.clone(),
+        keep: body.keep,
+        include_secret_key: body.include_secret_key,
     };
     rows.push(row.clone());
     if let Err(error) = store.commit(rows) {
@@ -237,7 +266,11 @@ fn claim(store: &BackupScheduleStore, id: &str, slot: Option<i64>) -> Result<Sch
     Ok(result)
 }
 fn execute(store: BackupScheduleStore, row: Schedule) {
-    let outcome = archive::create(&backup_dir(), &row.name, &row.paths, row.compression);
+    let outcome = if row.kind == "state" {
+        super::state::run(&row)
+    } else {
+        archive::create(&backup_dir(), &row.name, &row.paths, row.compression)
+    };
     let mut store = store.lock_safe();
     let mut rows = store.rows.clone();
     if let Some(target) = rows.iter_mut().find(|r| r.id == row.id) {

@@ -162,6 +162,16 @@ fn load(db: &mut Connection) -> rusqlite::Result<Topology> {
     Ok(Topology { devices, links, hosts })
 }
 
+/// The stored document, `None` when the database cannot be opened.
+pub(crate) fn current() -> Option<Topology> {
+    with_db(load)
+}
+
+/// Replace the stored document (already `checked`).
+pub(crate) fn replace(doc: &Topology) -> Option<()> {
+    with_db(|db| save(db, doc))
+}
+
 fn member(req: &HttpRequest, users: &crate::users::UserStore) -> bool {
     let user_id = crate::auth::verified_user_id(req).unwrap_or_default();
     user_id.is_empty() || users.lock_safe().iter().find(|u| u.id == user_id).is_none_or(crate::member_servers::is_member)
@@ -172,7 +182,7 @@ async fn get(req: HttpRequest, users: web::Data<crate::users::UserStore>) -> Htt
     if member(&req, &users) {
         return HttpResponse::Ok().json(ApiResponse::ok(Topology::default()));
     }
-    HttpResponse::Ok().json(ApiResponse::ok(with_db(load).unwrap_or_default()))
+    HttpResponse::Ok().json(ApiResponse::ok(current().unwrap_or_default()))
 }
 
 /// `PUT /api/terminal/topology`: a super administrator replaces the whole document.
@@ -188,7 +198,7 @@ async fn put(body: web::Json<Topology>, req: HttpRequest, users: web::Data<crate
         Ok(d) => d,
         Err(e) => return HttpResponse::Ok().json(ApiResponse::<()>::error(&e)),
     };
-    match with_db(|db| save(db, &doc)) {
+    match replace(&doc) {
         Some(()) => HttpResponse::Ok().json(ApiResponse::ok(doc)),
         None => HttpResponse::InternalServerError().json(ApiResponse::<()>::error("could not save the topology")),
     }

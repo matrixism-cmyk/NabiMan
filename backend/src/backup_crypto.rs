@@ -7,9 +7,9 @@ use std::{
     path::Path,
 };
 #[path = "backup_restore.rs"]
-mod restore;
+pub(crate) mod restore;
 #[path = "backup_encrypted_source.rs"]
-mod source;
+pub(crate) mod source;
 use restore::{Stage, MAX_BYTES};
 pub fn validate(name: &str, paths: &[String]) -> Result<(), String> {
     if name.trim().is_empty()

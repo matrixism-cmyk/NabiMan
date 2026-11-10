@@ -121,6 +121,12 @@ fn load(db: &Connection, after: i64, since: u64) -> rusqlite::Result<Vec<(i64, u
     Ok(out)
 }
 
+/// The texts of the events since `since` (unix seconds), oldest first.
+#[cfg(test)]
+pub(crate) fn texts_since(since: u64) -> Vec<String> {
+    with_db(|db| load(db, 0, since)).unwrap_or_default().into_iter().map(|r| r.6).collect()
+}
+
 #[derive(serde::Deserialize)]
 struct Query {
     /// Only events with a larger id (what the page already has).

@@ -123,7 +123,7 @@ pub(super) fn write<W: Write>(
 ) -> Result<W, String> {
     write_with_prefix(output, paths, destination, Path::new("/"))
 }
-pub(super) fn write_tree<W: Write>(
+pub(crate) fn write_tree<W: Write>(
     output: W,
     root: &Path,
     destination: &Path,

@@ -11,8 +11,11 @@ fn execute() -> Result<(), String> {
     }
     let args: Vec<_> = std::env::args().collect();
     if args.len() == 2 && args[1] == "--help" {
-        println!("nabiman-recovery pack TREE OUTPUT_DIRECTORY | restore ARCHIVE NEW_DIRECTORY | verify TREE\npack/restore read a passphrase from stdin; never start the recovered server automatically.");
+        println!("nabiman-recovery pack TREE OUTPUT_DIRECTORY | restore ARCHIVE NEW_DIRECTORY | verify TREE\npack/restore read a passphrase from stdin; never start the recovered server automatically.\n\nnabiman-recovery snapshot DATA_DIR OUTPUT_DIRECTORY [--with-secret-key] [--mec-db FILE]\nnabiman-recovery restore-state ARCHIVE NEW_DIRECTORY [--secret-key FILE]\nsnapshot is safe while the server runs (databases are copied consistently) and leaves secret.key out unless asked;\nrestore-state writes only a new directory and checks the key against the stored credentials.");
         return Ok(());
+    }
+    if matches!(args.get(1).map(String::as_str), Some("snapshot" | "restore-state")) {
+        return state(&args[1..]);
     }
     if args.len() == 3 && args[1] == "verify" {
         let result = bundle::verify(&PathBuf::from(&args[2]))?;
@@ -72,6 +75,34 @@ fn execute() -> Result<(), String> {
             serde_json::to_string(&result).map_err(|_| "Cannot encode verification")?
         );
     }
+    Ok(())
+}
+/// Data directory snapshots (nabiman_server::state_snapshot). No passphrase: the archive
+/// is as private as the data directory itself (0600) and holds no key unless asked to.
+/// Takes no data directory lock: a snapshot only reads, and a restore only creates a new directory.
+fn state(args: &[String]) -> Result<(), String> {
+    use nabiman_server::state_snapshot as snapshot;
+    let usage = || "Use --help for snapshot / restore-state syntax".to_string();
+    let (command, positional, flags) = (args[0].as_str(), args.get(1..3).ok_or_else(usage)?, &args[3..]);
+    let mut options = snapshot::Options::default();
+    let mut key = None;
+    let mut rest = flags.iter();
+    while let Some(flag) = rest.next() {
+        match (command, flag.as_str()) {
+            ("snapshot", "--with-secret-key") => options.include_secret_key = true,
+            ("snapshot", "--mec-db") => options.mec_db = Some(PathBuf::from(rest.next().ok_or_else(usage)?)),
+            ("restore-state", "--secret-key") => key = Some(PathBuf::from(rest.next().ok_or_else(usage)?)),
+            _ => return Err(usage()),
+        }
+    }
+    let result = if command == "snapshot" {
+        let name = snapshot::create(&PathBuf::from(&positional[0]), &PathBuf::from(&positional[1]), "nabiman-state", &options)?;
+        serde_json::json!({ "filename": name, "secret_key_included": options.include_secret_key })
+    } else {
+        let restored = snapshot::restore(&PathBuf::from(&positional[0]), &positional[1], key.as_deref())?;
+        serde_json::to_value(restored).map_err(|_| "Cannot encode restore summary")?
+    };
+    println!("{result}");
     Ok(())
 }
 fn main() {

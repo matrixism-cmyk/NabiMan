@@ -25,6 +25,9 @@ fn row() -> Schedule {
         next_run: None,
         last_result: None,
         last_slot: None,
+        kind: "paths".into(),
+        keep: None,
+        include_secret_key: false,
     }
 }
 #[test]
