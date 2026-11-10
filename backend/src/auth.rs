@@ -252,6 +252,7 @@ pub(crate) fn verified_role(req: &actix_web::HttpRequest) -> Option<crate::model
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum AuthDecision {
     Allow,
+    BadRequest,
     Unauthorized,
     Forbidden,
     MfaRequired,
@@ -264,7 +265,7 @@ pub fn check_auth(
     users: &UserStore,
 ) -> AuthDecision {
     req.extensions_mut().remove::<VerifiedPrincipal>();
-    let path = req.path();
+    let Ok(path) = crate::auth_gate::routed_path(req) else { return AuthDecision::BadRequest };
     let points = ExtensionPoints::of(req.app_data::<web::Data<ExtensionPoints>>());
     if path == "/api/auth/login"
         || path == "/api/auth/register"
@@ -285,7 +286,7 @@ pub fn check_auth(
         return AuthDecision::Allow;
     }
 
-    if let Some(decision) = api_tokens::check(req, users) { return decision; }
+    if let Some(decision) = api_tokens::check(req, users, path) { return decision; }
     // A URL the browser opens itself carries no Authorization header; a
     // product built on NabiMan may admit it with a one-use ticket of its own.
     let claims = match points.url_passes.iter().find_map(|pass| pass(req)) {

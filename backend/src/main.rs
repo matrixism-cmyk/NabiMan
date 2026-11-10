@@ -7,6 +7,7 @@ mod audit;
 mod audit_forwarding;
 mod audit_middleware;
 mod auth;
+mod auth_gate;
 mod backup;
 mod charts;
 mod config_manager;
@@ -145,22 +146,7 @@ where
     }
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        let denial = match auth::check_auth(&req, &self.secret, &self.sessions, &self.users) {
-            auth::AuthDecision::Allow => None,
-            auth::AuthDecision::Unauthorized => Some(
-                HttpResponse::Unauthorized().json(models::ApiResponse::<()>::error("Unauthorized")),
-            ),
-            auth::AuthDecision::MfaRequired => Some(
-                HttpResponse::Forbidden()
-                    .insert_header(("X-Nabiman-MFA-Required", "1"))
-                    .json(models::ApiResponse::<()>::error(
-                        "소속 보안 정책에 따라 2단계 인증 등록 후 다시 로그인해야 합니다",
-                    )),
-            ),
-            auth::AuthDecision::Forbidden => {
-                Some(HttpResponse::Forbidden().json(models::ApiResponse::<()>::error("Forbidden")))
-            }
-        };
+        let denial = auth_gate::denial(auth::check_auth(&req, &self.secret, &self.sessions, &self.users));
         if let Some(response) = denial {
             return Box::pin(async move { Ok(req.into_response(response).map_into_right_body()) });
         }
@@ -402,3 +388,7 @@ mod mec_managed_revocation_tests;
 
 #[cfg(test)]
 mod session_identity_tests;
+
+#[cfg(test)]
+#[path = "path_canon_tests.rs"]
+mod path_canon_tests;

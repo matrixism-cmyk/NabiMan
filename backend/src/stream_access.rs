@@ -60,7 +60,8 @@ impl ConnectionGrant {
             sid: claims.sid,
             sessions,
             users,
-            path: req.path().into(),
+            // The path the router matched, as `check_auth` judged it.
+            path: req.match_info().as_str().into(),
             ip: crate::access_rules::client_ip(req),
         })
     }

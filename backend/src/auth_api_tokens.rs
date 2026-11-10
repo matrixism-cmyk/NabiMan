@@ -1,7 +1,7 @@
 use super::*;
 use crate::api_keys::{ApiKeyStore, Rejection, TokenActor};
 /// Reject mixed credentials rather than silently selecting a stronger identity.
-pub(super) fn check(req: &ServiceRequest, users: &UserStore) -> Option<AuthDecision> {
+pub(super) fn check(req: &ServiceRequest, users: &UserStore, path: &str) -> Option<AuthDecision> {
     let bearer = req
         .headers()
         .get("Authorization")
@@ -26,7 +26,7 @@ pub(super) fn check(req: &ServiceRequest, users: &UserStore) -> Option<AuthDecis
         return Some(AuthDecision::Unauthorized);
     };
     Some(
-        match crate::api_keys::authenticate(raw, store, users, req.method().as_str(), req.path()) {
+        match crate::api_keys::authenticate(raw, store, users, req.method().as_str(), path) {
             Ok(actor) => {
                 req.extensions_mut().insert(VerifiedPrincipal {
                     user_id: actor.user.id.clone(),
