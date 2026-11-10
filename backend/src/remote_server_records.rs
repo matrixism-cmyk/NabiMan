@@ -131,6 +131,10 @@ pub(super) async fn add_server(
         Ok(servers) => servers,
         Err(error) => return storage_error(error),
     };
+    // A plan's server limit (only with a licence that carries one).
+    if let Err(e) = crate::license::plan::admit(crate::license::plan::Resource::Servers, servers.len()) {
+        return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error(&e));
+    }
     servers.push(server.clone());
     if let Err(e) = save_servers(&mut servers) {
         return storage_error(e);

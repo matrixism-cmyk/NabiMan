@@ -49,6 +49,7 @@ jobs:
           "$RUNNER_TEMP/release-tests/bin/python" scripts/test-release-signature.py
           "$RUNNER_TEMP/release-tests/bin/python" scripts/test-release-licenses.py
           "$RUNNER_TEMP/release-tests/bin/python" scripts/test-nabiman-update.py
+          python3 scripts/test-license-issuer.py
       - name: Release script syntax
         run: |
           for f in install.sh packaging/nabiman-update scripts/package-release.sh scripts/prune-deployments.sh scripts/check-docker-pins.sh; do

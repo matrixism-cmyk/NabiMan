@@ -202,6 +202,10 @@ async fn get_settings(req: HttpRequest, store: web::Data<crate::users::UserStore
 
 async fn put_settings(req: HttpRequest, store: web::Data<crate::users::UserStore>, body: web::Json<Settings>) -> HttpResponse {
     if let Err(r) = require_super(&req, &store) { return r; }
+    // Switching recording on needs a plan that includes it; switching it off never does.
+    if body.enabled && !settings().enabled && !crate::license::plan::entitled("recording") {
+        return HttpResponse::Forbidden().json(ApiResponse::<()>::error("이 라이선스의 요금제에는 세션 녹화가 포함되어 있지 않습니다"));
+    }
     match save_settings(&body) {
         Ok(()) => HttpResponse::Ok().json(ApiResponse::ok("saved")),
         Err(e) => HttpResponse::BadRequest().json(ApiResponse::<()>::error(&e)),

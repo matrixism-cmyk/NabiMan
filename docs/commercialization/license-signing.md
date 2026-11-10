@@ -68,6 +68,10 @@ python3 tools/license-issuer.py issue \
 
 기존 HMAC 토큰과 unsigned 저장 파일은 자동 신뢰·자동 변환하지 않는다. 기존 계약·기능·유효 기간을 확인한 뒤 새 토큰을 발급해야 한다. rollout 전에 기존 파일 목록·고객 영향·발급자 공개키·복구용 이전 release를 준비한다. 잘못된 파일 삭제를 정상 라이선스 이전 절차로 사용하지 않는다.
 
+## 요금제·한도·유예 (2026-11-11)
+
+`info`에 선택 필드 `limits`(plan, deployment, max_users, max_servers, features, grace_days)를 추가했다. `limits`가 있는 라이선스만 사용자·서버 추가 한도, 세션 녹화 켜기 제한, 만료 후 유예(기본 14일, 최대 90일)를 적용한다. 기존 라이선스와 발급 claims는 그대로 유효하고 동작도 같다. 발급 도구는 `limits`를 서버와 같은 규칙으로 검사한다. 이전 버전 서버는 `limits`가 있는 토큰을 거부하므로 요금제 라이선스는 이 버전 이상에만 발급한다. 필드 규칙과 집행 방식은 [hosting-model.md](hosting-model.md) 「요금제·한도·유예가 있는 라이선스」에 있다.
+
 ## Wire format
 
 `NBL1.` + hex(JSON envelope). Envelope 필드는 version=1, key_id, payload(hex JSON claims), signature(hex 64-byte Ed25519 signature)다. 서명 대상 byte sequence:
@@ -80,6 +84,6 @@ UTF8("NabiMan license v1") + 0x00 + UTF8(key_id) + 0x00 + decoded_payload_bytes
 
 ## 남은 상용화 작업
 
-지금까지는 검증 API와 화면·발급 도구의 개선이다. 서비스의 privileged 작업이나 서버 등록 API가 이 라이선스 정보로 차단되는 것은 아니다. 기능·서버 수·조직 단위 사용량의 서버 측 실제 enforcement, 유예 기간·읽기 전용 전환·초과 사용 정책·동시 등록 transaction·고객 안내를 설계하고 시험해야 한다. trial도 현재 기본 feature만 반환한다.
+지금까지는 검증 API와 화면·발급 도구의 개선이다. 2026-11-11부터 `limits`가 있는 라이선스에 한해 사용자·서버 추가를 한도에서 거부한다(위 절). 그 밖의 privileged 작업은 라이선스로 차단하지 않는다. 기능·서버 수·조직 단위 사용량의 서버 측 실제 enforcement, 유예 기간·읽기 전용 전환·초과 사용 정책·동시 등록 transaction·고객 안내를 설계하고 시험해야 한다. trial도 현재 기본 feature만 반환한다.
 
 기기·organization binding, 계약·청구·갱신, 개별 라이선스 취소, clock rollback 대응, HSM 발급·백업·복구, 독립 감사 저장, 기존 고객 migration, signed installer 및 artifact provenance는 후속 범위다. 상용 발급 개인키나 production verification root를 아직 구성하지 않았으며 운영 서비스도 변경하지 않았다.

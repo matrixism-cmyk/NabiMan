@@ -1,7 +1,4 @@
 //! Offline public-key verification. Issuing keys never belong on this server.
-use crate::lock_safe::LockExt;
-use crate::models::ApiResponse;
-use actix_web::{web, HttpRequest, HttpResponse};
 use chrono::{NaiveDate, Utc};
 use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
@@ -9,12 +6,10 @@ use std::{
     collections::{BTreeMap, HashSet},
     io::{Read, Write},
     path::{Path, PathBuf},
-    sync::Mutex,
 };
 
 const MAX_FILE: u64 = 65536;
 const TRIAL_SECONDS: i64 = 30 * 86400;
-static WRITES: Mutex<()> = Mutex::new(());
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct LicenseInfo {
@@ -24,6 +19,9 @@ pub struct LicenseInfo {
     pub expires_at: Option<String>,
     pub max_servers: Option<u32>,
     pub features: Vec<String>,
+    /// A plan's limits (`license_plan`); older licences have none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limits: Option<plan::PlanLimits>,
 }
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
@@ -69,11 +67,10 @@ pub struct LicenseStatus {
     pub max_servers: Option<u32>,
     pub validation_state: String,
     pub license_id: Option<String>,
-}
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ActivateRequest {
-    pub key: String,
+    /// The plan, when the licence carries one: then limits and grace apply.
+    pub limits: Option<plan::PlanLimits>,
+    pub grace_ends_at: Option<String>,
+    pub grace_days_remaining: Option<i64>,
 }
 fn data_dir() -> PathBuf {
     nabiman_server::data_dir()
@@ -179,9 +176,6 @@ fn validate_claims(claims: &Claims, today: NaiveDate) -> Result<(), String> {
         if exp < issued {
             return Err("Expiry precedes issue date".into());
         }
-        if exp < today {
-            return Err("License has expired".into());
-        }
     }
     let allowed = features_for_tier(&info.tier);
     let mut unique = HashSet::new();
@@ -192,6 +186,10 @@ fn validate_claims(claims: &Claims, today: NaiveDate) -> Result<(), String> {
             .any(|f| !allowed.contains(f) || !unique.insert(f))
     {
         return Err("Invalid license features".into());
+    }
+    if let Some(limits) = &info.limits {
+        // A plan states its own server limit; the tier's fixed ones do not apply.
+        return plan::validate(limits, info.max_servers);
     }
     match info.tier.as_str() {
         "free" if info.max_servers != Some(1) => {
@@ -205,7 +203,19 @@ fn validate_claims(claims: &Claims, today: NaiveDate) -> Result<(), String> {
     }
     Ok(())
 }
-fn verify(
+fn expiry(claims: &Claims) -> Option<NaiveDate> {
+    claims.info.expires_at.as_ref().and_then(|d| date(d).ok())
+}
+/// A licence that verifies and has not expired: what activation accepts.
+fn verify(key: &str, keys: &BTreeMap<String, VerifyingKey>, today: NaiveDate) -> Result<Claims, String> {
+    let claims = verify_signed(key, keys, today)?;
+    if expiry(&claims).is_some_and(|exp| exp < today) {
+        return Err("License has expired".into());
+    }
+    Ok(claims)
+}
+/// Signature, issuer and every field, but not whether it has expired.
+fn verify_signed(
     key: &str,
     keys: &BTreeMap<String, VerifyingKey>,
     today: NaiveDate,
@@ -252,6 +262,9 @@ fn inactive(state: &str) -> LicenseStatus {
         max_servers: Some(1),
         validation_state: state.into(),
         license_id: None,
+        limits: None,
+        grace_ends_at: None,
+        grace_days_remaining: None,
     }
 }
 fn trial(dir: &Path, now: i64) -> LicenseStatus {
@@ -307,26 +320,51 @@ fn status_at(dir: &Path, key_file: &Path, now: chrono::DateTime<Utc>) -> License
         Ok(keys) => keys,
         Err(_) => return inactive("verification_unavailable"),
     };
-    let claims = match verify(&stored.signed_key, &keys, now.date_naive()) {
+    let today = now.date_naive();
+    let claims = match verify_signed(&stored.signed_key, &keys, today) {
         Ok(c) => c,
-        Err(e) => {
-            return inactive(if e == "License has expired" {
-                "license_expired"
-            } else {
-                "invalid_license"
-            })
-        }
+        Err(_) => return inactive("invalid_license"),
     };
+    let expired = expiry(&claims).filter(|exp| *exp < today);
+    match (expired, &claims.info.limits) {
+        (None, _) => licensed(claims, today),
+        // Without a plan an expired licence is simply expired, as it always was.
+        (Some(_), None) => inactive("license_expired"),
+        (Some(exp), Some(limits)) => match plan::after_expiry(limits, exp, today) {
+            plan::AfterExpiry::Grace { ends, days_left } => {
+                let mut status = licensed(claims, today);
+                status.validation_state = "grace".into();
+                status.grace_ends_at = Some(ends.to_string());
+                status.grace_days_remaining = Some(days_left);
+                status
+            }
+            plan::AfterExpiry::Ended { ended } => {
+                // Past grace: the basic features, and the plan kept so growth stays stopped.
+                let mut status = inactive("license_expired");
+                status.holder = claims.info.holder.clone();
+                status.expires_at = claims.info.expires_at.clone();
+                status.days_remaining = Some((exp - today).num_days());
+                status.max_servers = claims.info.max_servers;
+                status.license_id = Some(claims.license_id.clone());
+                status.limits = claims.info.limits.clone();
+                status.grace_ends_at = Some(ended.to_string());
+                status.grace_days_remaining = Some(0);
+                status
+            }
+        },
+    }
+}
+/// The licence as `GET /api/license` reads it now.
+pub(crate) fn current() -> LicenseStatus {
+    status_at(&data_dir(), &key_path(), Utc::now())
+}
+fn licensed(claims: Claims, today: NaiveDate) -> LicenseStatus {
     let info = claims.info;
     LicenseStatus {
         active: true,
         tier: info.tier,
         holder: info.holder,
-        days_remaining: info
-            .expires_at
-            .as_ref()
-            .and_then(|d| date(d).ok())
-            .map(|d| (d - now.date_naive()).num_days()),
+        days_remaining: info.expires_at.as_ref().and_then(|d| date(d).ok()).map(|d| (d - today).num_days()),
         expires_at: info.expires_at,
         is_trial: false,
         trial_days_remaining: None,
@@ -334,59 +372,16 @@ fn status_at(dir: &Path, key_file: &Path, now: chrono::DateTime<Utc>) -> License
         max_servers: info.max_servers,
         validation_state: "licensed".into(),
         license_id: Some(claims.license_id),
+        limits: info.limits,
+        grace_ends_at: None,
+        grace_days_remaining: None,
     }
 }
-async fn get_status() -> HttpResponse {
-    HttpResponse::Ok().json(ApiResponse::ok(status_at(
-        &data_dir(),
-        &key_path(),
-        Utc::now(),
-    )))
-}
-async fn get_features() -> HttpResponse {
-    HttpResponse::Ok().json(ApiResponse::ok(
-        status_at(&data_dir(), &key_path(), Utc::now()).features,
-    ))
-}
-async fn activate(
-    req: HttpRequest,
-    users: web::Data<crate::users::UserStore>,
-    body: web::Json<ActivateRequest>,
-) -> HttpResponse {
-    if let Err(r) = crate::membership::require_super(&req, &users) {
-        return r;
-    }
-    let keys = match load_keys(&key_path()) {
-        Ok(keys) => keys,
-        Err(e) => return HttpResponse::ServiceUnavailable().json(ApiResponse::<()>::error(&e)),
-    };
-    let key = body.key.trim();
-    if let Err(e) = verify(key, &keys, Utc::now().date_naive()) {
-        return HttpResponse::BadRequest().json(ApiResponse::<()>::error(&e));
-    }
-    let _guard = WRITES.lock_safe();
-    let stored = serde_json::to_vec(&Stored {
-        signed_key: key.into(),
-    })
-    .expect("Stored license serialization");
-    if crate::private_storage::write(&data_dir().join("license.json"), &stored).is_err() {
-        return HttpResponse::InternalServerError()
-            .json(ApiResponse::<()>::error("Cannot persist signed license"));
-    }
-    HttpResponse::Ok().json(ApiResponse::ok(status_at(
-        &data_dir(),
-        &key_path(),
-        Utc::now(),
-    )))
-}
-pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.service(
-        web::scope("/api/license")
-            .route("", web::get().to(get_status))
-            .route("/activate", web::post().to(activate))
-            .route("/features", web::get().to(get_features)),
-    );
-}
+#[path = "license_http.rs"]
+mod http;
+pub use http::config;
+#[path = "license_plan.rs"]
+pub(crate) mod plan;
 #[cfg(test)]
 #[path = "license_tests.rs"]
 mod tests;

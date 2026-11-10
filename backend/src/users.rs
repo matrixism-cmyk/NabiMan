@@ -225,6 +225,10 @@ async fn create_user(
     if users.iter().any(|u| u.username == body.username) {
         return HttpResponse::Ok().json(ApiResponse::<()>::error("Username already exists"));
     }
+    // A plan's user limit (only with a licence that carries one).
+    if let Err(e) = crate::license::plan::admit(crate::license::plan::Resource::Users, crate::license::plan::seats(&users)) {
+        return HttpResponse::Ok().json(ApiResponse::<()>::error(&e));
+    }
     let user = NabimanUser {
         share_authorization_version: uuid::Uuid::new_v4().to_string(),
         id: generate_id(),

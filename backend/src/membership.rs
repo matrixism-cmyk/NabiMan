@@ -200,6 +200,13 @@ async fn review(
     {
         return error("마지막 최고관리자를 정지할 수 없습니다");
     }
+    if body.status == AccountStatus::Active && users[index].status != AccountStatus::Active {
+        // Approving or reinstating takes a seat a plan may not have left.
+        let seats = crate::license::plan::seats(&users);
+        if let Err(e) = crate::license::plan::admit(crate::license::plan::Resource::Users, seats) {
+            return error(&e);
+        }
+    }
     if body.status == AccountStatus::Active {
         for m in &body.memberships {
             if let Err(e) = crate::scope_settings::check_capacity(&users, &users[index].id, m) {

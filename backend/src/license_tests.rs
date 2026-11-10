@@ -22,6 +22,7 @@ fn claims() -> Claims {
             expires_at: Some("2026-10-31".into()),
             max_servers: Some(10),
             features: features_for_tier("pro"),
+            limits: None,
         },
     }
 }
@@ -264,3 +265,6 @@ fn failed_trial_storage_never_grants_trial() {
     std::fs::write(&file, "x").unwrap();
     assert!(!trial(&file, today().timestamp()).active);
 }
+
+#[path = "license_plan_tests.rs"]
+mod plan_tests;

@@ -11,6 +11,10 @@ import tempfile
 
 DOMAIN = b'NabiMan license v1\0'
 ID = re.compile(r'^[A-Za-z0-9_-]{1,64}$')
+PLAN_NAME = re.compile(r'^[a-z0-9_-]{1,32}$')
+PLAN_FEATURE = re.compile(r'^[a-z0-9_]{1,32}$')
+PLAN_FIELDS = {'plan', 'deployment', 'max_users', 'max_servers', 'features', 'grace_days'}
+INFO_FIELDS = {'tier', 'holder', 'issued_at', 'expires_at', 'max_servers', 'features'}
 FEATURES = {'free': ['basic_monitoring'], 'pro': ['basic_monitoring', 'management', 'alerts', 'backups'],
             'enterprise': ['basic_monitoring', 'management', 'alerts', 'backups', 'ldap', 'oauth', 'api_keys', 'unlimited_servers']}
 
@@ -99,7 +103,8 @@ def validate(claims):
     if claims['product'] != 'nabiman' or not isinstance(claims['license_id'], str) or not ID.fullmatch(claims['license_id']):
         raise ValueError('Invalid product or license ID')
     info = claims['info']
-    if not isinstance(info, dict) or set(info) != {'tier', 'holder', 'issued_at', 'expires_at', 'max_servers', 'features'}:
+    # `limits` (a plan) is optional: without it the licence is the older format, byte for byte.
+    if not isinstance(info, dict) or set(info) not in (INFO_FIELDS, INFO_FIELDS | {'limits'}):
         raise ValueError('Invalid license info fields')
     tier = info['tier']
     if tier not in FEATURES:
@@ -123,8 +128,33 @@ def validate(claims):
     limit = info['max_servers']
     if limit is not None and (type(limit) is not int or not 1 <= limit <= 4294967295):
         raise ValueError('Invalid server limit')
-    if tier == 'free' and limit != 1 or tier == 'pro' and (limit is None or limit > 10):
+    if 'limits' in info:
+        validate_plan(info['limits'], limit)
+    elif tier == 'free' and limit != 1 or tier == 'pro' and (limit is None or limit > 10):
         raise ValueError('Invalid server limit for tier')
+
+
+def count(value, name, low, high):
+    if value is not None and (type(value) is not int or not low <= value <= high):
+        raise ValueError(f'Invalid plan {name}')
+
+
+def validate_plan(plan, info_max_servers):
+    """The server's rules (license_plan.rs): a plan sets its own limits and grace."""
+    if not isinstance(plan, dict) or 'plan' not in plan or not set(plan) <= PLAN_FIELDS:
+        raise ValueError('Invalid plan fields')
+    if not isinstance(plan['plan'], str) or not PLAN_NAME.fullmatch(plan['plan']):
+        raise ValueError('Invalid plan name')
+    if plan.get('deployment') not in (None, 'installed', 'hosted'):
+        raise ValueError('Invalid plan deployment')
+    count(plan.get('max_users'), 'user limit', 1, 4294967295)
+    count(plan.get('max_servers'), 'server limit', 0, 4294967295)
+    count(plan.get('grace_days'), 'grace period', 0, 90)
+    if plan.get('max_servers') != info_max_servers:
+        raise ValueError('Plan server limit must match info.max_servers')
+    features = plan.get('features', [])
+    if not isinstance(features, list) or len(features) > 32 or len(set(features)) != len(features) or any(not isinstance(f, str) or not PLAN_FEATURE.fullmatch(f) for f in features):
+        raise ValueError('Invalid plan features')
 
 
 def issue(args):
