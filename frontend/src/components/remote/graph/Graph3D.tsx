@@ -10,6 +10,7 @@ import { richObject } from './view/richObjects';
 import { simpleObject } from './view/simpleObjects';
 import { arrowLength, LinkData, linkLook, linkShown, linkWidth, particleColor, particleCount, particleWidth, REPORT_COLOR, isOrder } from './view/linkStyle';
 import { addLights, addStars, flyTo } from './view/sceneSetup';
+import { reuseLinks, reuseNodes, visualKey, Placed } from './view/nodeReuse';
 import { watchContext } from './view/glContext';
 
 interface Props {
@@ -34,7 +35,7 @@ interface Props {
   fitKey?: string;
 }
 
-type N = GraphNode & { x?: number; y?: number; z?: number; fx?: number; fy?: number; fz?: number };
+type N = Placed;
 type L = LinkData & { source: string | N; target: string | N; note: string };
 
 /** Where the network's lowest tier stands above the lead, and the step between tiers. */
@@ -190,31 +191,33 @@ export default function Graph3D({ graph, selected, onSelect, onHoverEdge, settin
   useEffect(() => {
     const g = fg.current;
     if (!g) return;
-    // Keep where the nodes already are, so a refresh does not throw them about.
+    // Keep where the nodes already are, so a refresh does not throw them about; and keep the very objects of
+    // those that look the same, so their drawings are not thrown away and made again (see nodeReuse).
     const before = new Map<string, N>((g.graphData().nodes as N[]).map((n) => [n.id, n]));
+    const linksBefore = new Map<string, L>((g.graphData().links as L[]).map((l) => [l.id, l]));
     const deepest = Math.max(0, ...graph.nodes.map((n) => n.layer ?? 0));
-    const nodes: N[] = graph.nodes.map((n) => {
-      const old = before.get(n.id);
-      const next: N = { ...n, x: old?.x, y: old?.y, z: old?.z };
-      if (n.lead) { next.fx = 0; next.fy = 0; next.fz = 0; }
+    const style = look.current.settings.style;
+    const { nodes } = reuseNodes(before, graph.nodes, (n) => visualKey(n, deg.get(n.id) || 0, style));
+    for (const n of nodes) {
+      if (n.lead) { n.fx = 0; n.fy = 0; n.fz = 0; }
       // The network stands in tiers above the sessions: the internet on top, each hop inwards a step down.
-      if (n.kind === 'device') next.fy = BASE_Y + (deepest - (n.layer ?? deepest)) * TIER_GAP;
+      if (n.kind === 'device') n.fy = BASE_Y + (deepest - (n.layer ?? deepest)) * TIER_GAP;
       // With the network drawn, the machines stand in a tier of their own just under it (level with the lead),
       // each one's sessions hanging close below: left free, the tiers above pressed the busiest machine far down.
-      if (n.kind === 'server' && tiered) next.fy = SERVER_Y;
+      if (n.kind === 'server' && tiered) n.fy = SERVER_Y;
       // …and the sessions in a tier just under their machines, spread round them.
-      if (n.kind === 'session' && !n.lead && tiered) next.fy = SESSION_Y;
-      return next;
-    });
-    const links: L[] = graph.edges.map((e) => ({ id: e.id, source: e.from, target: e.to, live: e.live, strength: e.strength, color: e.color, note: e.note, kind: e.kind || 'order' }));
+      if (n.kind === 'session' && !n.lead && tiered) n.fy = SESSION_Y;
+    }
+    const made: L[] = graph.edges.map((e) => ({ id: e.id, source: e.from, target: e.to, live: e.live, strength: e.strength, color: e.color, note: e.note, kind: e.kind || 'order' }));
     // A hand-off's answer travels back along an unseen twin of its arrow.
     for (const e of graph.edges) {
-      if ((e.kind || 'order') === 'order') links.push({ id: `report>${e.id}`, source: e.to, target: e.from, live: false, strength: 0, color: REPORT_COLOR, note: '', kind: 'report' });
+      if ((e.kind || 'order') === 'order') made.push({ id: `report>${e.id}`, source: e.to, target: e.from, live: false, strength: 0, color: REPORT_COLOR, note: '', kind: 'report' });
     }
     // Sessions nothing reaches are tied to the centre by an unseen thread, so they orbit instead of drifting off.
     const hub = nodes.find((n) => n.lead) || nodes[0];
-    const tied = new Set(links.flatMap((l) => [l.source as string, l.target as string]));
-    if (hub) for (const n of nodes) if (n !== hub && !tied.has(n.id)) links.push({ id: `ghost>${n.id}`, source: hub.id, target: n.id, live: false, strength: 0, color: '#000000', note: '', kind: 'ghost' });
+    const tied = new Set(made.flatMap((l) => [l.source as string, l.target as string]));
+    if (hub) for (const n of nodes) if (n !== hub && !tied.has(n.id)) made.push({ id: `ghost>${n.id}`, source: hub.id, target: n.id, live: false, strength: 0, color: '#000000', note: '', kind: 'ghost' });
+    const { links } = reuseLinks(linksBefore, made, (l) => `${l.source}>${l.target}|${l.kind}|${l.live}|${l.strength.toFixed(2)}|${l.color}|${l.note}`);
     adj.current = adjacency(graph.edges.map((e) => ({ id: e.id, from: e.from, to: e.to })));
     fx.current?.keepOnly(new Set(nodes.map((n) => n.id)), new Set(links.map((l) => l.id)));
     g.graphData({ nodes, links });
