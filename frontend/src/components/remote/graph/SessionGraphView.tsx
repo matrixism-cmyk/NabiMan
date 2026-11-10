@@ -15,6 +15,7 @@ import { filterGraph, localSubset, searchMatches } from './view/graphFocus';
 import { useLightTheme, useReducedMotion } from './view/graphTheme';
 import { REPLAY_WINDOW } from './view/graphReplay';
 import { useReplay } from './view/useReplay';
+import { hasWebGL } from './view/webglProbe';
 import './session-graph.css';
 import { startVisibleInterval } from '../../../shared/ui/useVisibleInterval';
 
@@ -33,16 +34,6 @@ interface Props {
   links: SessionLink[];
   onAttach: (session: SessionInfo) => void;
   onPopOut: (session: SessionInfo) => void;
-}
-
-/** WebGL, which the 3D view needs; without it the 2D view is offered instead. */
-function hasWebGL() {
-  try {
-    const c = document.createElement('canvas');
-    return !!(c.getContext('webgl2') || c.getContext('webgl'));
-  } catch {
-    return false;
-  }
 }
 
 /** The sessions drawn as a graph (2D or 3D), with a panel for the one picked. */
