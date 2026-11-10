@@ -136,7 +136,8 @@ with tempfile.TemporaryDirectory(prefix='nabiman-tenant-transaction-') as tempor
                 env={**env, 'NABIMAN_DATA_DIR': str(second_auth)}, capture_output=True, timeout=15)
             assert second.returncode != 0
             assert b'exclusive MEC database ownership' in second.stderr
-            assert not second_auth.exists(), 'Second server must not initialize auth'
+            # Only the data directory lock may exist: no auth state is initialized.
+            assert not second_auth.exists() or [p.name for p in second_auth.iterdir()] == ['.lock'], 'Second server must not initialize auth'
             with sqlite3.connect(directory / 'mec.db') as db:
                 for name, state in [('orphan-pending', 'pending'), ('orphan-running', 'running')]:
                     kind = json.dumps({'kind': 'tenant_delete', 'tenant_id': 'tx-delete-fail'}, separators=(',', ':'))

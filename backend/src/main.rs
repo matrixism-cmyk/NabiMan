@@ -15,6 +15,7 @@ mod config_manager;
 mod containers;
 mod cors;
 mod cron;
+mod data_dir;
 mod database;
 mod diagnostics;
 mod disks;
@@ -166,6 +167,8 @@ async fn main() -> std::io::Result<()> {
     if unsafe { libc::prctl(libc::PR_SET_DUMPABLE, 0, 0, 0, 0) } != 0 {
         return Err(std::io::Error::last_os_error());
     }
+    // One server per data directory: taken before any store opens it, held until exit.
+    let _data_dir_lock = data_dir::prepare().inspect_err(|e| eprintln!("{e}"))?;
     let runtime_identity = web::Data::new(runtime_identity::RuntimeIdentity::capture()?);
     let mec_mode = mec::services::bootstrap::ServiceMode::from_env()
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
