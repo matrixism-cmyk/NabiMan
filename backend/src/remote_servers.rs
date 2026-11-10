@@ -66,7 +66,7 @@ pub fn server_password(srv: &RemoteServer) -> Option<String> {
     if srv.password_enc.is_empty() {
         return None;
     }
-    match secret_store::decrypt(&srv.password_enc) {
+    match secret_store::open(secret_store::Binding::server_password(&srv.id), &srv.password_enc) {
         Ok(pw) => Some(pw),
         Err(e) => {
             eprintln!(

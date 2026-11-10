@@ -35,7 +35,7 @@ pub fn rdp_login(id: &str) -> Option<(String, u16, String, String)> {
     let pw = if c.password_enc.is_empty() {
         String::new()
     } else {
-        crate::secret_store::decrypt(&c.password_enc).ok()?
+        crate::secret_store::open(crate::secret_store::Binding::console_password(&c.id), &c.password_enc).ok()?
     };
     Some((c.host, c.port, c.user, pw))
 }
@@ -96,13 +96,14 @@ pub fn create(label: &str, host: &str, port: u16, protocol: &str, user: &str, pa
     if list.len() >= 100 {
         return Err("콘솔은 최대 100개까지 등록할 수 있습니다".into());
     }
+    let id = format!("vnc_{}", uuid::Uuid::new_v4().simple());
     let console = Console {
-        id: format!("vnc_{}", uuid::Uuid::new_v4().simple()),
+        password_enc: seal(&id, &protocol, password)?,
+        id,
         label,
         host,
         port,
         user: user.trim().to_string(),
-        password_enc: seal(&protocol, password)?,
         protocol,
         owner_id: owner_id.to_string(),
     };
@@ -119,12 +120,12 @@ fn norm_protocol(p: &str) -> Result<String, String> {
     }
 }
 
-/// Encrypt a password for RDP; VNC consoles store none.
-fn seal(protocol: &str, password: &str) -> Result<String, String> {
+/// Encrypt console `id`'s password for RDP; VNC consoles store none.
+fn seal(id: &str, protocol: &str, password: &str) -> Result<String, String> {
     if protocol != "rdp" || password.is_empty() {
         return Ok(String::new());
     }
-    crate::secret_store::encrypt(password)
+    crate::secret_store::seal(crate::secret_store::Binding::console_password(id), password)
 }
 
 pub fn update(id: &str, label: &str, host: &str, port: u16, protocol: &str, user: &str, password: Option<&str>) -> Result<Console, String> {
@@ -140,7 +141,9 @@ pub fn update(id: &str, label: &str, host: &str, port: u16, protocol: &str, user
     if protocol != "rdp" {
         entry.password_enc.clear();
     } else if let Some(pw) = password {
-        entry.password_enc = seal(&protocol, pw)?;
+        entry.password_enc = seal(id, &protocol, pw)?;
+    } else if let Some(v2) = crate::secret_store::upgrade(crate::secret_store::Binding::console_password(id), &entry.password_enc) {
+        entry.password_enc = v2;
     }
     entry.protocol = protocol;
     let updated = entry.clone();
@@ -170,8 +173,9 @@ pub fn upsert_builtin(name: &str, label: &str, protocol: &str, host: &str, port:
     }
     let existing = list.iter().position(|c| c.id == name);
     let password_enc = match (password, existing.and_then(|i| list.get(i))) {
-        (Some(pw), _) => seal(&protocol, pw)?,
-        (None, Some(cur)) if protocol == "rdp" => cur.password_enc.clone(),
+        (Some(pw), _) => seal(name, &protocol, pw)?,
+        (None, Some(cur)) if protocol == "rdp" => crate::secret_store::upgrade(crate::secret_store::Binding::console_password(name), &cur.password_enc)
+            .unwrap_or_else(|| cur.password_enc.clone()),
         _ => String::new(),
     };
     let console = Console { id: name.into(), label: label.into(), host: host.trim().into(), port, protocol, user: user.trim().into(), password_enc, owner_id: String::new() };

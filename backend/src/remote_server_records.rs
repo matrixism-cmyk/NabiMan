@@ -53,10 +53,11 @@ pub(super) async fn add_server(
     if password.len() > 512 {
         return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error("Password too long"));
     }
+    let id = generate_id();
     let password_enc = if password.is_empty() {
         String::new()
     } else {
-        match secret_store::encrypt(password) {
+        match secret_store::seal(secret_store::Binding::server_password(&id), password) {
             Ok(enc) => enc,
             Err(e) => return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error(&e)),
         }
@@ -71,7 +72,7 @@ pub(super) async fn add_server(
     });
 
     let mut server = RemoteServer {
-        id: generate_id(),
+        id,
         name: body.name.clone(),
         host: body.host.clone(),
         port,
@@ -227,12 +228,15 @@ pub(super) async fn update_server(
             return HttpResponse::Ok()
                 .json(ApiResponse::<RemoteServer>::error("Password too long"));
         } else {
-            match secret_store::encrypt(password) {
+            match secret_store::seal(secret_store::Binding::server_password(&srv.id), password) {
                 Ok(enc) => srv.password_enc = enc,
                 Err(e) => return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error(&e)),
             }
         }
         srv.has_password = !srv.password_enc.is_empty();
+    } else if let Some(v2) = secret_store::upgrade(secret_store::Binding::server_password(&srv.id), &srv.password_enc) {
+        // A password from before bindings is re-encrypted with this save.
+        srv.password_enc = v2;
     }
     if let Err(e) = member_check(srv) {
         return HttpResponse::Ok().json(ApiResponse::<RemoteServer>::error(&e));

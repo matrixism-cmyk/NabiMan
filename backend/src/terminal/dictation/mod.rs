@@ -72,7 +72,9 @@ impl Settings {
         if self.language.is_empty() { "korean" } else { &self.language }
     }
     pub fn key(&self) -> Option<String> {
-        (!self.key_enc.is_empty()).then(|| crate::secret_store::decrypt(&self.key_enc).ok()).flatten()
+        (!self.key_enc.is_empty())
+            .then(|| crate::secret_store::open(crate::secret_store::Binding::dictation_key(), &self.key_enc).ok())
+            .flatten()
     }
 }
 
@@ -202,11 +204,14 @@ async fn put_settings(req: HttpRequest, body: web::Json<Change>) -> HttpResponse
         } else if !valid_key(key) {
             return bad("An API key starts with vk_");
         } else {
-            match crate::secret_store::encrypt(key) {
+            match crate::secret_store::seal(crate::secret_store::Binding::dictation_key(), key) {
                 Ok(enc) => s.key_enc = enc,
                 Err(e) => return HttpResponse::InternalServerError().json(ApiResponse::<()>::error(&e)),
             }
         }
+    } else if let Some(v2) = crate::secret_store::upgrade(crate::secret_store::Binding::dictation_key(), &s.key_enc) {
+        // A key from before bindings is re-encrypted with this save.
+        s.key_enc = v2;
     }
     match save(&s) {
         Ok(()) => get_settings(req).await,
