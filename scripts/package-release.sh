@@ -39,6 +39,10 @@ python3 "$repo_root/scripts/release-inventory.py" generate --source "$repo_root"
     --licenses "$stage/nabiman/licenses.json"
 cp "$repo_root/LICENSE" "$stage/nabiman/LICENSE"
 install -m 644 "$repo_root/nabiman.service" "$stage/nabiman/nabiman.service"
+# The version names the install directory (/usr/local/lib/nabiman/<version>).
+version=${NABIMAN_VERSION:-$(git -C "$repo_root" describe --tags --always --dirty 2>/dev/null || echo 0.0.0-dev)}
+if ! [[ "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$ ]]; then echo "Invalid release version: $version" >&2; exit 1; fi
+printf '%s\n' "$version" > "$stage/nabiman/VERSION"
 cp "$binary" "$stage/nabiman/nabiman-server"
 cp "$helper" "$stage/nabiman/nabiman-privileged-helper"
 install -m 755 "$recovery" "$stage/nabiman/nabiman-recovery"

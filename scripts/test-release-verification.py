@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import hashlib,importlib.util,io,json,pathlib,tarfile,tempfile,unittest
 spec=importlib.util.spec_from_file_location('verify',pathlib.Path(__file__).with_name('verify-release.py'));v=importlib.util.module_from_spec(spec);spec.loader.exec_module(v)
-REQUIRED=['nabiman-server','nabiman-privileged-helper','nabiman-recovery','management-recovery.py','verify-release.py','static/index.html','static/release-inventory.json','static/release-bom.cdx.json','LICENSE','NOTICE','THIRD_PARTY_LICENSES.md']
+REQUIRED=['nabiman-server','nabiman-privileged-helper','nabiman-recovery','management-recovery.py','verify-release.py','static/index.html','static/release-inventory.json','static/release-bom.cdx.json','LICENSE','NOTICE','THIRD_PARTY_LICENSES.md','VERSION','nabiman.service','packaging/nabiman-update']
 class Verification(unittest.TestCase):
  def archive(self,root,mutation=None):
   contents={'nabiman/'+name:b'fixture' for name in REQUIRED};entries={k:{'sha256':hashlib.sha256(b).hexdigest(),'size':len(b),'mode':0o755} for k,b in contents.items()}

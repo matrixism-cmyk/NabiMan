@@ -23,16 +23,16 @@ set -euo pipefail
 #   -h, --help
 #
 # Layout (docs/release/README.md):
+#   /usr/local/lib/nabiman/<version>/  each installed release; current -> the one in use
 #   /usr/local/bin/nabiman-server, nabiman-privileged-helper, nabiman-recovery,
-#     management-recovery.py           programs
-#   /usr/local/share/nabiman/static    web interface
+#     management-recovery.py, nabiman-update   links into current/
+#   /usr/local/share/nabiman/static    link to current/static (web interface)
 #   /var/lib/nabiman                   data (users, keys, databases)
 #   /etc/nabiman                       nabiman.env (local settings), release.pub
 #   /etc/systemd/system/nabiman.service
 
 REPO="${NABIMAN_REPO:-matrixism-cmyk/NabiMan}"
-INSTALL_DIR="/usr/local/bin"
-STATIC_DIR="/usr/local/share/nabiman/static"
+LIB_DIR="/usr/local/lib/nabiman"
 DATA_DIR="/var/lib/nabiman"
 CONFIG_DIR="/etc/nabiman"
 SERVICE_FILE="/etc/systemd/system/nabiman.service"
@@ -154,7 +154,9 @@ if [ -z "$BASE_URL" ]; then
         BASE_URL="https://github.com/$REPO/releases/download/$VERSION"
     fi
 fi
-STAGE=$(mktemp -d)
+# Staged next to the versions, so the verified package moves into place in one rename.
+mkdir -p "$LIB_DIR"
+STAGE=$(mktemp -d "$LIB_DIR/.install.XXXXXX")
 trap 'rm -rf "$STAGE"' EXIT
 if [ -n "$LOCAL_ARCHIVE" ]; then
     cp "$LOCAL_ARCHIVE" "$STAGE/$ASSET"
@@ -272,7 +274,7 @@ with tarfile.open(sys.argv[1],'r:gz') as package:
 PYEXTRACT
 python3 "$STAGE/verify-release.py" "$STAGE/$ASSET" --extract-to "$STAGE/verified"
 PAYLOAD="$STAGE/verified/nabiman"
-if [ ! -x "$PAYLOAD/nabiman-server" ] || [ ! -f "$PAYLOAD/static/index.html" ] || [ ! -f "$PAYLOAD/nabiman.service" ]; then
+if [ ! -x "$PAYLOAD/nabiman-server" ] || [ ! -f "$PAYLOAD/static/index.html" ] || [ ! -f "$PAYLOAD/nabiman.service" ] || [ ! -f "$PAYLOAD/VERSION" ]; then
     echo "Release package is missing the server, web interface or service unit." >&2
     exit 1
 fi
@@ -293,39 +295,13 @@ if [ ! -e "$DATA_DIR/users.json" ]; then
     fi
 fi
 
-# Install
-mkdir -p "$INSTALL_DIR" "$(dirname "$STATIC_DIR")" "$DATA_DIR"
-BIN_STAGE=$(mktemp "$INSTALL_DIR/.nabiman-server.XXXXXX")
-STATIC_STAGE=$(mktemp -d "$(dirname "$STATIC_DIR")/.nabiman-static.XXXXXX")
-install -m 755 "$PAYLOAD/nabiman-server" "$BIN_STAGE"
-cp -a "$PAYLOAD/static/." "$STATIC_STAGE/"
-
-STATIC_BACKUP=""
-if [ -d "$STATIC_DIR" ]; then
-    STATIC_BACKUP=$(mktemp -d "$(dirname "$STATIC_DIR")/.nabiman-static-backup.XXXXXX")
-    rmdir "$STATIC_BACKUP"
-    mv "$STATIC_DIR" "$STATIC_BACKUP"
-fi
-if ! mv "$STATIC_STAGE" "$STATIC_DIR"; then
-    if [ -n "$STATIC_BACKUP" ]; then mv "$STATIC_BACKUP" "$STATIC_DIR"; fi
-    echo "Could not install web interface." >&2
-    exit 1
-fi
-if ! mv -f "$BIN_STAGE" "$INSTALL_DIR/nabiman-server"; then
-    rm -rf "$STATIC_DIR"
-    if [ -n "$STATIC_BACKUP" ]; then mv "$STATIC_BACKUP" "$STATIC_DIR"; fi
-    echo "Could not install server binary." >&2
-    exit 1
-fi
-# The root helper (not enabled: Phase 4 moves the API to a non-root user and
-# starts it then) and the offline recovery tools.
-for TOOL in nabiman-privileged-helper nabiman-recovery management-recovery.py; do
-    [ -f "$PAYLOAD/$TOOL" ] || continue
-    TOOL_STAGE=$(mktemp "$INSTALL_DIR/.nabiman-tool.XXXXXX")
-    install -m 755 "$PAYLOAD/$TOOL" "$TOOL_STAGE"
-    mv -f "$TOOL_STAGE" "$INSTALL_DIR/$TOOL"
-done
-if [ -n "$STATIC_BACKUP" ]; then rm -rf "$STATIC_BACKUP"; fi
+# Install: the package becomes /usr/local/lib/nabiman/<version>, and the fixed
+# paths (/usr/local/bin/..., /usr/local/share/nabiman/static) link to
+# .../current. An older unversioned install is kept as a version of its own.
+# nabiman-update does the same for later releases (and rolls back).
+mkdir -p "$DATA_DIR" "$CONFIG_DIR"
+chmod 700 "$DATA_DIR"
+bash "$PAYLOAD/packaging/nabiman-update" --from-verified-dir "$PAYLOAD" --keep 3
 # Later updates check signatures with this key (not with one they download).
 mkdir -p "$CONFIG_DIR"
 if [ "$NABIMAN_RELEASE_PUBKEY" != "PLACEHOLDER" ]; then
@@ -339,10 +315,10 @@ if [ -n "${BOOTSTRAP_PASSWORD:-}" ]; then
 fi
 
 # systemd unit, from the package (its comments explain each setting).
-if [ -f "$SERVICE_FILE" ] && ! cmp -s "$PAYLOAD/nabiman.service" "$SERVICE_FILE"; then
+if [ -f "$SERVICE_FILE" ] && ! cmp -s "$LIB_DIR/current/nabiman.service" "$SERVICE_FILE"; then
     cp -p "$SERVICE_FILE" "$SERVICE_FILE.bak.$(date +%Y%m%d-%H%M%S)"
 fi
-install -m 644 "$PAYLOAD/nabiman.service" "$SERVICE_FILE"
+install -m 644 "$LIB_DIR/current/nabiman.service" "$SERVICE_FILE"
 if [ ! -e "$CONFIG_DIR/nabiman.env" ]; then
     install -m 600 /dev/null "$CONFIG_DIR/nabiman.env"
     printf '# Local settings for nabiman.service, e.g.\n# NABIMAN_PORT=8080\n' > "$CONFIG_DIR/nabiman.env"
@@ -354,6 +330,8 @@ systemctl enable nabiman
 echo ""
 echo "=== NabiMan installed ==="
 echo "Start/restart: systemctl restart nabiman"
+echo "Update:  nabiman-update        (signed, health-checked, rolls back by itself)"
+echo "Rollback: nabiman-update --rollback"
 echo "Status:  systemctl status nabiman"
 PORT=$(sed -n 's/^NABIMAN_PORT=//p' "$CONFIG_DIR/nabiman.env" | tail -n1)
 echo "Access:  http://$(hostname -I | awk '{print $1}'):${PORT:-8080}"

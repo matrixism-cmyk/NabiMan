@@ -1,0 +1,274 @@
+#!/usr/bin/env bash
+# nabiman-update: install a signed NabiMan release side by side, switch to it,
+# check that it answers, and switch back by itself when it does not.
+#
+#   nabiman-update [--version vX.Y.Z | --archive FILE [--signature FILE]]
+#                  [--base-url URL] [--keep N] [--no-restart] [--allow-downgrade]
+#                  [--health-url URL] [--health-timeout SECONDS]
+#   nabiman-update --rollback     back to the previous version (restart + check)
+#   nabiman-update --list         installed versions
+#
+# Layout (the paths in the systemd unit never change; they are links):
+#   /usr/local/lib/nabiman/<version>/        one verified package per version
+#   /usr/local/lib/nabiman/current           -> <version>   (what runs)
+#   /usr/local/lib/nabiman/previous          -> <version>   (what --rollback returns to)
+#   /usr/local/bin/nabiman-server, nabiman-privileged-helper, nabiman-recovery,
+#     management-recovery.py, nabiman-update  -> current/...
+#   /usr/local/share/nabiman/static          -> current/static
+#   /etc/nabiman/release.pub                 release signing key (from install.sh)
+#   /var/lib/nabiman                         data: never touched here
+#
+# Trust: a download is checked with the verify-release.py of the version that is
+# running now and the key in /etc/nabiman/release.pub, never with code or keys
+# from the download. Unsigned packages are refused unless --insecure-skip-verify.
+#
+# Environment (tests, unusual hosts): NABIMAN_PREFIX (default empty: "/"),
+# NABIMAN_REPO, NABIMAN_RELEASE_BASE, NABIMAN_SERVICE (default nabiman),
+# NABIMAN_RESTART_CMD (default: systemctl restart $NABIMAN_SERVICE).
+set -euo pipefail
+
+PREFIX=${NABIMAN_PREFIX:-}
+LIB=$PREFIX/usr/local/lib/nabiman
+BIN=$PREFIX/usr/local/bin
+SHARE=$PREFIX/usr/local/share/nabiman
+CONF=$PREFIX/etc/nabiman
+REPO=${NABIMAN_REPO:-matrixism-cmyk/NabiMan}
+SERVICE=${NABIMAN_SERVICE:-nabiman}
+RESTART_CMD=${NABIMAN_RESTART_CMD:-}
+LINKED=(nabiman-server nabiman-privileged-helper nabiman-recovery management-recovery.py)
+
+ACTION=update; VERSION=latest; BASE_URL=${NABIMAN_RELEASE_BASE:-}; ARCHIVE=""; SIGNATURE=""
+KEEP=3; RESTART=1; DOWNGRADE=0; SKIP_VERIFY=0; HEALTH_URL=""; HEALTH_TIMEOUT=60; FROM_DIR=""
+
+say() { printf 'nabiman-update: %s\n' "$*"; }
+die() { printf 'nabiman-update: %s\n' "$*" >&2; exit 1; }
+usage() { sed -n '2,27p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --version) VERSION=${2:?}; shift 2 ;;
+        --base-url) BASE_URL=${2:?}; shift 2 ;;
+        --archive) ARCHIVE=${2:?}; shift 2 ;;
+        --signature) SIGNATURE=${2:?}; shift 2 ;;
+        --keep) KEEP=${2:?}; shift 2 ;;
+        --no-restart) RESTART=0; shift ;;
+        --allow-downgrade) DOWNGRADE=1; shift ;;
+        --insecure-skip-verify) SKIP_VERIFY=1; shift ;;
+        --health-url) HEALTH_URL=${2:?}; shift 2 ;;
+        --health-timeout) HEALTH_TIMEOUT=${2:?}; shift 2 ;;
+        --rollback) ACTION=rollback; shift ;;
+        --list) ACTION=list; shift ;;
+        # install.sh: place a package it has already verified and extracted.
+        --from-verified-dir) ACTION=place; FROM_DIR=${2:?}; shift 2 ;;
+        -h|--help) usage; exit 0 ;;
+        *) die "unknown option $1 (see --help)" ;;
+    esac
+done
+case "$KEEP" in ''|*[!0-9]*) die "--keep must be a number" ;; esac
+[ "$KEEP" -ge 2 ] || die "--keep must be at least 2 (current and previous)"
+
+valid_version() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$ ]]; }
+current_version() { [ -L "$LIB/current" ] && basename "$(readlink "$LIB/current")"; }
+previous_version() { [ -L "$LIB/previous" ] && basename "$(readlink "$LIB/previous")"; }
+relink() { # name target: atomic replacement of a symlink
+    ln -sfn "$2" "$1.new.$$" && mv -Tf "$1.new.$$" "$1"
+}
+
+# Points current (and the fixed paths) at a version; previous at what ran before.
+switch_to() {
+    local target=$1 before
+    before=$(current_version || true)
+    relink "$LIB/current" "$target"
+    if [ -n "$before" ] && [ "$before" != "$target" ]; then relink "$LIB/previous" "$before"; fi
+    mkdir -p "$BIN" "$SHARE"
+    for name in "${LINKED[@]}"; do
+        if [ -e "$LIB/current/$name" ]; then relink "$BIN/$name" "$LIB/current/$name"; fi
+    done
+    relink "$BIN/nabiman-update" "$LIB/current/packaging/nabiman-update"
+    relink "$SHARE/static" "$LIB/current/static"
+    touch "$LIB/$target"
+}
+
+# A pre-versioned install (plain files from an older install.sh) becomes a
+# version of its own, so --rollback can still return to it.
+adopt_legacy() {
+    [ -f "$BIN/nabiman-server" ] && [ ! -L "$BIN/nabiman-server" ] || return 0
+    local dir
+    dir="legacy-$(date +%Y%m%d-%H%M%S)"
+    say "keeping the existing (unversioned) install as $dir"
+    mkdir -p "$LIB/$dir/packaging"
+    for name in "${LINKED[@]}"; do
+        if [ -f "$BIN/$name" ] && [ ! -L "$BIN/$name" ]; then mv "$BIN/$name" "$LIB/$dir/$name"; fi
+    done
+    if [ -d "$SHARE/static" ] && [ ! -L "$SHARE/static" ]; then mv "$SHARE/static" "$LIB/$dir/static"; fi
+    # The old install had no updater: give it this one so the links stay whole.
+    install -m 755 "${BASH_SOURCE[0]}" "$LIB/$dir/packaging/nabiman-update"
+    echo "$dir" > "$LIB/$dir/VERSION"
+    relink "$LIB/current" "$dir"
+}
+
+# Moves an extracted, verified package (DIR/nabiman/...) into LIB/<version>.
+place() {
+    local payload=$1 version
+    [ -x "$payload/nabiman-server" ] && [ -f "$payload/static/index.html" ] || die "package is missing the server or web interface"
+    version=$(tr -d '[:space:]' < "$payload/VERSION" 2>/dev/null || true)
+    valid_version "${version:-}" || die "package has no valid VERSION file"
+    mkdir -p "$LIB"
+    adopt_legacy
+    if [ -e "$LIB/$version" ]; then
+        if [ "$(current_version || true)" = "$version" ]; then say "$version is already installed and current"; PLACED=""; return 0; fi
+        say "$version is already installed; switching to it"
+        PLACED=$version; return 0
+    fi
+    mv -T "$payload" "$LIB/$version"
+    PLACED=$version
+}
+
+health_ok() {
+    local base=$1 code
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$base/api/healthz" || true)
+    [ "$code" = 200 ] && return 0
+    # No health route: the web UI must load and the API must answer for itself
+    # (401 without a login), not fall through to the UI's index page.
+    curl -fs --max-time 5 "$base/" 2>/dev/null | grep -qi '<html' || return 1
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$base/api/server/status" || true)
+    [ "$code" = 401 ] || [ "$code" = 200 ]
+}
+
+# The service runs the expected binary and answers within the timeout.
+check_running() {
+    local version=$1 base=$HEALTH_URL deadline pid exe port
+    if [ -z "$base" ]; then
+        port=$(sed -n 's/^NABIMAN_PORT=//p' "$CONF/nabiman.env" 2>/dev/null | tail -n1)
+        base="http://127.0.0.1:${port:-8080}"
+    fi
+    deadline=$((SECONDS + HEALTH_TIMEOUT))
+    while [ "$SECONDS" -lt "$deadline" ]; do
+        if [ -z "$RESTART_CMD" ] && command -v systemctl >/dev/null; then
+            pid=$(systemctl show -p MainPID --value "$SERVICE" 2>/dev/null || echo 0)
+            exe=$(readlink -f "/proc/$pid/exe" 2>/dev/null || true)
+            if [ "${pid:-0}" != 0 ] && [ "$exe" != "$(readlink -f "$LIB/$version/nabiman-server")" ]; then sleep 1; continue; fi
+        fi
+        if health_ok "$base"; then return 0; fi
+        sleep 1
+    done
+    return 1
+}
+
+restart() {
+    if [ -n "$RESTART_CMD" ]; then bash -c "$RESTART_CMD"; return; fi
+    if systemctl is-enabled --quiet nabiman-privileged-helper 2>/dev/null; then systemctl restart nabiman-privileged-helper; fi
+    systemctl restart "$SERVICE"
+}
+
+# Keeps the newest KEEP versions (by last activation), and always current and previous.
+prune() {
+    local cur prev n=0 dir name
+    cur=$(current_version || true); prev=$(previous_version || true)
+    while IFS= read -r dir; do
+        name=$(basename "$dir")
+        if [ "$name" = "$cur" ] || [ "$name" = "$prev" ]; then n=$((n + 1)); continue; fi
+        if [ "$n" -lt "$KEEP" ]; then n=$((n + 1)); continue; fi
+        say "removing old version $name"
+        rm -rf -- "${dir:?}"
+    done < <(find "$LIB" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%T@ %p\n' | sort -rn | cut -d' ' -f2-)
+}
+
+# Switch, restart, check; on failure switch back, restart, check again.
+activate() {
+    local version=$1 before prev_before
+    before=$(current_version || true); prev_before=$(previous_version || true)
+    switch_to "$version"
+    say "switched to $version${before:+ (was $before)}"
+    [ "$RESTART" -eq 1 ] || { say "not restarted (--no-restart): run 'systemctl restart $SERVICE'"; return 0; }
+    restart
+    if check_running "$version"; then say "$version is up and answering"; return 0; fi
+    say "$version did not come up healthy within ${HEALTH_TIMEOUT}s"
+    [ -n "$before" ] || die "nothing to roll back to"
+    switch_to "$before"
+    # previous must not become the version that just failed.
+    if [ -n "$prev_before" ]; then relink "$LIB/previous" "$prev_before"; else rm -f "$LIB/previous"; fi
+    restart
+    if check_running "$before"; then die "rolled back to $before (it answers); $version stays installed for inspection"; fi
+    die "rolled back to $before, but it does not answer either: check 'journalctl -u $SERVICE'"
+}
+
+fetch_and_verify() {
+    local arch asset stage verifier
+    case "$(uname -m)" in x86_64) arch=x86_64 ;; aarch64|arm64) arch=aarch64 ;; *) die "unsupported architecture $(uname -m)" ;; esac
+    asset="nabiman-linux-$arch.tar.gz"
+    stage=$(mktemp -d "$LIB/.update.XXXXXX"); STAGE=$stage
+    if [ -n "$ARCHIVE" ]; then
+        cp "$ARCHIVE" "$stage/$asset"
+        SIGNATURE=${SIGNATURE:-$ARCHIVE.minisig}
+        if [ -f "$SIGNATURE" ]; then cp "$SIGNATURE" "$stage/$asset.minisig"; fi
+    else
+        if [ -z "$BASE_URL" ]; then
+            if [ "$VERSION" = latest ]; then BASE_URL="https://github.com/$REPO/releases/latest/download"
+            else BASE_URL="https://github.com/$REPO/releases/download/$VERSION"; fi
+        fi
+        say "downloading $asset ($VERSION) from $BASE_URL"
+        curl -fL --retry 3 --silent --show-error "$BASE_URL/$asset" -o "$stage/$asset"
+        curl -fL --retry 3 --silent --show-error "$BASE_URL/$asset.minisig" -o "$stage/$asset.minisig" || true
+    fi
+    verifier="$LIB/current/verify-release.py"
+    [ -f "$verifier" ] || die "no installed verify-release.py ($verifier): reinstall with install.sh"
+    if [ "$SKIP_VERIFY" -eq 1 ]; then
+        say "WARNING: --insecure-skip-verify: the publisher is NOT checked"
+        python3 "$verifier" "$stage/$asset" --extract-to "$stage/out" >/dev/null
+    else
+        [ -f "$CONF/release.pub" ] || die "no release key in $CONF/release.pub: reinstall with a release's install.sh"
+        python3 "$verifier" "$stage/$asset" --public-key-file "$CONF/release.pub" --require-signature \
+            --extract-to "$stage/out" > "$stage/result.json" || die "refusing an unsigned or mismatched package"
+        say "signature OK: $(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("trusted_comment",""))' "$stage/result.json")"
+    fi
+}
+
+older_than_current() { # new version older than what runs?
+    local cur
+    cur=$(current_version || true)
+    [ -n "$cur" ] && [ "$cur" != "$1" ] && [ "$(printf '%s\n%s\n' "${cur#v}" "${1#v}" | sort -V | tail -n1)" = "${cur#v}" ]
+}
+
+STAGE=""; PLACED=""
+cleanup() { if [ -n "$STAGE" ]; then rm -rf -- "$STAGE"; fi; }
+trap cleanup EXIT
+
+case "$ACTION" in
+    list)
+        cur=$(current_version || true); prev=$(previous_version || true)
+        find "$LIB" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%T@ %f\n' 2>/dev/null | sort -rn | while read -r _ name; do
+            mark=""; [ "$name" = "$cur" ] && mark=" (current)"; [ "$name" = "$prev" ] && mark=" (previous)"
+            echo "$name$mark"
+        done ;;
+    place)
+        [ "$(id -u)" -eq 0 ] || [ -n "$PREFIX" ] || die "run as root"
+        place "$FROM_DIR"
+        if [ -n "$PLACED" ]; then switch_to "$PLACED"; say "installed $PLACED"; else switch_to "$(current_version)"; fi
+        prune ;;
+    rollback)
+        [ "$(id -u)" -eq 0 ] || [ -n "$PREFIX" ] || die "run as root"
+        prev=$(previous_version || true)
+        [ -n "$prev" ] && [ -d "$LIB/$prev" ] || die "no previous version to roll back to (see --list)"
+        cur=$(current_version || true)
+        switch_to "$prev"
+        say "rolled back to $prev (was $cur)"
+        if [ "$RESTART" -eq 1 ]; then
+            restart
+            check_running "$prev" || die "$prev does not answer either: check 'journalctl -u $SERVICE'"
+            say "$prev is up and answering"
+        fi ;;
+    update)
+        [ "$(id -u)" -eq 0 ] || [ -n "$PREFIX" ] || die "run as root"
+        [ -L "$LIB/current" ] || die "no versioned install in $LIB: install with install.sh first"
+        fetch_and_verify
+        new=$(tr -d '[:space:]' < "$STAGE/out/nabiman/VERSION" 2>/dev/null || true)
+        valid_version "${new:-}" || die "package has no valid VERSION file"
+        if [ "$new" = "$(current_version)" ]; then say "$new is already current"; exit 0; fi
+        if older_than_current "$new" && [ "$DOWNGRADE" -eq 0 ]; then
+            die "$new is older than $(current_version); pass --allow-downgrade (or use --rollback)"
+        fi
+        place "$STAGE/out/nabiman"
+        activate "$PLACED"
+        prune ;;
+esac

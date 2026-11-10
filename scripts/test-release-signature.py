@@ -11,7 +11,7 @@ try:
  from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
  from cryptography.hazmat.primitives import serialization
 except ImportError:Ed25519PrivateKey=None
-REQUIRED=['nabiman-server','nabiman-privileged-helper','nabiman-recovery','management-recovery.py','verify-release.py','static/index.html','static/release-inventory.json','static/release-bom.cdx.json','LICENSE','NOTICE','THIRD_PARTY_LICENSES.md']
+REQUIRED=['nabiman-server','nabiman-privileged-helper','nabiman-recovery','management-recovery.py','verify-release.py','static/index.html','static/release-inventory.json','static/release-bom.cdx.json','LICENSE','NOTICE','THIRD_PARTY_LICENSES.md','VERSION','nabiman.service','packaging/nabiman-update']
 def fixture(path):
  contents={'nabiman/'+n:b'fixture' for n in REQUIRED}
  manifest={'schema_version':1,'kind':'unsigned-package-file-manifest','files':{k:{'sha256':hashlib.sha256(b).hexdigest(),'size':len(b),'mode':0o755} for k,b in contents.items()}}
