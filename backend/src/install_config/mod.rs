@@ -18,6 +18,8 @@ mod file;
 pub(crate) mod settings;
 pub(crate) mod values;
 #[cfg(test)]
+mod docs_tests;
+#[cfg(test)]
 mod settings_tests;
 #[cfg(test)]
 mod tests;

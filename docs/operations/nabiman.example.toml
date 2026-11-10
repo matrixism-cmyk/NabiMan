@@ -1,0 +1,54 @@
+# NabiMan settings — an example. Copy to /etc/nabiman/nabiman.toml (or to
+# <data dir>/nabiman.toml), owned by root and not writable by others:
+#   install -o root -g root -m 0644 nabiman.example.toml /etc/nabiman/nabiman.toml
+#
+# Every key is a NABIMAN_* environment variable (port → NABIMAN_PORT,
+# [dictation] url → NABIMAN_DICTATION_URL); an environment variable always
+# wins over this file. Everything here is optional: left out, the default
+# shown applies. Do not put passwords or tokens here — see
+# docs/operations/configuration.md for where secrets go.
+
+# Where things are
+# port = 8080
+# static = "/usr/share/nabiman/static"
+# data_dir = "/var/lib/nabiman"        # only in /etc/nabiman/nabiman.toml
+
+# The web
+# product_name = "NabiMan"
+# trusted_proxies = ["127.0.0.1", "::1"]
+# hsts = true
+
+# Feedback widget: off unless both are set
+# feedback_origin = "https://feedback.example.com"
+# feedback_site = "your-site-id"
+# feedback_script = "/fixhub-admin.js"
+
+# External programs (found on PATH and in the usual places when unset)
+# soffice = "/opt/libreoffice26.2/program/soffice.bin"
+# rhwp = "/usr/local/bin/rhwp"
+# preview_fonts = "/usr/local/share/fonts/noto-kr"
+# claude = "/usr/local/bin/claude"
+# guacd_addr = "127.0.0.1:4822"
+# serial_group = "dialout"
+
+# Certificates: required to issue new Let's Encrypt certificates
+# letsencrypt_email = "ops@example.com"
+
+# On-call contact in the MEC NOC alert band
+# noc_contact = "noc@example.com"
+
+# Tables come last: every key after [name] belongs to it.
+
+# Speech service for dictation: off until set (here or in the settings screen)
+[dictation]
+# url = "https://speech.example.com"
+
+# DNS health check on the DNS screen: skipped unless a name is set
+[dns_check]
+# domain = "example.com"
+# expect = "192.0.2.10"
+
+# MEC
+[mec]
+# mode = "auto"
+# lb_pools = ["tenant=10.0.0.151-10.0.0.200 auto", "reserved=10.0.0.231-10.0.0.238"]
