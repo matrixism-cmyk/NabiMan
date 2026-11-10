@@ -30,6 +30,7 @@ import usersDetail from './users-detail';
 import usersAccess from './users-access';
 import usersGrants from './users-grants';
 import usersScope from './users-scope';
+import scope from './scope';
 
 export type { Lang };
 export { LANG_LABELS } from '../../shared/i18n';
@@ -66,6 +67,7 @@ const translations: Translations = {
   ...usersAccess,
   ...usersGrants,
   ...usersScope,
+  ...scope,
 };
 
 export default translations;
