@@ -10,6 +10,7 @@ import { richObject } from './view/richObjects';
 import { simpleObject } from './view/simpleObjects';
 import { arrowLength, LinkData, linkLook, linkShown, linkWidth, particleColor, particleCount, particleWidth, REPORT_COLOR, isOrder } from './view/linkStyle';
 import { addLights, addStars, flyTo } from './view/sceneSetup';
+import { watchContext } from './view/glContext';
 
 interface Props {
   graph: Graph;
@@ -125,9 +126,13 @@ export default function Graph3D({ graph, selected, onSelect, onHoverEdge, settin
     addLights(scene);
     stars.current = addStars(scene);
     fg.current = g;
+    // Should the browser take the context back (too many open, a GPU reset), the canvas stays blank until it
+    // returns: let it be given back, and redraw everything then.
+    const unwatch = watchContext(g.renderer().domElement, () => effects.touch(true));
     // For looking at the layout from the browser's console (and the screenshot check).
     (el as any).__graph = g;
     (el as any).__fx = effects;
+    (el as any).__gl = unwatch.counts;
 
     const move = (e: MouseEvent) => { pointer.current = { x: e.clientX, y: e.clientY }; };
     el.addEventListener('mousemove', move);
@@ -143,6 +148,7 @@ export default function Graph3D({ graph, selected, onSelect, onHoverEdge, settin
     frame = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(frame);
+      unwatch();
       watch.disconnect();
       el.removeEventListener('mousemove', move);
       g._destructor?.();
