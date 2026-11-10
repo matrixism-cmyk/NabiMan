@@ -62,6 +62,7 @@ mod service_registry;
 mod services;
 mod session_management;
 mod sessions;
+mod sqlite_schema;
 mod ssh_auth;
 mod ssh_cert;
 mod ssh_keys;

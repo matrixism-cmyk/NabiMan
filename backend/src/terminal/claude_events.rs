@@ -27,9 +27,19 @@ static DB: Mutex<Option<Connection>> = Mutex::new(None);
 fn open(path: &std::path::Path) -> rusqlite::Result<Connection> {
     let db = Connection::open(path)?;
     let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+    // Journal mode cannot change inside the migration's transaction.
+    db.execute_batch("PRAGMA journal_mode=WAL;")?;
+    SCHEMA.migrate(&db)?;
+    Ok(db)
+}
+
+/// Versions of `claude-events.sqlite3` (see `sqlite_schema`); append, never edit.
+pub(crate) const SCHEMA: crate::sqlite_schema::Schema =
+    crate::sqlite_schema::Schema { name: "claude-events.sqlite3", steps: &[schema_v1] };
+
+fn schema_v1(db: &Connection) -> rusqlite::Result<()> {
     db.execute_batch(
-        "PRAGMA journal_mode=WAL;
-         CREATE TABLE IF NOT EXISTS claude_events(
+        "CREATE TABLE IF NOT EXISTS claude_events(
            id INTEGER PRIMARY KEY AUTOINCREMENT,
            at INTEGER NOT NULL,
            from_card TEXT NOT NULL,
@@ -40,14 +50,15 @@ fn open(path: &std::path::Path) -> rusqlite::Result<Connection> {
            UNIQUE(at, from_card, to_card, text)
          );
          CREATE INDEX IF NOT EXISTS claude_events_at ON claude_events(at);",
-    )?;
-    Ok(db)
+    )
 }
 
 fn with_db<T>(f: impl FnOnce(&Connection) -> rusqlite::Result<T>) -> Option<T> {
     let mut slot = DB.lock_safe();
     if slot.is_none() {
-        *slot = open(&nabiman_server::data_dir().join("claude-events.sqlite3")).ok();
+        *slot = open(&nabiman_server::data_dir().join("claude-events.sqlite3"))
+            .map_err(|e| crate::sqlite_schema::report_once(SCHEMA.name, &e))
+            .ok();
     }
     slot.as_ref().and_then(|db| f(db).ok())
 }

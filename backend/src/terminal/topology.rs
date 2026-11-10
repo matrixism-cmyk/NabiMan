@@ -105,18 +105,28 @@ static DB: Mutex<Option<Connection>> = Mutex::new(None);
 fn open(path: &std::path::Path) -> rusqlite::Result<Connection> {
     let db = Connection::open(path)?;
     let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+    SCHEMA.migrate(&db)?;
+    Ok(db)
+}
+
+/// Versions of `topology.sqlite3` (see `sqlite_schema`); append, never edit.
+pub(crate) const SCHEMA: crate::sqlite_schema::Schema =
+    crate::sqlite_schema::Schema { name: "topology.sqlite3", steps: &[schema_v1] };
+
+fn schema_v1(db: &Connection) -> rusqlite::Result<()> {
     db.execute_batch(
         "CREATE TABLE IF NOT EXISTS topo_devices(key TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, address TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', pos INTEGER NOT NULL DEFAULT 0);
          CREATE TABLE IF NOT EXISTS topo_links(from_key TEXT NOT NULL, to_key TEXT NOT NULL, label TEXT NOT NULL DEFAULT '', pos INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(from_key, to_key));
          CREATE TABLE IF NOT EXISTS topo_hosts(server_host TEXT PRIMARY KEY, device_key TEXT NOT NULL);",
-    )?;
-    Ok(db)
+    )
 }
 
 fn with_db<T>(f: impl FnOnce(&mut Connection) -> rusqlite::Result<T>) -> Option<T> {
     let mut slot = DB.lock_safe();
     if slot.is_none() {
-        *slot = open(&nabiman_server::data_dir().join("topology.sqlite3")).ok();
+        *slot = open(&nabiman_server::data_dir().join("topology.sqlite3"))
+            .map_err(|e| crate::sqlite_schema::report_once(SCHEMA.name, &e))
+            .ok();
     }
     slot.as_mut().and_then(|db| f(db).ok())
 }

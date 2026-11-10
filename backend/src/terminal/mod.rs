@@ -6,8 +6,8 @@ mod ssh_command;
 use ssh_command::build_ssh_command;
 
 mod ai_agents;
-mod claude_events;
-mod topology;
+pub(crate) mod claude_events;
+pub(crate) mod topology;
 mod claude_lead;
 mod claude_links;
 mod claude_remote;

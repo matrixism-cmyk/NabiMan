@@ -19,19 +19,29 @@ static DB: Mutex<Option<Connection>> = Mutex::new(None);
 fn open(path: &std::path::Path) -> rusqlite::Result<Connection> {
     let db = Connection::open(path)?;
     let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+    SCHEMA.migrate(&db)?;
+    Ok(db)
+}
+
+/// Versions of `server-facts.sqlite3` (see `sqlite_schema`); append, never edit.
+pub(crate) const SCHEMA: crate::sqlite_schema::Schema =
+    crate::sqlite_schema::Schema { name: "server-facts.sqlite3", steps: &[schema_v1] };
+
+fn schema_v1(db: &Connection) -> rusqlite::Result<()> {
     db.execute_batch(
         "CREATE TABLE IF NOT EXISTS server_facts(
            id TEXT PRIMARY KEY, status TEXT NOT NULL, hostname TEXT NOT NULL DEFAULT '', os TEXT NOT NULL DEFAULT '',
            uptime TEXT NOT NULL DEFAULT '', cpu TEXT NOT NULL DEFAULT '', memory TEXT NOT NULL DEFAULT '',
            disk TEXT NOT NULL DEFAULT '', load TEXT NOT NULL DEFAULT '', checked_at TEXT NOT NULL DEFAULT '');",
-    )?;
-    Ok(db)
+    )
 }
 
 fn with_db<T>(f: impl FnOnce(&Connection) -> rusqlite::Result<T>) -> Option<T> {
     let mut slot = DB.lock_safe();
     if slot.is_none() {
-        *slot = open(&nabiman_server::data_dir().join("server-facts.sqlite3")).ok();
+        *slot = open(&nabiman_server::data_dir().join("server-facts.sqlite3"))
+            .map_err(|e| crate::sqlite_schema::report_once(SCHEMA.name, &e))
+            .ok();
     }
     slot.as_ref().and_then(|db| f(db).ok())
 }

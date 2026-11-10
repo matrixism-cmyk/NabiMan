@@ -9,7 +9,7 @@ use std::fs;
 use std::io::{self, Read, Seek, Write};
 use std::os::fd::AsRawFd;
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub const LOCK_FILE: &str = ".lock";
 
@@ -17,7 +17,6 @@ pub const LOCK_FILE: &str = ".lock";
 #[derive(Debug)]
 pub struct DataDirLock {
     _file: fs::File,
-    pub path: PathBuf,
 }
 
 pub fn acquire(dir: &Path) -> io::Result<DataDirLock> {
@@ -64,7 +63,7 @@ pub fn acquire(dir: &Path) -> io::Result<DataDirLock> {
     file.rewind()?;
     writeln!(file, "{}", std::process::id())?;
     let _ = file.sync_all();
-    Ok(DataDirLock { _file: file, path })
+    Ok(DataDirLock { _file: file })
 }
 
 #[cfg(test)]
@@ -75,7 +74,7 @@ mod tests {
     fn a_second_holder_is_refused_with_the_first_ones_pid_until_it_lets_go() {
         let dir = std::env::temp_dir().join(format!("nabiman-lock-{}", uuid::Uuid::new_v4()));
         let first = acquire(&dir).unwrap();
-        assert_eq!(fs::read_to_string(&first.path).unwrap().trim(), std::process::id().to_string());
+        assert_eq!(fs::read_to_string(dir.join(LOCK_FILE)).unwrap().trim(), std::process::id().to_string());
         // flock is per open file description, so a second open in this process conflicts too.
         let refused = acquire(&dir).unwrap_err();
         assert_eq!(refused.kind(), io::ErrorKind::WouldBlock);
@@ -94,7 +93,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("nabiman-lock-{}", uuid::Uuid::new_v4())).join("data");
         let lock = acquire(&dir).unwrap();
         assert_eq!(fs::metadata(&dir).unwrap().permissions().mode() & 0o777, 0o700);
-        assert_eq!(fs::metadata(&lock.path).unwrap().permissions().mode() & 0o777, 0o600);
+        assert_eq!(fs::metadata(dir.join(LOCK_FILE)).unwrap().permissions().mode() & 0o777, 0o600);
         drop(lock);
         fs::remove_dir_all(dir.parent().unwrap()).unwrap();
     }

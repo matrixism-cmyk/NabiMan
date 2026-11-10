@@ -1,22 +1,29 @@
 use rusqlite::Connection;
 
+/// Bring the MEC database to the current schema version, in one transaction.
 pub fn initialize(conn: &Connection) -> rusqlite::Result<()> {
-    conn.execute_batch("BEGIN IMMEDIATE")?;
-    let result = (|| {
-        let actions_existed: bool = conn.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='tenant_access_delegation_actions')",[],|r|r.get(0))?;
-        conn.execute_batch(SCHEMA_SQL)?;
-        if !actions_existed {
-            // The old schema could approve grants only. Migrate once; missing
-            // checkpoints in an already migrated DB must fail closed.
-            conn.execute(r#"INSERT INTO tenant_access_delegation_actions(tenant_id,version,actions) SELECT tenant_id,version,'["grant"]' FROM tenant_access_delegations"#,[])?;
-        }
-        conn.execute_batch("COMMIT")
-    })();
-    if result.is_err() {
-        let _ = conn.execute_batch("ROLLBACK");
-    }
-    result
+    SCHEMA.migrate(conn).map(|_| ())
 }
+
+/// Versions of `mec.db` (see `sqlite_schema`); append, never edit.
+pub const SCHEMA: crate::sqlite_schema::Schema =
+    crate::sqlite_schema::Schema { name: "mec.db", steps: &[v1_baseline] };
+
+/// The schema as it stood before versioning (idempotent on such databases).
+fn v1_baseline(conn: &Connection) -> rusqlite::Result<()> {
+    let actions_existed: bool = conn.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='tenant_access_delegation_actions')",[],|r|r.get(0))?;
+    conn.execute_batch(SCHEMA_SQL)?;
+    if !actions_existed {
+        // The old schema could approve grants only. Migrate once; missing
+        // checkpoints in an already migrated DB must fail closed.
+        conn.execute(r#"INSERT INTO tenant_access_delegation_actions(tenant_id,version,actions) SELECT tenant_id,version,'["grant"]' FROM tenant_access_delegations"#,[])?;
+    }
+    Ok(())
+}
+
+/// The tables as created before versioning; equal to the v1 baseline.
+#[cfg(test)]
+pub(crate) const LEGACY_SQL: &str = SCHEMA_SQL;
 
 const SCHEMA_SQL: &str = r#"
 CREATE TABLE IF NOT EXISTS tenant_access_delegations (

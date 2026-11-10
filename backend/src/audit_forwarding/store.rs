@@ -78,14 +78,11 @@ impl Store {
                 return Err(Error::Storage);
             }
         }
-        db.execute_batch("PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON; BEGIN IMMEDIATE;
-   CREATE TABLE IF NOT EXISTS forwarding_schema(version INTEGER NOT NULL);
-   INSERT INTO forwarding_schema SELECT 1 WHERE NOT EXISTS(SELECT 1 FROM forwarding_schema);
-   CREATE TABLE IF NOT EXISTS destinations(id TEXT PRIMARY KEY,revision TEXT NOT NULL,name TEXT NOT NULL,url TEXT NOT NULL,enabled INTEGER NOT NULL CHECK(enabled IN(0,1)),auth_enc TEXT NOT NULL,acknowledged INTEGER NOT NULL DEFAULT 0,last_ack_at TEXT,last_error TEXT);
-   CREATE TABLE IF NOT EXISTS deliveries(id TEXT PRIMARY KEY,destination TEXT NOT NULL,revision TEXT NOT NULL,payload TEXT NOT NULL,probe INTEGER NOT NULL CHECK(probe IN(0,1)),state TEXT NOT NULL CHECK(state IN('pending','sending','blocked')),attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts>=0),next_attempt INTEGER NOT NULL DEFAULT 0,last_error TEXT,FOREIGN KEY(destination) REFERENCES destinations(id) ON DELETE CASCADE);
-   CREATE INDEX IF NOT EXISTS forwarding_due ON deliveries(state,next_attempt);
-   CREATE TABLE IF NOT EXISTS forwarding_counters(name TEXT PRIMARY KEY,value INTEGER NOT NULL);
-   INSERT OR IGNORE INTO forwarding_counters VALUES('acknowledged',0),('capture_failed',0),('cancelled',0); COMMIT;")?;
+        db.execute_batch("PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON;")?;
+        SCHEMA.migrate(&db).map_err(|e| {
+            crate::sqlite_schema::report_once(SCHEMA.name, &e);
+            Error::Storage
+        })?;
         let version: i64 =
             db.query_row("SELECT version FROM forwarding_schema", [], |r| r.get(0))?;
         if version != 1 {
@@ -95,6 +92,25 @@ impl Store {
         db.execute("UPDATE deliveries SET state='pending',next_attempt=0,last_error='interrupted_possible_duplicate' WHERE state='sending'",[])?;
         Ok(Self { db })
     }
+}
+
+/// Versions of `audit-forwarding.sqlite3` (see `sqlite_schema`); append, never edit.
+/// The `forwarding_schema` row (always 1) predates this and is kept for older releases.
+pub const SCHEMA: crate::sqlite_schema::Schema =
+    crate::sqlite_schema::Schema { name: "audit-forwarding.sqlite3", steps: &[schema_v1] };
+
+fn schema_v1(db: &Connection) -> rusqlite::Result<()> {
+    db.execute_batch("
+   CREATE TABLE IF NOT EXISTS forwarding_schema(version INTEGER NOT NULL);
+   INSERT INTO forwarding_schema SELECT 1 WHERE NOT EXISTS(SELECT 1 FROM forwarding_schema);
+   CREATE TABLE IF NOT EXISTS destinations(id TEXT PRIMARY KEY,revision TEXT NOT NULL,name TEXT NOT NULL,url TEXT NOT NULL,enabled INTEGER NOT NULL CHECK(enabled IN(0,1)),auth_enc TEXT NOT NULL,acknowledged INTEGER NOT NULL DEFAULT 0,last_ack_at TEXT,last_error TEXT);
+   CREATE TABLE IF NOT EXISTS deliveries(id TEXT PRIMARY KEY,destination TEXT NOT NULL,revision TEXT NOT NULL,payload TEXT NOT NULL,probe INTEGER NOT NULL CHECK(probe IN(0,1)),state TEXT NOT NULL CHECK(state IN('pending','sending','blocked')),attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts>=0),next_attempt INTEGER NOT NULL DEFAULT 0,last_error TEXT,FOREIGN KEY(destination) REFERENCES destinations(id) ON DELETE CASCADE);
+   CREATE INDEX IF NOT EXISTS forwarding_due ON deliveries(state,next_attempt);
+   CREATE TABLE IF NOT EXISTS forwarding_counters(name TEXT PRIMARY KEY,value INTEGER NOT NULL);
+   INSERT OR IGNORE INTO forwarding_counters VALUES('acknowledged',0),('capture_failed',0),('cancelled',0);")
+}
+
+impl Store {
     pub fn list(&self) -> Result<Vec<Destination>, Error> {
         let mut stmt=self.db.prepare("SELECT id,revision,name,url,enabled,auth_enc!='', (SELECT count(*) FROM deliveries WHERE destination=d.id AND state!='blocked'), (SELECT count(*) FROM deliveries WHERE destination=d.id AND state='blocked'), d.last_error,d.acknowledged,d.last_ack_at FROM destinations d ORDER BY rowid")?;
         let rows = stmt.query_map([], |r| {

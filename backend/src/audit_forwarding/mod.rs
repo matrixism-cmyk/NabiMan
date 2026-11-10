@@ -1,7 +1,7 @@
 //! Durable HTTPS forwarding, separate from the local request journal.
 use crate::lock_safe::LockExt;
 mod api;
-mod store;
+pub(crate) mod store;
 #[cfg(test)]
 mod tests;
 use crate::audit::AuditEntry;
