@@ -51,7 +51,8 @@ TOML입니다. 키 이름이 곧 환경 변수 이름입니다.
 | — | `NABIMAN_CONFIG` | `/etc/nabiman/nabiman.toml`, 없으면 `데이터 디렉터리/nabiman.toml` | 읽을 설정 파일. 환경 변수로만 지정 |
 | `data_dir` | `NABIMAN_DATA_DIR` | `/var/lib/nabiman` | 데이터 디렉터리([데이터와 백업](data-and-backup.md)) |
 | `static` | `NABIMAN_STATIC` | `./static` | 웹 화면(빌드한 프런트엔드) 폴더 |
-| `port` | `NABIMAN_PORT` | `8080` | 서버가 듣는 포트(모든 주소) |
+| `listen` | `NABIMAN_LISTEN` | `127.0.0.1:<port>` | 서버가 듣는 주소. `127.0.0.1:18080`, `[::1]:8080`, 주소만(`0.0.0.0` → 포트는 `NABIMAN_PORT`), `localhost`. 기본은 루프백뿐이라 같은 서버의 TLS 프록시(nginx 등)를 거쳐야 닿습니다. 다른 서버에서 바로 닿게 하려면 `0.0.0.0`을 **명시**해야 하고, 그때 시작 로그에 경고가 남습니다(나비맨은 평문 HTTP). 호스트 이름(`localhost` 말고)이나 읽을 수 없는 값이면 서버가 시작하지 않습니다 |
+| `port` | `NABIMAN_PORT` | `8080` | 서버가 듣는 포트. `listen`에 포트가 없을 때 씁니다(둘 다 포트를 주면 `listen`의 포트) |
 | `secret_key_file` | `NABIMAN_SECRET_KEY_FILE` | `데이터 디렉터리/secret.key` | 저장 비밀번호 암호화 키 파일 |
 | `helper_socket` | `NABIMAN_HELPER_SOCKET` | `/run/nabiman-helper/control.sock` | 권한 도우미 소켓 |
 | `claude_socket` | `NABIMAN_CLAUDE_SOCKET` | `/run/nabiman/claude.sock` | Claude 세션 지휘 소켓 |

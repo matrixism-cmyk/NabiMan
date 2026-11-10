@@ -16,6 +16,8 @@ After=network-online.target
 Type=simple
 User=root
 ExecStart=/usr/local/bin/nabiman-server
+# Listens on 127.0.0.1:$NABIMAN_PORT unless NABIMAN_LISTEN says otherwise (e.g.
+# NABIMAN_LISTEN=0.0.0.0 in nabiman.env); put a TLS proxy (nginx) in front.
 Environment=NABIMAN_PORT=8080
 Environment=NABIMAN_STATIC=/usr/local/share/nabiman/static
 Environment=NABIMAN_DATA_DIR=/var/lib/nabiman

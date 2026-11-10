@@ -57,6 +57,7 @@ feedback_site = "fs_4oAGj2jt6Dgzp61MFo0uTq7_"
 
 - 시작 스크립트 `/workspace/nabiman/bin/start-nabiman.sh`가 주는 환경 변수(`NABIMAN_PORT=18080`, `NABIMAN_STATIC=/workspace/nabiman/static`, `NABIMAN_DATA_DIR=/workspace/var/lib/nabiman`, `NABIMAN_SERIAL_GROUP=nabi`)와 `PATH`(tmux 3.8, `/workspace/opt/bin`의 sshpass·guacd). 환경 변수가 파일보다 우선하므로 겹쳐도 문제없습니다.
 - guacd 주소는 기본값 `127.0.0.1:4822` 그대로입니다.
+- 듣는 주소는 기본값(`127.0.0.1:18080`) 그대로 둡니다. nginx의 `man.bebo.kr`이 `proxy_pass http://127.0.0.1:18080`으로 프록시하고, 2026-11-11에 18080으로 들어온 연결은 모두 127.0.0.1에서 온 것이었으며, 18080을 쓰는 k8s Service·LoadBalancer·스크립트는 없었습니다. 예전 기본(`0.0.0.0`)에서는 같은 클러스터의 다른 파드가 nginx를 거치지 않고 18080에 닿을 수 있었습니다.
 
 ## 비밀이 있는 곳 (옮기지 않음)
 

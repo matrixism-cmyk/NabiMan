@@ -197,7 +197,7 @@ async fn serve() -> std::io::Result<()> {
     let owned_mec_db = mec::db::open_owned(mec::db::default_path())?;
     let mec_db = owned_mec_db.handle.clone();
     storage.seed_defaults();
-    let port: u16 = install_config::values::number("NABIMAN_PORT", 8080);
+    let listen = install_config::listen::at_startup()?;
     let static_dir = std::env::var("NABIMAN_STATIC").unwrap_or_else(|_| "./static".to_string());
 
     let share_store = terminal::share_store::open(
@@ -255,7 +255,7 @@ async fn serve() -> std::io::Result<()> {
 
     // Which optional programs are here, once, before requests (never on the request path).
     external_tools::check_at_startup();
-    println!("NabiMan Server starting on http://0.0.0.0:{}", port);
+    println!("NabiMan Server starting on http://{}", listen.addr);
     println!("Static files: {}", static_dir);
 
     HttpServer::new(move || {
@@ -315,7 +315,7 @@ async fn serve() -> std::io::Result<()> {
                     })),
             )
     })
-    .bind(format!("0.0.0.0:{}", port))?
+    .bind(listen.addr)?
     .run()
     .await
 }

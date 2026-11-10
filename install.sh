@@ -334,5 +334,11 @@ echo "Update:  nabiman-update        (signed, health-checked, rolls back by itse
 echo "Rollback: nabiman-update --rollback"
 echo "Status:  systemctl status nabiman"
 PORT=$(sed -n 's/^NABIMAN_PORT=//p' "$CONFIG_DIR/nabiman.env" | tail -n1)
-echo "Access:  http://$(hostname -I | awk '{print $1}'):${PORT:-8080}"
+LISTEN=$(sed -n 's/^NABIMAN_LISTEN=//p' "$CONFIG_DIR/nabiman.env" | tail -n1)
+if [ -n "$LISTEN" ]; then
+    echo "Access:  listening on $LISTEN (NABIMAN_LISTEN in $CONFIG_DIR/nabiman.env)"
+else
+    echo "Access:  http://127.0.0.1:${PORT:-8080} on this machine only. Put a TLS proxy (nginx)"
+    echo "         in front, or set NABIMAN_LISTEN=0.0.0.0 in $CONFIG_DIR/nabiman.env (plain HTTP)."
+fi
 echo "Login with the configured admin password."

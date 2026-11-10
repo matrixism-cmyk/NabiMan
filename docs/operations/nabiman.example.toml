@@ -9,6 +9,7 @@
 # docs/operations/configuration.md for where secrets go.
 
 # Where things are
+# listen = "127.0.0.1:8080"        # default: loopback on `port`; "0.0.0.0" to be reachable directly (plain HTTP!)
 # port = 8080
 # static = "/usr/share/nabiman/static"
 # data_dir = "/var/lib/nabiman"        # only in /etc/nabiman/nabiman.toml

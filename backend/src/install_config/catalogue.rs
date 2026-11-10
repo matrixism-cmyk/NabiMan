@@ -8,6 +8,7 @@ pub(crate) const KNOWN: &[&str] = &[
     "NABIMAN_DATA_DIR",
     "NABIMAN_STATIC",
     "NABIMAN_PORT",
+    "NABIMAN_LISTEN",
     "NABIMAN_SECRET_KEY_FILE",
     "NABIMAN_HELPER_SOCKET",
     "NABIMAN_CLAUDE_SOCKET",

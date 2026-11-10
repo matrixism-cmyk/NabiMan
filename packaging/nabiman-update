@@ -137,10 +137,22 @@ health_ok() {
 
 # The service runs the expected binary and answers within the timeout.
 check_running() {
-    local version=$1 base=$HEALTH_URL deadline pid exe port
+    local version=$1 base=$HEALTH_URL deadline pid exe port listen host
     if [ -z "$base" ]; then
         port=$(sed -n 's/^NABIMAN_PORT=//p' "$CONF/nabiman.env" 2>/dev/null | tail -n1)
-        base="http://127.0.0.1:${port:-8080}"
+        listen=$(sed -n 's/^NABIMAN_LISTEN=//p' "$CONF/nabiman.env" 2>/dev/null | tail -n1)
+        host=127.0.0.1
+        # NABIMAN_LISTEN: an address, with or without a port (see configuration.md).
+        case "$listen" in
+            "") ;;
+            \[*\]:*) host=${listen%:*}; port=${listen##*:} ;;
+            \[*\]) host=$listen ;;
+            *:*:*) host="[$listen]" ;;
+            *:*) host=${listen%:*}; port=${listen##*:} ;;
+            *) host=$listen ;;
+        esac
+        case "$host" in 0.0.0.0|"[::]"|localhost) host=127.0.0.1 ;; esac
+        base="http://$host:${port:-8080}"
     fi
     deadline=$((SECONDS + HEALTH_TIMEOUT))
     while [ "$SECONDS" -lt "$deadline" ]; do

@@ -15,6 +15,7 @@
 
 mod catalogue;
 mod file;
+pub(crate) mod listen;
 pub(crate) mod settings;
 pub(crate) mod values;
 #[cfg(test)]

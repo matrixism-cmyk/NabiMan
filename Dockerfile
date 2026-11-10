@@ -46,6 +46,9 @@ COPY --from=frontend /app/frontend/build /usr/local/share/nabiman/static
 RUN mkdir -p /var/lib/nabiman /etc/nabiman && chmod 700 /var/lib/nabiman
 
 ENV NABIMAN_PORT=8080
+# Inside a container the published port reaches the server only on every address
+# (the default is loopback); publish it on the host's loopback or behind TLS.
+ENV NABIMAN_LISTEN=0.0.0.0:8080
 ENV NABIMAN_STATIC=/usr/local/share/nabiman/static
 ENV NABIMAN_DATA_DIR=/var/lib/nabiman
 
