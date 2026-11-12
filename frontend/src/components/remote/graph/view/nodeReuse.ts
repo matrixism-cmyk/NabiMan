@@ -67,3 +67,25 @@ export function reuseLinks<L extends LinkLike>(before: Map<string, L & { __key?:
   });
   return { links, kept, made };
 }
+
+/**
+ * The links with both ends set to the node objects themselves, never ids. The
+ * running layout reads `link.source.vx` on every tick, and the library only
+ * turns ids into nodes on its next update, a frame later: a kept link whose
+ * ends had just been set back to ids broke the tick in between ("Cannot create
+ * property 'vx' on string"). A link to a node that is not drawn is left out.
+ */
+export function tieEnds<L extends LinkLike, N extends { id: string }>(links: L[], nodes: N[]): L[] {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const idOf = (end: unknown) => (typeof end === 'object' && end !== null ? (end as { id: string }).id : String(end));
+  const out: L[] = [];
+  for (const l of links) {
+    const a = byId.get(idOf(l.source));
+    const b = byId.get(idOf(l.target));
+    if (!a || !b) continue;
+    l.source = a;
+    l.target = b;
+    out.push(l);
+  }
+  return out;
+}

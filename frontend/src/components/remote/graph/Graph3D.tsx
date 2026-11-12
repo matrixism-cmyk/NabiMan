@@ -10,7 +10,7 @@ import { richObject, richRadius } from './view/richObjects';
 import { simpleObject, simpleRadius } from './view/simpleObjects';
 import { arrowLength, LinkData, linkLook, linkShown, linkWidth, particleColor, particleCount, particleWidth, REPORT_COLOR, isOrder } from './view/linkStyle';
 import { addLights, addStars, flyTo } from './view/sceneSetup';
-import { reuseLinks, reuseNodes, visualKey, Placed } from './view/nodeReuse';
+import { reuseLinks, reuseNodes, visualKey, Placed, tieEnds } from './view/nodeReuse';
 import { biggestReach, flyDistance, minDistance, nodeReach } from './view/cameraLimits';
 import { watchContext } from './view/glContext';
 
@@ -230,7 +230,9 @@ export default function Graph3D({ graph, selected, onSelect, onHoverEdge, settin
     const hub = nodes.find((n) => n.lead) || nodes[0];
     const tied = new Set(made.flatMap((l) => [l.source as string, l.target as string]));
     if (hub) for (const n of nodes) if (n !== hub && !tied.has(n.id)) made.push({ id: `ghost>${n.id}`, source: hub.id, target: n.id, live: false, strength: 0, color: '#000000', note: '', kind: 'ghost' });
-    const { links } = reuseLinks(linksBefore, made, (l) => `${l.source}>${l.target}|${l.kind}|${l.live}|${l.strength.toFixed(2)}|${l.color}|${l.note}`);
+    const reused = reuseLinks(linksBefore, made, (l) => `${l.source}>${l.target}|${l.kind}|${l.live}|${l.strength.toFixed(2)}|${l.color}|${l.note}`);
+    // Ends as node objects at once: the layout may tick before the library has looked the ids up.
+    const links = tieEnds(reused.links, nodes);
     adj.current = adjacency(graph.edges.map((e) => ({ id: e.id, from: e.from, to: e.to })));
     fx.current?.keepOnly(new Set(nodes.map((n) => n.id)), new Set(links.map((l) => l.id)));
     g.graphData({ nodes, links });

@@ -78,3 +78,14 @@ describe('reuseLinks', () => {
     expect(out.made).toBe(1);
   });
 });
+
+describe('tieEnds', () => {
+  const { tieEnds } = require('./nodeReuse');
+  it('gives every link its node objects and drops links to nodes that are not drawn', () => {
+    const a = { id: 'pty_a' }; const b = { id: 'pty_b' };
+    const kept = { id: 'k', source: a, target: 'pty_b' };
+    const links = tieEnds([{ id: 'x', source: 'pty_a', target: 'pty_b' }, kept, { id: 'gone', source: 'pty_a', target: 'pty_z' }], [a, b]);
+    expect(links.map((l: { id: string }) => l.id)).toEqual(['x', 'k']);
+    for (const l of links) { expect(l.source).toBe(a); expect(l.target).toBe(b); }
+  });
+});
