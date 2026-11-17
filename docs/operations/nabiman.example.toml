@@ -18,6 +18,7 @@
 # The web
 # product_name = "NabiMan"
 # trusted_proxies = ["127.0.0.1", "::1"]
+# public_origin = "https://man.example.com"  # turns passkey sign-in on
 # hsts = true
 
 # Feedback widget: off unless both are set

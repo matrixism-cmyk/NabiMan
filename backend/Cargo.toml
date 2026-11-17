@@ -61,11 +61,19 @@ tokio-stream = { version = "0.1", features = ["sync"] }
 docx-rs = "0.4"
 # The optional settings file (/etc/nabiman/nabiman.toml); the version already in the lock.
 toml = "=0.5.11"
+# Passkey (WebAuthn) sign-in: the relying-party checks. Pure Rust crypto
+# (RustCrypto through crypto-glue), no OpenSSL. `conditional-ui` is the
+# crate's name for sign-in without a username (discoverable credentials).
+webauthn-rs = { version = "=0.6.2", default-features = false, features = ["conditional-ui"] }
 
 [dev-dependencies]
 rand10 = { package = "rand", version = "0.10", features = ["thread_rng"] }
 actix-rt = "2"
 actix-test = "0.1"
+# Names the request type of a test App (the version actix-web already uses).
+actix-http = "3"
+# A software authenticator for the passkey tests (never in the release build).
+webauthn-authenticator-rs = { version = "=0.6.2", default-features = false, features = ["softpasskey"] }
 
 # Runtime identity hashes the executing inode, which is much larger with debug symbols.
 # Keep SHA-256 compression optimized so debug smoke servers retain normal startup latency.

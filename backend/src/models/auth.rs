@@ -36,6 +36,26 @@ pub struct MfaState {
     pub last_used_step: Option<u64>,
     pub pending_expires_at: Option<i64>,
     pub revision: String,
+    /// The account's passkeys. Absent in user files written before passkeys
+    /// existed, so it must keep its default.
+    #[serde(default)]
+    pub passkeys: Vec<StoredPasskey>,
+}
+
+/// One passkey (a WebAuthn credential) of an account, as kept in the user
+/// database. Never sent to a browser as it is: lists show `id`, `name` and
+/// the two dates only.
+#[derive(Serialize, Deserialize, Clone)]
+pub struct StoredPasskey {
+    /// The credential's id, base64url as the browser reports it.
+    pub id: String,
+    /// What the person called it.
+    pub name: String,
+    pub created_at: String,
+    #[serde(default)]
+    pub last_used: Option<String>,
+    /// The public key, counter and backup flags the checks need.
+    pub credential: webauthn_rs::prelude::Passkey,
 }
 
 /// What a remote-only member may do beyond working on their servers, each

@@ -1,4 +1,5 @@
 import RegistrationForm from './RegistrationForm';
+import PasskeyLoginButton from './PasskeyLoginButton';
 import { useAuthCooldown } from '../hooks/useAuthCooldown';
 import React, { useState, useEffect } from 'react';
 import { setToken, setRefreshToken } from '../shared/api/useApi';
@@ -149,6 +150,8 @@ export default function LoginScreen({ onLogin }: Props) {
         <button type="submit" className="btn btn-primary" disabled={loading || cooldown.seconds > 0}>
           {loading ? t('login.loggingIn') : t('login.button')}
         </button>
+
+        {!needs2fa && <PasskeyLoginButton onLogin={onLogin} onError={setError} limited={cooldown.accept} disabled={loading || cooldown.seconds > 0} />}
 
         {oauthEnabled && !needs2fa && (
           <button type="button" className="btn btn-secondary" onClick={handleOAuthLogin}

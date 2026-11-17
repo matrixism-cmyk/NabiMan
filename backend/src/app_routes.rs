@@ -12,6 +12,7 @@ pub(crate) fn configure(cfg: &mut web::ServiceConfig) {
     crate::scope_settings::config(cfg);
     crate::jwt_sessions::config(cfg);
     crate::totp::config(cfg);
+    crate::passkeys::config(cfg);
     crate::server_status::config(cfg);
     crate::network::config(cfg);
     crate::accounts::config(cfg);

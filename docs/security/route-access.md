@@ -32,8 +32,8 @@ NabiMan 의 API 는 허용 목록 방식입니다. 등록된 모든 경로가 �
 
 ## 요약
 
-- 등록된 API 경로: 339개
-- 공개 33 · 관리자 전용 99 · 조회 52 · 운영 149 · 계정 6
+- 등록된 API 경로: 346개
+- 공개 35 · 관리자 전용 99 · 조회 52 · 운영 154 · 계정 6
 - 원격 회원이 닿는 경로: 63개 (메서드 지정 25 · 본인 것만 17 · 서버 규칙 21)
 
 ## 검토가 필요해 보이는 권한 (바꾸지 않고 그대로 옮김)
@@ -88,6 +88,13 @@ NabiMan 의 API 는 허용 목록 방식입니다. 등록된 모든 경로가 �
 | `/api/auth/oauth/callback` | 공개 | (로그인 없이) | (로그인 없이) | — |  |
 | `/api/auth/oauth/config` | 조회 | GET | GET | — |  |
 | `/api/auth/oauth/provider` | 공개 | (로그인 없이) | (로그인 없이) | — |  |
+| `/api/auth/passkeys` | 운영 | 모든 메서드 | GET | — | GET 는 모든 계정 |
+| `/api/auth/passkeys/delete` | 운영 | 모든 메서드 | GET | — | POST 는 모든 계정 |
+| `/api/auth/passkeys/login/begin` | 공개 | (로그인 없이) | (로그인 없이) | — |  |
+| `/api/auth/passkeys/login/finish` | 공개 | (로그인 없이) | (로그인 없이) | — |  |
+| `/api/auth/passkeys/register/begin` | 운영 | 모든 메서드 | GET | — | POST 는 모든 계정 |
+| `/api/auth/passkeys/register/finish` | 운영 | 모든 메서드 | GET | — | POST 는 모든 계정 |
+| `/api/auth/passkeys/rename` | 운영 | 모든 메서드 | GET | — | POST 는 모든 계정 |
 | `/api/auth/refresh` | 공개 | (로그인 없이) | (로그인 없이) | — |  |
 | `/api/auth/register` | 공개 | (로그인 없이) | (로그인 없이) | — |  |
 | `/api/auth/sessions` | 조회 | GET | GET | — | GET 는 모든 계정 |

@@ -69,7 +69,7 @@ fn protected(path: &str) -> bool {
             | "/api/auth/2fa/verify-setup"
             | "/api/auth/2fa/disable"
             | "/api/auth/2fa/recovery-codes"
-    )
+    ) || crate::passkeys::rate_limited(path)
 }
 impl<S, B> Service<ServiceRequest> for Middleware<S>
 where
@@ -134,7 +134,37 @@ where
             let signup = req.path() == "/api/auth/register";
             let category;
             let identity;
-            if signup {
+            // A passkey sign-in names no account. Asking for a challenge counts
+            // against the address only (above); the answer, against the
+            // credential it presents.
+            let passkey = crate::passkeys::public_route(req.path());
+            if passkey {
+                category = "passkey-credential";
+                #[derive(serde::Deserialize)]
+                struct Presented {
+                    id: String,
+                }
+                #[derive(serde::Deserialize)]
+                struct Answer {
+                    credential: Option<Presented>,
+                }
+                identity = match serde_json::from_slice::<Answer>(&bytes) {
+                    Ok(answer) => answer.credential.map(|c| c.id).unwrap_or_default(),
+                    Err(_) if bytes.is_empty() => String::new(),
+                    Err(_) => {
+                        return Ok(req
+                            .into_response(HttpResponse::BadRequest().json(
+                                ApiResponse::<()>::error("Invalid authentication request"),
+                            ))
+                            .map_into_right_body())
+                    }
+                };
+                if identity.len() > 2048 {
+                    return Ok(req
+                        .into_response(HttpResponse::BadRequest().finish())
+                        .map_into_right_body());
+                }
+            } else if signup {
                 category = "registration-source";
                 identity = peer;
             } else if let Some(id) = crate::auth::verified_user_id(req.request()) {
@@ -174,8 +204,11 @@ where
                 }
                 identity = name.to_lowercase();
             }
-            if let Err(seconds) = permit.account(category, &identity, Instant::now()) {
-                return Ok(req.into_response(limited(seconds)).map_into_right_body());
+            // No credential presented (the challenge step): nothing to count against.
+            if !(passkey && identity.is_empty()) {
+                if let Err(seconds) = permit.account(category, &identity, Instant::now()) {
+                    return Ok(req.into_response(limited(seconds)).map_into_right_body());
+                }
             }
             req.set_payload(bytes.into());
             let result = service.call(req).await;

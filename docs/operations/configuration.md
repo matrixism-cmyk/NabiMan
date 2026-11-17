@@ -66,6 +66,7 @@ TOML입니다. 키 이름이 곧 환경 변수 이름입니다.
 | — (비밀) | `NABIMAN_PASSWORD` | 없음 | 첫 관리자 비밀번호. 비밀이므로 파일에 쓰지 말고 시작 스크립트가 비밀 파일에서 읽어 넘기세요 |
 | `api_tokens_disabled` | `NABIMAN_API_TOKENS_DISABLED` | 꺼짐 | `1`이면 공개 API 키 로그인 중지 |
 | `cors_origins` | `NABIMAN_CORS_ORIGINS` | 없음(CORS 끔) | 다른 출처에서 API를 부를 수 있게 할 출처 목록 |
+| `public_origin` | `NABIMAN_PUBLIC_ORIGIN` | 없음(패스키 꺼짐) | 사람들이 브라우저로 여는 주소(`https://man.example.com`). 패스키 로그인이 이 주소에 묶입니다. 아래 "패스키" 참고 |
 | `trusted_proxies` | `NABIMAN_TRUSTED_PROXIES` | `127.0.0.1,::1` | `X-Forwarded-*`를 믿을 프록시 주소 |
 | `csp` | `NABIMAN_CSP` | 내장 정책 | `off`면 CSP를 보내지 않음, 다른 값이면 그 값으로 바꿈 |
 | `hsts` | `NABIMAN_HSTS` | 신뢰 프록시가 HTTPS라고 할 때만 | `true` 항상, `false` 보내지 않음 |
@@ -74,6 +75,18 @@ TOML입니다. 키 이름이 곧 환경 변수 이름입니다.
 | `feedback_site` | `NABIMAN_FEEDBACK_SITE` | 없음(위젯 꺼짐) | 그 서비스에서 이 사이트의 id. 출처와 둘 다 있어야 위젯이 켜짐 |
 | `feedback_script` | `NABIMAN_FEEDBACK_SCRIPT` | `/fixhub-admin.js`(내장 런처) | 위젯 런처 스크립트 주소. 다른 출처면 그 출처를 CSP `script-src`에 더함 |
 | `noc_contact` | `NABIMAN_NOC_CONTACT` | 없음(표시 안 함) | MEC NOC 화면 경보 띠에 보이는 당직 연락처 |
+
+#### 패스키
+
+패스키(지문·얼굴·기기 PIN으로 로그인)는 사이트 주소에 묶입니다. NabiMan은 그 주소를 요청의 `Host` 헤더에서
+짐작하지 않고 `public_origin`(`NABIMAN_PUBLIC_ORIGIN`)에서만 읽습니다.
+
+- 설정하지 않으면 패스키는 꺼져 있습니다. 로그인 화면의 "패스키로 로그인"과 보안 설정의 등록 버튼은 설정이 필요하다고 알려 줍니다. 비밀번호 로그인은 그대로입니다.
+- 값은 사람들이 브라우저 주소창에서 보는 출처입니다. nginx 같은 프록시 뒤에 있어도 프록시의 공개 주소를 씁니다: `public_origin = "https://man.example.com"`. 경로나 끝의 `/` 없이 씁니다.
+- 첫 번째 출처의 호스트 이름이 패스키의 소속(RP ID)이 됩니다. 이 이름을 바꾸면 이미 등록한 패스키는 쓸 수 없게 됩니다.
+- 여러 주소로 접속한다면 쉼표로 이어 씁니다. 두 번째부터는 첫 번째와 같은 이름이거나 그 하위 도메인이어야 합니다: `"https://example.com, https://man.example.com"`.
+- `https`만 됩니다. 시험할 때는 `http://localhost:18080`처럼 `localhost`에 한해 `http`를 받습니다. IP 주소(`http://127.0.0.1:18080`)는 브라우저가 패스키를 허용하지 않아 받지 않습니다.
+- 잘못된 값이면 서버는 그대로 뜨고 패스키만 꺼집니다. 이유는 시작 로그(`passkeys`)와 최고관리자의 보안 설정 화면에 나옵니다.
 
 ### 한도
 

@@ -6,6 +6,7 @@ import processes from './processes';
 import monitoring from './monitoring';
 import management from './management';
 import security from './security';
+import passkey from './passkey';
 import mec from './mec';
 import mecLive from './mec-live';
 import mecDashboard from './mec-dashboard';
@@ -55,6 +56,7 @@ const translations: Translations = {
   ...monitoring,
   ...management,
   ...security,
+  ...passkey,
   ...auditChange,
   ...mec,
   ...mecLive,

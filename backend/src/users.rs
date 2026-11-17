@@ -300,6 +300,7 @@ async fn update_user(
     let password_changed = new_hash.is_some();
     if let Some(hash) = new_hash {
         user.password_hash = hash;
+        user.mfa.passkeys.clear(); // whoever knew the old password may have added one
     }
     if let Some(ref role) = body.role {
         user.role = role.clone();
@@ -381,4 +382,4 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 mod tests;
 
 #[cfg(test)]
-pub(crate) use storage::isolated_test_storage;
+pub(crate) use storage::{isolated_test_storage, users_file_path as users_file_for_tests};

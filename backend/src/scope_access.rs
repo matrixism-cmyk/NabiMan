@@ -2,9 +2,10 @@
 use crate::models::{NabimanUser, ScopeKind, UserRole};
 
 /// What every active account may call, whatever its role or scope: its
-/// second factor's state and recovery codes, and its own sign-ins.
+/// second factor's state and recovery codes, its passkeys, and its own sign-ins.
 pub(crate) fn every_account(method: &str, path: &str) -> bool {
-    (path == "/api/auth/2fa/status" && method == "GET")
+    crate::passkeys::own_route(method, path)
+        || (path == "/api/auth/2fa/status" && method == "GET")
         || (path == "/api/auth/2fa/recovery-codes" && method == "POST")
         || (path == "/api/auth/sessions" && method == "GET")
         || (matches!(

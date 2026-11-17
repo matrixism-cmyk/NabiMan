@@ -8,6 +8,7 @@ import ServerStatusPanel from './ServerStatusPanel';
 import RemoteWorkspace from './remote/RemoteWorkspace';
 
 // Every other panel is its own chunk, fetched the first time its tab opens.
+const PasskeyPanel = lazy(() => import('./PasskeyPanel'));
 const ClaudeChatPanel = lazy(() => import('./claude/ClaudeChatPanel'));
 const AppSettingsPanel = lazy(() => import('./AppSettingsPanel'));
 const ClaudeSettingsPanel = lazy(() => import('./claude/ClaudeSettingsPanel'));
@@ -86,7 +87,7 @@ export default function PanelOutlet({ activeTab, onNavigate, onEnterFocus }: Pro
 
 function panelFor(activeTab: Tab, onNavigate: Props['onNavigate'], onEnterFocus: Props['onEnterFocus']) {
   switch (activeTab) {
-    case 'mfa': return <MfaPanel />;
+    case 'mfa': return <><MfaPanel /><PasskeyPanel /></>;
     case 'claudeChat': return <ClaudeChatPanel />;
     case 'appSettings': return <AppSettingsPanel />;
     case 'claudeSettings': return <ClaudeSettingsPanel />;

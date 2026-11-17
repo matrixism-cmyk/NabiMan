@@ -271,7 +271,8 @@ pub(crate) fn public_route(method: &str, path: &str) -> bool {
             | "/api/auth/2fa/verify"
             | "/api/auth/oauth/callback"
             | "/api/auth/ldap/login"
-    ) || (method == "GET"
+    ) || (method == "POST" && crate::passkeys::public_route(path))
+        || (method == "GET"
         && matches!(path, "/api/auth/oauth/authorize" | "/api/auth/oauth/provider" | "/api/auth/ldap/provider"))
 }
 

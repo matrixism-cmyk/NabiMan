@@ -25,6 +25,7 @@ pub(super) fn rotate_published_admin_password(
     crate::auth::validate_bootstrap_password(replacement, true)?;
     admin.share_authorization_version = uuid::Uuid::new_v4().to_string();
     admin.password_hash = bcrypt::hash(replacement, 10).map_err(|error| error.to_string())?;
+    admin.mfa.passkeys.clear();
     Ok(true)
 }
 
@@ -55,7 +56,7 @@ pub(crate) fn publish_at(users: &[NabimanUser], path: &std::path::Path) -> Resul
     save_users_at(users, path).map_err(|failure| failure.to_string())
 }
 
-pub(super) fn users_file_path() -> std::path::PathBuf {
+pub(crate) fn users_file_path() -> std::path::PathBuf {
     #[cfg(test)]
     if let Some(path) = TEST_FILE.with(|slot| slot.borrow().clone()) {
         return path;

@@ -51,6 +51,7 @@ mod notifications;
 mod oauth;
 mod openapi;
 mod packages;
+mod passkeys;
 mod password_check;
 mod password_policy;
 mod private_storage;
@@ -229,6 +230,7 @@ async fn serve() -> std::io::Result<()> {
     let user_store = users::new_user_store(&pw_hash);
     let session_store = jwt_sessions::open_session_store();
     let login_limiter = rate_limit::RateLimiter::new();
+    let passkey_service = web::Data::new(passkeys::Passkeys::from_env());
     let channel_store = notifications::new_channel_store();
     let rule_store = alert_rules::new_rule_store();
     alert_rules::start_alert_checker(rule_store.clone(), channel_store.clone());
@@ -323,6 +325,7 @@ async fn serve() -> std::io::Result<()> {
             .app_data(web::Data::new(terminal_tickets.clone()))
             .app_data(web::Data::new(share_tickets.clone()))
             .app_data(web::Data::new(remote::extension_points()))
+            .app_data(passkey_service.clone())
             .app_data(helper_client.clone())
             .app_data(runtime_identity.clone())
             .app_data(mec_state.clone())

@@ -11,6 +11,17 @@
 - 관리 중단(unmaintained) 경고는 직접 의존하는 크레이트만 실패로 칩니다(`unmaintained = "workspace"`).
   간접 의존은 아래 표로 관리하고, `ignore` 에는 kube 를 거쳐 들어오는 것만 이유와 함께 적었습니다.
 
+## 패스키(WebAuthn) 크레이트
+
+- `webauthn-rs` 0.6.2 (MPL-2.0, kanidm): 패스키 로그인의 서버 쪽 검증. `default-features = false` 에 `conditional-ui`
+  (사용자 이름 없는 로그인)만 켭니다. 암호 연산은 `crypto-glue` 를 거친 RustCrypto 로, OpenSSL 을 쓰지 않습니다
+  (`cargo tree -i openssl-sys` 는 아무것도 찾지 못해야 하고, `deny.toml` 의 `openssl-sys` 금지에 걸리지 않습니다).
+- `serde_with` 는 3.16.1 로 잠겨 있습니다. 더 새 버전은 `serde_json` 1.0.151 이상을 요구해 기존 잠금(1.0.149)을
+  바꾸게 되므로, 올릴 때는 `serde_json` 과 함께 올립니다.
+- `webauthn-authenticator-rs` 0.6.2 (`softpasskey`)는 테스트 전용(dev-dependency) 소프트웨어 인증기입니다. 릴리스 바이너리에 들어가지 않습니다.
+- MPL-2.0 은 파일 단위 카피레프트입니다. 이 크레이트들의 소스를 고치지 않고 그대로 쓰므로 추가 의무는 고지뿐이고,
+  릴리스의 `THIRD_PARTY_LICENSES.md` 에 자동으로 들어갑니다 (`packaging/licenses.json` 의 `allow_with_conditions`).
+
 ## 교체가 필요한 크레이트
 
 | 크레이트 | 버전 | 들어오는 경로 | 상태 | 계획 |

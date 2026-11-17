@@ -91,6 +91,8 @@ pub(super) async fn setup_2fa(
             last_used_step: None,
             pending_expires_at: Some(expires),
             revision: uuid::Uuid::new_v4().to_string(),
+            // Passkeys are not part of the authenticator-app enrollment.
+            passkeys: std::mem::take(&mut user.mfa.passkeys),
         };
         Ok(qr)
     });
@@ -162,7 +164,7 @@ async fn disable_2fa(
         }
         user.totp_enabled = false;
         user.totp_secret = None;
-        user.mfa = Default::default();
+        user.mfa = crate::models::MfaState { passkeys: std::mem::take(&mut user.mfa.passkeys), ..Default::default() };
         Ok(())
     });
     match result {

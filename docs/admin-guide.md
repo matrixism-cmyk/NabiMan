@@ -30,6 +30,15 @@
 ### Disabling 2FA
 - Call `POST /api/auth/2fa/disable` with current password
 
+## Passkeys
+
+A passkey (fingerprint, face or device PIN) signs an account in by itself; the password stays as the other way in.
+
+- Set `public_origin` (`NABIMAN_PUBLIC_ORIGIN`) to the address people open, e.g. `https://man.example.com`. Without it passkeys are off (see `docs/operations/configuration.md`).
+- Each account registers its own passkeys on the Two-step verification (2단계 인증) page, below the authenticator-app settings, with its current password. Removing one asks for the password too.
+- Sign-in: `POST /api/auth/passkeys/login/begin`, then `POST /api/auth/passkeys/login/finish`. A passkey sign-in is complete; no TOTP code is asked for. Disabled, pending and expired accounts, access hours and networks, and the sign-in rate limits apply as they do to a password sign-in.
+- Resetting an account's password as an administrator removes its passkeys.
+
 ## Session Management
 - Access tokens expire in 15 minutes
 - Refresh tokens expire in 7 days
