@@ -18,7 +18,7 @@ const ALLOWED = new Set([
   'components/mec/common/DonutChart.tsx', // categorical palette
   'components/remote/SessionLinks.tsx', // one hue per link
   'components/remote/SerialMonitorPopout.tsx', // xterm theme needs a hex value
-  'components/remote/VncConsoleView.tsx', // noVNC canvas ground
+  'components/remote/vncSession.ts', // noVNC canvas ground
   'components/terminal/terminalChrome.ts', // terminal colour schemes
 ]);
 const SKIP_DIRS = ['vendor', path.join('components', 'remote', 'graph')]; // the graph themes itself

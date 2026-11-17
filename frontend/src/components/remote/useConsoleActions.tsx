@@ -1,28 +1,34 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import ConsoleAccessModal from './ConsoleAccessModal';
 import ConsoleShareModal from './ConsoleShareModal';
 import { deleteConsole, VmConsole } from './vncApi';
 import type { Selection } from './workspaceState';
+import { consoleKeeper } from './consoleKeeper';
 
 type Named = { key: string; label: string };
 const POPUP = 'width=1300,height=900,menubar=no,toolbar=no,location=no';
 
 /** What a VM console's right-click menu does, and the access/share dialogs it opens. */
-export function useConsoleActions({ select, showWork, selection, refetch }: {
+export function useConsoleActions({ select, showWork, selection, refetch, consoles }: {
   select: (next: Selection) => void;
   showWork: () => void;
   selection: Selection;
   refetch: () => unknown;
+  /** The consoles the account may open, once loaded. */
+  consoles: VmConsole[] | null;
 }) {
   const { t } = useT();
   const [access, setAccess] = useState<Named | null>(null);
   const [share, setShare] = useState<Named | null>(null);
+  // A console the account may no longer open is not kept connected either.
+  useEffect(() => { if (consoles) consoleKeeper.retain(consoles.map((c) => c.name)); }, [consoles]);
   const page = (c: VmConsole) => `/remote#${c.protocol === 'rdp' ? 'rdp' : 'console'}/${encodeURIComponent(c.name)}`;
 
   const act = async (c: VmConsole, action: string) => {
     if (action === 'open') { select({ kind: 'console', vm: c.name, label: c.label, builtin: c.builtin }); showWork(); }
+    else if (action === 'hangUp') consoleKeeper.drop(c.name);
     else if (action === 'detach') window.open(page(c), `con_${c.name}`, POPUP);
     // A new connection opens its own window, so a multi-user VM can hold several.
     else if (action === 'newSession') window.open(page(c), `con_${c.name}_${Date.now()}`, POPUP);
@@ -34,6 +40,7 @@ export function useConsoleActions({ select, showWork, selection, refetch }: {
     else if (action === 'delete') {
       if (!(await confirmDialog({ message: t('remote.console.deleteConfirm', { label: c.label }), danger: true, confirmLabel: t('common.delete') }))) return;
       await deleteConsole(c.name);
+      consoleKeeper.drop(c.name);
       await refetch();
       if (selection.kind === 'console' && selection.vm === c.name) select({ kind: 'overview' });
     }

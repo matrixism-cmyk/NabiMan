@@ -319,6 +319,11 @@
 .rw-console-error { margin: 6px 12px; cursor: pointer; }
 .rw-console-screen { flex: 1; min-height: 0; background: var(--screen-bg); overflow: hidden; }
 .rw-console-screen canvas { display: block; }
+/* The screen a kept VNC connection draws into; the view puts it here while it is up. */
+.rw-console-kept { width: 100%; height: 100%; }
+.rw-console-speed { padding: 3px 6px; font-size: 12px; }
+/* A console still connected while something else is on screen. */
+.rw-item-kept { background: var(--success-soft); color: var(--success-strong); white-space: nowrap; }
 
 /* A VM console detached into its own window */
 .rw-console-popout { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--screen-bg); }

@@ -154,7 +154,7 @@ export default function RemoteWorkspace() {
     servers, selection, select, joinSessionId, manualPassword, connected, setConnected,
     setServerView, viewRef, openTerminal, refetchSessions, refetchServers, setError: setCheckError,
   });
-  const consoleMenu = useConsoleActions({ select, showWork, selection, refetch: refetchConsoles });
+  const consoleMenu = useConsoleActions({ select, showWork, selection, refetch: refetchConsoles, consoles });
   const detach = () => {
     if (!terminalTarget) return;
     const title = selection.kind === 'server' && selectedServer ? selectedServer.name

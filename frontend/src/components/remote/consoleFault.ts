@@ -4,6 +4,9 @@ export interface ConsoleFault { code?: number; message?: string }
 
 type TFunc = (key: string, params?: Record<string, string | number>) => string;
 
+/** Guacamole's SESSION_CONFLICT: closed because another connection took the session. */
+export const DISPLACED = 0x0209;
+
 /**
  * Explain a console disconnect in Korean and decide whether to auto-retry.
  * Credential/permission failures never retry — hammering a locked or disabled
@@ -14,6 +17,13 @@ type TFunc = (key: string, params?: Record<string, string | number>) => string;
 export function describeFault(t: TFunc, fault?: ConsoleFault): { message: string; retry: boolean } {
   const code = fault?.code;
   const msg = (fault?.message || '').toLowerCase();
+  // 0x0209 SESSION_CONFLICT: the same Windows account signed in from somewhere
+  // else and Windows closed this session (guacd: "Disconnected by other
+  // connection."). Reconnecting would throw the other side out in turn, and
+  // it us again — so this one waits for the user to ask.
+  if (code === DISPLACED || /other connection|session conflict/.test(msg)) {
+    return { message: t('remote.console.err.displaced'), retry: false };
+  }
   const authish = /denied|locked|disabled|credential|logon|authentic|unauthor|password|permission|security/.test(msg);
   // 0x0301 CLIENT_UNAUTHORIZED, 0x0303 CLIENT_FORBIDDEN.
   if (code === 0x0301 || code === 0x0303 || authish) return { message: t('remote.console.err.auth'), retry: false };

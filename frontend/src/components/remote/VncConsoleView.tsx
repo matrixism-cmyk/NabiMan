@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import RFB from '@novnc/novnc/lib/rfb.js';
 import { useT } from '../../shared/i18n';
 import { useFullscreen } from '../../shared/ui/useFullscreen';
 import { useChromeHidden } from '../../shared/ui/useChromeHidden';
@@ -7,90 +6,49 @@ import { useConsoleView, keepAlive, ConsoleShare } from './consoleView';
 import ConsoleSettingsModal from './ConsoleSettingsModal';
 import ConsoleDictation from './ConsoleDictation';
 import { useConsoleKeyboard } from './ConsoleKeyboard';
-import { describeFault, reconnectDelay, RECONNECT_MAX } from './consoleFault';
-import { consoleWsUrl, shareWsUrl } from './vncApi';
+import ConsoleSpeedSelect from './ConsoleSpeedSelect';
 import { sendKeysym, typeText } from './vncInput';
-
-type Status = 'connecting' | 'connected' | 'disconnected';
+import { VncSession } from './vncSession';
+import { noticeText } from './consoleSession';
+import { useConsoleSession } from './useConsoleSession';
+import { DEFAULT_SPEED, readSpeed, rememberSpeed } from './consoleSpeed';
 
 /** A browser VNC console for an internal VM, over NabiMan's own proxy. noVNC
- *  (RFB) draws into the canvas; the WebSocket is admitted by a one-use ticket. */
+ *  (RFB) draws into the canvas; the WebSocket is admitted by a one-use ticket.
+ *  In the workspace the connection is the console keeper's: leaving this view
+ *  lets go of the screen, not of the connection. */
 export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, canGrant, onGrant, canShare, onShare, popout, share }: {
   vm: string; label: string; canEdit?: boolean; onEdit?: () => void; onDelete?: () => void; canGrant?: boolean; onGrant?: () => void; canShare?: boolean; onShare?: () => void; popout?: boolean; share?: ConsoleShare;
 }) {
   const { t } = useT();
   const host = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
-  const rfb = useRef<RFB | null>(null);
-  const retries = useRef(0);
-  const reconnectTimer = useRef<number | undefined>(undefined);
+  const kept = !popout && !share;
+  const { session, begin, leave, reconnect, hangUp } = useConsoleSession(vm, kept, VncSession, () => new VncSession(vm, share));
+  const { status, vmClip } = session;
   const { full, toggle } = useFullscreen(root);
   const [folded, setFolded] = useChromeHidden();
   const [cview, setCview] = useConsoleView();
-  const keepaliveRef = useRef(true);
-  keepaliveRef.current = keepAlive(cview);
   const [showSettings, setShowSettings] = useState(false);
-  const [status, setStatus] = useState<Status>('connecting');
-  const [error, setError] = useState('');
   const [scale, setScale] = useState(true);
-  const [attempt, setAttempt] = useState(0);
+  const [speed, setSpeed] = useState(() => (share ? DEFAULT_SPEED : readSpeed(vm)));
   const [clipOpen, setClipOpen] = useState(false);
   const [sendText, setSendText] = useState('');
-  const [vmClip, setVmClip] = useState('');
   const [pasted, setPasted] = useState(false);
+  useEffect(() => { session.autoReconnect = keepAlive(cview); });
 
+  // While this view is up it holds the screen; going away gives it back and
+  // leaves the connection to the keeper.
   useEffect(() => {
-    let live = true;
-    let failed = false;
-    const controller = new AbortController();
-    setStatus('connecting'); setError('');
-    // On an unexpected drop, auto-reconnect with backoff; a security failure
-    // (bad VNC password/auth) is shown, not retried. The guard keeps one drop
-    // from firing twice.
-    const fail = (fault?: { code?: number; message?: string }) => {
-      if (!live || failed) return;
-      failed = true;
-      const { message, retry } = describeFault(t, fault);
-      if (retry && retries.current < RECONNECT_MAX && keepaliveRef.current) {
-        const n = ++retries.current;
-        setStatus('connecting');
-        setError(t('remote.console.reconnecting', { n, max: RECONNECT_MAX }));
-        reconnectTimer.current = window.setTimeout(() => { if (live) setAttempt(a => a + 1); }, reconnectDelay(n));
-      } else {
-        setStatus('disconnected'); setError(message);
-      }
-    };
-    (async () => {
-      try {
-        const url = share ? shareWsUrl(share.token, share.pw) : await consoleWsUrl(vm, controller.signal);
-        if (!live || !host.current) return;
-        const client = new RFB(host.current, url, { wsProtocols: ['binary'] });
-        client.scaleViewport = scale;
-        client.resizeSession = !scale;
-        client.viewOnly = Boolean(share?.viewOnly);
-        client.background = '#0b0d10';
-        client.addEventListener('connect', () => { if (live) { retries.current = 0; setStatus('connected'); setError(''); } });
-        client.addEventListener('disconnect', (e: Event) => {
-          if ((e as CustomEvent<{ clean: boolean }>).detail?.clean) setStatus('disconnected');
-          else fail();
-        });
-        client.addEventListener('securityfailure', () => fail({ message: 'securityfailure' }));
-        // Text copied inside the VM arrives here (if the guest supports it).
-        client.addEventListener('clipboard', (e: Event) => live && setVmClip((e as CustomEvent<{ text: string }>).detail?.text ?? ''));
-        rfb.current = client;
-      } catch (cause) {
-        if (!controller.signal.aborted) fail({ message: cause instanceof Error ? cause.message : undefined });
-      }
-    })();
-    return () => {
-      live = false; controller.abort();
-      if (reconnectTimer.current) window.clearTimeout(reconnectTimer.current);
-      try { rfb.current?.disconnect(); } catch { /* already gone */ }
-      rfb.current = null;
-    };
-  }, [vm, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
+    const el = host.current;
+    if (!el) return undefined;
+    session.attach(el);
+    begin();
+    return () => { session.detach(); leave(); };
+  }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { if (rfb.current) { rfb.current.scaleViewport = scale; rfb.current.resizeSession = !scale; } }, [scale]);
+  useEffect(() => { session.setScale(scale); }, [session, scale]);
+  useEffect(() => { session.setSpeed(speed); }, [session, speed]);
 
   // Ctrl/Cmd+V while the console has focus pastes the browser clipboard into the
   // VM as keystrokes — no panel, no VM changes. (ASCII is reliable; Hangul/IME
@@ -102,13 +60,13 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
       if (!share?.viewOnly && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'v' || e.key === 'V')) {
         e.preventDefault(); e.stopImmediatePropagation();
         navigator.clipboard.readText().then((text) => {
-          if (text && rfb.current) { typeText(rfb.current, text); setPasted(true); setTimeout(() => setPasted(false), 1200); }
+          if (text && session.rfb) { typeText(session.rfb, text); setPasted(true); setTimeout(() => setPasted(false), 1200); }
         }).catch(() => { /* needs clipboard permission */ });
       }
     };
     el.addEventListener('keydown', onKey, true);
     return () => el.removeEventListener('keydown', onKey, true);
-  }, []);
+  }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openClip = async () => {
     try { const text = await navigator.clipboard.readText(); if (text) setSendText(text); } catch { /* no permission */ }
@@ -116,13 +74,14 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
   };
 
   // Voice dictation typed into the VM (ASCII reliable; Hangul limited on VNC).
-  const dictate = (text: string) => { if (rfb.current) typeText(rfb.current, text); };
-  const dictateKeys = (keys: string) => { if (rfb.current) typeText(rfb.current, keys); };
+  const dictate = (text: string) => { if (session.rfb) typeText(session.rfb, text); };
+  const dictateKeys = (keys: string) => { if (session.rfb) typeText(session.rfb, keys); };
 
+  const notice = noticeText(t, session.notice);
   const kbd = useConsoleKeyboard({
     enabled: status === 'connected' && !share?.viewOnly,
     screen: host,
-    send: (keysym, down) => { try { if (rfb.current) sendKeysym(rfb.current, keysym, down); } catch { /* not ready */ } },
+    send: (keysym, down) => { try { if (session.rfb) sendKeysym(session.rfb, keysym, down); } catch { /* not ready */ } },
   });
 
   return (
@@ -136,6 +95,7 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
         <span className={`rw-console-state is-${status}`}>{t(`remote.console.${status}`)}</span>
         {share?.viewOnly && <span className="rw-proto-tag">{t('remote.console.share.viewOnly')}</span>}
         <span className="rw-console-spacer" />
+        {!share && <ConsoleSpeedSelect value={speed} onChange={(next) => { setSpeed(next); rememberSpeed(vm, next); }} />}
         <label className="rw-console-toggle"><input type="checkbox" checked={scale} onChange={e => setScale(e.target.checked)} /> {t('remote.console.fit')}</label>
         {status === 'connected' && !share?.viewOnly && <ConsoleDictation share={share} view={cview} onText={dictate} onKeys={dictateKeys} />}
         {kbd.button}
@@ -144,8 +104,9 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
         <button className="btn btn-secondary btn-sm" onClick={toggle} title={t('remote.console.fullscreen')} aria-label={t('remote.console.fullscreen')} aria-pressed={full}>⛶</button>
         <button className="btn btn-secondary btn-sm" onClick={() => setFolded(true)} title={t('app.hideChrome')} aria-label={t('app.hideChrome')}>▴</button>
         <button className="btn btn-secondary btn-sm" onClick={() => setShowSettings(true)} title={t('remote.console.settings')} aria-label={t('remote.console.settings')}>⚙</button>
-        {!share?.viewOnly && <button className="btn btn-secondary btn-sm" onClick={() => { try { rfb.current?.sendCtrlAltDel(); } catch { /* not ready */ } }} disabled={status !== 'connected'}>Ctrl+Alt+Del</button>}
-        {status === 'disconnected' && <button className="btn btn-primary btn-sm" onClick={() => { retries.current = 0; setAttempt(a => a + 1); }}>{t('remote.console.reconnect')}</button>}
+        {!share?.viewOnly && <button className="btn btn-secondary btn-sm" onClick={() => { try { session.rfb?.sendCtrlAltDel(); } catch { /* not ready */ } }} disabled={status !== 'connected'}>Ctrl+Alt+Del</button>}
+        {kept && status !== 'disconnected' && <button className="btn btn-secondary btn-sm" onClick={hangUp} title={t('remote.console.hangUpHint')}>{t('remote.console.hangUp')}</button>}
+        {status === 'disconnected' && <button className="btn btn-primary btn-sm" onClick={reconnect}>{t('remote.console.reconnect')}</button>}
         {canEdit && <button className="btn btn-secondary btn-sm" onClick={onEdit}>{t('common.edit')}</button>}
         {canGrant && <button className="btn btn-secondary btn-sm" onClick={onGrant}>{t('remote.console.access.btn')}</button>}
         {canShare && <button className="btn btn-secondary btn-sm" onClick={onShare}>{t('remote.console.share.btn')}</button>}
@@ -156,8 +117,8 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
           <label>{t('remote.console.clip.toVm')}</label>
           <textarea value={sendText} onChange={e => setSendText(e.target.value)} rows={2} placeholder={t('remote.console.clip.placeholder')} />
           <div className="rw-console-clip-row">
-            <button className="btn btn-primary btn-sm" disabled={!sendText || status !== 'connected'} onClick={() => { try { rfb.current?.clipboardPasteFrom(sendText); } catch { /* not connected: the button is disabled then anyway */ } }}>{t('remote.console.clip.send')}</button>
-            <button className="btn btn-secondary btn-sm" disabled={!sendText || status !== 'connected'} onClick={() => { if (rfb.current) typeText(rfb.current, sendText); }}>{t('remote.console.clip.type')}</button>
+            <button className="btn btn-primary btn-sm" disabled={!sendText || status !== 'connected'} onClick={() => { try { session.rfb?.clipboardPasteFrom(sendText); } catch { /* not connected: the button is disabled then anyway */ } }}>{t('remote.console.clip.send')}</button>
+            <button className="btn btn-secondary btn-sm" disabled={!sendText || status !== 'connected'} onClick={() => { if (session.rfb) typeText(session.rfb, sendText); }}>{t('remote.console.clip.type')}</button>
             <span className="rw-console-clip-hint">{t('remote.console.clip.hint')}</span>
           </div>
           <label>{t('remote.console.clip.fromVm')}</label>
@@ -167,7 +128,7 @@ export default function VncConsoleView({ vm, label, canEdit, onEdit, onDelete, c
           </div>
         </div>
       )}
-      {error && <p role="alert" className="message rw-console-error" onClick={() => setError('')}>{error}</p>}
+      {notice && <p role="alert" className="message rw-console-error" onClick={() => session.dismiss()}>{notice}</p>}
       {pasted && <div className="rw-console-toast">{t('remote.console.clip.pasted')}</div>}
       <div ref={host} className="rw-console-screen" tabIndex={-1} />
       {kbd.panel}

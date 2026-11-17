@@ -23,6 +23,7 @@ import sessionSettings from './session-settings';
 import sftp from './sftp';
 import remoteProtocols from './remote-protocols';
 import remoteBase from './remote-base';
+import remoteConsoleKeep from './remote-console-keep';
 import claude from './claude';
 import claudeVoices from './claude-voices';
 import diagnosticsTools from './diagnostics-tools';
@@ -70,6 +71,7 @@ const translations: Translations = {
   ...dictation,
   ...sessionSettings,
   ...remoteBase,
+  ...remoteConsoleKeep,
   ...sftp,
   ...claude,
   ...claudeVoices,

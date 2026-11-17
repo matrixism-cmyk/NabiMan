@@ -12,10 +12,15 @@ declare module '@novnc/novnc/lib/rfb.js' {
     background: string;
     viewOnly: boolean;
     focusOnClick: boolean;
+    /** JPEG quality, 0–9 (higher is sharper); applies to a live connection too. */
+    qualityLevel: number;
+    /** Compression effort, 0–9 (higher is smaller and slower). */
+    compressionLevel: number;
     disconnect(): void;
     sendCtrlAltDel(): void;
     sendKey(keysym: number, code?: string | null, down?: boolean): void;
     clipboardPasteFrom(text: string): void;
     focus(): void;
+    blur(): void;
   }
 }

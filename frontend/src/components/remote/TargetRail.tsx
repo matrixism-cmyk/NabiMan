@@ -11,6 +11,7 @@ import {
 import { RailAction, Selection } from './workspaceState';
 import { zoomStyle } from './panelZoom';
 import { assignedTo, useGrants, useMember } from './member';
+import { consoleKeeper, KEEP_HIDDEN_MS, useKeptConsoles } from './consoleKeeper';
 
 interface Props {
   /** A phone: no floating windows, and a long press opens the menu. */
@@ -63,6 +64,7 @@ export default function TargetRail({
     try { localStorage.setItem(FOLD_KEY, next ? '1' : '0'); } catch { /* private mode */ }
   };
   const closeMenu = useCallback(() => setMenu(null), []);
+  const keptConsoles = useKeptConsoles();
 
   // A finger has no right button: holding it on an entry opens the same menu.
   const press = useLongPress<MenuTarget>((at, target) => setMenu({ x: at.x, y: at.y, target, opener: at.el }));
@@ -92,6 +94,8 @@ export default function TargetRail({
         { key: 'newSession', icon: '＋', label: t('remote.console.newSession'), onSelect: act('newSession') },
         { key: 'detach', icon: '⧉', label: t('remote.console.detach'), onSelect: act('detach') },
       ];
+      // Connected here, on screen or kept: it can be hung up without opening it.
+      if (consoleKeeper.get(c.name)?.alive()) items.push({ key: 'hangUp', icon: '⏻', label: t('remote.console.hangUp'), onSelect: act('hangUp') });
       items.push({ key: 'share', icon: '↗', label: t('remote.console.share.btn'), separated: true, onSelect: act('share') });
       if (canManageConsoles) {
         items.push({ key: 'access', icon: '◍', label: t('remote.console.access.btn'), onSelect: act('access') });
@@ -236,10 +240,12 @@ export default function TargetRail({
               <button key={vm.name}
                 className={`rw-item ${selection.kind === 'console' && selection.vm === vm.name ? 'is-active' : ''}`}
                 aria-haspopup="menu"
-                onClick={() => onSelect({ kind: 'console', vm: vm.name, label: vm.label, builtin: vm.builtin })}
+                {...press.bind({ kind: 'console', console: vm })}
+                onClick={() => pick({ kind: 'console', vm: vm.name, label: vm.label, builtin: vm.builtin })}
                 onContextMenu={(e) => openMenu(e, { kind: 'console', console: vm })}>
                 <span className="rw-lamp rw-lamp-local" />
                 <span className="rw-item-name">{vm.label}</span>
+                {keptConsoles.includes(vm.name) && <span className="rw-item-count rw-item-kept" title={t('remote.console.keptHint', { minutes: KEEP_HIDDEN_MS / 60000 })}>{t('remote.console.kept')}</span>}
                 <span className="rw-item-sub">{vm.protocol === 'rdp' ? t('remote.consoleHintRdp') : (vm.builtin ? t('remote.consoleHint') : t('remote.consoleHintExternal'))}</span>
               </button>
             ))}
