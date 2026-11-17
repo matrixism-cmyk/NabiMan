@@ -24,6 +24,7 @@ struct RdpParams {
     width: u32,
     height: u32,
     dpi: u32,
+    speed: super::rdp_profile::Speed,
 }
 
 /// One Guacamole instruction: `len.value,len.value,…;` where the length is the
@@ -263,12 +264,12 @@ async fn pump(
             "security" => "any".into(),
             "ignore-cert" => "true".into(),
             "resize-method" => "display-update".into(),
-            "enable-wallpaper" => "true".into(),
             "enable-drive" => if drive_ok { "true" } else { "false" }.into(),
             "drive-name" => "NabiMan".into(),
             "drive-path" => drive_path.clone(),
             "create-drive-path" => "false".into(),
-            _ => String::new(),
+            // The looks the speed profile sets; everything else stays guacd's default.
+            other => p.speed.value(other).unwrap_or_default().into(),
         }
     };
     // args = ["args", VERSION, <param names…>]; the connect values line up with
@@ -322,13 +323,7 @@ fn q(query: &str, key: &str) -> Option<String> {
     super::parse_query_param(query, key)
 }
 
-/// The display the page asks for (its window, or the fixed size it chose): width, height, DPI.
-fn display_size(query: &str) -> (u32, u32, u32) {
-    let dims = |k: &str, d: u32| q(query, k).and_then(|v| v.parse().ok()).filter(|n| *n > 0 && *n <= 8000).unwrap_or(d);
-    (dims("GUAC_WIDTH", 1280), dims("GUAC_HEIGHT", 800), dims("GUAC_DPI", 96))
-}
-
-/// `GET /api/remote/rdp?target=<id>&ticket=…` (+ guacamole display params) —
+/// `GET /api/remote/rdp?target=<id>&ticket=…` (+ display size and `speed`) —
 /// the RDP console WebSocket.
 #[actix_web::get("/api/remote/rdp")]
 async fn ws_rdp(
@@ -360,8 +355,8 @@ async fn ws_rdp(
     let Some((user, password)) = super::console_creds::resolve(query, &target, user, password) else {
         return Ok(HttpResponse::Unauthorized().finish());
     };
-    let (width, height, dpi) = display_size(query);
-    let params = RdpParams { host, port, user, password, width, height, dpi };
+    let (width, height, dpi, speed) = super::rdp_profile::display(query);
+    let params = RdpParams { host, port, user, password, width, height, dpi, speed };
     ws::WsResponseBuilder::new(
         RdpConsole { params, started: Instant::now(), to_guacd: None, life: super::console_share::Lifeline::Account(grant), view_only: false },
         &req,
@@ -382,8 +377,8 @@ pub(super) fn open_shared_rdp(
     let Some((host, port, user, password)) = super::vnc_registry::rdp_login(console) else {
         return Ok(HttpResponse::NotFound().finish());
     };
-    let (width, height, dpi) = display_size(req.query_string());
-    let params = RdpParams { host, port, user, password, width, height, dpi };
+    let (width, height, dpi, speed) = super::rdp_profile::display(req.query_string());
+    let params = RdpParams { host, port, user, password, width, height, dpi, speed };
     ws::WsResponseBuilder::new(
         RdpConsole { params, started: Instant::now(), to_guacd: None, life: super::console_share::Lifeline::Share(token), view_only },
         req,

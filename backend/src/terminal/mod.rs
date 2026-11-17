@@ -37,6 +37,7 @@ pub(crate) mod sftp;
 pub mod share;
 pub mod vnc_console;
 pub mod vnc_registry;
+mod rdp_profile;
 pub mod rdp_tunnel;
 pub mod vnc_access;
 pub mod console_share;
