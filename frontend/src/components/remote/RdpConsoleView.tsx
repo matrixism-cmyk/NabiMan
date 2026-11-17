@@ -116,6 +116,16 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
     if (!share?.viewOnly) host.current?.focus({ preventScroll: true });
   }, [session, status]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The room changes without the window changing size, too: folding the top
+  // bar, the rail, a side panel. Watch the stage itself so the desktop follows.
+  useEffect(() => {
+    const el = host.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const watch = new ResizeObserver(() => refit());
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const notice = error || noticeText(t, session.notice);
   const ctrlAltDel = () => { [[true, 0xffe3], [true, 0xffe9], [true, 0xffff], [false, 0xffff], [false, 0xffe9], [false, 0xffe3]].forEach(([down, key]) => session.sendKey(down as boolean, key as number)); };
 
