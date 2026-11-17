@@ -247,7 +247,10 @@ export function fitFontToPane(
   maxSize = 28,
 ): void {
   if (!cols || !rows) return;
-  const proposal = () => fit.proposeDimensions();
+  // A terminal that is not drawn yet, or already closed, has no cell size: the
+  // addon throws on it instead of answering. Leave the text as it is then.
+  const proposal = () => { try { return fit.proposeDimensions(); } catch { return undefined; } };
+  if (!proposal()) return;
   const widthFits = () => { const p = proposal(); return Boolean(p && p.cols >= cols); };
   const heightFits = () => { const p = proposal(); return Boolean(p && p.rows >= rows); };
 
