@@ -42,6 +42,7 @@
     "smoke:claude": "node scripts/smoke-claude.js",
     "smoke:sessions": "node scripts/smoke-sessions.js",
     "smoke:signin": "node scripts/smoke-signin.js",
+    "smoke:passkey": "node scripts/smoke-passkey.js",
     "smoke:screen": "node scripts/smoke-screen.js",
     "smoke:standalone": "node scripts/smoke-standalone.js",
     "smoke:member": "node scripts/smoke-member.js",
