@@ -30,6 +30,8 @@ export class RdpSession extends ConsoleSession {
   onReceived?: (name: string) => void;
   private options: RdpOptions = { fixed: null, speed: DEFAULT_SPEED };
   private size = { w: 1280, h: 800 };
+  /** The size the VM was last told; the room may have changed while it could not be told. */
+  private told = { w: 0, h: 0 };
   private alt: { user: string; password: string } | null = null;
   private zoomer: ReturnType<typeof rdpZoom> | null = null;
   private sizeTimer?: ReturnType<typeof setTimeout>;
@@ -77,11 +79,22 @@ export class RdpSession extends ConsoleSession {
     this.fit();
     if (!width || !height) return;
     const w = Math.max(width, 640), h = Math.max(height, 480);
-    if (w === this.size.w && h === this.size.h) return;
     this.size = { w, h };
-    if (this.options.fixed) return;
+    this.tellSize();
+  }
+
+  /** Tells the VM the room it has, once it can hear it. Guacamole drops a size
+   *  sent before the connection is up, so one that changed meanwhile (the bar
+   *  wrapping onto a second row as its buttons appear) is sent again then;
+   *  otherwise the desktop stays the old size, scaled down or cut off. */
+  private tellSize(wait = 300) {
     if (this.sizeTimer) clearTimeout(this.sizeTimer);
-    this.sizeTimer = setTimeout(() => { try { this.client?.sendSize(w, h); } catch { /* not connected yet */ } }, 300);
+    if (this.options.fixed || this.status !== 'connected') return;
+    const { w, h } = this.size;
+    if (w === this.told.w && h === this.told.h) return;
+    this.sizeTimer = setTimeout(() => {
+      try { this.client?.sendSize(w, h); this.told = { w, h }; } catch { /* the connection went; the next one starts at this size */ }
+    }, wait);
   }
 
   sendKey(down: boolean, keysym: number) { try { this.client?.sendKeyEvent(down ? 1 : 0, keysym); } catch { /* not ready */ } }
@@ -119,7 +132,7 @@ export class RdpSession extends ConsoleSession {
 
     c.onstatechange = (state: number) => {
       if (!live()) return;
-      if (state === 3) { this.up(); zoomed.fit(); } else if (state === 5) fail();
+      if (state === 3) { this.up(); zoomed.fit(); this.tellSize(0); } else if (state === 5) fail();
     };
     c.onerror = (err: { code?: number; message?: string }) => fail(err);
     // Text copied inside the VM → the local clipboard, while the console shows.
@@ -141,6 +154,7 @@ export class RdpSession extends ConsoleSession {
     };
 
     const { w, h } = options.fixed || this.size;
+    this.told = { w, h };
     const query = `GUAC_WIDTH=${w}&GUAC_HEIGHT=${h}&GUAC_DPI=96&speed=${options.speed}`;
     if (share) {
       c.connect((share.pw ? `pw=${encodeURIComponent(share.pw)}&` : '') + query);
