@@ -10,13 +10,16 @@ jest.mock('../../vendor/guacamole-common.js', () => {
     element = global.document.createElement('div');
     onstatechange: ((state: number) => void) | null = null;
     constructor() { mockClients.push(this); }
-    getDisplay() { return { getElement: () => this.element, getWidth: () => 1280, getHeight: () => 800, getScale: () => 1, scale: () => undefined, onresize: null }; }
+    screen = [0, 0];
+    /** Sizes the VM will ignore before it starts following (Windows, right after connecting). */
+    deaf = 0;
+    getDisplay() { return { getElement: () => this.element, getWidth: () => this.screen[0], getHeight: () => this.screen[1], getScale: () => 1, scale: () => undefined, onresize: null }; }
     connect(query: string) { this.connected = query; }
     disconnect() { /* gone */ }
     /** As Guacamole: a size sent before the connection is up is dropped. */
-    sendSize(w: number, h: number) { if (this.state === 3) this.sizes.push([w, h]); }
+    sendSize(w: number, h: number) { if (this.state !== 3) return; this.sizes.push([w, h]); if (this.deaf > 0) this.deaf -= 1; else this.screen = [w - (w % 2), h]; }
     sendMouseState() { /* not looked at */ }
-    come() { this.state = 3; this.onstatechange?.(3); }
+    come() { this.state = 3; const m = /GUAC_WIDTH=(\d+)&GUAC_HEIGHT=(\d+)/.exec(this.connected || ''); if (m) this.screen = [Number(m[1]), Number(m[2])]; this.onstatechange?.(3); }
   }
   class Pointer { }
   const Mouse: any = Pointer;
@@ -52,6 +55,34 @@ test('room that changed while connecting is told to the VM once it is up', async
   client.come();
   jest.advanceTimersByTime(10);
   expect(client.sizes).toEqual([[1182, 662]]);
+  jest.advanceTimersByTime(10000);
+  expect(client.sizes).toEqual([[1182, 662]]);
+  session.close();
+});
+
+test('a size the VM ignored right after connecting is told again until the screen follows', async () => {
+  const { session, client } = await started(1182, 699);
+  client.deaf = 1;
+  client.come();
+  session.resize(1182, 662);
+  jest.advanceTimersByTime(400);
+  expect(client.sizes).toEqual([[1182, 662]]);
+  expect(client.screen).toEqual([1182, 699]);
+  jest.advanceTimersByTime(3000);
+  expect(client.sizes).toEqual([[1182, 662], [1182, 662]]);
+  expect(client.screen).toEqual([1182, 662]);
+  jest.advanceTimersByTime(20000);
+  expect(client.sizes.length).toBe(2);
+  session.close();
+});
+
+test('a VM that never follows is not asked for ever', async () => {
+  const { session, client } = await started(1182, 699);
+  client.deaf = 99;
+  client.come();
+  session.resize(1182, 662);
+  jest.advanceTimersByTime(60000);
+  expect(client.sizes.length).toBe(4);
   session.close();
 });
 

@@ -30,8 +30,6 @@ export class RdpSession extends ConsoleSession {
   onReceived?: (name: string) => void;
   private options: RdpOptions = { fixed: null, speed: DEFAULT_SPEED };
   private size = { w: 1280, h: 800 };
-  /** The size the VM was last told; the room may have changed while it could not be told. */
-  private told = { w: 0, h: 0 };
   private alt: { user: string; password: string } | null = null;
   private zoomer: ReturnType<typeof rdpZoom> | null = null;
   private sizeTimer?: ReturnType<typeof setTimeout>;
@@ -84,17 +82,26 @@ export class RdpSession extends ConsoleSession {
   }
 
   /** Tells the VM the room it has, once it can hear it. Guacamole drops a size
-   *  sent before the connection is up, so one that changed meanwhile (the bar
-   *  wrapping onto a second row as its buttons appear) is sent again then;
-   *  otherwise the desktop stays the old size, scaled down or cut off. */
-  private tellSize(wait = 300) {
+   *  sent before the connection is up, and Windows ignores one that arrives
+   *  right after it (the bar wrapping onto a second row as its buttons appear),
+   *  so the screen is looked at again afterwards and told once more while it
+   *  is still another size; otherwise the desktop stays scaled down or cut off. */
+  private tellSize(wait = 300, triesLeft = 3) {
     if (this.sizeTimer) clearTimeout(this.sizeTimer);
     if (this.options.fixed || this.status !== 'connected') return;
     const { w, h } = this.size;
-    if (w === this.told.w && h === this.told.h) return;
     this.sizeTimer = setTimeout(() => {
-      try { this.client?.sendSize(w, h); this.told = { w, h }; } catch { /* the connection went; the next one starts at this size */ }
+      if (this.screenIs(w, h)) return;
+      try { this.client?.sendSize(w, h); } catch { return; /* the connection went; the next one starts at this size */ }
+      if (triesLeft > 0) this.sizeTimer = setTimeout(() => this.tellSize(0, triesLeft - 1), 2500);
     }, wait);
+  }
+
+  /** The VM's screen is this size already (it rounds the width to an even number). */
+  private screenIs(w: number, h: number) {
+    const display = this.client?.getDisplay?.();
+    if (!display) return false;
+    return Math.abs(display.getWidth() - w) <= 2 && Math.abs(display.getHeight() - h) <= 2;
   }
 
   sendKey(down: boolean, keysym: number) { try { this.client?.sendKeyEvent(down ? 1 : 0, keysym); } catch { /* not ready */ } }
@@ -154,7 +161,6 @@ export class RdpSession extends ConsoleSession {
     };
 
     const { w, h } = options.fixed || this.size;
-    this.told = { w, h };
     const query = `GUAC_WIDTH=${w}&GUAC_HEIGHT=${h}&GUAC_DPI=96&speed=${options.speed}`;
     if (share) {
       c.connect((share.pw ? `pw=${encodeURIComponent(share.pw)}&` : '') + query);
