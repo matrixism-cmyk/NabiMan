@@ -54,12 +54,13 @@
       if (start.moved) {
         dragged = true; setTimeout(function () { dragged = false; }, 0);
         try { localStorage.setItem(POS_KEY, JSON.stringify({ right: parseFloat(el.style.right), bottom: parseFloat(el.style.bottom) })); } catch (_) { /* private mode */ }
+        el.setAttribute('data-moved', '');
       }
       start = null; el.style.cursor = '';
     }
     el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
     // Double-click puts it back in its corner.
-    el.addEventListener('dblclick', function () { try { localStorage.removeItem(POS_KEY); } catch (_) { /* private mode */ } place({ right: 16, bottom: 16 }); });
+    el.addEventListener('dblclick', function () { try { localStorage.removeItem(POS_KEY); } catch (_) { /* private mode */ } el.removeAttribute('data-moved'); place({ right: 16, bottom: 16 }); });
   }
   window.addEventListener('resize', function () { place(savedPos()); });
   function token() { try { return sessionStorage.getItem('nabiman_token'); } catch (_) { return null; } }
@@ -114,6 +115,8 @@
       Object.assign(button.style, { position: 'fixed', right: '16px', bottom: '16px', zIndex: '2147483000' });
       button.title = label('끌어서 옮길 수 있습니다 (두 번 누르면 제자리)', 'Drag to move (double-click to reset)', 'ドラッグで移動（ダブルクリックで元の位置）');
       button.addEventListener('click', open); document.body.appendChild(button);
+      // Put somewhere by the person: the page leaves it there (a VM console moves the default one off its screen).
+      try { if (localStorage.getItem(POS_KEY)) button.setAttribute('data-moved', ''); } catch (_) { /* private mode */ }
       draggable(button); place(savedPos());
     }
   }

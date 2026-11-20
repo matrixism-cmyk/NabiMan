@@ -331,3 +331,11 @@
 .app.chrome-hidden .main-content { padding: 4px; }
 .app.chrome-hidden .sidebar { padding-top: 4px; }
 
+
+/* A VM console's screen reaches the bottom right corner, where the feedback
+   launcher sits by default: on the clock of the VM's taskbar. While a console
+   shows, the launcher waits on the menu row instead; with the top folded away
+   or the console in its own window there is no such row, and it is hidden.
+   One the person dragged somewhere stays where they put it. */
+body:has(.rw-rdp-screen, .rw-console-screen) [data-nabiman-feedback-launcher]:not([data-moved]) { top: 84px !important; bottom: auto !important; }
+body:has(.app.chrome-hidden .rw-rdp-screen, .app.chrome-hidden .rw-console-screen, .rw-console-popout) [data-nabiman-feedback-launcher]:not([data-moved]) { display: none !important; }
