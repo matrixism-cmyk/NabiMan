@@ -338,4 +338,12 @@
    or the console in its own window there is no such row, and it is hidden.
    One the person dragged somewhere stays where they put it. */
 body:has(.rw-rdp-screen, .rw-console-screen) [data-nabiman-feedback-launcher]:not([data-moved]) { top: 84px !important; bottom: auto !important; }
+/* On the remote page by itself the only free row is its slim bar, beside the name. */
+body:has(.remote-shell .rw-rdp-screen, .remote-shell .rw-console-screen) [data-nabiman-feedback-launcher]:not([data-moved]) { top: 2px !important; right: auto !important; left: 150px; }
 body:has(.app.chrome-hidden .rw-rdp-screen, .app.chrome-hidden .rw-console-screen, .rw-console-popout) [data-nabiman-feedback-launcher]:not([data-moved]) { display: none !important; }
+
+/* The bar of open terminal windows lies over the bottom of the page. A page
+   that fills the window to its last row (a VM console's taskbar, a file list)
+   ends above the bar while it is there, instead of under it. */
+body:has(.term-taskbar) .app:not(.focus-mode),
+body:has(.term-taskbar) .remote-shell:not(.focus-mode) { height: calc(100vh - 44px); height: calc(100dvh - 44px); }
