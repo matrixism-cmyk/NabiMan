@@ -1,22 +1,25 @@
 /* Shared visual language. Colors follow the selected theme. */
 
 .app { height: 100dvh; }
-.app-header { min-height: 76px; padding: 16px 28px; gap: 20px; }
+/* Kept slim: the page is for the work below, and the margins around that work are
+   close to what folding the top away leaves (4px). */
+.app-header { min-height: 50px; padding: 7px 16px; gap: 16px; }
 .app-header h1 { line-height: 1; }
-.logo-link { display: flex; align-items: center; gap: 10px; border: 0; background: none; color: var(--text); font-size: 21px; font-weight: 750; letter-spacing: -.7px; }
+.logo-link { display: flex; align-items: center; gap: 8px; border: 0; background: none; color: var(--text); font-size: 18px; font-weight: 750; letter-spacing: -.7px; }
 .subtitle { padding-left: 20px; border-left: 1px solid var(--border); font-size: 12px; }
 .header-actions { flex-wrap: wrap; }
-.header-actions .btn { min-height: 32px; font-size: 12px; }
+.header-actions .btn { min-height: 30px; font-size: 12px; }
+.logo-link img { width: 26px; height: 26px; }
 .cat-nav { padding: 0 24px; gap: 8px; border-bottom-width: 1px; }
 .cat-btn { position: relative; padding: 15px 18px; font-size: 13px; }
 .cat-btn.active { background: linear-gradient(0deg, var(--accent-soft), transparent); }
-.sidebar { width: var(--sidebar-width); min-width: var(--sidebar-width); padding: 24px 12px; gap: 5px; }
-.sidebar-heading { padding: 0 12px 18px; color: var(--text-secondary); font-size: 11px; font-weight: 650; letter-spacing: .06em; }
+.sidebar { width: var(--sidebar-width); min-width: var(--sidebar-width); padding: 10px 8px; gap: 4px; }
+.sidebar-heading { padding: 2px 12px 8px; color: var(--text-secondary); font-size: 11px; font-weight: 650; letter-spacing: .06em; }
 .sidebar-btn { border: 1px solid transparent; border-radius: 8px; padding: 11px 12px; line-height: 1.4; }
 .sidebar-btn:hover { background: var(--surface-alt); }
 .sidebar-btn.active { border-color: color-mix(in srgb, var(--primary) 20%, transparent); background: var(--accent-soft); font-weight: 650; }
 .terminal-persist { left: var(--sidebar-width); }
-.main-content { padding: 28px; }
+.main-content { padding: 8px; }
 
 .kpi-sub { margin-top: 7px; opacity: 1; line-height: 1.5; }
 .info-grid { gap: 8px 16px; }
@@ -39,7 +42,7 @@
   .subtitle { display: none; }
 }
 @media (max-width: 768px) {
-  .app-header { padding: 14px 16px; }
+  .app-header { padding: 7px 12px; }
   .header-actions { gap: 6px; }
   .header-actions .btn { padding: 5px 8px; }
   .cat-nav { padding: 0 8px; gap: 0; }
@@ -47,7 +50,7 @@
   .sidebar { width: 100%; min-width: 100%; padding: 8px; flex-shrink: 0; }
   .sidebar-heading { display: none; }
   .sidebar-btn { padding: 8px 12px; }
-  .main-content { padding: 16px; }
+  .main-content { padding: 8px; }
   
   
   
@@ -60,7 +63,7 @@
    row it used to take. Its buttons fill the header's height and the active
    one is underlined on the header's own edge. Where the logo, the menu and
    the controls do not fit on one line, the menu is a row of its own again. */
-.app-header { --hx: 28px; --hy: 16px; }
+.app-header { --hx: 16px; --hy: 7px; }
 .app-header .cat-nav {
   flex: 1 1 0; min-width: 0; align-self: stretch; margin: calc(-1 * var(--hy)) 0; padding: 0 0 0 12px;
   border: 0; border-left: 1px solid var(--border); background: none; gap: 2px; scrollbar-width: none;
@@ -71,12 +74,12 @@
   .app-header { flex-wrap: wrap; }
   .app-header .cat-nav {
     order: 3; flex: 0 0 auto; width: calc(100% + 2 * var(--hx)); margin: 0 calc(-1 * var(--hx)) calc(-1 * var(--hy));
-    padding: 0 24px; border-left: 0; border-top: 1px solid var(--border); gap: 8px;
+    padding: 0 12px; border-left: 0; border-top: 1px solid var(--border); gap: 4px;
   }
-  .app-header .cat-btn { padding: 13px 18px; }
+  .app-header .cat-btn { padding: 9px 16px; }
 }
 @media (max-width: 768px) {
-  .app-header { --hx: 16px; --hy: 14px; }
+  .app-header { --hx: 12px; --hy: 7px; }
   .app-header .cat-nav { padding: 0 8px; gap: 0; }
   .app-header .cat-btn { padding: 12px; }
 }
