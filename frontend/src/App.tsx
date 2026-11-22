@@ -232,7 +232,19 @@ function App() {
           <img src={`${process.env.PUBLIC_URL}/favicon.svg`} alt="" width="32" height="32" />
           {t('app.title')}
         </button></h1>
-        <span className="subtitle">{t('app.subtitle')}</span>
+        {/* The menu, beside the logo; a screen too narrow for both gets it on a row of its own (CSS). */}
+        <nav className="cat-nav">
+          {visibleCategories.map((cat) => (
+            <button
+              key={cat.key}
+              className={`cat-btn ${activeCat === cat.key ? 'active' : ''}`}
+              onClick={() => handleCatClick(cat)}
+              aria-current={activeCat === cat.key ? 'page' : undefined}
+            >
+              {t(cat.labelKey)}
+            </button>
+          ))}
+        </nav>
         <HeaderMenu>
           <ThemeSelector compact />
           <LanguageSelector />
@@ -246,18 +258,6 @@ function App() {
       </header>
       <LicenseBanner enabled={currentUser.role === 'admin' && !scoped && !hiddenTabs.has('license')}
         onOpen={() => navigateTo('system', 'license')} />
-      <nav className="cat-nav">
-        {visibleCategories.map((cat) => (
-          <button
-            key={cat.key}
-            className={`cat-btn ${activeCat === cat.key ? 'active' : ''}`}
-            onClick={() => handleCatClick(cat)}
-            aria-current={activeCat === cat.key ? 'page' : undefined}
-          >
-            {t(cat.labelKey)}
-          </button>
-        ))}
-      </nav>
       <div className="app-body">
         {/* Folding the logo and the menu away: a small tab in the gap under the
             menu, where the one that unfolds them (▾, at the top) will be. */}

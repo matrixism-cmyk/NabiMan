@@ -55,3 +55,30 @@
   .terminal-persist { left: 0; }
   .login-form { padding: 28px 24px; }
 }
+
+/* The menu lives in the header, beside the logo, so the page below gets the
+   row it used to take. Its buttons fill the header's height and the active
+   one is underlined on the header's own edge. Where the logo, the menu and
+   the controls do not fit on one line, the menu is a row of its own again. */
+.app-header { --hx: 28px; --hy: 16px; }
+.app-header .cat-nav {
+  flex: 1 1 0; min-width: 0; align-self: stretch; margin: calc(-1 * var(--hy)) 0; padding: 0 0 0 12px;
+  border: 0; border-left: 1px solid var(--border); background: none; gap: 2px; scrollbar-width: none;
+}
+.app-header .cat-nav::-webkit-scrollbar { display: none; }
+.app-header .cat-btn { display: flex; align-items: center; padding: 0 13px; }
+@media (max-width: 1560px) {
+  .app-header { flex-wrap: wrap; }
+  .app-header .cat-nav {
+    order: 3; flex: 0 0 auto; width: calc(100% + 2 * var(--hx)); margin: 0 calc(-1 * var(--hx)) calc(-1 * var(--hy));
+    padding: 0 24px; border-left: 0; border-top: 1px solid var(--border); gap: 8px;
+  }
+  .app-header .cat-btn { padding: 13px 18px; }
+}
+@media (max-width: 768px) {
+  .app-header { --hx: 16px; --hy: 14px; }
+  .app-header .cat-nav { padding: 0 8px; gap: 0; }
+  .app-header .cat-btn { padding: 12px; }
+}
+/* A phone keeps the logo and "⋯" on one line (App.css); only the menu wraps under them. */
+@media (max-width: 640px) { .app-header { flex-wrap: wrap; } }

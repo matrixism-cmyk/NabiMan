@@ -334,13 +334,11 @@
 
 /* A VM console's screen reaches the bottom right corner, where the feedback
    launcher sits by default: on the clock of the VM's taskbar. While a console
-   shows, the launcher waits on the menu row instead; with the top folded away
-   or the console in its own window there is no such row, and it is hidden.
-   One the person dragged somewhere stays where they put it. */
-body:has(.rw-rdp-screen, .rw-console-screen) [data-nabiman-feedback-launcher]:not([data-moved]) { top: 84px !important; bottom: auto !important; }
+   shows, the launcher is out of the way (it is back on every other page);
+   one the person dragged somewhere stays where they put it. */
+body:has(.rw-rdp-screen, .rw-console-screen) [data-nabiman-feedback-launcher]:not([data-moved]) { display: none !important; }
 /* On the remote page by itself the only free row is its slim bar, beside the name. */
-body:has(.remote-shell .rw-rdp-screen, .remote-shell .rw-console-screen) [data-nabiman-feedback-launcher]:not([data-moved]) { top: 2px !important; right: auto !important; left: 150px; }
-body:has(.app.chrome-hidden .rw-rdp-screen, .app.chrome-hidden .rw-console-screen, .rw-console-popout) [data-nabiman-feedback-launcher]:not([data-moved]) { display: none !important; }
+body:has(.remote-shell:not(.is-folded) .rw-rdp-screen, .remote-shell:not(.is-folded) .rw-console-screen) [data-nabiman-feedback-launcher]:not([data-moved]) { display: block !important; top: 2px !important; bottom: auto !important; right: auto !important; left: 150px; }
 
 /* The bar of open terminal windows lies over the bottom of the page. A page
    that fills the window to its last row (a VM console's taskbar, a file list)
