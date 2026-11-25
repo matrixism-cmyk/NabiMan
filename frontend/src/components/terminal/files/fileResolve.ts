@@ -22,33 +22,39 @@ export interface FoundFile {
 /** Where to look for a name printed without its folder. */
 export interface Lookup {
   source: SftpSource;
-  /** The terminal session, when it is an account's own: its Claude sessions' folders come first. */
+  /** The terminal session, when it is an account's own: the server says where its Claude sessions and its shell are. */
   sessionId?: string;
   /** The folder a session was started in, when known. */
   startDir?: string;
+  /** The folder the shell prompt above the pressed line shows (`/abs`, `~`, `~/sub`), if any: see ./shellPrompt. */
+  promptDir?: string | null;
 }
 
 const KEEP_MS = 10000;
-/** Folders asked about for one press at most. */
-const MAX_FOLDERS = 4;
+/** A shell's folder changes with every `cd`: its answer is kept only for the press that asked. */
+const KEEP_CWD_MS = 1000;
+/** Folders a bare name is looked for in at most; one press lists twice as many folders at most. */
+const MAX_FOLDERS = 6;
 const MAX_KEPT = 60;
 
 interface Kept<T> { at: number; value: Promise<T> }
 const listings = new Map<string, Kept<SftpListing | null>>();
 const homes = new Map<string, Promise<string | null>>();
 const folders = new Map<string, Kept<string[]>>();
+const shells = new Map<string, Kept<string | null>>();
 
 /** Forgets every kept answer (tests). */
 export function forgetFiles(): void {
   listings.clear();
   homes.clear();
   folders.clear();
+  shells.clear();
 }
 
-function kept<T>(map: Map<string, Kept<T>>, key: string, make: () => Promise<T>): Promise<T> {
+function kept<T>(map: Map<string, Kept<T>>, key: string, make: () => Promise<T>, keepMs = KEEP_MS): Promise<T> {
   const now = Date.now();
   const have = map.get(key);
-  if (have && now - have.at < KEEP_MS) return have.value;
+  if (have && now - have.at < keepMs) return have.value;
   if (map.size >= MAX_KEPT) map.clear();
   const value = make();
   map.set(key, { at: now, value });
@@ -90,19 +96,47 @@ export function normalize(path: string): string | null {
 
 const readStored = (key: string) => { try { return localStorage.getItem(key) || ''; } catch { return ''; } };
 
-/** The folders a bare name may be in, most likely first. */
+/** Where the session's Claude sessions work, as the server knows it. */
+function claudeFolders(sid: string): Promise<string[]> {
+  return kept(folders, sid, () =>
+    apiRequest<{ claude: { cwd: string }[] }>(`/api/terminal/sessions/${encodeURIComponent(sid)}/claude`)
+      .then((res) => (res.success ? (res.data?.claude || []).map((c) => c.cwd) : []))
+      .catch(() => []));
+}
+
+/** The folder the session's shell is in now; the server knows it for a shell on its own machine only. */
+function shellFolder(sid: string): Promise<string | null> {
+  return kept(shells, sid, () =>
+    apiRequest<{ cwd: string | null }>(`/api/terminal/sessions/${encodeURIComponent(sid)}/cwd`)
+      .then((res) => (res.success ? res.data?.cwd || null : null))
+      .catch(() => null), KEEP_CWD_MS);
+}
+
+/**
+ * The folders a bare name may be in, most likely first:
+ * the folder the prompt above the pressed line shows (where that output was
+ * printed, on whichever machine the shell is); where Claude Code works; where
+ * the shell is now; where the session started; the folder the file panel
+ * shows; home.
+ */
 async function workingFolders(look: Lookup): Promise<string[]> {
   const out: string[] = [];
   const add = (dir?: string | null) => { if (dir && dir.startsWith('/') && !out.includes(dir)) out.push(dir); };
-  // Claude Code says where it works; a plain shell's folder is not known here.
-  if (look.sessionId && !look.source.shareKey) {
-    const sid = look.sessionId;
-    const claude = await kept(folders, sid, () =>
-      apiRequest<{ claude: { cwd: string }[] }>(`/api/terminal/sessions/${encodeURIComponent(sid)}/claude`)
-        .then((res) => (res.success ? (res.data?.claude || []).map((c) => c.cwd) : []))
-        .catch(() => []));
-    claude.slice(0, 2).forEach(add);
+  const own = look.sessionId && !look.source.shareKey ? look.sessionId : '';
+  // Asked together. The shell's folder is this machine's: only for this machine's files.
+  const [claude, shell] = await Promise.all([
+    own ? claudeFolders(own) : [],
+    own && look.source.scope === 'local' ? shellFolder(own) : null,
+  ]);
+  const shown = look.promptDir;
+  if (shown && shown.startsWith('~')) {
+    const base = await home(look.source);
+    if (base) add(normalize(joinPath(base, shown.slice(2))));
+  } else if (shown) {
+    add(normalize(shown));
   }
+  claude.slice(0, 2).forEach(add);
+  add(shell);
   add(look.startDir);
   // The folder the file panel beside the terminal is showing, or last showed.
   add(readStored(`nabiman_sftp_path_${look.source.key}`));

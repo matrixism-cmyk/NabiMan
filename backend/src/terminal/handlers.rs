@@ -7,6 +7,8 @@ mod claude;
 mod preferences;
 #[path = "session_edit_handlers.rs"]
 mod edits;
+#[path = "session_cwd.rs"]
+mod cwd;
 use claude::{directs_of, notes_of, remote_claude, sees_remote_claude, session_claude, LinkNote};
 use edits::{kill_session, rename_session, set_keepalive, set_timeout, toggle_share};
 use preferences::{get_settings, put_settings};
@@ -219,5 +221,9 @@ pub(crate) fn configure(cfg: &mut web::ServiceConfig) {
         .route(
             "/api/terminal/sessions/{id}/claude",
             web::get().to(session_claude),
+        )
+        .route(
+            "/api/terminal/sessions/{id}/cwd",
+            web::get().to(cwd::session_cwd),
         );
 }

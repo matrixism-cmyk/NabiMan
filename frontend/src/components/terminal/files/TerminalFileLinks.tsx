@@ -11,6 +11,7 @@ import { copyText } from '../ClaudeAddress';
 import { pathsAtPoint, pathsOnRow, ScreenPath } from './fileLines';
 import { attachLongPress } from './filePress';
 import { FoundFile, resolveFile } from './fileResolve';
+import { promptFolder } from './shellPrompt';
 import '../ai-guide.css';
 
 interface Options {
@@ -79,8 +80,10 @@ export function useTerminalFileLinks({ termRef, containerRef, storageKey, sessio
         const paths = pathsAtPoint(term, x, y);
         return paths.length ? paths : null;
       },
+      // Read when pressed, not on hover: the prompt above the line, then the server.
       resolve: (paths) => resolveFile(paths, {
         source, sessionId: look.current.sessionId() || undefined, startDir: look.current.startDir,
+        promptDir: promptFolder(term, paths[0].range.start.y - 1),
       }),
       open: (file, x, y) => { setNote(''); setMenu({ file, x: x + 2, y: y + 2 }); },
     });

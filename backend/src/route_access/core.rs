@@ -236,6 +236,7 @@ pub(super) const ROUTES: &[Route] = &[
     r("/api/terminal/sessions/{id}", Admin, M::Handler),
     r("/api/terminal/sessions/{id}/claude", Admin, M::Handler),
     r("/api/terminal/sessions/{id}/close", Admin, M::Handler),
+    r("/api/terminal/sessions/{id}/cwd", Admin, M::Handler),
     r("/api/terminal/sessions/{id}/keepalive", Admin, M::Handler),
     r("/api/terminal/sessions/{id}/name", Admin, M::Handler),
     r("/api/terminal/sessions/{id}/scrollback", Admin, M::Handler),

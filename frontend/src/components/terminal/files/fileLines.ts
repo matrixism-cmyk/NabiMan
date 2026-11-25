@@ -34,7 +34,7 @@ function lastCell(line: IBufferLine, cols: number): number {
 }
 
 /** Whether row `y` carries on from the row above it. */
-function continues(buffer: IBuffer, cols: number, y: number, loose: boolean): boolean {
+export function continues(buffer: IBuffer, cols: number, y: number, loose: boolean): boolean {
   const line = buffer.getLine(y);
   const above = buffer.getLine(y - 1);
   if (!line || !above) return false;

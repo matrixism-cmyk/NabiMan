@@ -132,6 +132,24 @@ describe('a path held down in a terminal', () => {
     expect(seen).toEqual(['mousedown']);
   });
 
+  it('finds a bare name in the folder the prompt above it shows, not the one a later prompt shows', async () => {
+    const { grid } = await mount('nabi@box:/work/deck$ ls\r\nnotes.txt\r\nnabi@box:/work/deck$ cd /\r\nnabi@box:/$ echo notes.txt\r\nnotes.txt');
+    // Row 4, printed under `/`: asked about there (and at home), and not found.
+    fireEvent.mouseDown(grid, { clientX: 15, clientY: 90, button: 0, detail: 1 });
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    await act(async () => { jest.advanceTimersByTime(HOLD_MS); });
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(list.mock.calls.map(([, path]) => path)).toEqual(['', '/']);
+    // Row 1, printed under `/work/deck`.
+    fireEvent.mouseUp(grid);
+    list.mockClear();
+    await act(async () => { fireEvent.mouseDown(grid, { clientX: 15, clientY: 30, button: 0, detail: 1 }); });
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    await act(async () => { jest.advanceTimersByTime(HOLD_MS); });
+    expect(screen.getByRole('menu', { name: 'notes.txt' })).toBeInTheDocument();
+    expect(list.mock.calls.map(([, path]) => path)).toEqual(['', '/work/deck']);
+  });
+
   it('does nothing over plain text, and asks the server nothing', async () => {
     const { hold, seen } = await mount(`at ${PATH}`);
     await hold(1);
