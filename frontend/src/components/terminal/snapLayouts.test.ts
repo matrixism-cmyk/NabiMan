@@ -1,4 +1,4 @@
-import { SNAP_LAYOUTS, tileZones, zoneAt, zoneRect } from './snapLayouts';
+import { SNAP_LAYOUTS, tileZones, unmaximized, zoneAt, zoneRect } from './snapLayouts';
 import { TASKBAR_H } from './windowGeometry';
 
 test('every arrangement fills the room exactly, without overlap', () => {
@@ -46,4 +46,16 @@ test('two tiled windows land exactly where the halves of the picker do', () => {
   const tiled = tileZones(2).map((z) => zoneRect(z, 1920, 1000));
   expect(tiled).toEqual(SNAP_LAYOUTS[1].map((z) => zoneRect(z, 1920, 1000)));
   expect(tileZones(4).map((z) => zoneRect(z, 1920, 1000))).toEqual(SNAP_LAYOUTS[5].map((z) => zoneRect(z, 1920, 1000)));
+});
+
+test('a maximised window dragged loose is its old size, under the pointer at the same share of its width', () => {
+  expect(unmaximized({ restore: { w: 800, h: 500 } }, 960, 1920)).toEqual({ x: 560, y: 0, w: 800, h: 500 });
+  // Grabbed near the right end, it stays inside the page.
+  const right = unmaximized({ restore: { w: 800, h: 500 } }, 1900, 1920);
+  expect(right.x + right.w).toBeLessThanOrEqual(1920);
+  expect(1900 - right.x).toBeGreaterThan(700);
+  // Never remembered a size: the usual one.
+  expect(unmaximized({}, 0, 1920)).toEqual({ x: 0, y: 0, w: 720, h: 440 });
+  // A page narrower than the old size.
+  expect(unmaximized({ restore: { w: 1600, h: 900 } }, 300, 800).w).toBeLessThanOrEqual(800);
 });

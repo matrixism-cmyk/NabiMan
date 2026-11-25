@@ -1,4 +1,4 @@
-import { MIN_H, MIN_W, TASKBAR_H } from './windowGeometry';
+import { DEFAULT_H, DEFAULT_W, MIN_H, MIN_W, TASKBAR_H } from './windowGeometry';
 
 /** A place a window can snap into: fractions of the room above the terminal bar. */
 export interface Zone { x: number; y: number; w: number; h: number }
@@ -58,4 +58,19 @@ export function tileZones(count: number): Zone[] {
     for (let col = 0; col < inRow; col += 1) zones.push({ x: col / inRow, y: row / rows, w: 1 / inRow, h: 1 / rows });
   }
   return zones;
+}
+
+/** How far a maximised window's bar is dragged before the window comes loose. */
+export const LOOSEN_PX = 6;
+
+/**
+ * Where a maximised window goes when it is dragged loose: the size it had
+ * before (or the usual one), at the top, with the pointer at the same share
+ * of its width as it was of the page's.
+ */
+export function unmaximized(win: { restore?: { w: number; h: number } }, pointerX: number, vw: number = window.innerWidth) {
+  const w = Math.min(Math.max(MIN_W, win.restore?.w || DEFAULT_W), Math.max(MIN_W, vw - 16));
+  const h = Math.max(MIN_H, win.restore?.h || DEFAULT_H);
+  const x = Math.round(Math.min(Math.max(0, pointerX - w * (pointerX / Math.max(1, vw))), Math.max(0, vw - w)));
+  return { x, y: 0, w, h };
 }

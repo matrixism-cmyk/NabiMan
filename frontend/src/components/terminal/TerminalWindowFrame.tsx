@@ -12,7 +12,7 @@ import { apiRequest } from '../../shared/api/useApi';
 import type { SessionInfo } from '../remote/SessionsView';
 import { clamp, MIN_H, MIN_W, TASKBAR_H, TermWindow } from './windowGeometry';
 import SnapPicker from './SnapPicker';
-import { SNAP_EDGE, SNAP_KEEP, Zone, zoneAt, zoneRect } from './snapLayouts';
+import { LOOSEN_PX, SNAP_EDGE, SNAP_KEEP, unmaximized, Zone, zoneAt, zoneRect } from './snapLayouts';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import AccountDictation from './dictation/AccountDictation';
 import { useVoiceReply } from './dictation/useVoiceReply';
@@ -62,20 +62,31 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
     // Nor may it while the name is being typed.
     if ((e.target as HTMLElement).closest('button, input, form')) return;
     if (e.button > 0) return; // primary button (or touch) only
-    if (win.maximized) return;
     const handle = e.currentTarget as HTMLElement;
     try { handle.setPointerCapture(e.pointerId); } catch { /* unsupported */ }
     const startX = e.clientX;
     const startY = e.clientY;
-    const originX = win.x;
-    const originY = win.y;
+    let originX = win.x;
+    let originY = win.y;
+    let width = win.w;
+    // A maximised window comes loose once it is really dragged (not on a mere
+    // click of its bar): back at the size it had, under the pointer at the
+    // same share of its width.
+    let height = win.h;
+    let held = win.maximized ? unmaximized(win, e.clientX) : null;
     onFocus(win.id);
     // Dragged to the top of the page, the arrangements come up; let go over
     // one of their zones and the window takes that place (snapLayouts).
     let picking = false;
     const move = (ev: PointerEvent) => {
+      if (held) {
+        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < LOOSEN_PX) return;
+        onUpdate(win.id, { maximized: false, ...held });
+        ({ x: originX, y: originY, w: width, h: height } = held);
+        held = null;
+      }
       onUpdate(win.id, {
-        x: clamp(originX + ev.clientX - startX, -win.w + 120, window.innerWidth - 80),
+        x: clamp(originX + ev.clientX - startX, -width + 120, window.innerWidth - 80),
         y: clamp(originY + ev.clientY - startY, 0, window.innerHeight - 60),
       });
       picking = ev.clientY <= (picking ? SNAP_KEEP : SNAP_EDGE);
@@ -86,7 +97,7 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
       if (zone) {
         onUpdate(win.id, {
           ...zoneRect(zone, window.innerWidth, window.innerHeight), maximized: false,
-          restore: { x: originX, y: originY, w: win.w, h: win.h },
+          restore: { x: originX, y: originY, w: width, h: height },
         });
       }
       picking = false;

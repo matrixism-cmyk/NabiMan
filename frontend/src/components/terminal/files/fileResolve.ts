@@ -28,6 +28,8 @@ export interface Lookup {
   startDir?: string;
   /** The folder the shell prompt above the pressed line shows (`/abs`, `~`, `~/sub`), if any: see ./shellPrompt. */
   promptDir?: string | null;
+  /** Full paths printed elsewhere in the terminal that end in a name (see ./fileMentions): tried when its folders do not have it. */
+  mentioned?: (name: string) => string[];
 }
 
 const KEEP_MS = 10000;
@@ -181,6 +183,17 @@ export async function resolveFile(matches: PathMatch[], look: Lookup): Promise<F
       seen.add(path);
       if (asked >= MAX_FOLDERS * 2) return null;
       asked += 1;
+      const found = await stat(look.source, path);
+      if (found) return found;
+    }
+  }
+  // Not in any folder a bare name is looked for in: the same name printed with its folder, elsewhere on the terminal.
+  for (const match of matches) {
+    if (match.kind !== 'name' && match.kind !== 'relative') continue;
+    for (const written of look.mentioned?.(match.path) || []) {
+      const [path] = await candidates({ ...match, path: written, kind: written.startsWith('~') ? 'home' : 'absolute' }, look);
+      if (!path || seen.has(path)) continue;
+      seen.add(path);
       const found = await stat(look.source, path);
       if (found) return found;
     }

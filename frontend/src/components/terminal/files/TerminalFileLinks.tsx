@@ -12,6 +12,7 @@ import { pathsAtPoint, pathsOnRow, ScreenPath } from './fileLines';
 import { attachLongPress } from './filePress';
 import { FoundFile, resolveFile } from './fileResolve';
 import { promptFolder } from './shellPrompt';
+import { mentionedPaths } from './fileMentions';
 import '../ai-guide.css';
 
 interface Options {
@@ -84,6 +85,7 @@ export function useTerminalFileLinks({ termRef, containerRef, storageKey, sessio
       resolve: (paths) => resolveFile(paths, {
         source, sessionId: look.current.sessionId() || undefined, startDir: look.current.startDir,
         promptDir: promptFolder(term, paths[0].range.start.y - 1),
+        mentioned: (name) => mentionedPaths(term, name),
       }),
       open: (file, x, y) => { setNote(''); setMenu({ file, x: x + 2, y: y + 2 }); },
     });

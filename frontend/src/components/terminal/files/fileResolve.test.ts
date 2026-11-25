@@ -142,4 +142,14 @@ describe('resolving a printed path', () => {
     expect(fetchMock.mock.calls.every(([url]) => String(url).startsWith('/api/share/tok/files/list?'))).toBe(true);
     fetchMock.mockRestore();
   });
+
+  it('falls back to the full path printed elsewhere when no folder has the name', async () => {
+    const look = { source: accountSource('local'), mentioned: (name: string) => (name === 'app.ts' ? ['/nowhere/app.ts', '/work/proj/src/app.ts'] : []) };
+    const found = await resolveFile([match('app.ts', 'name')], look);
+    expect(found?.path).toBe('/work/proj/src/app.ts');
+    // A name its folders do have never gets that far.
+    const asks = jest.fn(() => ['/work/proj/src/app.ts']);
+    expect((await resolveFile([match('notes.md', 'name')], { source: accountSource('local'), mentioned: asks }))?.path).toBe('/home/nabi/notes.md');
+    expect(asks).not.toHaveBeenCalled();
+  });
 });
