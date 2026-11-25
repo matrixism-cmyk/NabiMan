@@ -60,6 +60,7 @@ const MecSettingsPanel = lazy(() => import('./mec/MecSettingsPanel'));
 const MecIngressPanel = lazy(() => import('./mec/MecIngressPanel'));
 const MecDiscoveryPanel = lazy(() => import('./mec/MecDiscoveryPanel'));
 const MecUsersPanel = lazy(() => import('./mec/MecUsersPanel'));
+const RackPanel = lazy(() => import('./rack/RackPanel'));
 
 interface Props {
   activeTab: Tab;
@@ -141,6 +142,7 @@ function panelFor(activeTab: Tab, onNavigate: Props['onNavigate'], onEnterFocus:
     case 'mecIngress': return <MecIngressPanel />;
     case 'mecDiscovery': return <MecDiscoveryPanel />;
     case 'mecUsers': return <MecUsersPanel />;
+    case 'mecRack': return <RackPanel />;
     default: return null;
   }
 }

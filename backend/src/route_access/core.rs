@@ -147,6 +147,9 @@ pub(super) const ROUTES: &[Route] = &[
     r("/api/processes/inspect/{pid}", Operate, M::No),
     r("/api/processes/kill", Operate, M::No),
     r("/api/processes/options", Operate, M::No),
+    // The server-room rack page: read-only (only GET is served), for the staff as the MEC pages are.
+    r("/api/rack/layout", Operate, M::No),
+    r("/api/rack/status", Operate, M::No),
     r("/api/remote-servers", Read, M::Only(&["GET", "POST"])),
     r("/api/remote-servers/check-all", Read, M::No),
     r("/api/remote-servers/facts", Read, M::No),

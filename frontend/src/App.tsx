@@ -110,6 +110,8 @@ function App() {
   const { data: dbAvailable } = useApi<boolean>(full ? '/api/database/available' : '');
   const { data: mailAvailable } = useApi<boolean>(full ? '/api/mail/available' : '');
   const { data: dnsAvailable } = useApi<boolean>(full ? '/api/dns/available' : '');
+  // The install's branding: its name, a feedback widget for administrators when one is configured, and whether it has the rack page.
+  const branding = useBranding(Boolean(full));
   useEffect(() => {
     if (member && !isStandaloneRemote()) window.history.replaceState(null, '', '/remote');
   }, [member]);
@@ -119,6 +121,7 @@ function App() {
     if (dbAvailable === false) hidden.add('database');
     if (mailAvailable === false) hidden.add('mail');
     if (dnsAvailable === false) hidden.add('dns');
+    if (!branding?.rack) hidden.add('mecRack');
     if (currentUser?.role === 'viewer' || currentUser?.role === 'operator') {
       hidden.add('backup');
       hidden.add('audit');
@@ -141,7 +144,7 @@ function App() {
       categories.forEach(c => c.tabs.forEach(tab => { if (!allowed.has(tab.key)) hidden.add(tab.key); }));
     }
     setHiddenTabs(hidden);
-  }, [dockerAvailable, dbAvailable, mailAvailable, dnsAvailable, currentUser, scoped]);
+  }, [dockerAvailable, dbAvailable, mailAvailable, dnsAvailable, branding?.rack, currentUser, scoped]);
 
   const visibleCategories = useMemo(() => {
     return categories
@@ -170,8 +173,6 @@ function App() {
     try { await request; } catch { /* local logout completes even if offline */ }
   };
   const idle = useIdleLogout(Boolean(loggedIn && currentUser), handleLogout);
-  // The install's branding: its name, and a feedback widget for administrators when one is configured.
-  const branding = useBranding(Boolean(full));
   useEffect(() => {
     if (currentUser?.role === 'admin' && !scoped) injectFeedbackWidget(branding?.feedback_widget ?? null);
     if (branding?.product_name) document.title = branding.product_name;

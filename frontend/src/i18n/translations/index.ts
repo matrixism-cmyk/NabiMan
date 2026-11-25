@@ -17,6 +17,7 @@ import mecFirewall from './mec-firewall';
 import mecOps from './mec-ops';
 import mecWizard from './mec-wizard';
 import noc from './noc';
+import rack from './rack';
 import terminal from './terminal';
 import share from './share';
 import dictation from './dictation';
@@ -69,6 +70,7 @@ const translations: Translations = {
   ...mecOps,
   ...mecWizard,
   ...noc,
+  ...rack,
   ...terminal,
   ...share,
   ...dictation,

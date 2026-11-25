@@ -9,6 +9,8 @@ export interface Branding {
   feedback_widget: FeedbackWidget | null;
   /** The NOC's on-call contact, or null. */
   noc_contact: string | null;
+  /** Whether this install has the server-room rack page. */
+  rack?: boolean;
 }
 
 let cached: Promise<Branding | null> | null = null;

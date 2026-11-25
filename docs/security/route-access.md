@@ -32,8 +32,8 @@ NabiMan 의 API 는 허용 목록 방식입니다. 등록된 모든 경로가 �
 
 ## 요약
 
-- 등록된 API 경로: 347개
-- 공개 35 · 관리자 전용 100 · 조회 52 · 운영 154 · 계정 6
+- 등록된 API 경로: 349개
+- 공개 35 · 관리자 전용 100 · 조회 52 · 운영 156 · 계정 6
 - 원격 회원이 닿는 경로: 64개 (메서드 지정 25 · 본인 것만 18 · 서버 규칙 21)
 
 ## 검토가 필요해 보이는 권한 (바꾸지 않고 그대로 옮김)
@@ -257,6 +257,8 @@ NabiMan 의 API 는 허용 목록 방식입니다. 등록된 모든 경로가 �
 | `/api/processes/inspect/{pid}` | 운영 | 모든 메서드 | GET | — |  |
 | `/api/processes/kill` | 운영 | 모든 메서드 | GET | — |  |
 | `/api/processes/options` | 운영 | 모든 메서드 | GET | — |  |
+| `/api/rack/layout` | 운영 | 모든 메서드 | GET | — |  |
+| `/api/rack/status` | 운영 | 모든 메서드 | GET | — |  |
 | `/api/remote-servers` | 조회 | GET | GET | GET, POST |  |
 | `/api/remote-servers/check-all` | 조회 | GET | GET | — |  |
 | `/api/remote-servers/facts` | 조회 | GET | GET | — |  |

@@ -28,6 +28,7 @@ pub(crate) fn configure(cfg: &mut web::ServiceConfig) {
     crate::cron::config(cfg);
     crate::processes::config(cfg);
     crate::disks::config(cfg);
+    crate::rack::config(cfg);
     crate::remote_servers::config(cfg);
     crate::updates::config(cfg);
     crate::diagnostics::config(cfg);

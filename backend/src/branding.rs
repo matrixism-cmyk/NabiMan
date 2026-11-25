@@ -34,6 +34,8 @@ struct Branding {
     product_name: String,
     feedback_widget: Option<FeedbackWidget>,
     noc_contact: Option<String>,
+    /// Whether this install has the server-room rack page (see `rack`).
+    rack: bool,
 }
 
 /// `scheme://host[:port]` with nothing after it, as CSP takes a source.
@@ -81,6 +83,7 @@ fn branding_in(get: Lookup) -> Branding {
         product_name: text_in(get, "NABIMAN_PRODUCT_NAME").unwrap_or_else(|| "NabiMan".into()),
         feedback_widget: feedback_in(get),
         noc_contact: text_in(get, "NABIMAN_NOC_CONTACT"),
+        rack: crate::rack::enabled_in(get),
     }
 }
 
@@ -107,7 +110,8 @@ mod tests {
         assert_eq!(feedback_in(&with(&[("NABIMAN_FEEDBACK_ORIGIN", "javascript:x"), ("NABIMAN_FEEDBACK_SITE", "s")])), None);
         assert_eq!(feedback_in(&with(&[("NABIMAN_FEEDBACK_ORIGIN", "https://f.example"), ("NABIMAN_FEEDBACK_SITE", "a b")])), None);
         let b = branding_in(&with(&[]));
-        assert_eq!((b.product_name.as_str(), b.feedback_widget, b.noc_contact), ("NabiMan", None, None));
+        assert_eq!((b.product_name.as_str(), b.feedback_widget, b.noc_contact, b.rack), ("NabiMan", None, None, false));
+        assert!(branding_in(&with(&[("NABIMAN_RACK_LAYOUT_FILE", "/x.json")])).rack);
         assert_eq!(csp_sources(None), (None, None));
     }
 

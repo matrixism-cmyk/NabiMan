@@ -84,6 +84,9 @@ pub(crate) const KNOWN: &[&str] = &[
     "NABIMAN_MEC_AXGATE_LEGACY_UNTIL",
     "NABIMAN_MEC_AXGATE_DEBUG",
     "NABIMAN_MEC_AXGATE_DUMP_CONFIG",
+    // The server-room rack page
+    "NABIMAN_RACK_LAYOUT_FILE",
+    "NABIMAN_RACK_PROMETHEUS_URL",
 ];
 
 /// Names in the code that are not settings: build stamps, test switches,

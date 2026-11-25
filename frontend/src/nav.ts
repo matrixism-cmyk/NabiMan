@@ -9,7 +9,7 @@ export type Tab =
   | 'mfa' | 'loginSessions' | 'scopeSettings' | 'notifications' | 'alertrules' | 'vhost' | 'ipblock' | 'license' | 'enterpriseauth'
   | 'mecDashboard' | 'mecNoc' | 'mecLive' | 'mecTenants' | 'mecNodes' | 'mecGpu' | 'mecFirewall'
   | 'mecStorage' | 'mecIngress' | 'mecJobs' | 'mecAudit' | 'mecHealth'
-  | 'mecSettings' | 'mecDiscovery' | 'mecUsers'
+  | 'mecSettings' | 'mecDiscovery' | 'mecUsers' | 'mecRack'
   | 'claudeChat' | 'claudeSettings' | 'appSettings';
 
 export type Category =
@@ -80,6 +80,7 @@ export const categories: CatDef[] = [
     { key: 'mecDashboard', labelKey: 'tab.mecDashboard' },
     { key: 'mecLive', labelKey: 'tab.mecLive' },
     { key: 'mecHealth', labelKey: 'tab.mecHealth' },
+    { key: 'mecRack', labelKey: 'tab.mecRack' },
     { key: 'mecDiscovery', labelKey: 'tab.mecDiscovery' },
     { key: 'mecTenants', labelKey: 'tab.mecTenants' },
     { key: 'mecUsers', labelKey: 'tab.mecUsers' },

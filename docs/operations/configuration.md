@@ -159,6 +159,15 @@ MEC 연동 설정의 자세한 뜻은 [MEC 운영 문서](../mec-management/07-r
 | `mec_axgate_host_key_sha256`, `mec_axgate_legacy_until` | `NABIMAN_MEC_AXGATE_HOST_KEY_SHA256`, `NABIMAN_MEC_AXGATE_LEGACY_UNTIL` | 없음 | AXGATE 호스트 키 고정, 구식 키 허용 기한 |
 | `mec_axgate_vpn`, `mec_axgate_debug`, `mec_axgate_dump_config` | `NABIMAN_MEC_AXGATE_VPN`, `NABIMAN_MEC_AXGATE_DEBUG`, `NABIMAN_MEC_AXGATE_DUMP_CONFIG` | 꺼짐 | VPN 세션 조회, 디버그 출력, 설정 덤프(값이 있으면 켜짐) |
 
+### 서버실 랙
+
+MEC 메뉴의 "서버실 랙" 화면입니다. 두 설정이 모두 없으면 기능이 꺼져 있습니다(메뉴가 보이지 않고, `GET /api/rack/layout`·`GET /api/rack/status`는 "설정 안 됨"으로 답합니다). 읽기 전용이며 장비를 제어하지 않습니다.
+
+| 파일 키 | 환경 변수 | 기본값 | 하는 일 |
+|---|---|---|---|
+| `rack_layout_file` | `NABIMAN_RACK_LAYOUT_FILE` | 없음 | 랙 실장도 JSON 파일(심볼릭 링크도 됨). 파일이나 링크가 바뀌면 재시작 없이 다시 읽습니다. 읽을 수 없거나 형식이 틀리면 화면에 이유를 보여 줍니다. 한도: 1MiB, 랙 16개, 장비 400대, 랙 높이 1~60U. 장비의 `u`는 맨 위 칸 번호입니다(U1이 맨 아래) |
+| `rack_prometheus_url` | `NABIMAN_RACK_PROMETHEUS_URL` | 없음 | 운영 상태를 물어볼 Prometheus 주소(`http(s)://호스트[:포트][/경로]`). 없거나 닿지 않으면 그림은 나오고 상태만 "알 수 없음"으로 보입니다. 질의는 NabiMan 안에 고정되어 있고(파일의 `status_sources`는 쓰지 않음), 결과는 10초 동안 모든 화면이 함께 씁니다 |
+
 ## 새로 설치한 서버에서 달라지는 점
 
 예전 빌드는 이 서버의 값을 기본으로 가졌습니다. 새 빌드를 새 서버에 설치하면:

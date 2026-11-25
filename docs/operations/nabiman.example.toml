@@ -40,6 +40,10 @@
 # On-call contact in the MEC NOC alert band
 # noc_contact = "noc@example.com"
 
+# Server-room rack page (MEC menu): off until either is set
+# rack_layout_file = "/etc/nabiman/rack_layout.json"
+# rack_prometheus_url = "http://prometheus.example:9090"
+
 # Tables come last: every key after [name] belongs to it.
 
 # Speech service for dictation: off until set (here or in the settings screen)

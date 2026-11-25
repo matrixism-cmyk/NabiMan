@@ -57,6 +57,7 @@ mod password_policy;
 mod private_storage;
 mod processes;
 mod rate_limit;
+mod rack;
 mod rbac;
 mod route_access;
 mod remote;

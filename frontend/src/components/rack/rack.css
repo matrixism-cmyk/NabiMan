@@ -1,0 +1,148 @@
+/* The server-room rack page. Colours come from the theme's variables only:
+   device kinds are mixes of them, kept apart from the status colours by a
+   stripe (kind) versus a mark with its own shape (status). */
+.rack-panel {
+  --rack-server: color-mix(in srgb, var(--success) 55%, var(--info));
+  --rack-gpu: var(--running);
+  --rack-switch: var(--info);
+  --rack-firewall: color-mix(in srgb, var(--danger) 55%, var(--running));
+  --rack-5g: color-mix(in srgb, var(--warning) 60%, var(--danger));
+  --rack-storage: var(--text-secondary);
+  --rack-external: color-mix(in srgb, var(--warning) 40%, var(--text-secondary));
+  --rack-other: var(--text-muted);
+  /* One slot's height: the whole rack fits a wall screen without scrolling. */
+  --u: clamp(15px, calc((100vh - 303px) / 42), 26px);
+  padding: 14px 18px;
+}
+.rack-top { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+.rack-heading { flex: 1 1 320px; min-width: 0; }
+.rack-panel .rack-heading h2 { margin: 0 0 4px; font-size: 18px; }
+.rack-refresh { align-self: center; }
+.rack-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; font-size: 12px; color: var(--text-secondary); }
+.rack-meta details { position: relative; }
+.rack-meta summary { cursor: pointer; color: var(--text); }
+.rack-meta details[open] { flex-basis: 100%; }
+.rack-meta details ul { margin: 6px 0 0 18px; }
+.rack-meta details p { margin: 6px 0 0; }
+
+.rack-summary { display: flex; gap: 8px; flex-wrap: wrap; }
+.rack-tile { display: flex; flex-direction: column; gap: 2px; min-width: 96px; padding: 6px 12px; border: 1px solid var(--border); border-left-width: 4px; border-radius: 8px; background: var(--surface-alt); }
+.rack-tile-label { font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
+.rack-tile-value { font-size: 20px; font-weight: 700; line-height: 1.1; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rack-tile.tone-ok { border-left-color: var(--success); }
+.rack-tile.tone-warn { border-left-color: var(--warning); background: var(--warning-soft); }
+.rack-tile.tone-warn .rack-tile-value { color: var(--warning-strong); }
+.rack-tile.tone-down { border-left-color: var(--danger); background: var(--danger-soft); }
+.rack-tile.tone-down .rack-tile-value { color: var(--danger-strong); }
+
+.rack-banner { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding: 8px 12px; margin-bottom: 8px; border-radius: 6px; font-size: 13px; border-left: 3px solid var(--info); background: var(--info-soft); color: var(--info-strong); }
+.rack-banner.tone-warning { border-left-color: var(--warning); background: var(--warning-soft); color: var(--warning-strong); }
+.rack-banner.tone-error { border-left-color: var(--danger); background: var(--danger-soft); color: var(--danger-strong); }
+.rack-banner code, .rack-state code { font-size: 12px; overflow-wrap: anywhere; }
+.rack-state { padding: 28px 16px; text-align: center; color: var(--text-secondary); display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.rack-state strong { color: var(--text); font-size: 15px; }
+.rack-state code { max-width: 720px; padding: 8px 10px; border-radius: 6px; background: var(--surface-alt); color: var(--text); text-align: left; }
+.rack-tentative { flex-basis: 100%; }
+
+/* The racks, side by side; too narrow for all of them, they scroll sideways. */
+.rack-grid { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(380px, 1fr); gap: 14px; overflow-x: auto; padding-bottom: 6px; }
+.rack-cabinet { min-width: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); padding: 0 8px 8px; }
+.rack-cabinet-head { display: flex; gap: 10px; align-items: baseline; padding: 7px 4px; font-size: 13px; color: var(--text); }
+.rack-cabinet-head span { color: var(--text-secondary); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rack-body { display: grid; grid-template-columns: 26px 1fr; border: 2px solid var(--track); border-radius: 4px; background: var(--surface); }
+.rack-rail { list-style: none; margin: 0; padding: 0; border-right: 1px solid var(--border); }
+.rack-rail li { height: var(--u); line-height: var(--u); text-align: center; font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* Empty slots: faint lines one slot apart. */
+.rack-slots { container-type: inline-size; position: relative; height: calc(var(--units) * var(--u)); background: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--u) - 1px), color-mix(in srgb, var(--border) 55%, transparent) calc(var(--u) - 1px), color-mix(in srgb, var(--border) 55%, transparent) var(--u)); }
+
+.rack-device { --kind: var(--rack-other); position: absolute; left: 3px; right: 3px; top: calc(var(--top) * var(--u) + 0.5px); height: calc(var(--h) * var(--u) - 1px); display: flex; flex-direction: column; justify-content: center; gap: 0; min-width: 0; padding: 0 8px 0 8px; border: 1px solid var(--kind); border-left: 5px solid var(--kind); border-radius: 4px; background: color-mix(in srgb, var(--kind) 9%, var(--surface)); color: var(--text); font: inherit; font-size: 11.5px; line-height: 13px; text-align: left; cursor: pointer; overflow: hidden; }
+.rack-device:hover { background: color-mix(in srgb, var(--kind) 18%, var(--surface)); }
+.rack-device:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; z-index: 1; }
+.rack-device.is-unconfirmed { border-top-style: dashed; border-right-style: dashed; border-bottom-style: dashed; }
+.rack-device.is-listed { position: static; width: 100%; height: auto; min-height: 30px; padding-top: 5px; padding-bottom: 5px; margin-top: 5px; gap: 2px; }
+.rack-device.level-warn { box-shadow: inset 0 0 0 1px var(--warning); background: var(--warning-soft); }
+.rack-device.level-down { box-shadow: inset 0 0 0 2px var(--danger); background: var(--danger-soft); }
+.look-server { --kind: var(--rack-server); }
+.look-gpu { --kind: var(--rack-gpu); }
+.look-switch { --kind: var(--rack-switch); }
+.look-firewall { --kind: var(--rack-firewall); }
+.look-5g { --kind: var(--rack-5g); }
+.look-storage { --kind: var(--rack-storage); }
+.look-external { --kind: var(--rack-external); }
+/* A shape for each family as well: network gear is rounded, storage has a double stripe, other people's machines are hatched. */
+.look-switch, .look-firewall, .look-5g { border-radius: 9px; }
+.look-storage { border-left-style: double; border-left-width: 7px; }
+.rack-device.look-external, .rack-swatch.look-external { background-image: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--kind) 14%, transparent) 6px 8px); }
+.rack-device-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.rack-device-label { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.rack-device-node { flex: 0 0 auto; margin-left: auto; padding: 0 6px; border-radius: 999px; background: var(--surface-alt); color: var(--text); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rack-device-node.is-undecided { border: 1px dashed var(--text-muted); color: var(--text-secondary); }
+.rack-device-readings { display: flex; gap: 10px; min-width: 0; padding-left: 19px; overflow: hidden; white-space: nowrap; color: var(--text); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.rack-reading b { font-weight: 500; color: var(--text-secondary); }
+.rack-reading.is-over { color: var(--warning-strong); font-weight: 700; }
+.rack-reading.is-over::before { content: '▲ '; }
+.rack-candidate { display: inline-flex; gap: 5px; align-items: center; }
+.rack-candidate + .rack-candidate { padding-left: 10px; border-left: 1px solid var(--border); }
+
+/* A narrow rack keeps each candidate's light, name and temperature. */
+@container (max-width: 450px) { .rack-candidate .is-extra { display: none; } }
+
+/* Status marks: a shape for each level as well as a colour. */
+.rack-light { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 13px; height: 13px; font-size: 12px; line-height: 1; font-weight: 700; }
+.rack-light.level-ok { color: var(--success); }
+.rack-light.level-warn { color: var(--warning); }
+.rack-light.level-down { color: var(--danger); }
+.rack-light.level-unknown { color: var(--text-secondary); border: 1px solid var(--text-muted); border-radius: 50%; font-size: 9px; box-sizing: border-box; }
+.rack-light.level-none { color: var(--text-muted); }
+
+.rack-unplaced { margin-top: 10px; }
+.rack-unplaced h4 { margin: 0 0 2px; font-size: 12px; color: var(--warning-strong); }
+
+.rack-legend { display: flex; flex-wrap: wrap; gap: 4px 24px; align-items: center; margin-top: 10px; font-size: 12px; color: var(--text-secondary); }
+.rack-legend ul { display: flex; flex-wrap: wrap; gap: 4px 14px; list-style: none; margin: 0; padding: 0; }
+.rack-legend li { display: inline-flex; align-items: center; gap: 5px; }
+.rack-legend p { margin: 0; }
+.rack-swatch { width: 14px; height: 10px; border: 1px solid var(--kind, var(--rack-other)); border-left-width: 4px; border-radius: 2px; background: color-mix(in srgb, var(--kind, var(--rack-other)) 20%, var(--surface)); }
+.rack-swatch.look-storage { border-left-width: 6px; }
+.rack-swatch.is-dashed { width: 22px; border: 1px dashed var(--text-secondary); background: transparent; }
+
+/* The detail dialog. */
+.rack-detail { width: min(760px, 94vw); }
+.rack-detail .common-modal-title { display: flex; align-items: center; gap: 8px; }
+.rack-facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0 0 10px; font-size: 13px; outline: none; }
+.rack-facts dt { color: var(--text-secondary); }
+.rack-facts dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+.rack-notice { margin: 0 0 8px; padding: 6px 10px; border-left: 3px solid var(--warning); border-radius: 4px; background: var(--warning-soft); color: var(--warning-strong); font-size: 13px; }
+.rack-muted { margin: 6px 0; color: var(--text-secondary); font-size: 13px; }
+.rack-node-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.rack-node-card { padding: 10px 12px; border: 1px solid var(--border); border-top: 3px solid var(--text-muted); border-radius: 8px; background: var(--surface-alt); }
+.rack-node-card.level-ok { border-top-color: var(--success); }
+.rack-node-card.level-warn { border-top-color: var(--warning); }
+.rack-node-card.level-down { border-top-color: var(--danger); }
+.rack-node-card h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 14px; color: var(--text); }
+.rack-node-level { margin-left: auto; font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.rack-node-reasons { margin: 0 0 8px; color: var(--warning-strong); font-size: 13px; font-weight: 600; }
+.rack-bar { display: grid; grid-template-columns: 92px 1fr 110px; gap: 8px; align-items: center; margin: 4px 0; font-size: 12px; }
+.rack-bar-label { color: var(--text-secondary); }
+.rack-bar-track { height: 7px; border-radius: 4px; background: var(--track); overflow: hidden; }
+.rack-bar-track span { display: block; height: 100%; border-radius: 4px; background: var(--primary); }
+.rack-bar.tone-warn .rack-bar-track span { background: var(--warning); }
+.rack-bar.tone-warn .rack-bar-value { color: var(--warning-strong); font-weight: 700; }
+.rack-bar-value { text-align: right; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rack-bar > .rack-bar-label + .rack-bar-value { grid-column: 2 / 4; }
+.rack-gpu { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.rack-gpu h5 { margin: 0 0 4px; font-size: 13px; color: var(--text); }
+.rack-gpu h5 span { font-weight: 400; color: var(--text-secondary); }
+.rack-detail-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
+
+/* A phone: one rack per row, slots a fixed height. */
+@media (max-width: 720px) {
+  .rack-panel { --u: 17px; padding: 10px; }
+  .rack-grid { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: minmax(0, 1fr); overflow-x: visible; }
+  .rack-summary { width: 100%; }
+  .rack-tile { flex: 1 1 calc(50% - 8px); min-width: 0; }
+  .rack-tile-value { font-size: 17px; }
+  .rack-device-readings { gap: 7px; font-size: 11px; }
+  .rack-detail { min-width: 0; width: 96vw; padding: 16px; }
+  .rack-bar { grid-template-columns: 78px 1fr 92px; }
+}
