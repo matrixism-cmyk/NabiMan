@@ -1,3 +1,4 @@
+import { clearLetters } from './atlasCare';
 import { useImperativeHandle } from 'react';
 import type { MutableRefObject, Ref } from 'react';
 import type { Terminal } from 'xterm';
@@ -34,8 +35,7 @@ export function useTerminalHandle(ref: Ref<TerminalViewHandle>, {
       const term = termRef.current;
       const socket = wsRef.current;
       if (!term || !socket || socket.readyState !== WebSocket.OPEN) return;
-      term.clearTextureAtlas();
-      term.refresh(0, term.rows - 1);
+      clearLetters(term);
       // The server refreshes this tmux client even when its size is unchanged.
       // Preserve the terminal buffer, connection, and application input.
       socket.send(`\x01RESIZE:${term.cols}:${term.rows}`);

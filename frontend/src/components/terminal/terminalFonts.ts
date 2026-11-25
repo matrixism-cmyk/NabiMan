@@ -1,3 +1,4 @@
+import { clearLetters } from './atlasCare';
 import type { Terminal } from 'xterm';
 import './terminal-fonts.css';
 
@@ -46,8 +47,8 @@ export function applyTerminalFont(term: Terminal, id: string | undefined, ready:
     if (!alive()) return;
     // A different string makes xterm measure the cell again, now with the real font.
     term.options.fontFamily = `${font.family} `;
-    term.clearTextureAtlas();
-    term.refresh(0, term.rows - 1);
+    // Every terminal sharing the letters' picture, not this one alone (see ./atlasCare).
+    clearLetters(term);
     ready();
   });
 }
