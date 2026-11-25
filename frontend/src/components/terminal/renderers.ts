@@ -1,6 +1,7 @@
 import type { IDisposable, ITerminalAddon, Terminal } from 'xterm';
 import { WebglAddon } from 'xterm-addon-webgl';
 import { CanvasAddon } from 'xterm-addon-canvas';
+import { careForAtlas } from './atlasCare';
 
 /**
  * How a terminal draws: WebGL first, then Canvas, then xterm's own DOM.
@@ -90,6 +91,7 @@ const REAL: RendererAddons = {
 export function attachRenderer(term: Terminal, choice: RendererChoice, addons: RendererAddons = REAL): IDisposable {
   let current: IDisposable | null = null;
   let lossWatch: IDisposable | null = null;
+  let atlas: IDisposable | null = null;
   const set = (active: Renderer, reason?: FallbackReason) => states.set(term, reason ? { active, reason } : { active });
 
   const startCanvas = (reason?: FallbackReason) => {
@@ -110,8 +112,11 @@ export function attachRenderer(term: Terminal, choice: RendererChoice, addons: R
       term.loadAddon(addon);
       current = addon;
       // Lost later (GPU reset, too many contexts): this window carries on with Canvas
+      atlas = careForAtlas(term);
       lossWatch = addon.onContextLoss?.(() => {
         lossWatch?.dispose();
+        atlas?.dispose();
+        atlas = null;
         addon.dispose();
         startCanvas('webgl-lost');
       }) ?? null;
@@ -135,6 +140,7 @@ export function attachRenderer(term: Terminal, choice: RendererChoice, addons: R
   return {
     dispose: () => {
       lossWatch?.dispose();
+      atlas?.dispose();
       current?.dispose();
       states.delete(term);
     },
