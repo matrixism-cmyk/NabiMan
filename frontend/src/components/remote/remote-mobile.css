@@ -94,6 +94,7 @@ body.rw-fullscreen { overflow: hidden; }
 }
 .rw-sheet-item:active { background: rgba(59, 130, 246, 0.16); }
 .rw-sheet-item.is-cancel { text-align: center; color: var(--text-secondary); margin-top: 4px; }
+.rw-sheet-item.is-danger { color: var(--danger-strong); }
 
 /* Fingers, wherever the screen is: bigger menu rows and file rows. */
 @media (pointer: coarse) {

@@ -18,6 +18,8 @@ interface Props {
   onRenamed: () => void;
   onNewSession: () => void;
   onDetach: () => void;
+  /** Ends the session in the pane for good (asks first). */
+  onEndSession?: () => void;
   onShareSession: () => void;
   /** Sharing a files-only server's files, offered in its file view. */
   onShareFiles?: () => void;
@@ -83,6 +85,9 @@ export default function WorkspaceActions(props: Props) {
               {devicesOn && (
                 <button className="btn btn-secondary btn-sm" onClick={() => setDevicesOpen(true)}>{devicesLabel}</button>
               )}
+              {props.onEndSession && (
+                <button className="btn btn-danger btn-sm" onClick={props.onEndSession} title={t('terminal.endSessionHint')}>⏻ {t('terminal.endSession')}</button>
+              )}
             </>)}
           </>
         )}
@@ -127,6 +132,9 @@ export default function WorkspaceActions(props: Props) {
                 )}
                 {devicesOn && (
                   <button type="button" className="rw-sheet-item" onClick={run(() => setDevicesOpen(true))}>{devicesLabel}</button>
+                )}
+                {terminal.sessionId && props.onEndSession && (
+                  <button type="button" className="rw-sheet-item is-danger" onClick={run(props.onEndSession)}>⏻ {t('terminal.endSession')}</button>
                 )}
               </>
             )}

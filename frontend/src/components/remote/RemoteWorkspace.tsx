@@ -5,6 +5,7 @@ import { useT } from '../../shared/i18n';
 import TerminalView, { TerminalStatus, TerminalTarget, TerminalViewHandle } from '../terminal/TerminalView';
 import { useSessionTerminalSettings } from '../terminal/sessionSettings';
 import { useTerminalWindows } from '../terminal/TerminalWindows';
+import { useSessionEnd } from './useSessionEnd';
 import { paneEnded, pruneSessionZooms, startFresh } from '../terminal/terminalStorage';
 import TerminalSettingsModal from '../terminal/TerminalSettingsModal';
 import ShareDialog from '../terminal/ShareDialog';
@@ -206,6 +207,9 @@ export default function RemoteWorkspace() {
   const settings = useSessionTerminalSettings(currentSessionId || undefined);
   const terminalVisible = (hasSessionsView && serverView === 'terminal')
     || (selection.kind === 'adhoc' && Boolean(adhocTarget));
+  const sessionEnd = useSessionEnd({ visible: showTerminalPane && terminalVisible, status: termStatus, setStatus: setTermStatus, storageKey,
+    sessionId: currentSessionId, sessions, setConnected, setJoinSessionId, refetchSessions,
+    showSessions: () => (selection.kind === 'adhoc' ? select({ kind: 'overview' }) : setServerView('sessions')) });
   const headTitle = selection.kind === 'overview' ? t('remote.title')
     : selection.kind === 'new' ? t('remote.addRemoteServer')
     : selection.kind === 'local' ? t('remote.localShell')
@@ -266,7 +270,7 @@ export default function RemoteWorkspace() {
                 status: termStatus, sessionId: currentSessionId,
                 sessionName: sessions.find(s => s.id === currentSessionId)?.title || '',
               } : null}
-              onRenamed={refetchSessions} onNewSession={() => viewRef.current?.newSession()} onDetach={detach}
+              onRenamed={refetchSessions} onNewSession={() => viewRef.current?.newSession()} onDetach={detach} onEndSession={sessionEnd.end}
               onShareSession={() => { setShareTarget(currentSessionId); setShowShare(true); }}
               onShareFiles={serverView === 'files' && selectedServer ? () => setShareFiles(true) : undefined}
               onSettings={() => setShowSettings(true)}
