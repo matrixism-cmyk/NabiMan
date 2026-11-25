@@ -18,6 +18,7 @@ import mecOps from './mec-ops';
 import mecWizard from './mec-wizard';
 import noc from './noc';
 import rack from './rack';
+import rackEdit from './rack-edit';
 import terminal from './terminal';
 import share from './share';
 import dictation from './dictation';
@@ -71,6 +72,7 @@ const translations: Translations = {
   ...mecWizard,
   ...noc,
   ...rack,
+  ...rackEdit,
   ...terminal,
   ...share,
   ...dictation,

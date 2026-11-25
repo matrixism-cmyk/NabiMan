@@ -1,0 +1,28 @@
+/* Moving devices on the rack page. The accent colour marks what was moved
+   and where a device may land; the danger colour where it may not. */
+.rack-edit-bar { position: sticky; top: 0; z-index: 5; margin-bottom: 8px; padding: 8px 12px; border: 1px solid var(--primary); border-left-width: 4px; border-radius: 6px; background: color-mix(in srgb, var(--primary) 12%, var(--surface)); }
+.rack-edit-row { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.rack-edit-title { font-size: 14px; color: var(--text); white-space: nowrap; }
+.rack-edit-hint { flex: 1 1 320px; min-width: 0; font-size: 12px; color: var(--text-secondary); }
+.rack-edit-actions { display: flex; gap: 8px; margin-left: auto; }
+.rack-edit-bar .rack-banner { margin: 8px 0 0; align-items: center; }
+.rack-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* A face that can be picked up; touch drags it instead of scrolling the page. */
+.rack-device.is-editable { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.rack-editor.is-dragging, .rack-editor.is-dragging .rack-device { cursor: grabbing; user-select: none; -webkit-user-select: none; }
+.rack-device.is-held { opacity: 0.35; }
+/* Moved and not saved yet: a solid accent outline whatever it had, and a tag. */
+.rack-device.is-moved { border-style: solid; border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); z-index: 1; }
+.rack-moved-tag { flex: 0 0 auto; padding: 0 6px; border-radius: 999px; background: var(--primary); color: var(--primary-fg); font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+/* Where a moved device was. */
+.rack-origin { position: absolute; left: 3px; right: 3px; top: calc(var(--top) * var(--u) + 0.5px); height: calc(var(--h) * var(--u) - 1px); display: flex; align-items: center; padding: 0 12px; border: 1px dashed var(--text-secondary); border-radius: 4px; color: var(--text-secondary); font-size: 11px; opacity: 0.75; overflow: hidden; white-space: nowrap; pointer-events: none; }
+.rack-origin span { overflow: hidden; text-overflow: ellipsis; text-decoration: line-through; }
+/* Where the device being dragged would land. */
+.rack-drop { position: absolute; left: 1px; right: 1px; top: calc(var(--top) * var(--u) - 1px); height: calc(var(--h) * var(--u) + 1px); z-index: 3; display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 2px solid var(--primary); border-radius: 4px; background: color-mix(in srgb, var(--primary) 30%, var(--surface)); color: var(--text); font-size: 11.5px; line-height: 13px; overflow: hidden; white-space: nowrap; pointer-events: none; box-sizing: border-box; }
+.rack-drop strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rack-drop span { flex: 0 0 auto; margin-left: auto; font-variant-numeric: tabular-nums; }
+.rack-drop.is-invalid { border-color: var(--danger); border-style: dashed; background: color-mix(in srgb, var(--danger) 28%, var(--surface)); }
+.rack-drop.is-invalid span { color: var(--danger-strong); font-weight: 700; }
+.rack-drop.is-invalid span::before { content: '✖ '; }
+.rack-edit-start { align-self: center; }

@@ -12,6 +12,17 @@ interface Props {
   units: number | null;
   status: RackStatus | null;
   onOpen: (device: RackDevice) => void;
+  /** Given while positions are being edited: the face is picked up and moved instead of opened. */
+  edit?: FaceEdit;
+}
+
+export interface FaceEdit {
+  /** Somewhere else than in the saved layout. */
+  moved: boolean;
+  /** Being dragged right now. */
+  held: boolean;
+  onPointerDown: (e: React.PointerEvent<HTMLElement>, device: RackDevice) => void;
+  onKeyDown: (e: React.KeyboardEvent<HTMLElement>, device: RackDevice) => void;
 }
 
 /** The level to show for a device before or without a status answer. */
@@ -47,7 +58,7 @@ function Readings({ node, status }: { node: NodeStatus; status: RackStatus }) {
  * live numbers. Drawn to scale in the rack (`units` given) or as a card in
  * the list under it.
  */
-export default function RackDeviceFace({ device, look, rackName, units, status, onOpen }: Props) {
+export default function RackDeviceFace({ device, look, rackName, units, status, onOpen, edit }: Props) {
   const { t } = useT();
   const level = levelOf(device, status);
   const nodes = deviceNodes(device);
@@ -66,17 +77,20 @@ export default function RackDeviceFace({ device, look, rackName, units, status, 
   return (
     <button
       type="button"
-      className={`rack-device look-${look} level-${level}${calm ? ' is-calm' : ''}${device.u_confirmed ? '' : ' is-unconfirmed'}${placed ? '' : ' is-listed'}${tall ? ' is-tall' : ''}`}
+      className={`rack-device look-${look} level-${level}${calm ? ' is-calm' : ''}${device.u_confirmed ? '' : ' is-unconfirmed'}${placed ? '' : ' is-listed'}${tall ? ' is-tall' : ''}${edit ? ' is-editable' : ''}${edit?.moved ? ' is-moved' : ''}${edit?.held ? ' is-held' : ''}`}
       style={style}
       data-device={device.id}
       data-level={level}
-      aria-label={t('rack.device.aria', { label: device.label, where, level: reach || t(`rack.level.${level}`) })}
+      aria-label={`${t('rack.device.aria', { label: device.label, where, level: reach || t(`rack.level.${level}`) })}${edit?.moved ? ` · ${t('rack.edit.moved')}` : ''}`}
       title={`${device.label} · ${where}`}
-      onClick={() => onOpen(device)}
+      onClick={edit ? undefined : () => onOpen(device)}
+      onPointerDown={edit ? (e) => edit.onPointerDown(e, device) : undefined}
+      onKeyDown={edit ? (e) => edit.onKeyDown(e, device) : undefined}
     >
       <span className="rack-device-head">
         <Light level={level} calm={calm} />
         <span className="rack-device-label">{device.label}</span>
+        {edit?.moved && <span className="rack-moved-tag" data-moved>{t('rack.edit.moved')}</span>}
         {!tall && reachTag}
         {device.node && <span className="rack-device-node">{device.node}</span>}
         {undecided && <span className="rack-device-node is-undecided">{t('rack.nodeUndecided')}</span>}

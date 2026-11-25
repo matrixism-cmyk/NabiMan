@@ -27,6 +27,7 @@ import { openedFileLink } from './components/remote/fileLink';
 import { DEFAULT_GRANTS } from './components/remote/member';
 import CommandPalette from './components/CommandPalette';
 import LanguageSelector from './shared/ui/LanguageSelector';
+import { guardedLeave } from './shared/ui/leaveGuard';
 import { Tab, Category, CatDef, categories } from './nav';
 import { apiPost, clearToken, hasSession, useApi } from './shared/api/useApi';
 import { useT } from './i18n';
@@ -177,12 +178,13 @@ function App() {
     if (currentUser?.role === 'admin' && !scoped) injectFeedbackWidget(branding?.feedback_widget ?? null);
     if (branding?.product_name) document.title = branding.product_name;
   }, [branding, currentUser?.role, scoped]);
-  const handleNavigate = (tab: Tab) => { setActiveCat('mec'); setActiveTab(tab); };
-  const navigateTo = (cat: Category, tab: Tab) => { setActiveCat(cat); setActiveTab(tab); };
-  const handleCatClick = (cat: CatDef) => {
+  // A page with unsaved work (the rack editor) is asked before another page is shown.
+  const handleNavigate = (tab: Tab) => guardedLeave(() => { setActiveCat('mec'); setActiveTab(tab); });
+  const navigateTo = (cat: Category, tab: Tab) => guardedLeave(() => { setActiveCat(cat); setActiveTab(tab); });
+  const handleCatClick = (cat: CatDef) => guardedLeave(() => {
     setActiveCat(cat.key);
     if (!cat.tabs.some(tb => tb.key === activeTab)) setActiveTab(cat.tabs[0].key);
-  };
+  });
 
   if (!loggedIn) return <LoginScreen onLogin={() => setLoggedIn(true)} />;
 
@@ -280,7 +282,7 @@ function App() {
               <button
                 key={tab.key}
                 className={`sidebar-btn ${activeTab === tab.key ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => guardedLeave(() => setActiveTab(tab.key))}
                 aria-current={activeTab === tab.key ? 'page' : undefined}
               >
                 {t(tab.labelKey)}

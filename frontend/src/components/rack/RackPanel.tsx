@@ -1,10 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useT } from '../../i18n';
 import { useApi } from '../../shared/api/useApi';
-import type { LayoutAnswer, Rack, RackDevice, StatusAnswer } from './rackTypes';
+import type { LayoutAnswer, Rack, RackDevice, RackLayout, StatusAnswer } from './rackTypes';
 import { lookOf, nodesByName } from './rackFormat';
 import RackCabinet from './RackCabinet';
 import RackDetail from './RackDetail';
+import RackEditor from './RackEditor';
 import { RackLegend, RackMeta, RackSummary } from './RackHeader';
 import './rack.css';
 
@@ -23,7 +24,8 @@ function Notice({ tone, title, children }: { tone: 'info' | 'warning' | 'error';
 /**
  * The server room at a glance: each rack drawn as the layout file has it,
  * every device with its status light, servers with their live numbers.
- * Read-only; a device opens its details.
+ * A device opens its details. An administrator may switch to moving devices
+ * (`RackEditor`); for everyone else, and until then, the page only shows.
  */
 export default function RackPanel() {
   const { t } = useT();
@@ -31,8 +33,15 @@ export default function RackPanel() {
   const statusApi = useApi<StatusAnswer>('/api/rack/status', REFRESH_MS);
   const [openId, setOpenId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const { data: me } = useApi<{ role?: string }>('/api/users/me');
+  /** The layout being edited: kept as it was when editing began, whatever is fetched meanwhile. */
+  const [editing, setEditing] = useState<RackLayout | null>(null);
+  /** What a save answered, shown until the next fetch brings the same. */
+  const [saved, setSaved] = useState<RackLayout | null>(null);
+  const [savedVersion, setSavedVersion] = useState<string | null>(null);
 
-  const layout = layoutApi.data?.layout ?? null;
+  const fetched = layoutApi.data?.layout ?? null;
+  const layout = editing ?? saved ?? fetched;
   // A status for another version of the layout would light the wrong devices.
   const status = statusApi.data?.status && layout && statusApi.data.status.layout_version === layout.version ? statusApi.data.status : null;
   const nodes = useMemo(() => (layout ? nodesByName(layout) : {}), [layout]);
@@ -49,6 +58,14 @@ export default function RackPanel() {
     setBusy(true);
     try { await Promise.all([layoutApi.refetch(), statusApi.refetch()]); } finally { setBusy(false); }
   };
+  const startEditing = () => { setOpenId(null); setSavedVersion(null); setEditing(layout); };
+  const onSaved = async (answer: RackLayout) => {
+    setSaved(answer);
+    setSavedVersion(answer.version);
+    setEditing(null);
+    try { await refresh(); } finally { setSaved(null); }
+  };
+  const reload = async () => { setEditing(null); await refresh(); };
 
   const off = layoutApi.data?.configured === false;
   const fault = layoutApi.data?.error ?? null;
@@ -63,6 +80,9 @@ export default function RackPanel() {
           {layout && <RackMeta layout={layout} status={status} tentative={tentative} />}
         </div>
         {status && <RackSummary status={status} />}
+        {layout && !editing && me?.role === 'admin' && (
+          <button type="button" className="btn btn-secondary btn-sm rack-edit-start" onClick={startEditing} data-edit-start>✎ {t('rack.edit.start')}</button>
+        )}
         {!off && (
           <button type="button" className="btn btn-secondary btn-sm rack-refresh" onClick={refresh} disabled={busy}>
             {t('rack.refresh')}
@@ -88,6 +108,7 @@ export default function RackPanel() {
 
       {layout && (
         <>
+          {savedVersion && !editing && <Notice tone="info"><span data-saved>{t('rack.edit.saved', { version: savedVersion })}</span></Notice>}
           {statusApi.error && !status && <Notice tone="warning">{t('rack.requestFailed', { message: statusApi.error })}</Notice>}
           {status && status.source !== 'ok' && (
             <Notice tone="warning" title={t(`rack.source.${status.source}`)}>
@@ -100,9 +121,13 @@ export default function RackPanel() {
           {layout.overlaps.length > 0 && (
             <Notice tone="warning">{t('rack.overlap', { list: layout.overlaps.map((o) => `${o.rack}: ${o.first} / ${o.second}`).join(', ') })}</Notice>
           )}
-          <div className="rack-grid" data-racks={layout.racks.length}>
-            {layout.racks.map((rack) => <RackCabinet key={rack.id} rack={rack} nodes={nodes} status={status} onOpen={onOpen} />)}
-          </div>
+          {editing ? (
+            <RackEditor base={editing} liveVersion={fetched?.version ?? null} nodes={nodes} status={status} onSaved={onSaved} onClose={() => setEditing(null)} onReload={reload} />
+          ) : (
+            <div className="rack-grid" data-racks={layout.racks.length}>
+              {layout.racks.map((rack) => <RackCabinet key={rack.id} rack={rack} nodes={nodes} status={status} onOpen={onOpen} />)}
+            </div>
+          )}
           <RackLegend status={status} tentative={tentative} />
         </>
       )}

@@ -1,7 +1,8 @@
 //! The server-room rack page: the racks as a file describes them
 //! (`NABIMAN_RACK_LAYOUT_FILE`) and how each machine is doing, from
-//! Prometheus (`NABIMAN_RACK_PROMETHEUS_URL`). Read-only: two GET routes,
-//! no control of any device.
+//! Prometheus (`NABIMAN_RACK_PROMETHEUS_URL`). No device is controlled; the
+//! one thing written is the layout file, when an administrator moves
+//! devices on the page.
 //!
 //! - `GET /api/rack/layout`: the file, checked and cut down (see `layout`).
 //!   Read again whenever the file (or what its link points to) changes.
@@ -12,23 +13,38 @@
 //!   answers (see `reach`): by Prometheus' own probes when it has them,
 //!   else one ICMP echo or TCP connect from this server per thirty seconds.
 //!
+//! - `POST /api/rack/layout/moves`: devices moved on the page, saved as a
+//!   NEW version of the file (see `edit` and `save`); administrators only.
+//!
 //! With neither setting the feature is off: both routes say so and the web
 //! app hides the menu entry (`rack` in `GET /api/branding`).
 
 mod check;
+mod edit;
+mod json;
 mod layout;
+mod moves;
 mod ordered;
 mod probe;
 mod prometheus;
 mod raw;
 mod reach;
+mod save;
 mod status;
+#[cfg(test)]
+mod edit_tests;
+#[cfg(test)]
+mod json_tests;
 #[cfg(test)]
 mod layout_tests;
 #[cfg(test)]
 mod probe_tests;
 #[cfg(test)]
+mod moves_tests;
+#[cfg(test)]
 mod reach_tests;
+#[cfg(test)]
+mod save_tests;
 #[cfg(test)]
 mod service_tests;
 #[cfg(test)]
@@ -82,6 +98,8 @@ pub(crate) struct Service {
     prometheus: Option<Result<reqwest::Url, String>>,
     client: Result<reqwest::Client, String>,
     kept: Mutex<Option<Kept>>,
+    /// Held while a save writes: one at a time (see `edit`).
+    saving: Mutex<()>,
     /// Held while asking, so callers arriving together share one round.
     collected: tokio::sync::Mutex<Option<Arc<Collected>>>,
     ttl: Duration,
@@ -100,6 +118,7 @@ impl Service {
             prometheus: prometheus_url.map(|u| prometheus::base_url(&u)),
             client: prometheus::client(),
             kept: Mutex::new(None),
+            saving: Mutex::new(()),
             collected: tokio::sync::Mutex::new(None),
             ttl,
             rounds,
@@ -252,5 +271,5 @@ async fn get_status() -> HttpResponse {
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.route("/api/rack/layout", web::get().to(get_layout)).route("/api/rack/status", web::get().to(get_status));
+    cfg.route("/api/rack/layout", web::get().to(get_layout)).route("/api/rack/status", web::get().to(get_status)).configure(edit::config);
 }

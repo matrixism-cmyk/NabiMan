@@ -97,6 +97,7 @@ pub(crate) const NOT_SETTINGS: &[&str] = &[
     "NABIMAN_OFFSETS",
     "NABIMAN_WRITE_ROUTE_DOC",
     "NABIMAN_RESTORE_TEST_PHASE",
+    "NABIMAN_RACK_ROUNDTRIP_FILE",
 ];
 
 /// Settings that may not come from the file: which file to read, and, in

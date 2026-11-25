@@ -151,3 +151,10 @@ fn power_notes_keep_the_order_of_the_file() {
     assert!(parse(text.replace(r#""power":{"#, r#""power":[{"#).replace(r#"기준"}}"#, r#"기준"}]}"#).as_bytes()).is_err());
 }
 
+
+#[test]
+fn an_empty_description_is_no_description() {
+    let layout = parse(with_devices(r#"{"id":"a","label":"A","desc":""},{"id":"b","label":"B","desc":"  "},{"id":"c","label":"C","desc":"x"}"#).as_bytes()).unwrap();
+    let descs: Vec<Option<&str>> = layout.racks[0].devices.iter().map(|d| d.desc.as_deref()).collect();
+    assert_eq!(descs, [None, None, Some("x")], "the page gets null, and shows no row for it");
+}
