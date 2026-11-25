@@ -3,6 +3,7 @@ import React, {
 } from 'react';
 import { TerminalTarget } from './TerminalView';
 import StartMenu from './StartMenu';
+import { tileZones, zoneRect } from './snapLayouts';
 import { forgetTerminalStorage, pruneTerminalStorage, storedSessionId } from './terminalStorage';
 import TerminalSettingsModal from './TerminalSettingsModal';
 import TerminalWindowFrame from './TerminalWindowFrame';
@@ -159,23 +160,14 @@ export function TerminalWindowsProvider({ children, owner, active = true }: { ch
     setWindows((prev) => {
       const open = prev.filter((w) => !w.minimized);
       if (open.length === 0) return prev;
-      const cols = Math.ceil(Math.sqrt(open.length));
-      const rows = Math.ceil(open.length / cols);
-      const availW = window.innerWidth - 16;
-      const availH = window.innerHeight - TASKBAR_H - 16;
-      const cellW = Math.max(MIN_W, Math.floor(availW / cols));
-      const cellH = Math.max(MIN_H, Math.floor(availH / rows));
+      // The same places the layout picker drops a window into (snapLayouts).
+      const zones = tileZones(open.length);
       let i = 0;
       return prev.map((w) => {
         if (w.minimized) return w;
-        const col = i % cols;
-        const row = Math.floor(i / cols);
+        const place = zoneRect(zones[i], window.innerWidth, window.innerHeight);
         i += 1;
-        return {
-          ...w, maximized: false,
-          x: 8 + col * cellW, y: 8 + row * cellH,
-          w: cellW - 8, h: cellH - 8,
-        };
+        return { ...w, maximized: false, ...place };
       });
     });
   }, []);
@@ -258,7 +250,6 @@ function TerminalWindowLayer({
   windows, onUpdate, onFocus, onClose, onEndSession, onTile, onCascade, onOpenSettings, onOpen,
 }: LayerProps) {
   const { t } = useT();
-  if (windows.length === 0) return null;
   return (
     <div className="term-window-layer">
       {windows.map((win) => (
@@ -284,8 +275,9 @@ function TerminalWindowLayer({
           </button>
         ))}
         <span className="term-taskbar-spacer" />
-        <button className="term-taskbar-btn" onClick={onTile} title={t('terminal.tile')}>⊞ {t('terminal.tile')}</button>
-        <button className="term-taskbar-btn" onClick={onCascade} title={t('terminal.cascade')}>⧉ {t('terminal.cascade')}</button>
+        {/* With no window open the bar is only the start button and the settings. */}
+        {windows.length > 0 && <button className="term-taskbar-btn" onClick={onTile} title={t('terminal.tile')}>⊞ {t('terminal.tile')}</button>}
+        {windows.length > 0 && <button className="term-taskbar-btn" onClick={onCascade} title={t('terminal.cascade')}>⧉ {t('terminal.cascade')}</button>}
         <button className="term-taskbar-btn" onClick={onOpenSettings} title={t('terminal.settings')}>⚙ {t('common.settings')}</button>
       </div>
     </div>

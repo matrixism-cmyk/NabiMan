@@ -41,3 +41,21 @@ export function zoneAt(x: number, y: number, doc: Document = document): Zone | n
   const [layout, index] = mark.split(':').map(Number);
   return SNAP_LAYOUTS[layout]?.[index] || null;
 }
+
+/**
+ * Places for `count` windows side by side and in rows, filling the room: as
+ * square a grid as fits, and a last row with fewer windows shares the whole
+ * width among them. The same zones the picker's arrangements are made of, so
+ * tiling and dropping onto an arrangement line up to the pixel.
+ */
+export function tileZones(count: number): Zone[] {
+  if (count <= 0) return [];
+  const cols = Math.ceil(Math.sqrt(count));
+  const rows = Math.ceil(count / cols);
+  const zones: Zone[] = [];
+  for (let row = 0; row < rows; row += 1) {
+    const inRow = row < rows - 1 ? cols : count - cols * (rows - 1);
+    for (let col = 0; col < inRow; col += 1) zones.push({ x: col / inRow, y: row / rows, w: 1 / inRow, h: 1 / rows });
+  }
+  return zones;
+}

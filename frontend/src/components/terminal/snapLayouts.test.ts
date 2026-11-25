@@ -1,4 +1,4 @@
-import { SNAP_LAYOUTS, zoneAt, zoneRect } from './snapLayouts';
+import { SNAP_LAYOUTS, tileZones, zoneAt, zoneRect } from './snapLayouts';
 import { TASKBAR_H } from './windowGeometry';
 
 test('every arrangement fills the room exactly, without overlap', () => {
@@ -30,4 +30,20 @@ test('the zone under the pointer is read from the picker; anywhere else is none'
   expect(zoneAt(1, 1, at('out'))).toBeNull();
   document.body.innerHTML = '<div data-snap="9:9" id="bad"></div>';
   expect(zoneAt(1, 1, at('bad'))).toBeNull();
+});
+
+test('tiling fills the room whatever the number of windows, a short last row sharing the width', () => {
+  for (let n = 1; n <= 12; n += 1) {
+    const zones = tileZones(n);
+    expect(zones.length).toBe(n);
+    expect(zones.reduce((sum, z) => sum + z.w * z.h, 0)).toBeCloseTo(1, 6);
+  }
+  expect(tileZones(0)).toEqual([]);
+  expect(tileZones(3)).toEqual([{ x: 0, y: 0, w: 0.5, h: 0.5 }, { x: 0.5, y: 0, w: 0.5, h: 0.5 }, { x: 0, y: 0.5, w: 1, h: 0.5 }]);
+});
+
+test('two tiled windows land exactly where the halves of the picker do', () => {
+  const tiled = tileZones(2).map((z) => zoneRect(z, 1920, 1000));
+  expect(tiled).toEqual(SNAP_LAYOUTS[1].map((z) => zoneRect(z, 1920, 1000)));
+  expect(tileZones(4).map((z) => zoneRect(z, 1920, 1000))).toEqual(SNAP_LAYOUTS[5].map((z) => zoneRect(z, 1920, 1000)));
 });
