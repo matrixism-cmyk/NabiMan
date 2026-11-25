@@ -7,7 +7,11 @@ import { errorText, redact } from './crashReport';
  * raise the same error every few seconds, so a message already showing only
  * counts up, one dismissed stays quiet for a while, and a burst is capped.
  */
-export interface GlobalNotice { id: number; message: string; count: number }
+export interface GlobalNotice {
+  id: number; message: string; count: number;
+  /** Where it came from (the stack, the page), for whoever looks into it; nothing secret (redacted). */
+  detail: string;
+}
 
 const QUIET_MS = 60_000;
 const BURST_WINDOW_MS = 60_000;
@@ -40,6 +44,13 @@ function ignorable(reason: unknown, message: string): boolean {
   return /ResizeObserver loop|^Script error\.?$|AbortError/.test(message);
 }
 
+/** The message, the stack as far as it is useful, and the page it happened on. */
+function detailOf(reason: unknown, message: string): string {
+  const stack = reason instanceof Error && reason.stack ? redact(reason.stack).split('\n').slice(0, 14).join('\n') : '';
+  const where = typeof window === 'undefined' ? '' : `${window.location.pathname}${window.location.hash.split('?')[0]}`;
+  return [message, stack && stack !== message ? stack : '', `page: ${where}`, `at: ${new Date().toISOString()}`].filter(Boolean).join('\n').slice(0, 2400);
+}
+
 export function reportGlobalError(reason: unknown, now = Date.now()) {
   const message = redact(errorText(reason)).slice(0, 300);
   if (!message || ignorable(reason, message)) return;
@@ -55,7 +66,7 @@ export function reportGlobalError(reason: unknown, now = Date.now()) {
   if (burst.length >= BURST_MAX) return;
   burst.push(now);
   lastShown.set(message, now);
-  notices = [...notices, { id: nextId++, message, count: 1 }].slice(-VISIBLE_MAX);
+  notices = [...notices, { id: nextId++, message, count: 1, detail: detailOf(reason, message) }].slice(-VISIBLE_MAX);
   emit();
 }
 

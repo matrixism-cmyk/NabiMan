@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import React from 'react';
 import { I18nProvider } from '../../i18n';
-import { useSessionEnd } from './useSessionEnd';
+import { LEAVE_MS, useSessionEnd } from './useSessionEnd';
 
 const mockRequest = jest.fn();
 const mockConfirm = jest.fn();
@@ -25,18 +25,33 @@ function setup(over: Partial<Parameters<typeof useSessionEnd>[0]> = {}) {
 
 beforeEach(() => { localStorage.clear(); localStorage.setItem('nabiman_lang', 'ko'); mockRequest.mockReset(); mockConfirm.mockReset(); mockNotice.mockReset(); });
 
-test('ending asks first, ends the session, then lets go of the pane and shows the session list', async () => {
+test('ending asks first and ends the session; the pane lets go when the terminal reports it, or after a while if it never does', async () => {
+  jest.useFakeTimers();
   mockConfirm.mockResolvedValue(true); mockRequest.mockResolvedValue({ success: true });
   const { hook, calls, connected } = setup();
   await act(async () => { await hook.result.current.end(); });
   expect(mockConfirm.mock.calls[0][0].message).toContain('배포 작업');
   expect(mockRequest).toHaveBeenCalledWith('/api/terminal/sessions/pty_a', { method: 'DELETE' });
+  // Not yet: the terminal is still on screen.
+  expect(calls.showSessions).not.toHaveBeenCalled();
+  act(() => { jest.advanceTimersByTime(LEAVE_MS * 4 + 10); });
   expect(connected().has('ws_srv_1')).toBe(false);
   expect(connected().has('ws_local')).toBe(true);
   expect(calls.setJoinSessionId).toHaveBeenCalledWith(undefined);
   expect(calls.showSessions).toHaveBeenCalledTimes(1);
-  expect(calls.refetchSessions).toHaveBeenCalledTimes(1);
   expect(calls.setStatus).toHaveBeenCalledWith('connecting');
+  jest.useRealTimers();
+});
+
+test('after ending, a pane that already moved on to another session is left alone', async () => {
+  jest.useFakeTimers();
+  mockConfirm.mockResolvedValue(true); mockRequest.mockResolvedValue({ success: true });
+  const { hook, calls } = setup();
+  await act(async () => { await hook.result.current.end(); });
+  hook.rerender({ sessionId: 'pty_new' });
+  act(() => { jest.advanceTimersByTime(LEAVE_MS * 4 + 10); });
+  expect(calls.showSessions).not.toHaveBeenCalled();
+  jest.useRealTimers();
 });
 
 test('saying no, or a failed end, leaves the pane as it is', async () => {
@@ -54,16 +69,22 @@ test('saying no, or a failed end, leaves the pane as it is', async () => {
   expect(b.connected().has('ws_srv_1')).toBe(true);
 });
 
-test('a session that ended by itself leaves the pane at once — only while the pane shows', () => {
+test('a session that ended by itself leaves the pane a moment later — only while the pane shows', () => {
+  jest.useFakeTimers();
   const { hook, calls, connected } = setup();
-  expect(calls.showSessions).not.toHaveBeenCalled();
   hook.rerender({ status: 'ended', visible: false });
+  act(() => { jest.advanceTimersByTime(LEAVE_MS * 3); });
   expect(calls.showSessions).not.toHaveBeenCalled();
   hook.rerender({ status: 'ended', visible: true });
+  // Its last lines stay for a moment, so the terminal is not torn down mid-draw.
+  act(() => { jest.advanceTimersByTime(LEAVE_MS - 20); });
+  expect(calls.showSessions).not.toHaveBeenCalled();
+  act(() => { jest.advanceTimersByTime(40); });
   expect(calls.showSessions).toHaveBeenCalledTimes(1);
   expect(connected().has('ws_srv_1')).toBe(false);
   expect(calls.setStatus).toHaveBeenCalledWith('connecting');
   expect(calls.refetchSessions).toHaveBeenCalled();
+  jest.useRealTimers();
 });
 
 test('a pane with no session yet has nothing to end', async () => {

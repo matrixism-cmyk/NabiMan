@@ -38,6 +38,7 @@ const strings: Translations = {
   'crash.copyFailed': { ko: '클립보드에 복사하지 못했습니다. 아래 내용을 직접 선택해서 복사해 주세요.', en: 'Could not copy to the clipboard. Select the text below and copy it yourself.', ja: 'クリップボードにコピーできませんでした。下の内容を選択してコピーしてください。' },
   'notice.unexpected': { ko: '예기치 않은 오류가 있었습니다: {message}', en: 'An unexpected error occurred: {message}', ja: '予期しないエラーが発生しました: {message}' },
   'notice.unexpectedHint': { ko: '화면이 이상하게 보이면 새로고침해 주세요.', en: 'If something looks wrong, reload the page.', ja: '表示がおかしい場合は再読み込みしてください。' },
+  'notice.copied': { ko: '복사했습니다', en: 'Copied', ja: 'コピーしました' },
   'notice.repeat': { ko: '({count}번)', en: '(×{count})', ja: '（{count}回）' },
   'confirm.noticeTitle': { ko: '알림', en: 'Notice', ja: 'お知らせ' },
   'confirm.more': { ko: '외 {count}개', en: 'and {count} more', ja: 'ほか {count} 件' },
