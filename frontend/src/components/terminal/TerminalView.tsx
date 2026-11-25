@@ -16,6 +16,7 @@ import { useTerminalZoom } from './useTerminalZoom';
 import { useTerminalHandle } from './useTerminalHandle';
 import { useTerminalLayout } from './useTerminalLayout';
 import { useT } from '../../shared/i18n';
+import { useTerminalFileLinks } from './files/TerminalFileLinks';
 
 import type { TerminalStatus, TerminalViewHandle, TerminalViewProps } from './terminalTypes';
 export type { TerminalTarget, TerminalStatus, TerminalViewHandle } from './terminalTypes';
@@ -341,6 +342,11 @@ const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function 
     joinRef, settingsRef, zoom, storageKey, clearBuffer, connect,
   });
 
+  // File names and paths on screen, pressed and held: open, copy path, copy link.
+  const fileLinks = useTerminalFileLinks({
+    termRef, containerRef, storageKey, sessionId: () => sessionIdRef.current, startDir: target.start?.dir,
+  });
+
   const retry = () => {
     attemptsRef.current = 0;
     if (status === 'ended') {
@@ -361,6 +367,7 @@ const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function 
         : <TerminalHistoryControls screenId={screenId} position={historyPosition}
           connected={status === 'connected'} termRef={termRef} wsRef={wsRef} />}
       <TerminalStatusPill status={status} onRetry={retry} />
+      {fileLinks}
     </div>
   );
 });

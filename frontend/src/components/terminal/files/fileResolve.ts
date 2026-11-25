@@ -1,0 +1,155 @@
+import { apiRequest } from '../../../shared/api/useApi';
+import { isFolder, joinPath, listDir, SftpEntry, SftpListing, SftpSource } from '../../remote/sftp/sftpApi';
+import type { PathMatch } from './filePaths';
+
+/**
+ * From a path printed in a terminal to a file on that terminal's server.
+ *
+ * What is printed is only ever a path handed to the file panel's own listing
+ * request for this session's server, which checks the account like any other
+ * file request. A press asks once per folder, and the answer is kept for a few
+ * seconds so pressing again (or the menu's actions) does not ask again.
+ */
+export interface FoundFile {
+  /** The absolute path. */
+  path: string;
+  /** The folder it is in. */
+  dir: string;
+  entry: SftpEntry;
+  folder: boolean;
+}
+
+/** Where to look for a name printed without its folder. */
+export interface Lookup {
+  source: SftpSource;
+  /** The terminal session, when it is an account's own: its Claude sessions' folders come first. */
+  sessionId?: string;
+  /** The folder a session was started in, when known. */
+  startDir?: string;
+}
+
+const KEEP_MS = 10000;
+/** Folders asked about for one press at most. */
+const MAX_FOLDERS = 4;
+const MAX_KEPT = 60;
+
+interface Kept<T> { at: number; value: Promise<T> }
+const listings = new Map<string, Kept<SftpListing | null>>();
+const homes = new Map<string, Promise<string | null>>();
+const folders = new Map<string, Kept<string[]>>();
+
+/** Forgets every kept answer (tests). */
+export function forgetFiles(): void {
+  listings.clear();
+  homes.clear();
+  folders.clear();
+}
+
+function kept<T>(map: Map<string, Kept<T>>, key: string, make: () => Promise<T>): Promise<T> {
+  const now = Date.now();
+  const have = map.get(key);
+  if (have && now - have.at < KEEP_MS) return have.value;
+  if (map.size >= MAX_KEPT) map.clear();
+  const value = make();
+  map.set(key, { at: now, value });
+  return value;
+}
+
+function listing(source: SftpSource, dir: string): Promise<SftpListing | null> {
+  return kept(listings, `${source.base}\n${dir}`, () =>
+    listDir(source, dir).then((res) => (res.success && res.data ? res.data : null)).catch(() => null));
+}
+
+/** The account's home folder there: what `~` stands for. Asked once. */
+function home(source: SftpSource): Promise<string | null> {
+  let value = homes.get(source.base);
+  if (!value) {
+    value = listDir(source, '').then((res) => {
+      if (!res.success || !res.data) return null;
+      // The answer is the home folder's listing too: keep it as one.
+      listings.set(`${source.base}\n${res.data.path}`, { at: Date.now(), value: Promise.resolve(res.data) });
+      return res.data.path;
+    }).catch(() => null);
+    homes.set(source.base, value);
+    value.then((path) => { if (!path) homes.delete(source.base); });
+  }
+  return value;
+}
+
+/** `/a/./b/../c` as `/a/c`; null for anything but an absolute path. */
+export function normalize(path: string): string | null {
+  if (!path.startsWith('/')) return null;
+  const out: string[] = [];
+  for (const part of path.split('/')) {
+    if (!part || part === '.') continue;
+    if (part === '..') out.pop();
+    else out.push(part);
+  }
+  return `/${out.join('/')}`;
+}
+
+const readStored = (key: string) => { try { return localStorage.getItem(key) || ''; } catch { return ''; } };
+
+/** The folders a bare name may be in, most likely first. */
+async function workingFolders(look: Lookup): Promise<string[]> {
+  const out: string[] = [];
+  const add = (dir?: string | null) => { if (dir && dir.startsWith('/') && !out.includes(dir)) out.push(dir); };
+  // Claude Code says where it works; a plain shell's folder is not known here.
+  if (look.sessionId && !look.source.shareKey) {
+    const sid = look.sessionId;
+    const claude = await kept(folders, sid, () =>
+      apiRequest<{ claude: { cwd: string }[] }>(`/api/terminal/sessions/${encodeURIComponent(sid)}/claude`)
+        .then((res) => (res.success ? (res.data?.claude || []).map((c) => c.cwd) : []))
+        .catch(() => []));
+    claude.slice(0, 2).forEach(add);
+  }
+  add(look.startDir);
+  // The folder the file panel beside the terminal is showing, or last showed.
+  add(readStored(`nabiman_sftp_path_${look.source.key}`));
+  add(await home(look.source));
+  return out.slice(0, MAX_FOLDERS);
+}
+
+/** The absolute paths `match` may mean, most likely first. */
+async function candidates(match: PathMatch, look: Lookup): Promise<string[]> {
+  if (match.kind === 'absolute') return [match.path];
+  if (match.kind === 'home') {
+    const base = await home(look.source);
+    return base ? [joinPath(base, match.path.slice(2))] : [];
+  }
+  const dirs = await workingFolders(look);
+  const out = dirs.map((dir) => joinPath(dir, match.path));
+  // A diff names files as `a/src/x.ts` and `b/src/x.ts`.
+  if (/^[ab]\//.test(match.path)) out.push(...dirs.map((dir) => joinPath(dir, match.path.slice(2))));
+  return out;
+}
+
+async function stat(source: SftpSource, raw: string): Promise<FoundFile | null> {
+  const path = normalize(raw);
+  if (!path || path === '/') return null;
+  const at = path.lastIndexOf('/');
+  const dir = at === 0 ? '/' : path.slice(0, at);
+  const name = path.slice(at + 1);
+  const entry = (await listing(source, dir))?.entries.find((e) => e.name === name);
+  return entry ? { path, dir, entry, folder: isFolder(entry) } : null;
+}
+
+/**
+ * The first of `matches` (the paths under one press, longest first) that is
+ * there, or null. At most a handful of folders are asked about.
+ */
+export async function resolveFile(matches: PathMatch[], look: Lookup): Promise<FoundFile | null> {
+  let asked = 0;
+  const seen = new Set<string>();
+  for (const match of matches) {
+    for (const path of await candidates(match, look)) {
+      if (seen.has(path)) continue;
+      seen.add(path);
+      if (asked >= MAX_FOLDERS * 2) return null;
+      asked += 1;
+      const found = await stat(look.source, path);
+      if (found) return found;
+    }
+  }
+  return null;
+}

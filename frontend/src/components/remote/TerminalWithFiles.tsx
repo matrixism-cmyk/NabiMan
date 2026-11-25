@@ -1,8 +1,9 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useT } from '../../shared/i18n';
 import SftpPanel from './sftp/SftpPanel';
 import { draggingOwnRows } from './sftp/sftpDrop';
 import { accountSource, SftpSource } from './sftp/sftpApi';
+import { TerminalFilesContext } from './terminalFiles';
 import type { TerminalTarget } from '../terminal/terminalTypes';
 import { ErrorBoundary } from '../../shared/ui/ErrorBoundary';
 import './sftp/sftp.css';
@@ -61,13 +62,19 @@ export default function TerminalWithFiles({
   const scope = filesScope(target);
   const own = useMemo(() => (scope ? accountSource(scope) : null), [scope]);
   const source = given === undefined ? own : given;
-  if (!source) return <ErrorBoundary region="terminal">{children}</ErrorBoundary>;
+  // A folder asked for from the terminal (a path held down there): see ../terminal/files.
+  const [goTo, setGoTo] = useState<{ path: string } | null>(null);
 
-  const toggle = (next: boolean) => {
-    if (controlled) { onOpenChange(next); return; }
+  const toggle = useCallback((next: boolean) => {
+    if (onOpenChange) { onOpenChange(next); return; }
     setOpen(next);
     write(OPEN_KEY, next ? '1' : '0');
-  };
+  }, [onOpenChange, OPEN_KEY]);
+  const files = useMemo(() => (source ? {
+    source,
+    showFolder: (path: string) => { setGoTo({ path }); toggle(true); },
+  } : null), [source, toggle]);
+  if (!source) return <ErrorBoundary region="terminal">{children}</ErrorBoundary>;
 
   const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -118,7 +125,9 @@ export default function TerminalWithFiles({
           if (text) onInsert(`${text} `);
         }}
       >
-        <ErrorBoundary region="terminal">{children}</ErrorBoundary>
+        <TerminalFilesContext.Provider value={files}>
+          <ErrorBoundary region="terminal">{children}</ErrorBoundary>
+        </TerminalFilesContext.Provider>
         {dropping && <div className="rw-split-drop" aria-hidden="true">{t('sftp.dropOnTerminal')}</div>}
       </div>
       {open ? (
@@ -128,7 +137,7 @@ export default function TerminalWithFiles({
             onPointerDown={startResize} onKeyDown={resizeByKey} onDoubleClick={() => toggle(false)} />
           <div className="rw-split-files" style={{ width }}>
             <ErrorBoundary region="sftp" resetKey={source.base}>
-              <SftpPanel source={source} serverName={name} onInsert={onInsert} onClose={() => toggle(false)} />
+              <SftpPanel source={source} serverName={name} onInsert={onInsert} onClose={() => toggle(false)} goTo={goTo} />
             </ErrorBoundary>
           </div>
         </>

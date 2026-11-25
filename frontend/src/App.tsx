@@ -22,6 +22,8 @@ import { useFocusMode } from './shared/ui/useFocusMode';
 import RemoteShell, { isStandaloneRemote } from './components/remote/RemoteShell';
 import ConsolePopout, { isConsolePopout } from './components/remote/ConsolePopout';
 import SerialMonitorPopout, { serialMonitorTarget } from './components/remote/SerialMonitorPopout';
+import FileLinkPage from './components/remote/FileLinkPage';
+import { openedFileLink } from './components/remote/fileLink';
 import { DEFAULT_GRANTS } from './components/remote/member';
 import CommandPalette from './components/CommandPalette';
 import LanguageSelector from './shared/ui/LanguageSelector';
@@ -61,6 +63,8 @@ function App() {
 
   // /remote is the remote workspace on its own: no menus, so no view in the hash.
   const [standalone] = useState(isStandaloneRemote);
+  // /remote#file/<server>/<path>: a link to one file, kept through signing in.
+  const fileLink = useMemo(() => openedFileLink(loggedIn), [loggedIn]);
   // Deep-linking: restore view from the URL hash on load and on back/forward.
   useEffect(() => {
     if (standalone) return undefined;
@@ -196,6 +200,9 @@ function App() {
   // tab bridging the board feeds it, so any signed-in account may open one.
   const serialMonitor = serialMonitorTarget();
   if (serialMonitor) return <SerialMonitorPopout sid={serialMonitor.sid} name={serialMonitor.name} />;
+
+  // The file panel asks the server, which decides whether this account may see the file.
+  if (fileLink) return <FileLinkPage link={fileLink} />;
 
   if (isConsolePopout()) {
     return currentUser.role === 'admin'

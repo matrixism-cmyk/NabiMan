@@ -207,3 +207,10 @@
 .sftp-tools .sftp-auto.is-on { color: var(--success); border-color: var(--success); }
 .sftp-tools .sftp-auto.is-on { animation: sftp-auto-pulse 2.4s ease-in-out infinite; }
 @keyframes sftp-auto-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+
+/* A link to one file (/remote#file/…): the panel fills the page, the file's path beside the name. */
+.file-link-files { flex: 1; min-height: 0; }
+.file-link-path {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12px; color: var(--text-secondary); font-family: var(--font-mono, monospace);
+}

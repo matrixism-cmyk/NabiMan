@@ -29,6 +29,8 @@ interface Props {
   onInsert?: (text: string) => void;
   /** Folds the panel away; absent when the panel is the whole view. */
   onClose?: () => void;
+  /** A folder to show instead of the remembered one, and a file in it to preview: a link to a file, a path picked in the terminal. */
+  goTo?: { path: string; preview?: string } | null;
 }
 
 const read = (key: string) => { try { return localStorage.getItem(key) || ''; } catch { return ''; } };
@@ -46,7 +48,7 @@ interface Menu { x: number; y: number; entry?: SftpEntry; opener: HTMLElement | 
  * it are uploaded (folders too), rows dragged onto a folder are moved there,
  * and rows dragged onto the terminal type their paths.
  */
-export default function SftpPanel({ source, serverName, onInsert, onClose }: Props) {
+export default function SftpPanel({ source, serverName, onInsert, onClose, goTo }: Props) {
   const { t } = useT();
   const pathKey = `nabiman_sftp_path_${source.key}`;
   const [listing, setListing] = useState<SftpListing | null>(null);
@@ -67,7 +69,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
   const listRef = useRef<HTMLDivElement>(null);
 
   // `silent`: a background poll — no spinner, keep the old listing on failure.
-  const load = useCallback(async (path: string, fallbackHome = false, silent = false) => {
+  const load = useCallback(async (path: string, fallbackHome = false, silent = false): Promise<SftpListing | null> => {
     if (!silent) { setLoading(true); setError(''); }
     try {
       const res = await listDir(source, path);
@@ -77,6 +79,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
         setListing(res.data);
         setError('');
         write(pathKey, res.data.path);
+        return res.data;
       } else if (fallbackHome && path) {
         await load('', false); // the remembered folder is gone: go home
       } else if (!silent) {
@@ -87,9 +90,19 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
     } finally {
       if (!silent) setLoading(false);
     }
+    return null;
   }, [source, pathKey, t]);
 
-  useEffect(() => { load(read(pathKey), true); }, [load, pathKey]);
+  // The remembered folder — or the one asked for, with its file shown once the folder is read.
+  useEffect(() => {
+    let live = true;
+    load(goTo?.path || read(pathKey), true).then((got) => {
+      if (!live || !goTo?.preview) return;
+      if (got?.entries.some((e) => e.name === goTo.preview && !isFolder(e))) setPreviewing(goTo.preview);
+      else setError(t('sftp.linkMissing', { name: goTo.preview }));
+    });
+    return () => { live = false; };
+  }, [load, pathKey, goTo, t]);
 
   // Quietly re-read the current folder so outside changes show (useAutoRefresh).
   const { on: auto, toggle: toggleAuto } = useAutoRefresh(
@@ -122,6 +135,10 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
 
   // Files that can be shown in place, in list order, for stepping through.
   const previewable = useMemo(() => visible.filter((e) => !isFolder(e) && previewOf(e.name)), [visible]);
+  // A file asked for by name is shown even when the list hides it (a dot file).
+  const asked = previewing && !previewable.some((e) => e.name === previewing)
+    ? (listing?.entries || []).filter((e) => e.name === previewing && !isFolder(e)) : [];
+  const previewFiles = asked.length ? asked : previewable;
   const open = (entry: SftpEntry) => {
     if (isFolder(entry)) load(pathOf(entry.name));
     else if (previewOf(entry.name)) setPreviewing(entry.name);
@@ -351,7 +368,7 @@ export default function SftpPanel({ source, serverName, onInsert, onClose }: Pro
           items={menuItems(menu.entry)} onClose={() => setMenu(null)} />
       )}
       {previewing && listing && (
-        <PreviewDialog source={source} dir={listing.path} files={previewable} start={previewing}
+        <PreviewDialog source={source} dir={listing.path} files={previewFiles} start={previewing}
           onDownload={(e) => transfers.download([{ path: pathOf(e.name) }])}
           onClose={() => { setPreviewing(null); listRef.current?.focus(); }} />
       )}

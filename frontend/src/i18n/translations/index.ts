@@ -39,6 +39,7 @@ import usersScope from './users-scope';
 import scope from './scope';
 import signup from './signup';
 import sftpSniff from './sftp-sniff';
+import terminalFile from './terminal-file';
 import about from './about';
 import firstRun from './first-run';
 import auditChange from './audit-change';
@@ -90,6 +91,7 @@ const translations: Translations = {
   ...scope,
   ...signup,
   ...sftpSniff,
+  ...terminalFile,
   ...about,
   ...firstRun,
 };
