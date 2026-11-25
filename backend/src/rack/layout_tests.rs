@@ -139,3 +139,15 @@ fn node_names_and_addresses_must_look_like_what_they_are() {
     let bad_info = r#"{"racks":[{"id":"R1","units":42,"node_info":{"n1":{"ip":"nope"}}}]}"#;
     assert!(fault(bad_info).contains("node_info.n1.ip"));
 }
+
+#[test]
+fn power_notes_keep_the_order_of_the_file() {
+    let text = r#"{"version":"v","title":"t","racks":[{"id":"R1","name":"RACK #1","units":42,"devices":[]}],
+      "power":{"상전":"메인 100A","UPS":"메인 50A","skip":{"x":1},"note":"2025.9 기준"}}"#;
+    let layout = parse(text.as_bytes()).expect("valid");
+    let labels: Vec<&str> = layout.power.iter().map(|p| p.label.as_str()).collect();
+    assert_eq!(labels, ["상전", "UPS", "note"]);
+    // A power block that is not an object is a broken file, said plainly.
+    assert!(parse(text.replace(r#""power":{"#, r#""power":[{"#).replace(r#"기준"}}"#, r#"기준"}]}"#).as_bytes()).is_err());
+}
+

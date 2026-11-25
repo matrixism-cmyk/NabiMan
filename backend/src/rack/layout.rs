@@ -32,7 +32,7 @@ struct RawLayout {
     notes: Option<String>,
     racks: Vec<RawRack>,
     #[serde(default)]
-    power: Option<BTreeMap<String, serde_json::Value>>,
+    power: Option<super::ordered::Ordered>,
 }
 
 #[derive(Deserialize)]
@@ -305,13 +305,14 @@ pub(crate) fn parse(bytes: &[u8]) -> Result<Layout, String> {
     Ok(Layout { version: text("version", &raw.version, 64)?, title: text("title", &raw.title, 300)?, sources, notes: optional("notes", &raw.notes, 4000)?, power, racks, nodes, overlaps })
 }
 
-fn power(raw: Option<&BTreeMap<String, serde_json::Value>>) -> Result<Vec<Pair>, String> {
+fn power(raw: Option<&super::ordered::Ordered>) -> Result<Vec<Pair>, String> {
     let Some(raw) = raw else { return Ok(Vec::new()) };
-    if raw.len() > MAX_POWER {
+    if raw.total > MAX_POWER {
         return Err(format!("power: more than {MAX_POWER} entries"));
     }
-    // Text entries only; anything else in there is not for the page.
-    raw.iter()
+    // Text entries only, in the order the file has them; anything else in there is not for the page.
+    raw.entries
+        .iter()
         .filter_map(|(k, v)| v.as_str().map(|v| (k, v)))
         .map(|(k, v)| Ok(Pair { label: text("power", k, 100)?, value: text(&format!("power.{k}"), v, 500)? }))
         .collect()

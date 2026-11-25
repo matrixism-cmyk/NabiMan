@@ -13,6 +13,7 @@
 //! app hides the menu entry (`rack` in `GET /api/branding`).
 
 mod layout;
+mod ordered;
 mod prometheus;
 mod status;
 #[cfg(test)]
