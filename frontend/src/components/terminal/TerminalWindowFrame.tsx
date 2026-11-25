@@ -11,6 +11,8 @@ import AiGuideButton from './AiGuideButton';
 import { apiRequest } from '../../shared/api/useApi';
 import type { SessionInfo } from '../remote/SessionsView';
 import { clamp, MIN_H, MIN_W, TASKBAR_H, TermWindow } from './windowGeometry';
+import SnapPicker from './SnapPicker';
+import { SNAP_EDGE, SNAP_KEEP, Zone, zoneAt, zoneRect } from './snapLayouts';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import AccountDictation from './dictation/AccountDictation';
 import { useVoiceReply } from './dictation/useVoiceReply';
@@ -52,6 +54,7 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
     return () => { live = false; };
   }, [sessionId, setSessionName]);
 
+  const [snap, setSnap] = useState<{ over: Zone | null } | null>(null);
   const beginDrag = (e: React.PointerEvent) => {
     // Pointer-down on a title-bar button must not start a drag: capturing the
     // pointer on the bar would swallow the pointerup and the button would
@@ -67,13 +70,27 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
     const originX = win.x;
     const originY = win.y;
     onFocus(win.id);
+    // Dragged to the top of the page, the arrangements come up; let go over
+    // one of their zones and the window takes that place (snapLayouts).
+    let picking = false;
     const move = (ev: PointerEvent) => {
       onUpdate(win.id, {
         x: clamp(originX + ev.clientX - startX, -win.w + 120, window.innerWidth - 80),
         y: clamp(originY + ev.clientY - startY, 0, window.innerHeight - 60),
       });
+      picking = ev.clientY <= (picking ? SNAP_KEEP : SNAP_EDGE);
+      setSnap(picking ? { over: zoneAt(ev.clientX, ev.clientY) } : null);
     };
-    const up = () => {
+    const up = (ev: Event) => {
+      const zone = picking && ev.type === 'pointerup' ? zoneAt((ev as PointerEvent).clientX, (ev as PointerEvent).clientY) : null;
+      if (zone) {
+        onUpdate(win.id, {
+          ...zoneRect(zone, window.innerWidth, window.innerHeight), maximized: false,
+          restore: { x: originX, y: originY, w: win.w, h: win.h },
+        });
+      }
+      picking = false;
+      setSnap(null);
       handle.removeEventListener('pointermove', move);
       handle.removeEventListener('pointerup', up);
       handle.removeEventListener('pointercancel', up);
@@ -207,6 +224,7 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
       {showShare && sessionId && (
         <ShareDialog sessionId={sessionId} sessionLabel={sessionName || `${win.title} · ${win.subtitle}`} onClose={() => setShowShare(false)} />
       )}
+      {snap && <SnapPicker over={snap.over} />}
       <div className="term-resize term-resize-e" onPointerDown={(e) => beginResize(e, 'e')} />
       <div className="term-resize term-resize-s" onPointerDown={(e) => beginResize(e, 's')} />
       <div className="term-resize term-resize-se" onPointerDown={(e) => beginResize(e, 'se')} />

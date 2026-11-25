@@ -311,6 +311,13 @@ const t: T = {
   'remote.railShow': { ko: '서버 목록 펼치기', en: 'Show the server list', ja: 'サーバー一覧を表示' },
   'remote.railTab': { ko: '서버 목록', en: 'Servers', ja: 'サーバー' },
   'terminal.restored': { ko: '이전 화면 복원됨', en: 'previous screen restored', ja: '前の画面を復元しました' },
+  'snap.title': { ko: '창을 놓을 자리', en: 'Where to place the window', ja: 'ウィンドウの配置先' },
+  'start.title': { ko: '시작: 세션과 서버를 창으로 열기', en: 'Start: open a session or a server in a window', ja: 'スタート: セッションやサーバーをウィンドウで開く' },
+  'start.search': { ko: '세션·서버 찾기', en: 'Find a session or a server', ja: 'セッション・サーバーを検索' },
+  'start.running': { ko: '실행 중인 세션', en: 'Running sessions', ja: '実行中のセッション' },
+  'start.fresh': { ko: '새 세션 열기', en: 'Start a new session', ja: '新しいセッションを開く' },
+  'start.none': { ko: '해당하는 세션이 없습니다.', en: 'No matching session.', ja: '該当するセッションはありません。' },
+  'start.windowed': { ko: '창 열림', en: 'window open', ja: 'ウィンドウ表示中' },
   'terminal.lines': { ko: '{n}줄', en: '{n} lines', ja: '{n}行' },
 };
 

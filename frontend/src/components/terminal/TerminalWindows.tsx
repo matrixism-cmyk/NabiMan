@@ -2,6 +2,7 @@ import React, {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from 'react';
 import { TerminalTarget } from './TerminalView';
+import StartMenu from './StartMenu';
 import { forgetTerminalStorage, pruneTerminalStorage, storedSessionId } from './terminalStorage';
 import TerminalSettingsModal from './TerminalSettingsModal';
 import TerminalWindowFrame from './TerminalWindowFrame';
@@ -226,6 +227,7 @@ export function TerminalWindowsProvider({ children, owner, active = true }: { ch
         onTile={tile}
         onCascade={cascade}
         onOpenSettings={() => setShowSettings(true)}
+        onOpen={openTerminal}
       />}
       {active && showSettings && <TerminalSettingsModal onClose={() => setShowSettings(false)} />}
     </TerminalWindowsContext.Provider>
@@ -249,10 +251,11 @@ interface LayerProps {
   onTile: () => void;
   onCascade: () => void;
   onOpenSettings: () => void;
+  onOpen: (target: TerminalTarget, options?: OpenOptions) => void;
 }
 
 function TerminalWindowLayer({
-  windows, onUpdate, onFocus, onClose, onEndSession, onTile, onCascade, onOpenSettings,
+  windows, onUpdate, onFocus, onClose, onEndSession, onTile, onCascade, onOpenSettings, onOpen,
 }: LayerProps) {
   const { t } = useT();
   if (windows.length === 0) return null;
@@ -269,7 +272,7 @@ function TerminalWindowLayer({
         />
       ))}
       <div className="term-taskbar">
-        <span className="term-taskbar-label">{t('tab.terminal')} {windows.length}</span>
+        <StartMenu windows={windows} open={onOpen} />
         {windows.map((win) => (
           <button
             key={win.id}
