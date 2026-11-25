@@ -62,6 +62,8 @@
 .rack-device.is-listed { position: static; width: 100%; height: auto; min-height: 30px; padding-top: 5px; padding-bottom: 5px; margin-top: 5px; gap: 2px; }
 .rack-device.level-warn { box-shadow: inset 0 0 0 1px var(--warning); background: var(--warning-soft); }
 .rack-device.level-down { box-shadow: inset 0 0 0 2px var(--danger); background: var(--danger-soft); }
+/* One of ours that does not answer: a thin red line, lighter than a node that is down. Somebody else's: nothing. */
+.rack-device.level-noreply:not(.is-calm) { box-shadow: inset 0 0 0 1px var(--danger); }
 .look-server { --kind: var(--rack-server); }
 .look-gpu { --kind: var(--rack-gpu); }
 .look-switch { --kind: var(--rack-switch); }
@@ -78,6 +80,11 @@
 .rack-device-node { flex: 0 0 auto; margin-left: auto; padding: 0 6px; border-radius: 999px; background: var(--surface-alt); color: var(--text); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .rack-device-node.is-undecided { border: 1px dashed var(--text-muted); color: var(--text-secondary); }
 .rack-device-readings { display: flex; gap: 10px; min-width: 0; padding-left: 19px; overflow: hidden; white-space: nowrap; color: var(--text); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+/* Whether a device that is no node answers, in words beside its light. */
+.rack-reach { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
+.rack-reach.level-ok { color: var(--text); }
+.rack-reach.level-noreply:not(.is-calm) { color: var(--danger-strong); font-weight: 700; }
+.rack-device-head > .rack-reach { flex: 0 0 auto; }
 .rack-reading b { font-weight: 500; color: var(--text-secondary); }
 .rack-reading.is-over { color: var(--warning-strong); font-weight: 700; }
 .rack-reading.is-over::before { content: '▲ '; }
@@ -86,6 +93,8 @@
 
 /* A narrow rack keeps each candidate's light, name and temperature. */
 @container (max-width: 450px) { .rack-candidate .is-extra { display: none; } }
+/* There a one-slot device keeps its name and whether it answers; its address is in its details. */
+@container (max-width: 450px) { .rack-device:not(.is-tall) .rack-device-node.is-address { display: none; } }
 
 /* Status marks: a shape for each level as well as a colour. */
 .rack-light { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 13px; height: 13px; font-size: 12px; line-height: 1; font-weight: 700; }
@@ -94,6 +103,8 @@
 .rack-light.level-down { color: var(--danger); }
 .rack-light.level-unknown { color: var(--text-secondary); border: 1px solid var(--text-muted); border-radius: 50%; font-size: 9px; box-sizing: border-box; }
 .rack-light.level-none { color: var(--text-muted); }
+.rack-light.level-noreply { color: var(--danger); font-size: 13px; }
+.rack-light.level-noreply.is-calm { color: var(--text-secondary); border: 1px solid var(--text-muted); border-radius: 50%; font-size: 9px; box-sizing: border-box; }
 
 .rack-unplaced { margin-top: 10px; }
 .rack-unplaced h4 { margin: 0 0 2px; font-size: 12px; color: var(--warning-strong); }
@@ -119,6 +130,8 @@
 .rack-node-card.level-ok { border-top-color: var(--success); }
 .rack-node-card.level-warn { border-top-color: var(--warning); }
 .rack-node-card.level-down { border-top-color: var(--danger); }
+.rack-node-card.level-noreply:not(.is-calm) { border-top-color: var(--danger); }
+.rack-node-card > .rack-muted:last-child { margin-bottom: 0; }
 .rack-node-card h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 14px; color: var(--text); }
 .rack-node-level { margin-left: auto; font-size: 12px; font-weight: 500; color: var(--text-secondary); }
 .rack-node-reasons { margin: 0 0 8px; color: var(--warning-strong); font-size: 13px; font-weight: 600; }

@@ -4,10 +4,13 @@
 //! where, never a panic. Fields the page does not need (`status_sources`
 //! among them: queries are fixed in `prometheus`) are not passed on.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 use std::net::Ipv4Addr;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+
+use super::check::Check;
+use super::raw::{RawDevice, RawLayout};
 
 pub(crate) const MAX_FILE_BYTES: u64 = 1024 * 1024;
 pub(crate) const MAX_RACKS: usize = 16;
@@ -19,83 +22,6 @@ const MAX_SOURCES: usize = 50;
 const MAX_POWER: usize = 20;
 /// The device kinds the page has a look for; any other becomes `other`.
 const TYPES: &[&str] = &["server", "switch", "firewall", "5g", "storage", "external"];
-
-#[derive(Deserialize)]
-struct RawLayout {
-    #[serde(default)]
-    version: String,
-    #[serde(default)]
-    title: String,
-    #[serde(default)]
-    sources: Vec<String>,
-    #[serde(default)]
-    notes: Option<String>,
-    racks: Vec<RawRack>,
-    #[serde(default)]
-    power: Option<super::ordered::Ordered>,
-}
-
-#[derive(Deserialize)]
-struct RawRack {
-    id: String,
-    #[serde(default)]
-    name: String,
-    #[serde(default)]
-    role: Option<String>,
-    units: u32,
-    #[serde(default)]
-    devices: Vec<RawDevice>,
-    #[serde(default)]
-    node_info: Option<BTreeMap<String, RawNode>>,
-}
-
-#[derive(Deserialize)]
-struct RawDevice {
-    id: String,
-    label: String,
-    #[serde(default, rename = "type")]
-    kind: Option<String>,
-    #[serde(default)]
-    u: Option<u32>,
-    #[serde(default)]
-    h: Option<u32>,
-    #[serde(default)]
-    u_confirmed: bool,
-    #[serde(default)]
-    node: Option<String>,
-    #[serde(default)]
-    node_candidates: Option<Vec<String>>,
-    #[serde(default)]
-    ip: Option<String>,
-    #[serde(default)]
-    bmc: Option<String>,
-    #[serde(default)]
-    gpu: Option<String>,
-    #[serde(default)]
-    cpu: Option<u32>,
-    #[serde(default)]
-    arch: Option<String>,
-    #[serde(default)]
-    desc: Option<String>,
-    #[serde(default)]
-    order_hint: Option<i32>,
-}
-
-#[derive(Deserialize)]
-struct RawNode {
-    #[serde(default)]
-    ip: Option<String>,
-    #[serde(default)]
-    role: Option<String>,
-    #[serde(default)]
-    model: Option<String>,
-    #[serde(default)]
-    cpu: Option<u32>,
-    #[serde(default)]
-    mem_gi: Option<u32>,
-    #[serde(default)]
-    gpu: Option<String>,
-}
 
 /// What the browser gets.
 #[derive(Serialize, Clone, Debug, PartialEq)]
@@ -132,6 +58,8 @@ pub(crate) struct Rack {
     pub name: String,
     pub role: Option<String>,
     pub units: u32,
+    /// Somebody else's rack (the file says so with `external`).
+    pub external: bool,
     pub devices: Vec<Device>,
 }
 
@@ -156,6 +84,10 @@ pub(crate) struct Device {
     pub arch: Option<String>,
     pub desc: Option<String>,
     pub order_hint: Option<i32>,
+    /// How a device that is no node is asked whether it answers.
+    pub check: Check,
+    /// Not one of ours: its own `external`, else its rack's, else its type.
+    pub external: bool,
 }
 
 impl Device {
@@ -269,7 +201,7 @@ pub(crate) fn parse(bytes: &[u8]) -> Result<Layout, String> {
         }
         let mut devices = Vec::new();
         for (di, d) in rack.devices.iter().enumerate() {
-            let device = device(&format!("{at}.devices[{di}]"), d, rack.units)?;
+            let device = device(&format!("{at}.devices[{di}]"), d, rack.units, rack.external.unwrap_or(false))?;
             if !seen_ids.insert(device.id.clone()) {
                 return Err(format!("{at}.devices[{di}].id: {} is used twice", device.id));
             }
@@ -297,7 +229,7 @@ pub(crate) fn parse(bytes: &[u8]) -> Result<Layout, String> {
             merge(&mut nodes, from_info);
         }
         overlaps.extend(overlapping(&rack_id, &devices));
-        racks.push(Rack { id: rack_id, name: text(&format!("{at}.name"), &rack.name, 100)?, role: optional(&format!("{at}.role"), &rack.role, 200)?, units: rack.units, devices });
+        racks.push(Rack { id: rack_id, name: text(&format!("{at}.name"), &rack.name, 100)?, role: optional(&format!("{at}.role"), &rack.role, 200)?, units: rack.units, external: rack.external.unwrap_or(false), devices });
     }
     if nodes.len() > MAX_NODES {
         return Err(format!("more than {MAX_NODES} nodes named"));
@@ -318,7 +250,7 @@ fn power(raw: Option<&super::ordered::Ordered>) -> Result<Vec<Pair>, String> {
         .collect()
 }
 
-fn device(at: &str, d: &RawDevice, units: u32) -> Result<Device, String> {
+fn device(at: &str, d: &RawDevice, units: u32, rack_external: bool) -> Result<Device, String> {
     let h = d.h.unwrap_or(1);
     if h == 0 || h > units {
         return Err(format!("{at}.h: {h} given; 1–{units} allowed in this rack"));
@@ -345,6 +277,7 @@ fn device(at: &str, d: &RawDevice, units: u32) -> Result<Device, String> {
         None => None,
     };
     let kind = d.kind.as_deref().map(|k| k.trim().to_ascii_lowercase()).unwrap_or_default();
+    let kind_is_external = kind == "external";
     Ok(Device {
         id: id(&format!("{at}.id"), &d.id)?,
         label: text(&format!("{at}.label"), &d.label, 200)?,
@@ -362,6 +295,8 @@ fn device(at: &str, d: &RawDevice, units: u32) -> Result<Device, String> {
         arch: optional(&format!("{at}.arch"), &d.arch, 32)?,
         desc: optional(&format!("{at}.desc"), &d.desc, 1000)?,
         order_hint: d.order_hint,
+        check: Check::parse(&format!("{at}.check ({})", d.id), d.check.as_deref())?,
+        external: d.external.unwrap_or(rack_external || kind_is_external),
     })
 }
 

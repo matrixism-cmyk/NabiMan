@@ -1,8 +1,9 @@
 import React, { useRef } from 'react';
 import { useT } from '../../i18n';
 import Modal from '../../shared/ui/Modal';
-import type { NodeStatus, Rack, RackDevice, RackNode, RackStatus } from './rackTypes';
-import { Look, barTone, celsius, deviceNodes, gib, gpuName, pct, watts } from './rackFormat';
+import { formatDateTime } from '../../shared/i18n';
+import type { DeviceStatus, NodeStatus, Rack, RackDevice, RackNode, RackStatus } from './rackTypes';
+import { Look, barTone, celsius, checkedBy, deviceNodes, gib, gpuName, isCalm, latency, pct, reachText, reachWhy, watts } from './rackFormat';
 import { slotLabel } from './rackGeometry';
 import { Light, levelOf } from './RackDeviceFace';
 
@@ -71,6 +72,26 @@ function NodeCard({ name, info, node, status }: { name: string; info: RackNode |
   );
 }
 
+/** Whether a device that is no node answers: how that was checked, when, how fast, or what is missing. */
+function ReachCard({ device, own }: { device: RackDevice; own: DeviceStatus }) {
+  const { t } = useT();
+  const calm = isCalm(own);
+  const why = reachWhy(t, own.reason) || (own.level === 'none' ? t('rack.detail.notCollected') : '');
+  return (
+    <section className={`rack-node-card level-${own.level}${calm ? ' is-calm' : ''}`} data-reach-card>
+      <h4><Light level={own.level} calm={calm} /> {t('rack.detail.reach')} <span className="rack-node-level">{reachText(t, own) || t(`rack.level.${own.level}`)}</span></h4>
+      <dl className="rack-facts">
+        <Fact label={t('rack.detail.address')}>{device.ip ?? t('rack.detail.noAddress')}</Fact>
+        <Fact label={t('rack.detail.checkedBy')}>{checkedBy(t, own.checked_by)}</Fact>
+        <Fact label={t('rack.detail.checkedAt')}>{own.checked_at ? formatDateTime(own.checked_at, { dateStyle: 'short', timeStyle: 'medium' }) : null}</Fact>
+        <Fact label={t('rack.detail.latency')}>{latency(own.latency_ms)}</Fact>
+      </dl>
+      {why && <p className="rack-muted" data-why>{why}</p>}
+      {own.external && <p className="rack-muted" data-external>{t('rack.detail.external')}</p>}
+    </section>
+  );
+}
+
 /** Everything known about one device; Esc or a click outside closes it. */
 export default function RackDetail({ device, rack, look, nodes, status, onClose }: Props) {
   const { t } = useT();
@@ -78,22 +99,23 @@ export default function RackDetail({ device, rack, look, nodes, status, onClose 
   const top = useRef<HTMLDListElement>(null);
   const names = deviceNodes(device);
   const level = levelOf(device, status);
+  const own = status?.devices[device.id];
   const undecided = !device.node && names.length > 0;
   const position = device.u !== null ? t('rack.detail.rackU', { rack: rack.name, slot: `${slotLabel(device.u, device.h)} (${device.h}U)` }) : `${rack.name} · ${t('rack.unplaced')}`;
   return (
-    <Modal onClose={onClose} className="rack-detail" initialFocus={top} title={<><Light level={level} /> {device.label}</>}>
+    <Modal onClose={onClose} className="rack-detail" initialFocus={top} title={<><Light level={level} calm={isCalm(own)} /> {device.label}</>}>
       <dl className="rack-facts" ref={top} tabIndex={-1}>
         <Fact label={t('rack.detail.type')}>{t(`rack.look.${look}`)}</Fact>
         <Fact label={t('rack.detail.position')}>{position}</Fact>
         <Fact label={t('rack.detail.node')}>{device.node ?? (undecided ? `${t('rack.nodeUndecided')} (${names.join(', ')})` : null)}</Fact>
-        {!device.node && <Fact label={t('rack.detail.ip')}>{device.ip}</Fact>}
+        {!device.node && names.length > 0 && <Fact label={t('rack.detail.ip')}>{device.ip}</Fact>}
         <Fact label={t('rack.detail.bmc')}>{device.bmc}</Fact>
         <Fact label={t('rack.detail.notes')}>{device.desc}</Fact>
       </dl>
       {device.u === null && <p className="rack-notice">{t('rack.detail.unplaced')}</p>}
       {device.u !== null && !device.u_confirmed && <p className="rack-notice">{t('rack.detail.uNotice')}</p>}
       {undecided && <p className="rack-notice">{t('rack.detail.candidates')}</p>}
-      {names.length === 0 && <p className="rack-muted">{t('rack.detail.notCollected')}</p>}
+      {names.length === 0 && (own ? <ReachCard device={device} own={own} /> : <p className="rack-muted">{t('rack.detail.notCollected')}</p>)}
       {names.length > 0 && (
         <div className="rack-node-cards">
           {names.map((name) => <NodeCard key={name} name={name} info={nodes[name]} node={status?.nodes[name]} status={status} />)}

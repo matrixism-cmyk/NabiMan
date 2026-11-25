@@ -1,9 +1,10 @@
 use super::layout::{parse, Layout};
 use super::layout_tests::SAMPLE;
 use super::prometheus::{parse_answer, Metric, Samples, QUERIES};
+use super::reach::Reach;
 use super::status::*;
 
-fn vector(series: &[(&[(&str, &str)], &str)]) -> String {
+pub(super) fn vector(series: &[(&[(&str, &str)], &str)]) -> String {
     let items: Vec<serde_json::Value> = series
         .iter()
         .map(|(labels, value)| {
@@ -39,6 +40,9 @@ pub(super) fn canned(metric: Metric) -> String {
         ])
     };
     match metric {
+        // Prometheus already probes the switch of `SAMPLE`.
+        Metric::ProbeSuccess => vector(&[(&[("instance", "10.0.0.1")], "1")]),
+        Metric::ProbeDuration => vector(&[(&[("instance", "10.0.0.1")], "0.0006")]),
         Metric::Ready => vector(&[(&[("node", "mec-cp01")], "1"), (&[("node", "mec-wn02")], "1"), (&[("node", "mec-wn03")], "1"), (&[("node", "mec-cp02")], "1")]),
         Metric::Cpu => node(["12.34", "6.19", "0.89", "20"]),
         Metric::Memory => node(["30", "41.26", "27", "11"]),
@@ -58,7 +62,7 @@ pub(super) fn canned(metric: Metric) -> String {
     }
 }
 
-fn samples_with(change: &dyn Fn(Metric) -> Option<String>) -> Samples {
+pub(super) fn samples_with(change: &dyn Fn(Metric) -> Option<String>) -> Samples {
     let mut samples = Samples::default();
     for (metric, _) in QUERIES {
         let body = change(metric).unwrap_or_else(|| canned(metric));
@@ -72,7 +76,7 @@ fn layout() -> Layout {
 }
 
 fn status_with(change: &dyn Fn(Metric) -> Option<String>) -> Status {
-    assemble(&layout(), Source::Collected(&samples_with(change)), "2026-11-25T12:00:00Z".into())
+    assemble(&layout(), Source::Collected(&samples_with(change)), &Reach::default(), "2026-11-25T12:00:00Z".into())
 }
 
 #[test]
@@ -85,7 +89,7 @@ fn a_healthy_cluster_reads_ok_with_every_value_in_place() {
     assert_eq!(wn02.gpus.len(), 2);
     let a40 = &wn02.gpus[0];
     assert_eq!((a40.index, a40.mig_id, a40.model.as_deref(), a40.util_pct, a40.temp_c, a40.power_w, a40.mem_used_mib, a40.mem_total_mib), (0, None, Some("NVIDIA A40"), Some(35.0), Some(41.0), Some(70.5), Some(601.0), Some(45487.0)));
-    assert_eq!(s.summary, Summary { nodes_total: 4, nodes_ready: 4, gpus: 5, warnings: 0, down: 0, max_temp_c: Some(70.0) });
+    assert_eq!(s.summary, Summary { nodes_total: 4, nodes_ready: 4, gpus: 5, warnings: 0, down: 0, max_temp_c: Some(70.0), ..Summary::default() });
     assert_eq!(s.thresholds, Thresholds { temp_c: 80.0, memory_pct: 90.0, disk_pct: 90.0 });
     assert!(!s.nodes.contains_key("elsewhere"), "only the layout's nodes are reported");
 }
@@ -108,9 +112,9 @@ fn devices_take_the_worst_of_their_nodes_and_none_without_one() {
     assert_eq!((s.nodes["mec-cp01"].level, s.nodes["mec-wn02"].level), (Level::Ok, Level::Warn));
     assert_eq!(s.nodes["mec-wn02"].reasons, ["memory"]);
     for id in ["lenovo-1", "lenovo-2"] {
-        assert_eq!(s.devices[id], DeviceStatus { level: Level::Warn, nodes: vec!["mec-cp01".into(), "mec-wn02".into()] }, "{id}");
+        assert_eq!(s.devices[id], DeviceStatus { level: Level::Warn, nodes: vec!["mec-cp01".into(), "mec-wn02".into()], ..DeviceStatus::default() }, "{id}");
     }
-    assert_eq!(s.devices["sw"], DeviceStatus { level: Level::None, nodes: vec![] }, "an address alone is not collected");
+    assert_eq!(s.devices["sw"], DeviceStatus::default(), "a device with no node and no finding shows nothing");
     assert_eq!(s.devices["odd"].level, Level::None);
     assert_eq!(s.devices["gh-wn03"].nodes, ["mec-wn03"]);
     // Each node counts once though two machines show it.
@@ -143,7 +147,7 @@ fn not_ready_is_down_and_outranks_a_warning() {
     assert_eq!(s.nodes["mec-wn02"].level, Level::Warn);
     assert_eq!(s.devices["lenovo-1"].level, Level::Down, "the worst candidate decides");
     assert_eq!((s.summary.nodes_ready, s.summary.down, s.summary.warnings), (3, 1, 1));
-    assert!(Level::Down > Level::Warn && Level::Warn > Level::Unknown && Level::Unknown > Level::Ok && Level::Ok > Level::None);
+    assert!(Level::Down > Level::Warn && Level::Warn > Level::NoReply && Level::NoReply > Level::Unknown && Level::Unknown > Level::Ok && Level::Ok > Level::None);
 }
 
 #[test]
@@ -159,16 +163,16 @@ fn a_node_prometheus_does_not_know_is_unknown() {
 
 #[test]
 fn no_prometheus_means_unknown_everywhere_with_the_reason() {
-    let down = assemble(&layout(), Source::Unreachable("cannot connect"), "t".into());
+    let down = assemble(&layout(), Source::Unreachable("cannot connect"), &Reach::default(), "t".into());
     assert_eq!((down.source, down.message.as_deref()), ("unreachable", Some("cannot connect")));
     assert!(down.nodes.len() == 4 && down.nodes.values().all(|n| n.level == Level::Unknown));
     assert_eq!((down.devices["lenovo-1"].level, down.devices["t4"].level, down.devices["sw"].level), (Level::Unknown, Level::Unknown, Level::None));
-    let off = assemble(&layout(), Source::NotConfigured, "t".into());
+    let off = assemble(&layout(), Source::NotConfigured, &Reach::default(), "t".into());
     assert_eq!((off.source, off.message, off.devices["t4"].level), ("not_configured", None, Level::Unknown));
     let mut partial = samples_with(&|_| None);
     partial.by_metric.remove(&Metric::Ready);
     partial.failed.push("Ready".into());
-    let s = assemble(&layout(), Source::Collected(&partial), "t".into());
+    let s = assemble(&layout(), Source::Collected(&partial), &Reach::default(), "t".into());
     assert_eq!((s.source, s.message.as_deref(), s.nodes["mec-cp01"].level), ("partial", Some("no answer for: Ready"), Level::Unknown));
 }
 
@@ -191,5 +195,5 @@ fn the_queries_are_fixed_text_and_never_name_a_node() {
             assert!(!query.contains(&node.name));
         }
     }
-    assert_eq!(QUERIES.len(), 10);
+    assert_eq!(QUERIES.len(), 12);
 }

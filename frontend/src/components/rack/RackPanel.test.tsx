@@ -3,25 +3,25 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { I18nProvider } from '../../i18n';
 import { useApi } from '../../shared/api/useApi';
 import RackPanel, { REFRESH_MS } from './RackPanel';
-import type { LayoutAnswer, NodeStatus, RackDevice, RackLayout, RackStatus, StatusAnswer } from './rackTypes';
+import type { DeviceStatus, LayoutAnswer, Level, NodeStatus, RackDevice, RackLayout, RackStatus, StatusAnswer } from './rackTypes';
 
 jest.mock('../../shared/api/useApi', () => ({ useApi: jest.fn() }));
 
 const device = (over: Partial<RackDevice> & { id: string }): RackDevice => ({
   label: over.id, type: 'server', u: null, h: 1, u_confirmed: false, node: null, node_candidates: [], ip: null, bmc: null,
-  gpu: null, cpu: null, arch: null, desc: null, order_hint: null, ...over,
+  gpu: null, cpu: null, arch: null, desc: null, order_hint: null, check: 'ping', external: false, ...over,
 });
 
 const layout: RackLayout = {
   version: 'v-test', title: 'Test server room', sources: ['site survey', 'cluster facts'], notes: 'a note',
   power: [{ label: 'UPS', value: 'main 50A' }], overlaps: [],
   racks: [
-    { id: 'R1', name: 'RACK #1', role: 'core', units: 42, devices: [
+    { id: 'R1', name: 'RACK #1', role: 'core', units: 42, external: false, devices: [
       device({ id: 'sw', label: 'Core switch', type: 'switch', u: 38, u_confirmed: true, ip: '10.0.0.1' }),
       device({ id: 'lenovo-1', label: 'SR650 #1', u: 27, h: 2, node_candidates: ['mec-cp01', 'mec-wn02'], desc: 'which node is not known' }),
       device({ id: 'gh', label: 'GH200 box', u: 21, h: 2, node: 'mec-wn03', ip: '10.0.0.204', bmc: '10.0.0.206', gpu: 'GH200 x1', cpu: 72, arch: 'arm64' }),
     ] },
-    { id: 'R2', name: 'RACK #2', role: null, units: 42, devices: [
+    { id: 'R2', name: 'RACK #2', role: null, units: 42, external: false, devices: [
       device({ id: 'late', label: 'Placed later B', type: 'storage', order_hint: 2 }),
       device({ id: 'early', label: 'Placed later A', type: 'external', order_hint: 1 }),
       device({ id: 't4', label: 'T4 box', u: 36, h: 2, node: 'mec-cp02', ip: '10.0.0.199', gpu: 'T4 x2' }),
@@ -37,6 +37,8 @@ const layout: RackLayout = {
 
 const node = (over: Partial<NodeStatus>): NodeStatus => ({ level: 'ok', reasons: [], ready: true, cpu_pct: 12, mem_pct: 30, disk_pct: 50, temp_c: 55, gpus: [], ...over });
 
+const dev = (level: Level, nodes: string[] = []): DeviceStatus => ({ level, nodes, external: false, reason: null, latency_ms: null, checked_by: null, checked_at: null });
+
 const status: RackStatus = {
   collected_at: '2026-11-25T12:00:00Z', source: 'ok', message: null, layout_version: 'v-test',
   nodes: {
@@ -49,10 +51,10 @@ const status: RackStatus = {
     'mec-cp02': node({ level: 'down', ready: false }),
   },
   devices: {
-    sw: { level: 'none', nodes: [] }, 'lenovo-1': { level: 'warn', nodes: ['mec-cp01', 'mec-wn02'] }, gh: { level: 'ok', nodes: ['mec-wn03'] },
-    late: { level: 'none', nodes: [] }, early: { level: 'none', nodes: [] }, t4: { level: 'down', nodes: ['mec-cp02'] },
+    sw: dev('none'), 'lenovo-1': dev('warn', ['mec-cp01', 'mec-wn02']), gh: dev('ok', ['mec-wn03']),
+    late: dev('none'), early: dev('none'), t4: dev('down', ['mec-cp02']),
   },
-  summary: { nodes_total: 4, nodes_ready: 3, gpus: 2, warnings: 1, down: 1, max_temp_c: 70 },
+  summary: { nodes_total: 4, nodes_ready: 3, gpus: 2, warnings: 1, down: 1, max_temp_c: 70, probed: 0, reachable: 0, noreply: 0, external_noreply: 0, over_limit: 0 },
   thresholds: { temp_c: 80, memory_pct: 90, disk_pct: 90 },
 };
 
@@ -231,7 +233,7 @@ describe('RackPanel', () => {
     const devices = Object.fromEntries(Object.entries(status.devices).map(([id, d]) => [id, { ...d, level: d.nodes.length ? 'unknown' as const : 'none' as const }]));
     serve({ configured: true, layout, error: null }, { configured: true, error: null, status: {
       ...status, source: 'unreachable', message: 'cannot connect', nodes: unknown, devices,
-      summary: { nodes_total: 4, nodes_ready: 0, gpus: 0, warnings: 0, down: 0, max_temp_c: null },
+      summary: { ...status.summary, nodes_ready: 0, gpus: 0, warnings: 0, down: 0, max_temp_c: null },
     } });
     show();
     expect(screen.getByText(/Prometheus cannot be reached/)).toBeInTheDocument();

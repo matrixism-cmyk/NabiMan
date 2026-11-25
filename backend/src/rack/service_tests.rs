@@ -8,6 +8,7 @@ use actix_web::{web, App, HttpResponse, HttpServer};
 
 use super::layout_tests::SAMPLE;
 use super::prometheus::QUERIES;
+use super::reach_tests::{quiet, FakeProber};
 use super::status::Level;
 use super::status_tests::canned;
 use super::*;
@@ -72,7 +73,7 @@ fn layout_file(text: &str) -> (PathBuf, PathBuf) {
 async fn status_comes_from_the_fixed_queries_and_is_kept_for_a_while() {
     let prometheus = fake().await;
     let (dir, file) = layout_file(SAMPLE);
-    let service = Service::new(Some(file), Some(prometheus.url.clone()), Duration::from_secs(60));
+    let service = Service::new(Some(file), Some(prometheus.url.clone()), Duration::from_secs(60), quiet());
     let layout = service.layout().unwrap();
     let first = service.status(&layout).await;
     assert_eq!((first.source, first.summary.nodes_ready, first.summary.gpus), ("ok", 4, 5));
@@ -92,7 +93,7 @@ async fn status_comes_from_the_fixed_queries_and_is_kept_for_a_while() {
 async fn the_answers_are_asked_for_again_once_they_are_old() {
     let prometheus = fake().await;
     let (dir, file) = layout_file(SAMPLE);
-    let service = Service::new(Some(file), Some(format!("{}/", prometheus.url)), Duration::from_millis(50));
+    let service = Service::new(Some(file), Some(format!("{}/", prometheus.url)), Duration::from_millis(50), quiet());
     let layout = service.layout().unwrap();
     assert_eq!(service.status(&layout).await.source, "ok");
     tokio::time::sleep(Duration::from_millis(80)).await;
@@ -110,21 +111,21 @@ async fn an_unreachable_or_misnamed_prometheus_is_a_message_not_an_error() {
     let (dir, file) = layout_file(SAMPLE);
     // A port nothing listens on.
     let closed = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap().local_addr().unwrap();
-    let service = Service::new(Some(file.clone()), Some(format!("http://{closed}")), Duration::from_secs(60));
+    let service = Service::new(Some(file.clone()), Some(format!("http://{closed}")), Duration::from_secs(60), quiet());
     let answer = status_answer(&service).await;
     let status = answer.status.expect("a status all the same");
     assert!(answer.configured && answer.error.is_none());
     assert_eq!((status.source, status.message.as_deref()), ("unreachable", Some("cannot connect")));
-    assert_eq!((status.devices["t4"].level, status.devices["sw"].level), (Level::Unknown, Level::None));
+    assert_eq!((status.devices["t4"].level, status.devices["sw"].level), (Level::Unknown, Level::NoReply), "the switch is asked from here when Prometheus cannot say");
 
     for bad in ["prometheus:9090", "ftp://host", "http://user:pw@host", "http://host/?query=up"] {
-        let service = Service::new(Some(file.clone()), Some(bad.into()), Duration::from_secs(60));
+        let service = Service::new(Some(file.clone()), Some(bad.into()), Duration::from_secs(60), quiet());
         let status = status_answer(&service).await.status.unwrap();
         assert_eq!(status.source, "unreachable", "{bad}");
         assert!(status.message.unwrap().starts_with("rack_prometheus_url:"), "{bad}");
     }
 
-    let only_layout = Service::new(Some(file), None, Duration::from_secs(60));
+    let only_layout = Service::new(Some(file), None, Duration::from_secs(60), quiet());
     let status = status_answer(&only_layout).await.status.unwrap();
     assert_eq!((status.source, status.devices["t4"].level), ("not_configured", Level::Unknown));
     let _ = std::fs::remove_dir_all(dir);
@@ -153,7 +154,7 @@ async fn with_neither_setting_the_feature_is_off() {
 async fn a_missing_or_broken_file_is_reported_and_read_again_when_it_changes() {
     let dir = scratch();
     let file = dir.join("layout.json");
-    let service = Service::new(Some(file.clone()), None, Duration::from_secs(60));
+    let service = Service::new(Some(file.clone()), None, Duration::from_secs(60), quiet());
     let fault = service.layout().unwrap_err();
     assert_eq!(fault.code, "unreadable");
     assert!(fault.detail.contains("layout.json"), "{}", fault.detail);
@@ -190,7 +191,7 @@ async fn a_link_moved_to_a_newer_file_is_followed() {
     std::fs::write(&v1, SAMPLE).unwrap();
     std::fs::write(&v2, SAMPLE.replace(r#""version": "t1""#, r#""version": "t2""#)).unwrap();
     std::os::unix::fs::symlink("v1.json", &link).unwrap();
-    let service = Service::new(Some(link.clone()), None, Duration::from_secs(60));
+    let service = Service::new(Some(link.clone()), None, Duration::from_secs(60), quiet());
     assert_eq!(service.layout().unwrap().version, "t1");
     std::fs::remove_file(&link).unwrap();
     std::os::unix::fs::symlink("v2.json", &link).unwrap();
@@ -236,4 +237,54 @@ fn staff_may_read_and_members_may_not() {
         assert_eq!((rack.class, rack.member), (mec.class, mec.member));
     }
     assert!(!crate::rbac::check_permission(&UserRole::Operator, "GET", "/api/rack/other"), "nothing else under /api/rack is open");
+}
+
+#[actix_web::test]
+async fn a_device_prometheus_does_not_probe_is_asked_from_here_once_for_every_page() {
+    let prober = FakeProber::new(&[((std::net::Ipv4Addr::new(10, 0, 0, 1), reach::Method::Ping), reach::Outcome::Reply { ms: Some(0.6) })], Duration::from_millis(20));
+    let (dir, file) = layout_file(SAMPLE);
+    let service = Service::new(Some(file.clone()), None, Duration::from_secs(60), super::reach_tests::rounds(&prober, Duration::from_secs(60)));
+    let layout = service.layout().unwrap();
+    let all = futures::future::join_all((0..8).map(|_| service.status(&layout))).await;
+    assert_eq!(prober.count(), 1, "eight pages, one question");
+    let sw = &all[0].devices["sw"];
+    assert_eq!((sw.level, sw.latency_ms, sw.checked_by.as_deref()), (Level::Ok, Some(0.6), Some("ping")));
+    assert_eq!((all[0].devices["odd"].level, all[0].devices["odd"].reason), (Level::None, Some("no_address")));
+    assert_eq!((all[0].summary.probed, all[0].summary.reachable, all[0].summary.noreply), (1, 1, 0));
+    assert_eq!(all[0].devices["t4"].level, Level::Unknown, "nodes are never pinged: their state is Kubernetes'");
+    // An address learnt later is picked up from the file, and only it is new.
+    std::fs::write(&file, SAMPLE.replace(r#""type": "ups", "u": 1"#, r#""type": "ups", "u": 1, "ip": "10.0.0.9""#)).unwrap();
+    let status = service.status(&service.layout().unwrap()).await;
+    assert_eq!((prober.count(), status.devices["odd"].level, status.summary.noreply), (2, Level::NoReply, 1));
+
+    // Prometheus probes the switch itself: nothing is sent from here.
+    let prometheus = fake().await;
+    let covered = FakeProber::new(&[], Duration::ZERO);
+    std::fs::write(&file, SAMPLE).unwrap();
+    let service = Service::new(Some(file), Some(prometheus.url.clone()), Duration::from_secs(60), super::reach_tests::rounds(&covered, Duration::from_secs(60)));
+    let status = service.status(&service.layout().unwrap()).await;
+    assert_eq!((covered.count(), status.devices["sw"].level, status.devices["sw"].latency_ms, status.devices["sw"].checked_by.as_deref()), (0, Level::Ok, Some(0.6), Some("prometheus-icmp")));
+    assert_eq!(status.devices["sw"].checked_at.as_deref(), Some(status.collected_at.as_str()));
+    prometheus.handle.stop(false).await;
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[actix_web::test]
+async fn nothing_is_asked_with_the_feature_off_or_a_layout_that_cannot_be_read() {
+    let prober = FakeProber::new(&[], Duration::ZERO);
+    let rounds = || super::reach_tests::rounds(&prober, Duration::from_secs(60));
+    let off = Service::new(None, None, Duration::from_secs(60), rounds());
+    assert!(status_answer(&off).await.status.is_none());
+    let dir = scratch();
+    let file = dir.join("layout.json");
+    let missing = Service::new(Some(file.clone()), None, Duration::from_secs(60), rounds());
+    assert_eq!(status_answer(&missing).await.error.unwrap().code, "unreadable");
+    std::fs::write(&file, SAMPLE.replace(r#""ip": "10.0.0.1""#, r#""ip": "10.0.0.1", "check": "ssh""#)).unwrap();
+    let fault = status_answer(&missing).await.error.unwrap();
+    assert_eq!(fault.code, "invalid");
+    assert!(fault.detail.contains("check (sw)"), "{}", fault.detail);
+    let url_only = Service::new(None, Some("http://127.0.0.1:9".into()), Duration::from_secs(60), rounds());
+    assert_eq!(status_answer(&url_only).await.error.unwrap().code, "no_file");
+    assert_eq!(prober.count(), 0);
+    let _ = std::fs::remove_dir_all(dir);
 }

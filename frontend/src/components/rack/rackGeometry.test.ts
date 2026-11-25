@@ -2,7 +2,7 @@ import { arrange, deviceBox, fits, slotLabel, slotNumbers, slotSpan } from './ra
 import type { RackDevice } from './rackTypes';
 
 const device = (id: string, u: number | null, h = 1, order_hint: number | null = null): RackDevice => ({
-  id, label: id, type: 'server', u, h, u_confirmed: false, node: null, node_candidates: [], ip: null, bmc: null, gpu: null, cpu: null, arch: null, desc: null, order_hint,
+  id, label: id, type: 'server', u, h, u_confirmed: false, node: null, node_candidates: [], ip: null, bmc: null, gpu: null, cpu: null, arch: null, desc: null, check: 'ping', external: false, order_hint,
 });
 
 describe('rack geometry', () => {

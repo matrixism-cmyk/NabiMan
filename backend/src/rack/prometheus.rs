@@ -25,11 +25,14 @@ pub(crate) enum Metric {
     GpuPower,
     GpuMemUsed,
     GpuMemFree,
+    ProbeSuccess,
+    ProbeDuration,
 }
 
 /// Every query the rack page makes. Node metrics are per `instance`
-/// (node_exporter, `<ip>:<port>`), GPU metrics per DCGM `Hostname` and GPU.
-pub(crate) const QUERIES: [(Metric, &str); 10] = [
+/// (node_exporter, `<ip>:<port>`), GPU metrics per DCGM `Hostname` and GPU,
+/// reachability per blackbox probe target.
+pub(crate) const QUERIES: [(Metric, &str); 12] = [
     (Metric::Ready, r#"max by (node) (kube_node_status_condition{condition="Ready",status="true"})"#),
     (Metric::Cpu, r#"100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])))"#),
     (Metric::Memory, "100 * (1 - max by (instance) (node_memory_MemAvailable_bytes) / max by (instance) (node_memory_MemTotal_bytes))"),
@@ -40,6 +43,10 @@ pub(crate) const QUERIES: [(Metric, &str); 10] = [
     (Metric::GpuPower, "max by (Hostname, gpu, GPU_I_ID, GPU_I_PROFILE, modelName) (DCGM_FI_DEV_POWER_USAGE)"),
     (Metric::GpuMemUsed, "max by (Hostname, gpu, GPU_I_ID, GPU_I_PROFILE, modelName) (DCGM_FI_DEV_FB_USED)"),
     (Metric::GpuMemFree, "max by (Hostname, gpu, GPU_I_ID, GPU_I_PROFILE, modelName) (DCGM_FI_DEV_FB_FREE)"),
+    // Blackbox probes Prometheus already makes, each by its target (`instance`):
+    // an ICMP probe's is the bare address, a TCP probe's `address:port`.
+    (Metric::ProbeSuccess, "max by (instance) (probe_success)"),
+    (Metric::ProbeDuration, "max by (instance) (probe_duration_seconds)"),
 ];
 
 /// One query's whole wait, and all of them together.

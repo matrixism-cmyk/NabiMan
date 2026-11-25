@@ -94,6 +94,9 @@ export default function RackPanel() {
               {status.message && <code>{status.message}</code>}
             </Notice>
           )}
+          {status && status.summary.over_limit > 0 && (
+            <Notice tone="warning">{t('rack.reach.overLimit', { count: status.summary.over_limit })}</Notice>
+          )}
           {layout.overlaps.length > 0 && (
             <Notice tone="warning">{t('rack.overlap', { list: layout.overlaps.map((o) => `${o.rack}: ${o.first} / ${o.second}`).join(', ') })}</Notice>
           )}

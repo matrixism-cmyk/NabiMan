@@ -8,16 +8,27 @@
 //! - `GET /api/rack/status`: each node's and device's state (see `status`),
 //!   from a fixed set of queries (see `prometheus`) whose answers are kept
 //!   for ten seconds, so many open pages cost Prometheus the same as one.
+//!   A device that is no node and has an address is asked whether it
+//!   answers (see `reach`): by Prometheus' own probes when it has them,
+//!   else one ICMP echo or TCP connect from this server per thirty seconds.
 //!
 //! With neither setting the feature is off: both routes say so and the web
 //! app hides the menu entry (`rack` in `GET /api/branding`).
 
+mod check;
 mod layout;
 mod ordered;
+mod probe;
 mod prometheus;
+mod raw;
+mod reach;
 mod status;
 #[cfg(test)]
 mod layout_tests;
+#[cfg(test)]
+mod probe_tests;
+#[cfg(test)]
+mod reach_tests;
 #[cfg(test)]
 mod service_tests;
 #[cfg(test)]
@@ -74,14 +85,16 @@ pub(crate) struct Service {
     /// Held while asking, so callers arriving together share one round.
     collected: tokio::sync::Mutex<Option<Arc<Collected>>>,
     ttl: Duration,
+    /// What NabiMan asked devices itself, kept and shared (see `reach`).
+    rounds: reach::Rounds,
 }
 
 impl Service {
     pub(crate) fn from_settings(get: Lookup) -> Self {
-        Self::new(text_in(get, "NABIMAN_RACK_LAYOUT_FILE").map(PathBuf::from), text_in(get, "NABIMAN_RACK_PROMETHEUS_URL"), STATUS_TTL)
+        Self::new(text_in(get, "NABIMAN_RACK_LAYOUT_FILE").map(PathBuf::from), text_in(get, "NABIMAN_RACK_PROMETHEUS_URL"), STATUS_TTL, reach::Rounds::new(Arc::new(probe::SystemProber), reach::TTL))
     }
 
-    pub(crate) fn new(layout_file: Option<PathBuf>, prometheus_url: Option<String>, ttl: Duration) -> Self {
+    pub(crate) fn new(layout_file: Option<PathBuf>, prometheus_url: Option<String>, ttl: Duration, rounds: reach::Rounds) -> Self {
         Self {
             layout_file,
             prometheus: prometheus_url.map(|u| prometheus::base_url(&u)),
@@ -89,6 +102,7 @@ impl Service {
             kept: Mutex::new(None),
             collected: tokio::sync::Mutex::new(None),
             ttl,
+            rounds,
         }
     }
 
@@ -149,21 +163,31 @@ impl Service {
         fresh
     }
 
-    /// The status of everything in `layout`.
+    /// The status of everything in `layout`. Reached only with the feature
+    /// on and a layout that could be read: nothing is asked of any device
+    /// otherwise.
     pub(crate) async fn status(&self, layout: &Layout) -> Status {
         let now = || chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-        match &self.prometheus {
-            None => status::assemble(layout, Source::NotConfigured, now()),
-            Some(Err(why)) => status::assemble(layout, Source::Unreachable(&format!("rack_prometheus_url: {why}")), now()),
-            Some(Ok(base)) => {
-                let collected = self.collected(base).await;
-                let source = match &collected.result {
-                    Ok(samples) => Source::Collected(samples),
-                    Err(why) => Source::Unreachable(why),
-                };
-                status::assemble(layout, source, collected.stamp.clone())
-            }
-        }
+        let collected = match &self.prometheus {
+            Some(Ok(base)) => Some(self.collected(base).await),
+            _ => None,
+        };
+        let misnamed = match &self.prometheus {
+            Some(Err(why)) => format!("rack_prometheus_url: {why}"),
+            _ => String::new(),
+        };
+        let (source, stamp) = match (&self.prometheus, &collected) {
+            (None, _) => (Source::NotConfigured, now()),
+            (Some(_), Some(c)) => (c.result.as_ref().map_or_else(|why| Source::Unreachable(why), Source::Collected), c.stamp.clone()),
+            (Some(_), None) => (Source::Unreachable(&misnamed), now()),
+        };
+        let samples = match &source {
+            Source::Collected(samples) => Some(*samples),
+            _ => None,
+        };
+        let plan = reach::plan(layout, samples, &stamp);
+        let asked = self.rounds.answers(plan.targets()).await;
+        status::assemble(layout, source, &plan.finish(&asked), stamp)
     }
 }
 

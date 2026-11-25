@@ -2,9 +2,9 @@ import React from 'react';
 import { useT } from '../../i18n';
 import { formatDateTime } from '../../shared/i18n';
 import type { RackLayout, RackStatus } from './rackTypes';
-import { LEVELS, LEVEL_GLYPH, LOOKS, celsius } from './rackFormat';
+import { CALM_GLYPH, LEVELS, LEVEL_GLYPH, LOOKS, celsius } from './rackFormat';
 
-/** The numbers to take in first: nodes ready, GPUs, warnings, the hottest reading. */
+/** The numbers to take in first: nodes ready, GPUs, warnings, the hottest reading, and how many of the other devices answer. */
 export function RackSummary({ status }: { status: RackStatus }) {
   const { t } = useT();
   const s = status.summary;
@@ -22,6 +22,7 @@ export function RackSummary({ status }: { status: RackStatus }) {
       {tile('gpus', t('rack.sum.gpus'), known ? t('rack.sum.gpusUnit', { count: s.gpus }) : '–', 'plain')}
       {tile('warnings', t('rack.sum.warnings'), known ? `${s.warnings > 0 ? '▲ ' : ''}${t('rack.sum.count', { count: s.warnings })}` : '–', s.warnings > 0 ? 'warn' : 'plain')}
       {s.down > 0 && tile('down', t('rack.sum.down'), `✖ ${t('rack.sum.count', { count: s.down })}`, 'down')}
+      {s.probed > 0 && tile('reach', t('rack.sum.reach'), `${s.noreply > 0 ? `${LEVEL_GLYPH.noreply} ` : ''}${s.reachable}/${s.probed}`, s.noreply > 0 ? 'down' : s.reachable === s.probed ? 'ok' : 'plain')}
       {tile('maxTemp', t('rack.sum.maxTemp'), `${hot ? '▲ ' : ''}${celsius(s.max_temp_c)}`, hot ? 'warn' : 'plain')}
     </div>
   );
@@ -36,7 +37,8 @@ export function RackLegend({ status, tentative }: { status: RackStatus | null; t
         {LOOKS.map((look) => <li key={look}><span className={`rack-swatch look-${look}`} aria-hidden="true" />{t(`rack.look.${look}`)}</li>)}
       </ul>
       <ul>
-        {LEVELS.map((level) => <li key={level}><span className={`rack-light level-${level}`} aria-hidden="true">{LEVEL_GLYPH[level]}</span>{t(`rack.level.${level}`)}</li>)}
+        {LEVELS.map((level) => <li key={level}><span className={`rack-light level-${level}`} aria-hidden="true">{LEVEL_GLYPH[level]}</span>{t(`rack.legend.level.${level}`)}</li>)}
+        <li><span className="rack-light level-noreply is-calm" aria-hidden="true">{CALM_GLYPH}</span>{t('rack.level.externalNoreply')}</li>
         {tentative && <li><span className="rack-swatch is-dashed" aria-hidden="true" />{t('rack.legend.dashed')}</li>}
       </ul>
       {status && (

@@ -1,6 +1,7 @@
 /** What GET /api/rack/layout and /api/rack/status answer (backend/src/rack). */
 export type DeviceKind = 'server' | 'switch' | 'firewall' | '5g' | 'storage' | 'external' | 'other';
-export type Level = 'ok' | 'warn' | 'down' | 'unknown' | 'none';
+/** `noreply`: a device that is no node was asked and did not answer (not `down`, which is a node NotReady). */
+export type Level = 'ok' | 'warn' | 'down' | 'noreply' | 'unknown' | 'none';
 
 export interface RackDevice {
   id: string;
@@ -20,6 +21,10 @@ export interface RackDevice {
   arch: string | null;
   desc: string | null;
   order_hint: number | null;
+  /** How a device that is no node is asked whether it answers: `ping`, `tcp:<port>`, `none`. */
+  check: string;
+  /** Not one of ours. */
+  external: boolean;
 }
 
 export interface Rack {
@@ -27,6 +32,7 @@ export interface Rack {
   name: string;
   role: string | null;
   units: number;
+  external: boolean;
   devices: RackDevice[];
 }
 
@@ -79,14 +85,41 @@ export interface NodeStatus {
   gpus: GpuStatus[];
 }
 
+export interface DeviceStatus {
+  level: Level;
+  nodes: string[];
+  external: boolean;
+  /** Without a node, why there is no answer to show (`no_address`, `check_none`, `ping_missing`, …). */
+  reason: string | null;
+  latency_ms: number | null;
+  /** `prometheus-icmp`, `prometheus-tcp`, `ping`, `tcp:<port>`. */
+  checked_by: string | null;
+  checked_at: string | null;
+}
+
+export interface StatusSummary {
+  nodes_total: number;
+  nodes_ready: number;
+  gpus: number;
+  warnings: number;
+  down: number;
+  max_temp_c: number | null;
+  /** Devices that are no node and were asked whether they answer; of those, how many did, and how many of ours / of others did not. */
+  probed: number;
+  reachable: number;
+  noreply: number;
+  external_noreply: number;
+  over_limit: number;
+}
+
 export interface RackStatus {
   collected_at: string;
   source: 'ok' | 'partial' | 'unreachable' | 'not_configured';
   message: string | null;
   layout_version: string;
   nodes: Record<string, NodeStatus>;
-  devices: Record<string, { level: Level; nodes: string[] }>;
-  summary: { nodes_total: number; nodes_ready: number; gpus: number; warnings: number; down: number; max_temp_c: number | null };
+  devices: Record<string, DeviceStatus>;
+  summary: StatusSummary;
   thresholds: { temp_c: number; memory_pct: number; disk_pct: number };
 }
 

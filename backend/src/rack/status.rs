@@ -7,6 +7,7 @@ use std::collections::{BTreeMap, HashMap};
 use serde::Serialize;
 
 use super::layout::Layout;
+use super::reach::{Finding, Reach, MAX_TARGETS};
 use super::prometheus::{Metric, Sample, Samples};
 
 /// At or above these a node is `warn`.
@@ -15,14 +16,18 @@ pub(crate) const WARN_MEMORY_PCT: f64 = 90.0;
 pub(crate) const WARN_DISK_PCT: f64 = 90.0;
 
 /// Worst last, so the worst of several is their maximum.
-#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum Level {
     /// Nothing is collected for this device.
+    #[default]
     None,
     Ok,
-    /// Prometheus has no answer for it.
+    /// There is no answer about it (Prometheus has none, or it could not be asked).
     Unknown,
+    /// A device that is no node was asked and did not answer (see `reach`).
+    /// Not `Down`: that is a Kubernetes node that is NotReady.
+    NoReply,
     Warn,
     Down,
 }
@@ -54,12 +59,23 @@ pub(crate) struct NodeStatus {
     pub gpus: Vec<Gpu>,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Default)]
 pub(crate) struct DeviceStatus {
-    /// The worst of its nodes; `none` when it has no node.
+    /// The worst of its nodes. Without a node: `ok` (it answers), `noreply`,
+    /// `unknown` (it could not be asked) or `none` (nothing to ask; see `reason`).
     pub level: Level,
     /// The nodes it shows: its own, or the ones it may be.
     pub nodes: Vec<String>,
+    /// Not one of ours: no answer from it is not our fault to fix.
+    pub external: bool,
+    /// Without a node, why there is no answer to show: `no_address`,
+    /// `check_none`, `address_refused`, `over_limit`, `not_in_time`,
+    /// `ping_missing`, `ping_denied`, `no_route`, `ping_failed`.
+    pub reason: Option<&'static str>,
+    pub latency_ms: Option<f64>,
+    /// `prometheus-icmp`, `prometheus-tcp`, `ping`, `tcp:<port>`.
+    pub checked_by: Option<String>,
+    pub checked_at: Option<String>,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, Default)]
@@ -71,6 +87,16 @@ pub(crate) struct Summary {
     pub warnings: usize,
     pub down: usize,
     pub max_temp_c: Option<f64>,
+    /// Devices that are no node and were asked whether they answer.
+    pub probed: usize,
+    /// Of those: answered.
+    pub reachable: usize,
+    /// Of those: ours, and did not answer.
+    pub noreply: usize,
+    /// Of those: somebody else's, and did not answer.
+    pub external_noreply: usize,
+    /// Devices not asked because more than the limit have an address.
+    pub over_limit: usize,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
@@ -207,8 +233,9 @@ fn nodes_from(layout: &Layout, samples: &Samples) -> BTreeMap<String, NodeStatus
         .collect()
 }
 
-/// The page's status for `layout`, from `source`, stamped `collected_at`.
-pub(crate) fn assemble(layout: &Layout, source: Source, collected_at: String) -> Status {
+/// The page's status for `layout`: its nodes from `source`, its other
+/// devices from `reach`, stamped `collected_at`.
+pub(crate) fn assemble(layout: &Layout, source: Source, reach: &Reach, collected_at: String) -> Status {
     let (nodes, name, message) = match source {
         Source::Collected(samples) => {
             let partial = !samples.failed.is_empty();
@@ -217,16 +244,30 @@ pub(crate) fn assemble(layout: &Layout, source: Source, collected_at: String) ->
         Source::Unreachable(why) => (layout.nodes.iter().map(|n| (n.name.clone(), unknown_node())).collect(), "unreachable", Some(why.to_string())),
         Source::NotConfigured => (layout.nodes.iter().map(|n| (n.name.clone(), unknown_node())).collect(), "not_configured", None),
     };
-    let devices = layout
+    let devices: BTreeMap<String, DeviceStatus> = layout
         .racks
         .iter()
         .flat_map(|r| &r.devices)
         .map(|d| {
             let names = d.nodes();
-            let level = names.iter().map(|n| nodes.get(*n).map_or(Level::Unknown, |s| s.level)).max().unwrap_or(Level::None);
-            (d.id.clone(), DeviceStatus { level, nodes: names.into_iter().map(String::from).collect() })
+            let status = match names.iter().map(|n| nodes.get(*n).map_or(Level::Unknown, |s| s.level)).max() {
+                Some(level) => DeviceStatus { level, nodes: names.into_iter().map(String::from).collect(), external: d.external, ..DeviceStatus::default() },
+                None => {
+                    let Finding { level, reason, latency_ms, checked_by, checked_at } = reach.found.get(&d.id).cloned().unwrap_or_default();
+                    DeviceStatus { level, nodes: Vec::new(), external: d.external, reason, latency_ms, checked_by, checked_at }
+                }
+            };
+            (d.id.clone(), status)
         })
         .collect();
+    let probed = || devices.values().filter(|d| d.checked_by.is_some());
+    let message = match reach.over_limit {
+        0 => message,
+        n => {
+            let said = format!("{n} devices were not checked for an answer: more than {MAX_TARGETS} have an address");
+            Some(message.map_or(said.clone(), |m| format!("{m}; {said}")))
+        }
+    };
     let temps = nodes.values().flat_map(|n| n.temp_c.into_iter().chain(n.gpus.iter().filter_map(|g| g.temp_c)));
     let summary = Summary {
         nodes_total: nodes.len(),
@@ -235,6 +276,11 @@ pub(crate) fn assemble(layout: &Layout, source: Source, collected_at: String) ->
         warnings: nodes.values().filter(|n| n.level == Level::Warn).count(),
         down: nodes.values().filter(|n| n.level == Level::Down).count(),
         max_temp_c: temps.fold(None, |max: Option<f64>, t| Some(max.map_or(t, |m| m.max(t)))),
+        probed: probed().count(),
+        reachable: probed().filter(|d| d.level == Level::Ok).count(),
+        noreply: probed().filter(|d| d.level == Level::NoReply && !d.external).count(),
+        external_noreply: probed().filter(|d| d.level == Level::NoReply && d.external).count(),
+        over_limit: reach.over_limit,
     };
     Status {
         collected_at,
