@@ -59,23 +59,37 @@ export function agoText(t: (key: string, params?: Record<string, string | number
  * then dimmed, and said to be the screen last seen); a console never opened
  * here shows only how it is reached.
  */
-export function ConsoleCard({ console: c, shot, fresh, held, onOpen }: {
-  console: VmConsole; shot?: ConsoleShot; fresh: boolean; held: boolean; onOpen: () => void;
+export function ConsoleCard({ console: c, shot, fresh, held, windowed, onOpen, onPopOut }: {
+  console: VmConsole; shot?: ConsoleShot; fresh: boolean; held: boolean;
+  /** It has a window on this page already: opening raises that one. */
+  windowed?: boolean;
+  onOpen: () => void;
+  /** "새창으로 분리": a browser window instead. Shift+click on the card does the same. */
+  onPopOut?: () => void;
 }) {
   const { t } = useT();
   const protocol = c.protocol === 'rdp' ? 'RDP' : 'VNC';
   return (
-    <button type="button" role="menuitem" className="term-start-card" onClick={onOpen} title={t('start.consoleHint', { label: c.label })}>
-      <span className={`term-start-shot ${shot && !fresh ? 'is-stale' : ''}`}>
-        {shot ? <><img src={shot.url} alt="" draggable={false} /><span className="term-start-tag">{protocol}</span></> : protocol}
-      </span>
-      <span className="term-start-line"><span className="term-start-name">{c.label}</span></span>
-      {(held || (shot && !fresh)) && (
-        <span className="term-start-line">
-          {shot && !fresh && <span className="term-start-sub">{t('start.lastSeen', { ago: agoText(t, shot.at) })}</span>}
-          {held && <span className="term-start-tag is-open">{t('remote.console.kept')}</span>}
+    <span className="term-start-cardwrap">
+      <button type="button" role="menuitem" className="term-start-card" title={t('start.consoleHint', { label: c.label })}
+        onClick={(e) => (e.shiftKey && onPopOut ? onPopOut() : onOpen())}>
+        <span className={`term-start-shot ${shot && !fresh ? 'is-stale' : ''}`}>
+          {shot ? <><img src={shot.url} alt="" draggable={false} /><span className="term-start-tag">{protocol}</span></> : protocol}
         </span>
+        <span className="term-start-line"><span className="term-start-name">{c.label}</span></span>
+        {(held || windowed || (shot && !fresh)) && (
+          <span className="term-start-line">
+            {shot && !fresh && <span className="term-start-sub">{t('start.lastSeen', { ago: agoText(t, shot.at) })}</span>}
+            {windowed ? <span className="term-start-tag is-open">{t('start.windowed')}</span>
+              : held && <span className="term-start-tag is-open">{t('remote.console.kept')}</span>}
+          </span>
+        )}
+      </button>
+      {onPopOut && (
+        <button type="button" role="menuitem" className="term-start-popout" onClick={onPopOut}
+          title={`${t('remote.console.popOut')} — ${t('remote.console.popOutHint')}`}
+          aria-label={t('start.consolePopOut', { label: c.label })}>⇱</button>
       )}
-    </button>
+    </span>
   );
 }

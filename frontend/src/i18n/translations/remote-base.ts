@@ -126,7 +126,6 @@ const t: T = {
   'remote.console.secretHint': { ko: '비밀번호를 칠 때 누르세요. 휴대폰이 영문 비밀번호 자판을 띄워, 한글로 바뀌거나 첫 글자가 대문자로 바뀌지 않습니다. 입력한 글자는 ●로만 보입니다.', en: 'Press before typing a password: the phone brings up a plain English keyboard, with no capitals or corrections added. What you type shows as ● only.', ja: 'パスワードを入力するときに押します。スマートフォンが英字のパスワード用キーボードを表示し、日本語入力や先頭の大文字化が起きません。入力した文字は●でのみ表示されます。' },
   'remote.console.typedHint': { ko: 'VM으로 보낸 글자입니다. 비밀번호가 틀린다면 한글로 쳐지지 않았는지 여기서 확인하세요.', en: 'What was sent to the VM. If a password fails, check here that it was not typed in another language.', ja: 'VM に送った文字です。パスワードが通らないときは、別の言語で入力されていないかここで確認してください。' },
   'remote.console.keyboardHint': { ko: '휴대폰 키보드를 띄워 VM에 입력합니다. 아래 줄에 Esc·Tab·방향키·Ctrl·Alt가 있습니다.', en: 'Bring up the phone keyboard to type into the VM. The row below has Esc, Tab, arrows, Ctrl and Alt.', ja: 'スマートフォンのキーボードを表示して VM に入力します。下の列に Esc・Tab・矢印・Ctrl・Alt があります。' },
-  'remote.console.detach': { ko: '분리', en: 'Detach', ja: '分離' },
   'remote.console.notFound': { ko: '콘솔을 찾을 수 없습니다.', en: 'Console not found.', ja: 'コンソールが見つかりません。' },
   'remote.console.access.btn': { ko: '권한', en: 'Access', ja: '権限' },
   'remote.console.access.title': { ko: '콘솔 접근 권한', en: 'Console access', ja: 'コンソールアクセス権限' },

@@ -166,3 +166,77 @@ test('an ordinary drop still reconnects by itself', async () => {
   act(() => { jest.advanceTimersByTime(1500); });
   expect(mockClients).toHaveLength(2);
 });
+
+test('in a window, keys go to the VM only while it is the focused window', async () => {
+  const page = render(view({ windowed: true, focused: false }));
+  await connect();
+  const el = host();
+  // Connected in a window that is not in front: it does not take the keyboard…
+  expect(document.activeElement).not.toBe(el);
+  // …and a key that reaches its screen anyway types nothing.
+  fireEvent.keyDown(el, { keyCode: 0x61 });
+  expect(mockClients[0].keys).toEqual([]);
+
+  page.rerender(view({ windowed: true, focused: true }));
+  expect(document.activeElement).toBe(el);
+  fireEvent.keyDown(el, { keyCode: 0x62 });
+  expect(mockClients[0].keys).toEqual([[1, 0x62]]);
+
+  // Another window comes to the front (or this one is minimised): the held key
+  // goes up in the VM, the screen gives the focus back, and nothing more is typed.
+  page.rerender(view({ windowed: true, focused: false }));
+  expect(mockClients[0].keys).toEqual([[1, 0x62], [0, 0x62]]);
+  expect(document.activeElement).not.toBe(el);
+  fireEvent.keyDown(el, { keyCode: 0x63 });
+  expect(mockClients[0].keys).toHaveLength(2);
+  // The connection is the same one throughout.
+  expect(mockClients).toHaveLength(1);
+  expect(mockClients[0].disconnected).toBe(false);
+});
+
+test('in a window the bar is compact: no label, no way out of the pane, but fullscreen and "연결 끊기" stay', async () => {
+  render(view({ windowed: true, focused: true, onDetach: jest.fn(), onPopOut: jest.fn() }));
+  await connect();
+  expect(screen.queryByText('Windows 11')).toBeNull();
+  expect(screen.queryByRole('button', { name: '분리' })).toBeNull();
+  expect(screen.queryByRole('button', { name: '새창으로 분리' })).toBeNull();
+  expect(screen.getByRole('button', { name: '전체화면' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '연결 끊기' })).toBeInTheDocument();
+  expect(document.querySelector('.rw-console')).toHaveClass('is-windowed');
+});
+
+test('in the workspace the bar offers both: "분리" (a window on the page) and "새창으로 분리" (a browser window)', async () => {
+  const onDetach = jest.fn(); const onPopOut = jest.fn();
+  render(view({ onDetach, onPopOut }));
+  await connect();
+  const detach = screen.getByRole('button', { name: '분리' });
+  expect(detach.title).toContain('아래 줄');
+  fireEvent.click(detach);
+  expect(onDetach).toHaveBeenCalledTimes(1);
+  const popOut = screen.getByRole('button', { name: '새창으로 분리' });
+  expect(popOut.title).toContain('다른 모니터');
+  fireEvent.click(popOut);
+  expect(onPopOut).toHaveBeenCalledTimes(1);
+});
+
+test('a window whose connection was dropped shows the disconnected state with its reconnect button, not a blank body', async () => {
+  render(view({ windowed: true, focused: true }));
+  await connect();
+  // The keeper needed the place, the rail hung it up, or it went to a browser window.
+  act(() => consoleKeeper.drop('win11'));
+  expect(mockClients[0].disconnected).toBe(true);
+  expect(screen.getByText('끊김')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '다시 연결' }));
+  await connect();
+  expect(mockClients).toHaveLength(2);
+  expect(screen.getByText('연결됨')).toBeInTheDocument();
+  expect(consoleKeeper.get('win11')).toBeDefined();
+});
+
+test('closing a console window leaves the connection to the keeper, as leaving the pane does', async () => {
+  const page = render(view({ windowed: true, focused: true }));
+  await connect();
+  page.unmount();
+  expect(mockClients[0].disconnected).toBe(false);
+  expect(consoleKeeper.hidden()).toEqual(['win11']);
+});

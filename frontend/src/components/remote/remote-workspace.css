@@ -401,3 +401,6 @@
 .serial-dev-tail { max-height: 7.5em; margin: 0; }
 .serial-dev-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
 .serial-dev-add { display: flex; flex-direction: column; gap: 6px; }
+/* The selected console is open as a window: where it is, and the two ways on. */
+.rw-console-elsewhere { display: flex; flex-direction: column; gap: 12px; }
+.rw-console-elsewhere p { margin: 0; }

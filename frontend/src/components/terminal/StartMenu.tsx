@@ -5,7 +5,8 @@ import { useT } from '../../shared/i18n';
 import { useConsoleSnapshots } from '../remote/consoleSnapshots';
 import { addressOf, hasFiles, hasTerminal, sessionLabel } from '../remote/protocols';
 import { RemoteServer } from '../remote/remoteTypes';
-import { listConsoles, openConsoleWindow, VmConsole } from '../remote/vncApi';
+import { popOutConsole } from '../remote/consoleHandOver';
+import { listConsoles, VmConsole } from '../remote/vncApi';
 import { openInWorkspace } from '../remote/workspaceState';
 import { ConsoleCard, SessionCard, StartSession } from './StartMenuParts';
 import { moveFocus } from './startMenuKeys';
@@ -13,12 +14,14 @@ import type { TerminalTarget } from './TerminalView';
 import { storedSessionId } from './terminalStorage';
 import './start-menu.css';
 
-interface Win { id: string }
+interface Win { id: string; kind?: string; console?: { name: string } }
 
 interface Props {
   windows: Win[];
   /** Opens a terminal window; with `joinSessionId` it shows a running session (or raises its window). */
   open: (target: TerminalTarget, options?: { title?: string; joinSessionId?: string }) => void;
+  /** Opens a VM console as a window on this page (or raises the one it has). */
+  openConsole: (c: VmConsole) => void;
 }
 
 const targetOf = (server: RemoteServer): TerminalTarget =>
@@ -32,7 +35,7 @@ const LAMPS: Record<string, string> = { online: 'is-up', offline: 'is-down', par
  * page, which a maximised window covers. Sessions show the last lines on their
  * screen and consoles the screen this tab already has open, to tell them apart.
  */
-export default function StartMenu({ windows, open }: Props) {
+export default function StartMenu({ windows, open, openConsole }: Props) {
   const { t } = useT();
   const [shown, setShown] = useState(false);
   const [query, setQuery] = useState('');
@@ -88,8 +91,11 @@ export default function StartMenu({ windows, open }: Props) {
     setShown(false);
   };
   const fresh = (target: TerminalTarget, title: string) => { open(target, { title }); setShown(false); };
-  // As the rail's "분리": a window of its own, the same one when asked again.
-  const openConsole = (c: VmConsole) => { openConsoleWindow(c)?.focus(); setShown(false); };
+  // As the rail's "분리": a window on this page, the same one when asked again;
+  // and its "새창으로 분리": a browser window of its own, which takes the connection over.
+  const windowedConsoles = new Set(windows.map(w => (w.kind === 'console' ? w.console?.name : undefined)));
+  const showConsole = (c: VmConsole) => { openConsole(c); setShown(false); };
+  const popOut = (c: VmConsole) => { popOutConsole(c); setShown(false); };
   const openFiles = (s: RemoteServer) => { openInWorkspace({ kind: 'server', id: s.id }); setShown(false); };
 
   return (
@@ -97,7 +103,7 @@ export default function StartMenu({ windows, open }: Props) {
       <button type="button" className={`term-start-btn ${shown ? 'is-open' : ''}`} aria-haspopup="menu" aria-expanded={shown}
         title={t('start.title')} onClick={() => { setShown(v => !v); setQuery(''); }}>
         <img src={`${process.env.PUBLIC_URL}/favicon.svg`} alt="" width="18" height="18" />
-        <span>{t('tab.terminal')} {windows.length}</span>
+        <span>{t('terminal.windows')} {windows.length}</span>
       </button>
       {/* The bar scrolls sideways and blurs what is behind it, either of which would clip a menu inside it: the menu goes on the page itself. */}
       {shown && createPortal(
@@ -124,7 +130,8 @@ export default function StartMenu({ windows, open }: Props) {
                 <h4>{t('start.consoles')} {vms.length}</h4>
                 <div className="term-start-grid">
                   {vms.map(c => (
-                    <ConsoleCard key={c.name} console={c} shot={shots.shot(c.name)} fresh={shots.fresh(c.name)} held={shots.held(c.name)} onOpen={() => openConsole(c)} />
+                    <ConsoleCard key={c.name} console={c} shot={shots.shot(c.name)} fresh={shots.fresh(c.name)} held={shots.held(c.name)}
+                      windowed={windowedConsoles.has(c.name)} onOpen={() => showConsole(c)} onPopOut={() => popOut(c)} />
                   ))}
                 </div>
               </section>

@@ -364,7 +364,7 @@ export default function RemoteWorkspace() {
           {(selection.kind === 'console' || selection.kind === 'console-form') && (
             <ConsoleArea selection={selection} consoles={consoles || []} canManage={canManageConsoles}
               onSelect={select} onChanged={refetchConsoles}
-              onAccess={consoleMenu.openAccess} onShare={consoleMenu.openShare} />
+              onAccess={consoleMenu.openAccess} onShare={consoleMenu.openShare} place={consoleMenu.place} />
           )}
           {consoleMenu.modals}
           {isServerTarget && selectedServer && serverView === 'files' && <FilesView server={selectedServer} />}

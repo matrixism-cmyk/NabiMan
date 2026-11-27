@@ -107,3 +107,12 @@
   background: color-mix(in srgb, var(--primary) 18%, transparent); border: 2px solid var(--primary);
 }
 @media (max-width: 720px) { .term-snap-layout { width: 46px; height: 34px; } .term-snap-picker { gap: 6px; padding: 8px; } }
+
+/* A console's card with its "새창으로 분리" beside it. */
+.term-start-cardwrap { position: relative; display: flex; min-width: 0; }
+.term-start-cardwrap > .term-start-card { flex: 1; }
+.term-start-popout {
+  position: absolute; left: 10px; top: 10px; width: 22px; height: 20px; padding: 0; border-radius: 5px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); font-size: 12px; line-height: 1;
+}
+.term-start-popout:hover, .term-start-popout:focus-visible { border-color: var(--primary); color: var(--text); outline: none; }

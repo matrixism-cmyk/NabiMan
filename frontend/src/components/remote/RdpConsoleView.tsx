@@ -7,6 +7,7 @@ import { useChromeHidden } from '../../shared/ui/useChromeHidden';
 import { remoteKey, ALT_R } from './rdpKeys';
 import { useConsoleView, keepAlive, fixedSize, ConsoleShare } from './consoleView';
 import ConsoleSettingsModal from './ConsoleSettingsModal';
+import ConsoleDetachButtons from './ConsoleDetachButtons';
 import ConsoleDictation from './ConsoleDictation';
 import { useConsoleKeyboard } from './ConsoleKeyboard';
 import ConsoleAltUserModal from './ConsoleAltUserModal';
@@ -23,9 +24,14 @@ import { DEFAULT_SPEED, readSpeed, rememberSpeed } from './consoleSpeed';
  *  to and from the VM, natively (no VNC-style keystroke workaround). In the
  *  workspace the connection is the console keeper's: leaving this view lets go
  *  of the screen and the keys, not of the connection. */
-export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelete, canGrant, onGrant, canShare, onShare, popout, share }: {
+export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelete, canGrant, onGrant, canShare, onShare, popout, share, windowed, focused, onDetach, onPopOut }: {
   target: string; label: string; canEdit?: boolean; onEdit?: () => void; onDelete?: () => void;
   canGrant?: boolean; onGrant?: () => void; canShare?: boolean; onShare?: () => void; popout?: boolean; share?: ConsoleShare;
+  /** Shown inside a floating window: a compact bar, and no way out of the pane (it is out already). */
+  windowed?: boolean;
+  /** In a window: whether it is the focused one. Keys go to the VM only then. */
+  focused?: boolean;
+  onDetach?: () => void; onPopOut?: () => void;
 }) {
   const { t } = useT();
   const host = useRef<HTMLDivElement>(null);
@@ -49,6 +55,9 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
   const options = { touch: cview.touch, fixed, speed };
   const [showSettings, setShowSettings] = useState(false);
   const [askUser, setAskUser] = useState(false);
+  const keyboard = useRef<{ reset: () => void } | null>(null);
+  const hasKeys = useRef(focused !== false);
+  hasKeys.current = focused !== false;
   useEffect(() => { session.autoReconnect = keepAlive(cview); });
 
   // Drag a file onto the VM to copy it in, via guacd's redirected drive (it
@@ -89,12 +98,18 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
     const focusScreen = () => { if (document.activeElement !== el) el.focus({ preventScroll: true }); };
     el.addEventListener('mousedown', focusScreen, true);
     const kb = new Guacamole.Keyboard(el);
+    keyboard.current = kb;
+    // The keys this view sent down: only those go up again, so a key pressed
+    // while the window was not the focused one leaves no trace in the VM.
+    const sent = new Set<number>();
     kb.onkeydown = (keysym: number) => {
+      // A window that is not the focused one types nothing into its VM.
+      if (!hasKeys.current) return;
       const out = remoteKey(keysym);
       session.sendKey(true, out.keysym);
-      if (out.tap) session.sendKey(false, out.keysym);
+      if (out.tap) session.sendKey(false, out.keysym); else sent.add(keysym);
     };
-    kb.onkeyup = (keysym: number) => { const out = remoteKey(keysym); if (!out.tap) session.sendKey(false, out.keysym); };
+    kb.onkeyup = (keysym: number) => { if (sent.delete(keysym)) session.sendKey(false, remoteKey(keysym).keysym); };
     el.addEventListener('mouseenter', session.pushClipboard);
     window.addEventListener('focus', session.pushClipboard);
     return () => {
@@ -113,8 +128,19 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
   useEffect(() => {
     if (status !== 'connected') { setDrivePanel(false); return; }
     refit();
-    if (!share?.viewOnly) host.current?.focus({ preventScroll: true });
+    if (!share?.viewOnly && focused !== false) host.current?.focus({ preventScroll: true });
   }, [session, status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // In a window, the keyboard follows the window's focus: taken when it comes
+  // to the front, given up — with every held key let go — when another does
+  // or the window is minimised.
+  useEffect(() => {
+    const el = host.current;
+    if (focused === undefined || !el) return;
+    if (focused) { if (status === 'connected' && !share?.viewOnly) el.focus({ preventScroll: true }); return; }
+    try { keyboard.current?.reset(); } catch { /* the keyboard may already be gone */ }
+    if (el.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+  }, [focused]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The room changes without the window changing size, too: folding the top
   // bar, the rail, a side panel. Watch the stage itself so the desktop follows.
@@ -138,13 +164,13 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
   });
 
   return (
-    <div className={`rw-view rw-console ${folded ? 'is-folded' : ''}`} ref={root}>
+    <div className={`rw-view rw-console ${folded && !windowed ? 'is-folded' : ''} ${windowed ? 'is-windowed' : ''}`} ref={root}>
       {folded && popout && (
         <button type="button" className="chrome-handle" onClick={() => setFolded(false)}
           title={t('app.showChrome')} aria-label={t('app.showChrome')}>▾</button>
       )}
       <div className="rw-console-bar">
-        <strong>{label}</strong>
+        {!windowed && <strong>{label}</strong>}
         <span className="rw-proto-tag">RDP</span>
         {altUser && <span className="rw-proto-tag">{t('remote.console.altUserActive', { user: altUser })}</span>}
         {share?.viewOnly && <span className="rw-proto-tag">{t('remote.console.share.viewOnly')}</span>}
@@ -154,9 +180,9 @@ export default function RdpConsoleView({ target, label, canEdit, onEdit, onDelet
         {status === 'connected' && !share?.viewOnly && <ConsoleDictation share={share} view={cview} onText={typist.text} onKeys={typist.keys} />}
         {kbd.button}
         {driveReady && !share && <button className={`btn btn-secondary btn-sm ${drivePanel ? 'is-active' : ''}`} onClick={() => setDrivePanel(d => !d)}>{t('remote.console.drive.files')}</button>}
-        {!popout && <button className="btn btn-secondary btn-sm" onClick={() => window.open(`/remote#rdp/${encodeURIComponent(target)}`, `rdp_${target}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no')}>{t('remote.console.detach')}</button>}
+        {!popout && !windowed && <ConsoleDetachButtons onDetach={onDetach} onPopOut={onPopOut || (() => { window.open(`/remote#rdp/${encodeURIComponent(target)}`, `rdp_${target}`, 'width=1300,height=900,menubar=no,toolbar=no,location=no'); })} />}
         <button className="btn btn-secondary btn-sm" onClick={toggle} title={t('remote.console.fullscreen')} aria-label={t('remote.console.fullscreen')} aria-pressed={full}>⛶</button>
-        <button className="btn btn-secondary btn-sm" onClick={() => setFolded(true)} title={t('app.hideChrome')} aria-label={t('app.hideChrome')}>▴</button>
+        {!windowed && <button className="btn btn-secondary btn-sm" onClick={() => setFolded(true)} title={t('app.hideChrome')} aria-label={t('app.hideChrome')}>▴</button>}
         {!share && <button className="btn btn-secondary btn-sm" onClick={() => setAskUser(true)} title={t('remote.console.altUser')} aria-label={t('remote.console.altUser')}>👤</button>}
         <button className="btn btn-secondary btn-sm" onClick={() => setShowSettings(true)} title={t('remote.console.settings')} aria-label={t('remote.console.settings')}>⚙</button>
         {!share?.viewOnly && <button className="btn btn-secondary btn-sm" title={t('remote.console.hangulHint')}

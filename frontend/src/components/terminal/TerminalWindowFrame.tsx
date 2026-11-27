@@ -10,17 +10,14 @@ import ClaudeAddress, { useClaudePeers } from './ClaudeAddress';
 import AiGuideButton from './AiGuideButton';
 import { apiRequest } from '../../shared/api/useApi';
 import type { SessionInfo } from '../remote/SessionsView';
-import { clamp, MIN_H, MIN_W, TASKBAR_H, TermWindow } from './windowGeometry';
-import SnapPicker from './SnapPicker';
-import { LOOSEN_PX, SNAP_EDGE, SNAP_KEEP, unmaximized, Zone, zoneAt, zoneRect } from './snapLayouts';
+import { TerminalWin } from './windowGeometry';
+import WindowShell, { ShellHandlers } from './WindowShell';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import AccountDictation from './dictation/AccountDictation';
 import { useVoiceReply } from './dictation/useVoiceReply';
 
-interface FrameProps {
-  win: TermWindow;
-  onUpdate: (id: string, patch: Partial<TermWindow>) => void;
-  onFocus: (id: string) => void;
+interface FrameProps extends ShellHandlers {
+  win: TerminalWin;
   onClose: (id: string) => void;
   onEndSession: (id: string) => void;
 }
@@ -54,122 +51,12 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
     return () => { live = false; };
   }, [sessionId, setSessionName]);
 
-  const [snap, setSnap] = useState<{ over: Zone | null } | null>(null);
-  const beginDrag = (e: React.PointerEvent) => {
-    // Pointer-down on a title-bar button must not start a drag: capturing the
-    // pointer on the bar would swallow the pointerup and the button would
-    // never see a click.
-    // Nor may it while the name is being typed.
-    if ((e.target as HTMLElement).closest('button, input, form')) return;
-    if (e.button > 0) return; // primary button (or touch) only
-    const handle = e.currentTarget as HTMLElement;
-    try { handle.setPointerCapture(e.pointerId); } catch { /* unsupported */ }
-    const startX = e.clientX;
-    const startY = e.clientY;
-    let originX = win.x;
-    let originY = win.y;
-    let width = win.w;
-    // A maximised window comes loose once it is really dragged (not on a mere
-    // click of its bar): back at the size it had, under the pointer at the
-    // same share of its width.
-    let height = win.h;
-    let held = win.maximized ? unmaximized(win, e.clientX) : null;
-    onFocus(win.id);
-    // Dragged to the top of the page, the arrangements come up; let go over
-    // one of their zones and the window takes that place (snapLayouts).
-    let picking = false;
-    const move = (ev: PointerEvent) => {
-      if (held) {
-        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < LOOSEN_PX) return;
-        onUpdate(win.id, { maximized: false, ...held });
-        ({ x: originX, y: originY, w: width, h: height } = held);
-        held = null;
-      }
-      onUpdate(win.id, {
-        x: clamp(originX + ev.clientX - startX, -width + 120, window.innerWidth - 80),
-        y: clamp(originY + ev.clientY - startY, 0, window.innerHeight - 60),
-      });
-      picking = ev.clientY <= (picking ? SNAP_KEEP : SNAP_EDGE);
-      setSnap(picking ? { over: zoneAt(ev.clientX, ev.clientY) } : null);
-    };
-    const up = (ev: Event) => {
-      const zone = picking && ev.type === 'pointerup' ? zoneAt((ev as PointerEvent).clientX, (ev as PointerEvent).clientY) : null;
-      if (zone) {
-        onUpdate(win.id, {
-          ...zoneRect(zone, window.innerWidth, window.innerHeight), maximized: false,
-          restore: { x: originX, y: originY, w: width, h: height },
-        });
-      }
-      picking = false;
-      setSnap(null);
-      handle.removeEventListener('pointermove', move);
-      handle.removeEventListener('pointerup', up);
-      handle.removeEventListener('pointercancel', up);
-      handle.removeEventListener('lostpointercapture', up);
-    };
-    handle.addEventListener('pointermove', move);
-    handle.addEventListener('pointerup', up);
-    handle.addEventListener('pointercancel', up);
-    handle.addEventListener('lostpointercapture', up);
-  };
-
-  const beginResize = (e: React.PointerEvent, edge: 'se' | 'e' | 's') => {
-    e.stopPropagation();
-    const handle = e.currentTarget as HTMLElement;
-    try { handle.setPointerCapture(e.pointerId); } catch { /* unsupported */ }
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const originW = win.w;
-    const originH = win.h;
-    onFocus(win.id);
-    const move = (ev: PointerEvent) => {
-      const patch: Partial<TermWindow> = { maximized: false };
-      if (edge !== 's') patch.w = Math.max(MIN_W, originW + ev.clientX - startX);
-      if (edge !== 'e') patch.h = Math.max(MIN_H, originH + ev.clientY - startY);
-      onUpdate(win.id, patch);
-    };
-    const up = () => {
-      handle.removeEventListener('pointermove', move);
-      handle.removeEventListener('pointerup', up);
-      handle.removeEventListener('pointercancel', up);
-      handle.removeEventListener('lostpointercapture', up);
-    };
-    handle.addEventListener('pointermove', move);
-    handle.addEventListener('pointerup', up);
-    handle.addEventListener('pointercancel', up);
-    handle.addEventListener('lostpointercapture', up);
-  };
-
-  const toggleMaximize = () => {
-    if (win.maximized) {
-      const r = win.restore;
-      onUpdate(win.id, {
-        maximized: false,
-        ...(r ? { x: r.x, y: r.y, w: r.w, h: r.h } : {}),
-      });
-    } else {
-      onUpdate(win.id, {
-        maximized: true,
-        restore: { x: win.x, y: win.y, w: win.w, h: win.h },
-      });
-    }
-  };
-
-  const style: React.CSSProperties = win.maximized
-    ? { left: 0, top: 0, width: '100vw', height: `calc(100vh - ${TASKBAR_H}px)`, zIndex: win.z }
-    : { left: win.x, top: win.y, width: win.w, height: win.h, zIndex: win.z };
-
   return (
-    <div
-      className={`term-window ${win.minimized ? 'term-window-minimized' : ''}`}
-      style={style}
-      onPointerDown={(e) => { if (!(e.target as HTMLElement).closest('.term-window-actions')) onFocus(win.id); }}
-    >
-      <div
-        className="term-window-bar"
-        onPointerDown={beginDrag}
-        onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest('button, input, form')) toggleMaximize(); }}
-      >
+    <WindowShell
+      win={win}
+      onUpdate={onUpdate}
+      onFocus={onFocus}
+      lead={<>
         <span className={`term-window-dot term-window-dot-${status}`} />
         <span className="term-window-title">{win.title}</span>
         {sessionId && (
@@ -177,7 +64,8 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
         )}
         <ClaudeAddress variant="bar" peers={claude} />
         <span className="term-window-sub">{win.subtitle}</span>
-        <span className="term-window-actions">
+      </>}
+      actions={<>
           <AccountDictation variant="bar" sessionId={sessionId || undefined} onText={(text) => viewRef.current?.insertText(text)}
             onKeys={(keys) => viewRef.current?.sendKeys(keys)} reply={reply} />
           <button
@@ -197,8 +85,8 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
             <button title={t('terminal.sessionSettings')} aria-label={t('terminal.sessionSettings')}
               onClick={(e) => { e.stopPropagation(); setShowSettings(true); }}>⚙</button>
           </>)}
-          <button title={t('terminal.minimize')} onClick={(e) => { e.stopPropagation(); onUpdate(win.id, { minimized: true }); }}>─</button>
-          <button title={win.maximized ? t('terminal.restoreSize') : t('terminal.maximize')} onClick={(e) => { e.stopPropagation(); toggleMaximize(); }}>▢</button>
+      </>}
+      closing={<>
           <button
             title={t('terminal.endSessionHint')}
             onClick={async (e) => {
@@ -213,9 +101,16 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
             title={t('terminal.closeWindowHint')}
             onClick={(e) => { e.stopPropagation(); onClose(win.id); }}
           >✕</button>
-        </span>
-      </div>
-      <div className="term-window-body">
+      </>}
+      extras={<>
+      {showSettings && sessionId && (
+        <TerminalSettingsModal sessionId={sessionId} sessionName={sessionName || win.title} onClose={() => setShowSettings(false)} />
+      )}
+      {showShare && sessionId && (
+        <ShareDialog sessionId={sessionId} sessionLabel={sessionName || `${win.title} · ${win.subtitle}`} onClose={() => setShowShare(false)} />
+      )}
+      </>}
+    >
         <TerminalWithFiles target={win.target} name={win.title} place="window"
           onInsert={(text) => viewRef.current?.insertText(text)}>
           <TerminalView
@@ -228,17 +123,6 @@ export default function TerminalWindowFrame({ win, onUpdate, onFocus, onClose, o
             onSessionId={setSessionId}
           />
         </TerminalWithFiles>
-      </div>
-      {showSettings && sessionId && (
-        <TerminalSettingsModal sessionId={sessionId} sessionName={sessionName || win.title} onClose={() => setShowSettings(false)} />
-      )}
-      {showShare && sessionId && (
-        <ShareDialog sessionId={sessionId} sessionLabel={sessionName || `${win.title} · ${win.subtitle}`} onClose={() => setShowShare(false)} />
-      )}
-      {snap && <SnapPicker over={snap.over} />}
-      <div className="term-resize term-resize-e" onPointerDown={(e) => beginResize(e, 'e')} />
-      <div className="term-resize term-resize-s" onPointerDown={(e) => beginResize(e, 's')} />
-      <div className="term-resize term-resize-se" onPointerDown={(e) => beginResize(e, 'se')} />
-    </div>
+    </WindowShell>
   );
 }

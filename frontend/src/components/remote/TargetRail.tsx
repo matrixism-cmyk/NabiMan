@@ -92,7 +92,8 @@ export default function TargetRail({
       const items: RailMenuItem[] = [
         { key: 'open', icon: '▶', label: t('remote.menuConnect'), onSelect: act('open') },
         { key: 'newSession', icon: '＋', label: t('remote.console.newSession'), onSelect: act('newSession') },
-        { key: 'detach', icon: '⧉', label: t('remote.console.detach'), onSelect: act('detach') },
+        { key: 'detach', icon: '⧉', label: t('remote.console.detach'), hint: t('remote.console.detachHint'), onSelect: act('detach') },
+        { key: 'popOut', icon: '⇱', label: t('remote.console.popOut'), hint: t('remote.console.popOutHint'), onSelect: act('popOut') },
       ];
       // Connected here, on screen or kept: it can be hung up without opening it.
       if (consoleKeeper.get(c.name)?.alive()) items.push({ key: 'hangUp', icon: '⏻', label: t('remote.console.hangUp'), onSelect: act('hangUp') });

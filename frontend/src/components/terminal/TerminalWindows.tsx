@@ -2,13 +2,18 @@ import React, {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from 'react';
 import { TerminalTarget } from './TerminalView';
-import StartMenu from './StartMenu';
-import { tileZones, zoneRect } from './snapLayouts';
 import { toggleAllWindows } from './hideAll';
 import { forgetTerminalStorage, pruneTerminalStorage, storedSessionId } from './terminalStorage';
 import TerminalSettingsModal from './TerminalSettingsModal';
 import TerminalWindowFrame from './TerminalWindowFrame';
-import { clamp, DEFAULT_H, DEFAULT_W, MIN_H, MIN_W, TASKBAR_H, TermWindow } from './windowGeometry';
+import TerminalTaskbar from './TerminalTaskbar';
+import { CONSOLE_H, CONSOLE_W, TermWindow, WindowPatch } from './windowGeometry';
+import {
+  cascadeWindows, clampWindows, consoleWindowOf, focusedWindowId, keepListedConsoles, LAYOUT_KEY, loadLayout, placeNew, saveLayout, tileWindows,
+} from './windowStore';
+import ConsoleWindowFrame from '../remote/ConsoleWindowFrame';
+import { onConsolePoppedOut } from '../remote/consoleHandOver';
+import { listConsoles, VmConsole } from '../remote/vncApi';
 import { apiRequest } from '../../shared/api/useApi';
 import { useT } from '../../shared/i18n';
 import { noticeDialog } from '../../shared/ui/ConfirmDialog';
@@ -23,6 +28,10 @@ interface OpenOptions {
 interface Ctx {
   windows: TermWindow[];
   openTerminal: (target: TerminalTarget, options?: OpenOptions) => string;
+  /** Opens a VM console as a window, or raises the window it already has. */
+  openConsole: (c: VmConsole) => string;
+  /** The consoles the account may open have loaded: windows of others go. */
+  syncConsoles: (listed: VmConsole[] | null) => void;
   closeWindow: (id: string) => void;
   endSession: (id: string) => void;
   focusWindow: (id: string) => void;
@@ -33,26 +42,6 @@ interface Ctx {
 
 const TerminalWindowsContext = createContext<Ctx | null>(null);
 
-const LAYOUT_KEY = 'nabiman_term_windows';
-
-function loadLayout(key = LAYOUT_KEY): TermWindow[] {
-  try {
-    const raw = localStorage.getItem(key)
-      || (key === `${LAYOUT_KEY}:admin` ? localStorage.getItem(LAYOUT_KEY) : null);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((w: TermWindow) => w && w.id && w.target);
-  } catch {
-    return [];
-  }
-}
-
-function saveLayout(windows: TermWindow[], key = LAYOUT_KEY) {
-  try { localStorage.setItem(key, JSON.stringify(windows));
-    if (key === `${LAYOUT_KEY}:admin`) localStorage.removeItem(LAYOUT_KEY); } catch { /* storage blocked or full: only what this browser remembers is lost */ }
-}
-
 function describe(target: TerminalTarget): string {
   if (target.kind === 'local') return 'local';
   return `${target.user || 'root'}@${target.host || '?'}:${target.port || 22}`;
@@ -60,12 +49,14 @@ function describe(target: TerminalTarget): string {
 
 
 /**
- * Floating terminal windows.
+ * Floating windows: terminals and VM consoles.
  *
- * Every window owns one tmux-backed session and keeps its own xterm instance
- * alive for as long as it is open (minimising only hides it), so switching
- * tabs, dragging or losing the network never clears a screen. Positions are
- * remembered across reloads and each window re-attaches to its session.
+ * A terminal window owns one tmux-backed session and keeps its own xterm
+ * instance alive for as long as it is open (minimising only hides it), so
+ * switching tabs, dragging or losing the network never clears a screen. A
+ * console window shows a VM console whose connection is the console keeper's;
+ * a console has at most one window. Positions are remembered across reloads
+ * and each window re-attaches to its session.
  */
 export function TerminalWindowsProvider({ children, owner, active = true }: { children: React.ReactNode; owner?: string; active?: boolean }) {
   const { t } = useT();
@@ -81,7 +72,25 @@ export function TerminalWindowsProvider({ children, owner, active = true }: { ch
     if (active && !owner) pruneTerminalStorage(loadLayout(layoutKey).map((w) => w.id));
   }, [active, owner, layoutKey]);
 
-  const update = useCallback((id: string, patch: Partial<TermWindow>) => {
+  // Console windows that came back from storage wait for the list of consoles
+  // the account may open: until it has loaded they do not connect, and only
+  // then are the ones no longer listed dropped (never during the load).
+  const [consolesKnown, setConsolesKnown] = useState(() => !windows.some((w) => w.kind === 'console'));
+  const syncConsoles = useCallback((listed: VmConsole[] | null) => {
+    setWindows((prev) => keepListedConsoles(prev, listed));
+    setConsolesKnown(true);
+  }, []);
+  useEffect(() => {
+    if (consolesKnown) return undefined;
+    let live = true;
+    // Refused (an account that may not open consoles): none stays. Unreachable:
+    // the windows stay, and each says so itself with a way to reconnect.
+    listConsoles().then((r) => { if (live) syncConsoles(r.success ? r.data || [] : null); })
+      .catch(() => { if (live) setConsolesKnown(true); });
+    return () => { live = false; };
+  }, [consolesKnown, syncConsoles]);
+
+  const update = useCallback((id: string, patch: WindowPatch) => {
     setWindows((prev) => prev.map((w) => (w.id === id ? { ...w, ...patch } : w)));
   }, []);
 
@@ -111,27 +120,46 @@ export function TerminalWindowsProvider({ children, owner, active = true }: { ch
     if (options?.joinSessionId) {
       try { localStorage.setItem(`nabiman_term_sid_${id}`, options.joinSessionId); } catch { /* storage blocked or full: only what this browser remembers is lost */ }
     }
-    setWindows((prev) => {
-      const offset = (prev.length % 6) * 28;
-      const maxX = Math.max(0, window.innerWidth - DEFAULT_W - 20);
-      const maxY = Math.max(0, window.innerHeight - DEFAULT_H - TASKBAR_H - 20);
-      const win: TermWindow = {
-        id,
-        title: options?.title || (target.kind === 'local' ? 'Local Shell' : describe(target)),
-        subtitle: describe(target),
-        target,
-        x: clamp(60 + offset, 0, maxX),
-        y: clamp(70 + offset, 0, maxY),
-        w: Math.min(DEFAULT_W, Math.max(MIN_W, window.innerWidth - 40)),
-        h: Math.min(DEFAULT_H, Math.max(MIN_H, window.innerHeight - 120)),
-        z: topZ.current,
-        minimized: false,
-        maximized: false,
-      };
-      return [...prev, win];
-    });
+    setWindows((prev) => [...prev, {
+      id,
+      kind: 'terminal',
+      title: options?.title || (target.kind === 'local' ? 'Local Shell' : describe(target)),
+      subtitle: describe(target),
+      target,
+      ...placeNew(prev.length, window.innerWidth, window.innerHeight),
+      z: topZ.current,
+      minimized: false,
+      maximized: false,
+    }]);
     return id;
   }, [windows, focusWindow, active]);
+
+  const openConsole = useCallback((c: VmConsole): string => {
+    if (!active) return '';
+    // One connection, one place: a console that has a window is raised, not opened twice.
+    const existing = consoleWindowOf(windows, c.name);
+    if (existing) { focusWindow(existing.id); return existing.id; }
+    const id = `cw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+    topZ.current += 1;
+    const protocol = c.protocol === 'rdp' ? 'rdp' : 'vnc';
+    setWindows((prev) => (consoleWindowOf(prev, c.name) ? prev : [...prev, {
+      id,
+      kind: 'console',
+      title: c.label,
+      subtitle: protocol.toUpperCase(),
+      console: { name: c.name, label: c.label, protocol, builtin: Boolean(c.builtin) },
+      ...placeNew(prev.length, window.innerWidth, window.innerHeight, { w: CONSOLE_W, h: CONSOLE_H }),
+      z: topZ.current,
+      minimized: false,
+      maximized: false,
+    }]));
+    return id;
+  }, [windows, focusWindow, active]);
+
+  // "새창으로 분리": the console went to a browser window, so its window here goes.
+  useEffect(() => onConsolePoppedOut((name) => {
+    setWindows((prev) => prev.filter((w) => !(w.kind === 'console' && w.console.name === name)));
+  }), []);
 
   /**
    * Close the window but leave the session running server-side — it stays in
@@ -157,21 +185,7 @@ export function TerminalWindowsProvider({ children, owner, active = true }: { ch
   }, [t]);
 
   /** Lay every open window out in a grid that fills the screen. */
-  const tile = useCallback(() => {
-    setWindows((prev) => {
-      const open = prev.filter((w) => !w.minimized);
-      if (open.length === 0) return prev;
-      // The same places the layout picker drops a window into (snapLayouts).
-      const zones = tileZones(open.length);
-      let i = 0;
-      return prev.map((w) => {
-        if (w.minimized) return w;
-        const place = zoneRect(zones[i], window.innerWidth, window.innerHeight);
-        i += 1;
-        return { ...w, maximized: false, ...place };
-      });
-    });
-  }, []);
+  const tile = useCallback(() => setWindows((prev) => tileWindows(prev, window.innerWidth, window.innerHeight)), []);
 
   /** The windows the bar's "모두 숨기기" took off the page, to bring the same ones back. */
   const hiddenByAll = useRef<string[]>([]);
@@ -179,56 +193,35 @@ export function TerminalWindowsProvider({ children, owner, active = true }: { ch
     setWindows((prev) => { const next = toggleAllWindows(prev, hiddenByAll.current); hiddenByAll.current = next.remembered; return next.windows; });
   }, []);
 
-  const cascade = useCallback(() => {
-    setWindows((prev) => {
-      let i = 0;
-      return prev.map((w) => {
-        if (w.minimized) return w;
-        const offset = i * 32;
-        i += 1;
-        return {
-          ...w, maximized: false,
-          x: 40 + offset, y: 60 + offset,
-          w: Math.min(DEFAULT_W, window.innerWidth - offset - 80),
-          h: Math.min(DEFAULT_H, window.innerHeight - offset - 140),
-        };
-      });
-    });
-  }, []);
+  const cascade = useCallback(() => setWindows((prev) => cascadeWindows(prev, window.innerWidth, window.innerHeight)), []);
 
   // Keep windows reachable when the browser window shrinks.
   useEffect(() => {
-    const onResize = () => {
-      setWindows((prev) => prev.map((w) => ({
-        ...w,
-        x: clamp(w.x, 0, Math.max(0, window.innerWidth - 120)),
-        y: clamp(w.y, 0, Math.max(0, window.innerHeight - 80)),
-      })));
-    };
+    const onResize = () => setWindows((prev) => clampWindows(prev, window.innerWidth, window.innerHeight));
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
   const value = useMemo<Ctx>(() => ({
-    windows, openTerminal, closeWindow, endSession, focusWindow, tile, cascade,
+    windows, openTerminal, openConsole, syncConsoles, closeWindow, endSession, focusWindow, tile, cascade,
     openSettings: () => setShowSettings(true),
-  }), [windows, openTerminal, closeWindow, endSession, focusWindow, tile, cascade]);
+  }), [windows, openTerminal, openConsole, syncConsoles, closeWindow, endSession, focusWindow, tile, cascade]);
+  const focused = focusedWindowId(windows);
 
   return (
     <TerminalWindowsContext.Provider value={value}>
       {children}
-      {active && <TerminalWindowLayer
-        windows={windows}
-        onUpdate={update}
-        onFocus={focusWindow}
-        onClose={closeWindow}
-        onEndSession={endSession}
-        onTile={tile}
-        onCascade={cascade}
-        onOpenSettings={() => setShowSettings(true)}
-        onOpen={openTerminal}
-        onToggleAll={toggleAll}
-      />}
+      {active && (
+        <div className="term-window-layer">
+          {windows.map((win) => (win.kind === 'console'
+            ? <ConsoleWindowFrame key={win.id} win={win} focused={focused === win.id} ready={consolesKnown}
+              onUpdate={update} onFocus={focusWindow} onClose={closeWindow} />
+            : <TerminalWindowFrame key={win.id} win={win} onUpdate={update} onFocus={focusWindow} onClose={closeWindow} onEndSession={endSession} />
+          ))}
+          <TerminalTaskbar windows={windows} onFocus={focusWindow} onTile={tile} onCascade={cascade}
+            onOpenSettings={() => setShowSettings(true)} onOpen={openTerminal} onOpenConsole={openConsole} onToggleAll={toggleAll} />
+        </div>
+      )}
       {active && showSettings && <TerminalSettingsModal onClose={() => setShowSettings(false)} />}
     </TerminalWindowsContext.Provider>
   );
@@ -240,60 +233,4 @@ export function useTerminalWindows(): Ctx {
     throw new Error('useTerminalWindows must be used inside <TerminalWindowsProvider>');
   }
   return ctx;
-}
-
-interface LayerProps {
-  windows: TermWindow[];
-  onUpdate: (id: string, patch: Partial<TermWindow>) => void;
-  onFocus: (id: string) => void;
-  onClose: (id: string) => void;
-  onEndSession: (id: string) => void;
-  onTile: () => void;
-  onCascade: () => void;
-  onOpenSettings: () => void;
-  onOpen: (target: TerminalTarget, options?: OpenOptions) => void;
-  onToggleAll: () => void;
-}
-
-function TerminalWindowLayer({
-  windows, onUpdate, onFocus, onClose, onEndSession, onTile, onCascade, onOpenSettings, onOpen, onToggleAll,
-}: LayerProps) {
-  const { t } = useT();
-  return (
-    <div className="term-window-layer">
-      {windows.map((win) => (
-        <TerminalWindowFrame
-          key={win.id}
-          win={win}
-          onUpdate={onUpdate}
-          onFocus={onFocus}
-          onClose={onClose}
-          onEndSession={onEndSession}
-        />
-      ))}
-      <div className="term-taskbar">
-        <StartMenu windows={windows} open={onOpen} />
-        {windows.map((win) => (
-          <button
-            key={win.id}
-            className={`term-taskbar-item ${win.minimized ? 'minimized' : ''}`}
-            onClick={() => onFocus(win.id)}
-            title={win.subtitle}
-          >
-            {win.minimized ? '▣ ' : '▪ '}{win.title}{win.sessionName ? ` - ${win.sessionName}` : ''}
-          </button>
-        ))}
-        <span className="term-taskbar-spacer" />
-        {/* With no window open the bar is only the start button and the settings. */}
-        {windows.length > 0 && (
-          <button className="term-taskbar-btn" onClick={onToggleAll} aria-pressed={!windows.some((w) => !w.minimized)}>
-            {windows.some((w) => !w.minimized) ? `▁ ${t('terminal.hideAll')}` : `▣ ${t('terminal.showAll')}`}
-          </button>
-        )}
-        {windows.length > 0 && <button className="term-taskbar-btn" onClick={onTile} title={t('terminal.tile')}>⊞ {t('terminal.tile')}</button>}
-        {windows.length > 0 && <button className="term-taskbar-btn" onClick={onCascade} title={t('terminal.cascade')}>⧉ {t('terminal.cascade')}</button>}
-        <button className="term-taskbar-btn" onClick={onOpenSettings} title={t('terminal.settings')}>⚙ {t('common.settings')}</button>
-      </div>
-    </div>
-  );
 }

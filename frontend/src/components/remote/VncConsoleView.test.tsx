@@ -17,11 +17,13 @@ jest.mock('@novnc/novnc/lib/rfb.js', () => {
     background = '';
     disconnected = false;
     blurred = 0;
+    focused = 0;
     target: any;
     url: string;
     constructor(target: any, url: string) { super(); this.target = target; this.url = url; mockRfbs.push(this); }
     disconnect() { this.disconnected = true; }
     blur() { this.blurred += 1; }
+    focus() { this.focused += 1; }
   }
   return { __esModule: true, default: RFB };
 });
@@ -79,4 +81,34 @@ test('a share page owns its connection and closes it with the page', async () =>
   expect(consoleKeeper.size()).toBe(0);
   page.unmount();
   expect(mockRfbs[0].disconnected).toBe(true);
+});
+
+test('in a window, noVNC has the keyboard only while the window is the focused one', async () => {
+  const page = render(view({ windowed: true, focused: false }));
+  await connect();
+  const rfb = mockRfbs[0];
+  // Connected in a window that is not in front: the keyboard is not taken.
+  expect(rfb.focused).toBe(0);
+  expect(rfb.blurred).toBeGreaterThan(0);
+
+  page.rerender(view({ windowed: true, focused: true }));
+  expect(rfb.focused).toBe(1);
+  const blurs = rfb.blurred;
+  // Another window in front, or this one minimised: the canvas lets go (noVNC releases held keys on blur).
+  page.rerender(view({ windowed: true, focused: false }));
+  expect(rfb.blurred).toBe(blurs + 1);
+  expect(rfb.disconnected).toBe(false);
+  // Compact inside a window: neither way out of the pane.
+  expect(screen.queryByRole('button', { name: '분리' })).toBeNull();
+  expect(screen.queryByRole('button', { name: '새창으로 분리' })).toBeNull();
+  expect(screen.queryByText('Ubuntu')).toBeNull();
+});
+
+test('in the workspace a VNC console offers both "분리" and "새창으로 분리"', async () => {
+  const onDetach = jest.fn(); const onPopOut = jest.fn();
+  render(view({ onDetach, onPopOut }));
+  await connect();
+  fireEvent.click(screen.getByRole('button', { name: '분리' }));
+  fireEvent.click(screen.getByRole('button', { name: '새창으로 분리' }));
+  expect([onDetach.mock.calls.length, onPopOut.mock.calls.length]).toEqual([1, 1]);
 });

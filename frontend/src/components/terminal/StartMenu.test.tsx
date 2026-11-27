@@ -35,9 +35,11 @@ beforeEach(() => {
 });
 afterEach(() => { jest.restoreAllMocks(); });
 
-const show = (open = jest.fn()) => {
-  render(<I18nProvider><StartMenu windows={[{ id: 'w1' }]} open={open} /></I18nProvider>);
-  fireEvent.click(screen.getByRole('button', { name: /터미널 1/ }));
+const openConsole = jest.fn();
+const show = (open = jest.fn(), windows: React.ComponentProps<typeof StartMenu>['windows'] = [{ id: 'w1' }]) => {
+  openConsole.mockClear();
+  render(<I18nProvider><StartMenu windows={windows} open={open} openConsole={openConsole} /></I18nProvider>);
+  fireEvent.click(screen.getByRole('button', { name: new RegExp(`창 ${windows.length}`) }));
   return open;
 };
 
@@ -62,7 +64,7 @@ test('a server starts a new session; so does the local shell', async () => {
   await screen.findByText('배포 작업');
   fireEvent.click(screen.getAllByText('web-1')[1]);
   expect(open).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'ssh', serverId: 'srv1' }), { title: 'web-1' });
-  fireEvent.click(screen.getByRole('button', { name: /터미널 1/ }));
+  fireEvent.click(screen.getByRole('button', { name: /창 1/ }));
   const local = await waitFor(() => screen.getAllByText('로컬 셸'));
   fireEvent.click(local[local.length - 1]);
   expect(open).toHaveBeenLastCalledWith({ kind: 'local' }, { title: '로컬 셸' });
@@ -101,18 +103,46 @@ test('lists the VM consoles with how they are reached; the search narrows them t
   expect(screen.getByText('ubuntu-desk')).toBeInTheDocument();
 });
 
-test('a console opens in its own window, the one the rail\'s detach uses', async () => {
+test('a console card opens the console as a window on this page, as the rail\'s 분리 does', async () => {
+  const opened = jest.spyOn(window, 'open');
+  show();
+  fireEvent.click(await screen.findByText('윈도우 11'));
+  expect(openConsole).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'win11', protocol: 'rdp' }));
+  expect(screen.queryByRole('menu')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: /창 1/ }));
+  fireEvent.click(await screen.findByText('ubuntu-desk'));
+  expect(openConsole).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'vm 2' }));
+  // No browser window: that is the card's other button.
+  expect(opened).not.toHaveBeenCalled();
+});
+
+test('the card\'s small button — or Shift+click — is "새창으로 분리": this tab hangs up and a browser window opens', async () => {
+  const close = jest.fn();
+  consoleKeeper.adopt('win11', { close, alive: () => true, watch: () => () => undefined });
   const focus = jest.fn();
   const opened = jest.spyOn(window, 'open').mockReturnValue({ focus } as unknown as Window);
   show();
-  fireEvent.click(await screen.findByText('윈도우 11'));
+  await screen.findByText('윈도우 11');
+  const button = screen.getByRole('menuitem', { name: '윈도우 11 새창으로 분리' });
+  expect(button.title).toContain('다른 모니터');
+  fireEvent.click(button);
+  expect(close).toHaveBeenCalled();
   expect(opened).toHaveBeenLastCalledWith('/remote#rdp/win11', 'con_win11', expect.stringContaining('width=1300'));
   expect(focus).toHaveBeenCalled();
+  expect(openConsole).not.toHaveBeenCalled();
   expect(screen.queryByRole('menu')).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: /터미널 1/ }));
-  fireEvent.click(await screen.findByText('ubuntu-desk'));
+
+  fireEvent.click(screen.getByRole('button', { name: /창 1/ }));
+  fireEvent.click(await screen.findByText('ubuntu-desk'), { shiftKey: true });
   expect(opened).toHaveBeenLastCalledWith('/remote#console/vm%202', 'con_vm 2', expect.any(String));
-  expect(opened).toHaveBeenCalledTimes(2);
+  expect(openConsole).not.toHaveBeenCalled();
+});
+
+test('a console that has a window says so on its card, and the button counts consoles among the windows', async () => {
+  show(jest.fn(), [{ id: 'w1' }, { id: 'c1', kind: 'console', console: { name: 'vm 2' } }]);
+  const card = (await screen.findByText('ubuntu-desk')).closest('button') as HTMLElement;
+  expect(card).toHaveTextContent('창 열림');
+  expect((screen.getByText('윈도우 11').closest('button') as HTMLElement)).not.toHaveTextContent('창 열림');
 });
 
 test('no console section when the account may not list them', async () => {
@@ -122,8 +152,8 @@ test('no console section when the account may not list them', async () => {
   await waitFor(() => expect(mockRequest).toHaveBeenCalledWith('/api/remote/consoles'));
   expect(screen.queryByText(/VM 콘솔/)).toBeNull();
   mockRequest.mockImplementation((path: string) => (path === '/api/remote/consoles' ? Promise.reject(new Error('offline')) : Promise.resolve({ success: true, data: answers[path] })));
-  fireEvent.click(screen.getByRole('button', { name: /터미널 1/ }));
-  fireEvent.click(screen.getByRole('button', { name: /터미널 1/ }));
+  fireEvent.click(screen.getByRole('button', { name: /창 1/ }));
+  fireEvent.click(screen.getByRole('button', { name: /창 1/ }));
   await screen.findByText('배포 작업');
   expect(screen.queryByText(/VM 콘솔/)).toBeNull();
 });

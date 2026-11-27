@@ -7,6 +7,8 @@ export interface RailMenuItem {
   icon?: string;
   danger?: boolean;
   disabled?: boolean;
+  /** A line on what the item does, shown on hover. */
+  hint?: string;
   /** Draw a divider above this item. */
   separated?: boolean;
   /** Leave the menu open once picked: the item reports back in the footer. */
@@ -128,6 +130,7 @@ export default function RailContextMenu({ x, y, title, items, onClose, opener, f
             role="menuitem"
             className={`rw-menu-item ${item.danger ? 'is-danger' : ''}`}
             disabled={item.disabled}
+            title={item.hint}
             onClick={() => { if (!item.keepOpen) onClose(); item.onSelect(); }}
           >
             <span className="rw-menu-icon" aria-hidden="true">{item.icon || ''}</span>

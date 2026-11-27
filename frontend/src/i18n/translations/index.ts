@@ -27,6 +27,7 @@ import sftp from './sftp';
 import remoteProtocols from './remote-protocols';
 import remoteBase from './remote-base';
 import remoteConsoleKeep from './remote-console-keep';
+import consoleWindows from './console-windows';
 import claude from './claude';
 import claudeVoices from './claude-voices';
 import diagnosticsTools from './diagnostics-tools';
@@ -79,6 +80,7 @@ const translations: Translations = {
   ...sessionSettings,
   ...remoteBase,
   ...remoteConsoleKeep,
+  ...consoleWindows,
   ...sftp,
   ...claude,
   ...claudeVoices,

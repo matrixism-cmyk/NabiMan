@@ -4,6 +4,7 @@ import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import ConsoleAccessModal from './ConsoleAccessModal';
 import ConsoleShareModal from './ConsoleShareModal';
 import { deleteConsole, openConsoleWindow, VmConsole } from './vncApi';
+import { useConsoleWindows } from './useConsoleWindows';
 import type { Selection } from './workspaceState';
 import { consoleKeeper } from './consoleKeeper';
 import { consoleSnapshots } from './consoleSnapshots';
@@ -25,10 +26,14 @@ export function useConsoleActions({ select, showWork, selection, refetch, consol
   // A console the account may no longer open is not kept connected either.
   useEffect(() => { if (consoles) consoleKeeper.retain(consoles.map((c) => c.name)); }, [consoles]);
 
+  const place = useConsoleWindows({ selection, select, consoles });
+
   const act = async (c: VmConsole, action: string) => {
     if (action === 'open') { select({ kind: 'console', vm: c.name, label: c.label, builtin: c.builtin }); showWork(); }
     else if (action === 'hangUp') { consoleKeeper.drop(c.name); consoleSnapshots.forget(c.name); }
-    else if (action === 'detach') openConsoleWindow(c);
+    // Into a window on this page; or out to a browser window, which takes the connection over.
+    else if (action === 'detach') place.detach(c);
+    else if (action === 'popOut') place.popOut(c);
     // A new connection opens its own window, so a multi-user VM can hold several.
     else if (action === 'newSession') openConsoleWindow(c, `con_${c.name}_${Date.now()}`);
     else if (action === 'edit') {
@@ -48,6 +53,7 @@ export function useConsoleActions({ select, showWork, selection, refetch, consol
 
   return {
     act,
+    place,
     openAccess: (key: string, label: string) => setAccess({ key, label }),
     openShare: (key: string, label: string) => setShare({ key, label }),
     modals: (

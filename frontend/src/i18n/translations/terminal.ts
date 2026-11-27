@@ -321,7 +321,7 @@ const t: T = {
   'start.none': { ko: '해당하는 세션이 없습니다.', en: 'No matching session.', ja: '該当するセッションはありません。' },
   'start.windowed': { ko: '창 열림', en: 'window open', ja: 'ウィンドウ表示中' },
   'start.consoles': { ko: 'VM 콘솔', en: 'VM consoles', ja: 'VMコンソール' },
-  'start.consoleHint': { ko: '{label} 콘솔을 따로 창으로 엽니다', en: 'Opens the {label} console in a window of its own', ja: '{label} のコンソールを別ウィンドウで開きます' },
+  'start.consoleHint': { ko: '{label} 콘솔을 창으로 엽니다. Shift+클릭하면 브라우저 창을 따로 엽니다', en: 'Opens the {label} console in a window on this page. Shift+click opens a browser window instead', ja: '{label} のコンソールをこのページ内のウィンドウで開きます。Shift+クリックでブラウザの別ウィンドウを開きます' },
   'start.files': { ko: '파일', en: 'Files', ja: 'ファイル' },
   'start.filesHint': { ko: '{name}의 파일을 원격 화면에서 엽니다', en: 'Opens the files of {name} in the remote workspace', ja: '{name} のファイルをリモート画面で開きます' },
   'start.lastSeen': { ko: '마지막으로 본 화면 · {ago}', en: 'Last seen · {ago}', ja: '最後に見た画面 · {ago}' },

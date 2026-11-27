@@ -403,3 +403,19 @@
   margin: 6px 0 0; padding: 10px 12px; border-radius: 6px; line-height: 1.15;
   background: #0f1923; color: #e0e6ed; border: 1px solid var(--border); overflow-x: auto; white-space: pre;
 }
+
+/* ── VM console windows ──────────────────────────────────────────────── */
+/* What tells a console from a terminal, on the bar and in the title: a word, not a colour. */
+.term-kind-tag {
+  flex: 0 0 auto; display: inline-block; margin-right: 5px; padding: 0 5px; border: 1px solid currentColor; border-radius: 4px;
+  font-size: 10px; font-weight: 700; line-height: 15px; letter-spacing: 0.04em; vertical-align: 1px; opacity: 0.85;
+}
+.term-window-bar .term-kind-tag { margin-right: 0; color: var(--text-secondary); }
+.term-window-actions .term-window-popout { font-size: 12px; white-space: nowrap; }
+.term-window-console .term-window-body { position: relative; background: var(--screen-bg); }
+/* The console's own bar, compact: one row that scrolls sideways rather than eating the desktop's height. */
+.term-window-console .rw-console-bar { flex-wrap: nowrap; gap: 6px; padding: 4px 8px; overflow-x: auto; scrollbar-width: thin; background: var(--surface); }
+.term-window-console .rw-console-bar > * { flex: 0 0 auto; }
+.term-window-console .rw-console-bar .rw-console-spacer { flex: 1 0 0; }
+.term-window-console .rw-console-bar .btn-sm { padding: 2px 7px; font-size: 12px; }
+.term-window-console .rw-console-missing { display: flex; }
