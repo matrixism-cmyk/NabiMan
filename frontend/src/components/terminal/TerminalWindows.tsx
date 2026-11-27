@@ -4,6 +4,7 @@ import React, {
 import { TerminalTarget } from './TerminalView';
 import StartMenu from './StartMenu';
 import { tileZones, zoneRect } from './snapLayouts';
+import { toggleAllWindows } from './hideAll';
 import { forgetTerminalStorage, pruneTerminalStorage, storedSessionId } from './terminalStorage';
 import TerminalSettingsModal from './TerminalSettingsModal';
 import TerminalWindowFrame from './TerminalWindowFrame';
@@ -172,6 +173,12 @@ export function TerminalWindowsProvider({ children, owner, active = true }: { ch
     });
   }, []);
 
+  /** The windows the bar's "모두 숨기기" took off the page, to bring the same ones back. */
+  const hiddenByAll = useRef<string[]>([]);
+  const toggleAll = useCallback(() => {
+    setWindows((prev) => { const next = toggleAllWindows(prev, hiddenByAll.current); hiddenByAll.current = next.remembered; return next.windows; });
+  }, []);
+
   const cascade = useCallback(() => {
     setWindows((prev) => {
       let i = 0;
@@ -220,6 +227,7 @@ export function TerminalWindowsProvider({ children, owner, active = true }: { ch
         onCascade={cascade}
         onOpenSettings={() => setShowSettings(true)}
         onOpen={openTerminal}
+        onToggleAll={toggleAll}
       />}
       {active && showSettings && <TerminalSettingsModal onClose={() => setShowSettings(false)} />}
     </TerminalWindowsContext.Provider>
@@ -244,10 +252,11 @@ interface LayerProps {
   onCascade: () => void;
   onOpenSettings: () => void;
   onOpen: (target: TerminalTarget, options?: OpenOptions) => void;
+  onToggleAll: () => void;
 }
 
 function TerminalWindowLayer({
-  windows, onUpdate, onFocus, onClose, onEndSession, onTile, onCascade, onOpenSettings, onOpen,
+  windows, onUpdate, onFocus, onClose, onEndSession, onTile, onCascade, onOpenSettings, onOpen, onToggleAll,
 }: LayerProps) {
   const { t } = useT();
   return (
@@ -276,6 +285,11 @@ function TerminalWindowLayer({
         ))}
         <span className="term-taskbar-spacer" />
         {/* With no window open the bar is only the start button and the settings. */}
+        {windows.length > 0 && (
+          <button className="term-taskbar-btn" onClick={onToggleAll} aria-pressed={!windows.some((w) => !w.minimized)}>
+            {windows.some((w) => !w.minimized) ? `▁ ${t('terminal.hideAll')}` : `▣ ${t('terminal.showAll')}`}
+          </button>
+        )}
         {windows.length > 0 && <button className="term-taskbar-btn" onClick={onTile} title={t('terminal.tile')}>⊞ {t('terminal.tile')}</button>}
         {windows.length > 0 && <button className="term-taskbar-btn" onClick={onCascade} title={t('terminal.cascade')}>⧉ {t('terminal.cascade')}</button>}
         <button className="term-taskbar-btn" onClick={onOpenSettings} title={t('terminal.settings')}>⚙ {t('common.settings')}</button>

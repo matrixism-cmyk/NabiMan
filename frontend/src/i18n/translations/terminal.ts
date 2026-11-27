@@ -168,6 +168,8 @@ const t: T = {
   'terminal.minimize': { ko: '최소화', en: 'Minimise', ja: '最小化' },
   'terminal.maximize': { ko: '최대화', en: 'Maximise', ja: '最大化' },
   'terminal.restoreSize': { ko: '이전 크기', en: 'Restore size', ja: '元のサイズ' },
+  'terminal.hideAll': { ko: '모두 숨기기', en: 'Hide all', ja: 'すべて隠す' },
+  'terminal.showAll': { ko: '모두 보이기', en: 'Show all', ja: 'すべて表示' },
   'terminal.tile': { ko: '정렬', en: 'Tile', ja: '整列' },
   'terminal.cascade': { ko: '계단식', en: 'Cascade', ja: 'カスケード' },
   'terminal.endSessionHint': {
