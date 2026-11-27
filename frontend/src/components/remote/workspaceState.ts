@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+
 /** What the work area is currently about. */
 export type Selection =
   | { kind: 'overview' }
@@ -38,6 +40,29 @@ export function readSelection(): Selection {
 
 export function rememberSelection(selection: Selection) {
   try { localStorage.setItem(SELECTION_KEY, JSON.stringify(selection)); } catch { /* unreadable saved state: start from the default */ }
+}
+
+const SELECT_EVENT = 'nabiman_remote_select';
+
+/**
+ * Shows `selection` in the remote workspace from outside it (the start menu):
+ * an open workspace is told at once; one that is not on screen reads the
+ * remembered selection when the page comes to it.
+ */
+export function openInWorkspace(selection: Selection) {
+  rememberSelection(selection);
+  window.dispatchEvent(new CustomEvent<Selection>(SELECT_EVENT, { detail: selection }));
+  // NabiMan's own menus follow the hash; /remote is the workspace already.
+  if (!/^\/remote\/?$/.test(window.location.pathname) && window.location.hash !== '#remote/remote') window.location.hash = '#remote/remote';
+}
+
+/** The workspace's side of `openInWorkspace`. */
+export function useSelectionRequests(select: (next: Selection) => void, showWork: () => void) {
+  useEffect(() => {
+    const asked = (e: Event) => { select((e as CustomEvent<Selection>).detail); showWork(); };
+    window.addEventListener(SELECT_EVENT, asked);
+    return () => window.removeEventListener(SELECT_EVENT, asked);
+  }, [select, showWork]);
 }
 
 /** What the work area had open, so a reload puts the operator back in it. */

@@ -3,12 +3,12 @@ import { useT } from '../../shared/i18n';
 import { confirmDialog } from '../../shared/ui/ConfirmDialog';
 import ConsoleAccessModal from './ConsoleAccessModal';
 import ConsoleShareModal from './ConsoleShareModal';
-import { deleteConsole, VmConsole } from './vncApi';
+import { deleteConsole, openConsoleWindow, VmConsole } from './vncApi';
 import type { Selection } from './workspaceState';
 import { consoleKeeper } from './consoleKeeper';
+import { consoleSnapshots } from './consoleSnapshots';
 
 type Named = { key: string; label: string };
-const POPUP = 'width=1300,height=900,menubar=no,toolbar=no,location=no';
 
 /** What a VM console's right-click menu does, and the access/share dialogs it opens. */
 export function useConsoleActions({ select, showWork, selection, refetch, consoles }: {
@@ -24,14 +24,13 @@ export function useConsoleActions({ select, showWork, selection, refetch, consol
   const [share, setShare] = useState<Named | null>(null);
   // A console the account may no longer open is not kept connected either.
   useEffect(() => { if (consoles) consoleKeeper.retain(consoles.map((c) => c.name)); }, [consoles]);
-  const page = (c: VmConsole) => `/remote#${c.protocol === 'rdp' ? 'rdp' : 'console'}/${encodeURIComponent(c.name)}`;
 
   const act = async (c: VmConsole, action: string) => {
     if (action === 'open') { select({ kind: 'console', vm: c.name, label: c.label, builtin: c.builtin }); showWork(); }
-    else if (action === 'hangUp') consoleKeeper.drop(c.name);
-    else if (action === 'detach') window.open(page(c), `con_${c.name}`, POPUP);
+    else if (action === 'hangUp') { consoleKeeper.drop(c.name); consoleSnapshots.forget(c.name); }
+    else if (action === 'detach') openConsoleWindow(c);
     // A new connection opens its own window, so a multi-user VM can hold several.
-    else if (action === 'newSession') window.open(page(c), `con_${c.name}_${Date.now()}`, POPUP);
+    else if (action === 'newSession') openConsoleWindow(c, `con_${c.name}_${Date.now()}`);
     else if (action === 'edit') {
       select({ kind: 'console-form', edit: { id: c.name, label: c.label, host: c.host || '', port: c.port || (c.protocol === 'rdp' ? 3389 : 5900),
         protocol: c.protocol || 'vnc', user: c.user || '', builtin: Boolean(c.builtin) } });
@@ -41,6 +40,7 @@ export function useConsoleActions({ select, showWork, selection, refetch, consol
       if (!(await confirmDialog({ message: t('remote.console.deleteConfirm', { label: c.label }), danger: true, confirmLabel: t('common.delete') }))) return;
       await deleteConsole(c.name);
       consoleKeeper.drop(c.name);
+      consoleSnapshots.forget(c.name);
       await refetch();
       if (selection.kind === 'console' && selection.vm === c.name) select({ kind: 'overview' });
     }

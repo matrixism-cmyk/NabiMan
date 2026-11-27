@@ -6,6 +6,7 @@ import VncConsoleForm from './VncConsoleForm';
 import { deleteConsole, VmConsole } from './vncApi';
 import { Selection } from './workspaceState';
 import { consoleKeeper } from './consoleKeeper';
+import { consoleSnapshots } from './consoleSnapshots';
 import { ErrorBoundary } from '../../shared/ui/ErrorBoundary';
 
 /** The VM-console work area: a live console (with edit/delete for admins on a
@@ -30,7 +31,7 @@ export default function ConsoleArea({ selection, consoles, canManage, onSelect, 
       : undefined;
     const del = async () => {
       if (!(await confirmDialog({ message: t('remote.console.deleteConfirm', { label }), danger: true, confirmLabel: t('common.delete') }))) return;
-      await deleteConsole(vm); consoleKeeper.drop(vm); await onChanged(); onSelect({ kind: 'overview' });
+      await deleteConsole(vm); consoleKeeper.drop(vm); consoleSnapshots.forget(vm); await onChanged(); onSelect({ kind: 'overview' });
     };
     const common = { label, canEdit: canMng, onEdit: edit, onDelete: del, canGrant: canManage, onGrant: () => onAccess(vm, label), canShare: true, onShare: () => onShare(vm, label) };
     return <ErrorBoundary region="console" resetKey={vm}><ConsoleSuspense>{rec?.protocol === 'rdp'
@@ -41,7 +42,7 @@ export default function ConsoleArea({ selection, consoles, canManage, onSelect, 
     const edit = selection.edit;
     return (
       <VncConsoleForm edit={edit}
-        onSaved={async (c) => { consoleKeeper.drop(c.name); await onChanged(); onSelect({ kind: 'console', vm: c.name, label: c.label, builtin: false }); }}
+        onSaved={async (c) => { consoleKeeper.drop(c.name); consoleSnapshots.forget(c.name); await onChanged(); onSelect({ kind: 'console', vm: c.name, label: c.label, builtin: false }); }}
         onCancel={() => onSelect(edit ? { kind: 'console', vm: edit.id, label: edit.label, builtin: false } : { kind: 'overview' })} />
     );
   }

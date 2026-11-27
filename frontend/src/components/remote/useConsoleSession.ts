@@ -1,6 +1,7 @@
 import { useMemo, useSyncExternalStore } from 'react';
 import { consoleKeeper } from './consoleKeeper';
 import type { ConsoleSession } from './consoleSession';
+import { consoleSnapshots } from './consoleSnapshots';
 
 /**
  * The connection behind a console view. In the workspace (`kept`) it is the
@@ -26,6 +27,10 @@ export function useConsoleSession<S extends ConsoleSession>(
     /** Connect again, as the user asked. */
     reconnect() { if (kept) consoleKeeper.adopt(key, session); session.reconnect(); },
     /** Disconnect, as the user asked. */
-    hangUp() { if (kept && consoleKeeper.get(key) === session) consoleKeeper.drop(key); else session.close(); },
+    hangUp() {
+      if (kept && consoleKeeper.get(key) === session) consoleKeeper.drop(key); else session.close();
+      // Hung up on purpose: its picture goes too.
+      if (kept) consoleSnapshots.forget(key);
+    },
   }), [session, key, kept]);
 }

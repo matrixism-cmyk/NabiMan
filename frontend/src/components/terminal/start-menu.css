@@ -6,14 +6,18 @@
 }
 .term-start-btn:hover, .term-start-btn.is-open { border-color: var(--primary); background: var(--accent-soft); }
 .term-start-menu {
-  position: fixed; left: 8px; bottom: 50px; z-index: 2147481500; width: min(680px, calc(100vw - 16px)); max-height: min(560px, calc(100dvh - 70px));
+  position: fixed; left: 8px; bottom: 50px; z-index: 2147481500; width: min(1100px, calc(100vw - 16px)); max-height: min(640px, calc(100dvh - 70px));
   display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 10px;
   background: var(--surface); border: 1px solid var(--border); box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55);
 }
-.term-start-search { width: 100%; min-height: 34px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 13px; }
-.term-start-lists { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-height: 0; overflow: hidden; }
-.term-start-lists section { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow-y: auto; }
-.term-start-lists h4 { margin: 0 0 4px; font-size: 11px; font-weight: 650; letter-spacing: .04em; color: var(--text-secondary); position: sticky; top: 0; background: var(--surface); padding: 2px 0; }
+.term-start-menu.no-consoles { width: min(860px, calc(100vw - 16px)); }
+.term-start-search { flex: 0 0 auto; width: 100%; min-height: 34px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 13px; }
+/* Three areas side by side: the sessions get what the other two leave. */
+.term-start-areas { display: grid; grid-template-columns: minmax(0, 1fr) 312px 236px; gap: 14px; min-height: 0; overflow: hidden; }
+.no-consoles .term-start-areas { grid-template-columns: minmax(0, 1fr) 250px; }
+.term-start-areas section { display: flex; flex-direction: column; gap: 2px; min-width: 0; min-height: 0; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; }
+.term-start-areas h4 { margin: 0; font-size: 11px; font-weight: 650; letter-spacing: .04em; color: var(--text-secondary); position: sticky; top: 0; z-index: 1; background: var(--surface); padding: 2px 0 6px; flex: 0 0 auto; }
+.term-start-areas .term-start-item + h4 { margin-top: 10px; }
 .term-start-note { margin: 4px 2px; font-size: 12px; color: var(--text-secondary); }
 .term-start-item {
   display: flex; align-items: center; gap: 7px; width: 100%; min-height: 30px; padding: 4px 8px; border: 0; border-radius: 6px; cursor: pointer;
@@ -22,13 +26,68 @@
 .term-start-item:hover, .term-start-item:focus-visible { background: var(--accent-soft); outline: none; }
 .term-start-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
 .term-start-sub { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; color: var(--text-secondary); }
-.term-start-tag { flex: 0 0 auto; margin-left: auto; font-size: 10px; padding: 1px 6px; border-radius: 999px; background: var(--info-soft); color: var(--info-strong); }
+.term-start-tag { flex: 0 0 auto; margin-left: auto; font-size: 10px; padding: 1px 6px; border-radius: 999px; background: var(--info-soft); color: var(--info-strong); white-space: nowrap; }
 .term-start-tag + .term-start-tag { margin-left: 0; }
 .term-start-tag.is-open { background: var(--success-soft); color: var(--success-strong); }
 .term-start-dot { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
 .term-start-dot.is-busy { background: var(--warning); box-shadow: 0 0 0 3px var(--warning-soft); }
 .term-start-plus { flex: 0 0 auto; width: 14px; color: var(--text-secondary); font-size: 12px; text-align: center; }
-@media (max-width: 640px) { .term-start-lists { grid-template-columns: 1fr; overflow-y: auto; } .term-start-lists section { overflow: visible; } }
+.term-start-lamp { flex: 0 0 auto; margin-left: auto; width: 7px; height: 7px; border-radius: 50%; }
+.term-start-lamp.is-up { background: var(--success); }
+.term-start-lamp.is-down { background: var(--danger); }
+.term-start-lamp.is-partial { background: var(--warning); }
+
+/* Sessions and consoles are cards: a small picture of the screen over the name. */
+.term-start-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; padding-bottom: 2px; }
+.term-start-consoles .term-start-grid { grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); }
+.term-start-card {
+  display: flex; flex-direction: column; gap: 5px; min-width: 0; padding: 6px; border-radius: 8px; cursor: pointer;
+  background: var(--bg); border: 1px solid var(--border); color: var(--text); font-size: 12px; text-align: left;
+}
+.term-start-card:hover, .term-start-card:focus-visible { border-color: var(--primary); background: var(--accent-soft); outline: none; }
+.term-start-card:focus-visible { box-shadow: 0 0 0 2px var(--accent-soft); }
+.term-start-line { display: flex; align-items: center; gap: 5px; min-width: 0; min-height: 16px; }
+.term-start-card .term-start-name { font-weight: 600; }
+/* The same dark screen as a session tile in the remote workspace, whatever the theme. */
+.term-start-screen, .term-start-shot {
+  display: block; box-sizing: border-box; width: 100%; margin: 0; overflow: hidden; border-radius: 5px;
+  background: #0b1114; color: #9fb0b6; border: 1px solid var(--border);
+}
+.term-start-screen {
+  height: 84px; padding: 4px 5px; white-space: pre;
+  font-family: 'Fira Code', 'JetBrains Mono', ui-monospace, monospace; font-size: 8px; line-height: 9.2px;
+}
+.term-start-screen.is-empty, .term-start-shot {
+  display: flex; align-items: center; justify-content: center; padding: 0;
+  font-family: inherit; font-size: 11px; font-weight: 650; letter-spacing: .08em; color: #5f7178;
+}
+.term-start-shot { position: relative; aspect-ratio: 16 / 10; }
+.term-start-shot .term-start-tag { position: absolute; top: 4px; right: 4px; letter-spacing: 0; font-weight: 500; }
+/* Consoles are often named alike ("Windows 11", "Windows 11 (2)"): the whole name, on two lines if need be. */
+.term-start-consoles .term-start-name { white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.25; }
+.term-start-shot img { width: 100%; height: 100%; object-fit: contain; }
+.term-start-shot.is-stale img { opacity: .45; filter: grayscale(.7); }
+
+/* Not wide enough for three: consoles and new sessions share the second column. */
+@media (max-width: 1000px) {
+  .term-start-areas { grid-template-columns: minmax(0, 1fr) 250px; grid-template-rows: auto minmax(0, 1fr); }
+  .term-start-running { grid-row: 1 / span 2; }
+  .term-start-consoles { max-height: 46vh; }
+  .term-start-consoles .term-start-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+  .no-consoles .term-start-areas { grid-template-rows: minmax(0, 1fr); }
+}
+/* A phone: one column, the whole menu scrolling, smaller pictures. */
+@media (max-width: 640px) {
+  .term-start-areas, .no-consoles .term-start-areas { display: flex; flex-direction: column; overflow-y: auto; }
+  .term-start-areas section { overflow: visible; flex: 0 0 auto; padding-right: 0; }
+  .term-start-consoles { max-height: none; }
+  .term-start-grid, .term-start-consoles .term-start-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
+  .term-start-consoles .term-start-shot { aspect-ratio: 16 / 9; }
+  .term-start-card { padding: 5px; gap: 4px; }
+  .term-start-screen { height: 66px; font-size: 6.5px; line-height: 7.2px; padding: 3px 4px; }
+  .term-start-screen.is-empty { font-size: 10px; }
+  .term-start-item { min-height: 36px; }
+}
 
 /* Dragging a window to the top: the arrangements to drop it into. */
 .term-snap-picker {

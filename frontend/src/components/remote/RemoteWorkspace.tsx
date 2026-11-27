@@ -39,7 +39,7 @@ import ProtocolBadges from './ProtocolBadges';
 import { addressOf, hasFiles, hasTerminal } from './protocols';
 import { useTargetActions } from './useTargetActions';
 import {
-  OverviewView, readPaneState, readSelection, rememberPaneState, rememberSelection, Selection, ServerView,
+  OverviewView, readPaneState, readSelection, rememberPaneState, rememberSelection, Selection, ServerView, useSelectionRequests,
   sessionLabel,
 } from './workspaceState';
 import { useMember } from './member';
@@ -121,6 +121,7 @@ export default function RemoteWorkspace() {
     setManualPassword(false);
     setJoinSessionId(undefined);
   }, []);
+  useSelectionRequests(select, showWork);
   const label = selection.kind === 'local' ? 'local'
     : selection.kind === 'server' && selectedServer ? sessionLabel(selectedServer)
     : selection.kind === 'adhoc' && adhocTarget ? `${adhocTarget.proto}:${adhocTarget.user}@${adhocTarget.host}:${adhocTarget.port}`

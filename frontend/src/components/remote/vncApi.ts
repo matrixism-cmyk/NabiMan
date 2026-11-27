@@ -16,6 +16,17 @@ export interface VmConsole {
 /** The internal VM consoles the account may open (admins/operators). */
 export const listConsoles = () => apiRequest<VmConsole[]>('/api/remote/consoles');
 
+const POPUP = 'width=1300,height=900,menubar=no,toolbar=no,location=no';
+
+/** The page that shows one console full-window (see ConsolePopout). */
+export const consolePage = (c: Pick<VmConsole, 'name' | 'protocol'>) =>
+  `/remote#${c.protocol === 'rdp' ? 'rdp' : 'console'}/${encodeURIComponent(c.name)}`;
+
+/** Opens a console in a browser window of its own. Under its usual name the
+ *  same window is used again, so asking twice does not connect twice. */
+export const openConsoleWindow = (c: Pick<VmConsole, 'name' | 'protocol'>, name = `con_${c.name}`) =>
+  window.open(consolePage(c), name, POPUP);
+
 export const createConsole = (body: { label: string; host: string; port: number; protocol: string; user?: string; password?: string }) =>
   apiPost<VmConsole>('/api/remote/consoles', body);
 
